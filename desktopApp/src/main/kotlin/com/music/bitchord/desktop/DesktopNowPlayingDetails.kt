@@ -92,9 +92,11 @@ internal fun DesktopNowPlayingDetailsPanel(
     var spotifyCanvas by remember(song.videoId, song.title, song.artist) {
         mutableStateOf<DesktopCanvasArtwork?>(null)
     }
-    LaunchedEffect(song.videoId, song.title, song.artist, song.albumName, animatedCanvas, isPlaying) {
+    LaunchedEffect(song.videoId, song.title, song.artist, song.albumName, animatedCanvas) {
         spotifyCanvas = null
-        if (animatedCanvas && isPlaying && DesktopSpotifyToken.cookie().isNotBlank()) {
+        // Pausing must freeze the decoded Canvas frame, not discard the clip and
+        // trigger another authenticated Spotify lookup when playback resumes.
+        if (animatedCanvas && DesktopSpotifyToken.cookie().isNotBlank()) {
             spotifyCanvas = DesktopCanvasClient.lookupSpotify(song)
         }
     }
