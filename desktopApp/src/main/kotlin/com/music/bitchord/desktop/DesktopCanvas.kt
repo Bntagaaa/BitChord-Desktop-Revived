@@ -148,7 +148,9 @@ object DesktopCanvasClient {
         val album = song.albumName
         // The main player may have already resolved a Spotify clip for this track.
         cached(song)?.takeIf {
-            it.source == DesktopCanvasSource.SPOTIFY && it.matches(title, artist, album)
+            // Spotify can index this recording under a different release name from
+            // YouTube Music. The exact track and credited artist are the identity.
+            it.source == DesktopCanvasSource.SPOTIFY && it.matches(title, artist, null)
         }?.let { return it }
         // Only cache successful Spotify results. Authentication and Canvas endpoints are
         // external, so a timeout/401/temporary miss must not poison the next retry.
@@ -160,7 +162,7 @@ object DesktopCanvasClient {
                     .onFailure { DesktopTrackLog.log("canvas: Spotify lookup failed (${it.message})") }
                     .getOrNull()
             }?.takeIf {
-                it.source == DesktopCanvasSource.SPOTIFY && it.matches(title, artist, album)
+                it.source == DesktopCanvasSource.SPOTIFY && it.matches(title, artist, null)
             }
             if (found != null) synchronized(cache) { cache[key] = Entry(found, album != null) }
             found
