@@ -43,7 +43,7 @@ import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 
 /** What the column beside the page is showing. */
-internal enum class DesktopSidePanel { LYRICS, QUEUE }
+internal enum class DesktopSidePanel { LYRICS, QUEUE, DETAILS }
 
 /**
  * Apple Music's right-hand sidebar: the lyrics or the queue in a column beside the page, while the
@@ -62,7 +62,7 @@ internal fun DesktopSidePanelColumn(
     val haze = LocalDesktopHaze.current
     val glassActive = blurBackground && haze != null &&
         DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.SIDE_PANELS)
-    // Lyrics and Queue share the same material even while crossfading.
+    // Lyrics, Queue and Details share the same material even while crossfading.
     val panelFill = DesktopTheme.palette.lyricsSurface
     AnimatedVisibility(
         visible = panel != null,
@@ -97,14 +97,21 @@ internal fun DesktopSidePanelColumn(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(if (which == DesktopSidePanel.LYRICS) HEADER_HEIGHT else QUEUE_HEADER_HEIGHT)
+                                    .height(when (which) {
+                                        DesktopSidePanel.LYRICS, DesktopSidePanel.DETAILS -> HEADER_HEIGHT
+                                        DesktopSidePanel.QUEUE -> QUEUE_HEADER_HEIGHT
+                                    })
                                     .padding(start = 18.dp, end = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 // The queue heads itself ("Queue", then its sections); only the lyrics
                                 // need a name over them.
                                 Text(
-                                    text = if (which == DesktopSidePanel.LYRICS) DesktopStrings["lyrics", "Lyrics"] else "",
+                                    text = when (which) {
+                                        DesktopSidePanel.LYRICS -> DesktopStrings["lyrics", "Lyrics"]
+                                        DesktopSidePanel.DETAILS -> "Now playing"
+                                        DesktopSidePanel.QUEUE -> ""
+                                    },
                                     color = DesktopForeground,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -124,9 +131,17 @@ internal fun DesktopSidePanelColumn(
                                     .fillMaxWidth()
                                     .weight(1f)
                                     .padding(
-                                        start = if (which == DesktopSidePanel.LYRICS) 18.dp else 14.dp,
-                                        end = if (which == DesktopSidePanel.LYRICS) 18.dp else 4.dp,
-                                        bottom = 14.dp,
+                                        start = when (which) {
+                                            DesktopSidePanel.LYRICS -> 18.dp
+                                            DesktopSidePanel.DETAILS -> 0.dp
+                                            DesktopSidePanel.QUEUE -> 14.dp
+                                        },
+                                        end = when (which) {
+                                            DesktopSidePanel.LYRICS -> 18.dp
+                                            DesktopSidePanel.DETAILS -> 0.dp
+                                            DesktopSidePanel.QUEUE -> 4.dp
+                                        },
+                                        bottom = if (which == DesktopSidePanel.DETAILS) 0.dp else 14.dp,
                                     ),
                             ) {
                                 if (which == DesktopSidePanel.LYRICS && DesktopTheme.isLight) {

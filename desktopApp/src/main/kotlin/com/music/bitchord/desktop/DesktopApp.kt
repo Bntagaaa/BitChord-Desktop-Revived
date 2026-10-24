@@ -146,6 +146,7 @@ import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -3535,6 +3536,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                                 releaseShortcutTextFocus()
                                 overlays.toggleSidePanel(DesktopSidePanel.QUEUE)
                             },
+                            onOpenDetails = {
+                                releaseShortcutTextFocus()
+                                overlays.toggleSidePanel(DesktopSidePanel.DETAILS)
+                            },
                             sidePanel = overlays.sidePanel,
                         )
                     }
@@ -3580,6 +3585,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             releaseShortcutTextFocus()
                             overlays.toggleSidePanel(DesktopSidePanel.QUEUE)
                         },
+                        onOpenDetails = {
+                            releaseShortcutTextFocus()
+                            overlays.toggleSidePanel(DesktopSidePanel.DETAILS)
+                        },
                     )
                 },
                 trailing = {
@@ -3592,7 +3601,11 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                         if (current == null) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(
-                                    if (which == DesktopSidePanel.LYRICS) "Play a song to see its lyrics here." else "Nothing in Up Next",
+                                    when (which) {
+                                        DesktopSidePanel.LYRICS -> "Play a song to see its lyrics here."
+                                        DesktopSidePanel.QUEUE -> "Nothing in Up Next"
+                                        DesktopSidePanel.DETAILS -> "Play a song to see its details here."
+                                    },
                                     color = DesktopSecondary,
                                 )
                             }
@@ -3619,6 +3632,30 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                                 onRemove = ::removeFromQueue,
                                 onMove = ::moveInQueue,
                                 onClear = ::clearQueue,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            DesktopSidePanel.DETAILS -> DesktopNowPlayingDetailsPanel(
+                                song = current,
+                                isPlaying = playback.isPlaying,
+                                lyrics = sharedLyrics,
+                                lyricsLoading = lyricsLoading,
+                                position = playerPosition,
+                                queue = liveQueue.songs,
+                                queueIndex = liveQueue.index,
+                                onShowLyrics = { overlays.sidePanel = DesktopSidePanel.LYRICS },
+                                onShowQueue = { overlays.sidePanel = DesktopSidePanel.QUEUE },
+                                onPlayQueueIndex = ::playQueueIndex,
+                                onOpenArtist = { id, name ->
+                                    overlays.sidePanel = null
+                                    if (id != null) {
+                                        openArtist(id, name)
+                                    } else {
+                                        scope.launch {
+                                            YtMusicRepository.findArtistPageId(name).getOrNull()
+                                                ?.let { found -> openArtist(found, name) }
+                                        }
+                                    }
+                                },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -4763,7 +4800,8 @@ private fun DesktopTopBar(
     onOpenAudioOutput: () -> Unit,
     onOpenLyrics: () -> Unit,
     onOpenQueue: () -> Unit,
-    /** Which of the two the column beside the page is showing, lit on its button. */
+    onOpenDetails: () -> Unit,
+    /** Which panel the column beside the page is showing, lit on its button. */
     sidePanel: DesktopSidePanel?,
 ) {
     // The same beat clock the player's scrubber runs, so this line and the player breathe
@@ -5080,6 +5118,14 @@ private fun DesktopTopBar(
                             painterResource(Res.drawable.player_transport_up_next),
                             DesktopStrings["queue", "Queue"],
                             tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopForeground else DesktopSecondary,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
+                    DesktopToolbarButton(onClick = onOpenDetails, size = 32.dp) {
+                        Icon(
+                            Icons.Rounded.Info,
+                            "Now playing details",
+                            tint = if (sidePanel == DesktopSidePanel.DETAILS) DesktopForeground else DesktopSecondary,
                             modifier = Modifier.size(19.dp),
                         )
                     }
@@ -5405,6 +5451,7 @@ private fun DesktopBottomChrome(
     onOpenAudioOutput: () -> Unit,
     onOpenLyrics: () -> Unit,
     onOpenQueue: () -> Unit,
+    onOpenDetails: () -> Unit,
 ) {
     Column(
         Modifier
@@ -5434,6 +5481,7 @@ private fun DesktopBottomChrome(
                 onOpenAudioOutput = onOpenAudioOutput,
                 onOpenLyrics = onOpenLyrics,
                 onOpenQueue = onOpenQueue,
+                onOpenDetails = onOpenDetails,
             )
         }
         if (compact) DesktopFloatingNavigation(destination, settingsOpen, onDestinationSelected)
@@ -5518,6 +5566,7 @@ private fun DesktopMiniPlayer(
     onOpenAudioOutput: () -> Unit,
     onOpenLyrics: () -> Unit,
     onOpenQueue: () -> Unit,
+    onOpenDetails: () -> Unit,
 ) {
     val shape = RoundedCornerShape(16.dp)
     val dockSurface = if (DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.FLOATING_PLAYER)) {
@@ -5593,6 +5642,9 @@ private fun DesktopMiniPlayer(
                     }
                     DesktopToolbarButton(onClick = onOpenQueue, size = 32.dp) {
                         Icon(painterResource(Res.drawable.player_transport_up_next), "Queue", tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
+                    }
+                    DesktopToolbarButton(onClick = onOpenDetails, size = 32.dp) {
+                        Icon(Icons.Rounded.Info, "Now playing details", tint = if (sidePanel == DesktopSidePanel.DETAILS) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
                     }
                     DesktopToolbarButton(onClick = onOpenAudioOutput, size = 32.dp) {
                         Icon(Icons.Rounded.Headphones, DesktopStrings["audio_output", "Audio output"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))

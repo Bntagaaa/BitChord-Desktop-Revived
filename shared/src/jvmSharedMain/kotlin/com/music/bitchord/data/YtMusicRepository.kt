@@ -970,6 +970,14 @@ object YtMusicRepository {
         call("playlist:delete") { Innertube.deletePlaylist(playlistId) }
 
     /**
+     * Lightweight artist header for Now Playing Details. Unlike [artistPage], this
+     * deliberately skips fetching all of the artist's releases and top songs.
+     */
+    suspend fun artistOverview(browseId: String): Result<ArtistPage> = call("artistOverview:$browseId") {
+        InnertubeParser.parseArtistPage(Innertube.browse(browseId))
+    }
+
+    /**
      * Artist page. The landing page only lists ~5 songs, so the linked
      * "Top songs" playlist is fetched to fill the list out, and any linked
      * full release shelves (Albums, Singles & EPs) are fetched to populate
