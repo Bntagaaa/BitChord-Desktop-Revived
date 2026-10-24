@@ -91,25 +91,33 @@ internal object DesktopSpotifyCanvas {
     }
 
     private fun searchTrack(title: String, artist: String, album: String?, token: String): TrackHit? {
-        val query = listOfNotNull(title, artist, album).joinToString(" ")
-        val items = get(url(SEARCH_URL, listOf("q" to query, "type" to "track", "limit" to "10")), token)
-            ?.get("tracks")?.jsonObject?.get("items")?.jsonArray
-            ?: return null
-        for (item in items) {
-            val track = item as? JsonObject ?: continue
-            val trackTitle = track.text("name") ?: continue
-            val artists = track["artists"]?.jsonArray
-                ?.mapNotNull { it.jsonObject.text("name") }
-                .orEmpty()
-            if (!canvasMatches(trackTitle, artists, title, artist)) continue
-            val uri = track.text("uri") ?: continue
-            return TrackHit(
-                uri = uri,
-                title = trackTitle,
-                artist = artists.joinToString(", ").ifBlank { artist },
-                album = track["album"]?.jsonObject?.text("name"),
-            )
+        // YouTube Music sometimes uses a release title that Spotify indexes differently.
+        // First try the more specific query, then retry by track + artist without album.
+        val queries = listOfNotNull(
+            album?.takeIf { it.isNotBlank() }?.let { "$title $artist $it" },
+            "$title $artist",
+        ).distinct()
+        for (query in queries) {
+            val items = get(url(SEARCH_URL, listOf("q" to query, "type" to "track", "limit" to "20")), token)
+                ?.get("tracks")?.jsonObject?.get("items")?.jsonArray
+                ?: continue
+            for (item in items) {
+                val track = item as? JsonObject ?: continue
+                val trackTitle = track.text("name") ?: continue
+                val artists = track["artists"]?.jsonArray
+                    ?.mapNotNull { it.jsonObject.text("name") }
+                    .orEmpty()
+                if (!canvasMatches(trackTitle, artists, title, artist)) continue
+                val uri = track.text("uri") ?: continue
+                return TrackHit(
+                    uri = uri,
+                    title = trackTitle,
+                    artist = artists.joinToString(", ").ifBlank { artist },
+                    album = track["album"]?.jsonObject?.text("name"),
+                )
+            }
         }
+        DesktopTrackLog.log("canvas: no exact Spotify track match for $title — $artist")
         return null
     }
 
