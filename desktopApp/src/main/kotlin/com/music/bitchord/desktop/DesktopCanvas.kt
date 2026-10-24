@@ -150,10 +150,20 @@ object DesktopCanvasClient {
         cached(song)?.takeIf {
             it.source == DesktopCanvasSource.SPOTIFY && it.matches(title, artist, album)
         }?.let { return it }
-        return resolve("spotify|song|${song.videoId}|${title}|${artist}", album != null) {
-            firstHit({ DesktopSpotifyCanvas.search(title, artist, album) }) {
+        // Only cache successful Spotify results. Authentication and Canvas endpoints are
+        // external, so a timeout/401/temporary miss must not poison the next retry.
+        val key = "spotify|song|${song.videoId}|${title}|${artist}"
+        return gate.withLock {
+            synchronized(cache) { cache[key]?.artwork }?.let { return@withLock it }
+            val found = withContext(Dispatchers.IO) {
+                runCatching { DesktopSpotifyCanvas.search(title, artist, album) }
+                    .onFailure { DesktopTrackLog.log("canvas: Spotify lookup failed (${it.message})") }
+                    .getOrNull()
+            }?.takeIf {
                 it.source == DesktopCanvasSource.SPOTIFY && it.matches(title, artist, album)
             }
+            if (found != null) synchronized(cache) { cache[key] = Entry(found, album != null) }
+            found
         }
     }
 
