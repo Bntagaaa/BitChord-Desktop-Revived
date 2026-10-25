@@ -6255,13 +6255,14 @@ private fun DesktopArtistHeroAction(
     contentDescription: String,
     onClick: () -> Unit,
 ) {
+    // Keep the shape explicit at every layer. Compose Desktop's elevated shadow
+    // was making these small translucent circles look faceted against bright art.
     Box(
         Modifier
             .size(48.dp)
-            .shadow(4.dp, CircleShape)
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.30f))
+            .background(Color.Black.copy(alpha = 0.30f), CircleShape)
             .border(0.8.dp, Color.White.copy(alpha = 0.28f), CircleShape)
+            .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
