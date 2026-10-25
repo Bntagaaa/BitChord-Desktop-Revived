@@ -177,6 +177,7 @@ internal fun DesktopNewPage(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NewSectionHeader(
     shelf: HomeShelf,
