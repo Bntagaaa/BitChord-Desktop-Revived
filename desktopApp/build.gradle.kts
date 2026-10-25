@@ -21,20 +21,31 @@ val targetOs: String = (providers.gradleProperty("bitchord.target").orNull ?: wh
     else -> error("BitChord desktop supports Linux and Windows only")
 }).lowercase()
 
-// Native package managers require a numeric upstream version. Windows also requires
-// MAJOR.MINOR.BUILD even though the app's public version is displayed without the patch number.
-// Keep descriptive build labels (for example "test-visua") for the app/artifact name, but derive
-// installer metadata from their numeric prefix. If there is no numeric prefix, use the project's
-// default major/minor so test builds can still produce valid DEB, RPM, EXE, and MSI packages.
+// Native package managers require a numeric version. Windows EXE/MSI metadata must
+// have exactly MAJOR.MINOR.BUILD, even when the public app version is a test label.
+// Only accept a numeric prefix that supplies *both* major and minor. A short label
+// such as "1" otherwise becomes "1.29" and fails during Gradle configuration,
+// including Linux AppImage builds that never package a Windows installer.
+// Preserve the original label for the app and artifacts; use the project's
+// default major/minor only for installer metadata when the prefix is unusable.
 val desktopVersionCode = 29
-val numericPackageBase = appVersion.substringBefore('-')
-    .takeIf { it.matches(Regex("""\d+(\.\d+)*""")) }
-    ?: defaultAppVersion.substringBefore('-')
-val nativePackageVersion = numericPackageBase.split('.').take(2).joinToString(".") + ".$desktopVersionCode"
+val numericPackagePrefix = appVersion.substringBefore('-')
+val requestedMajorMinor = Regex("""^(\d+)\.(\d+)(?:\.\d+)*$""")
+    .matchEntire(numericPackagePrefix)
+    ?.destructured
+    ?.let { (major, minor) ->
+        val majorValue = major.toIntOrNull()
+        val minorValue = minor.toIntOrNull()
+        if (majorValue != null && minorValue != null &&
+            majorValue in 0..255 && minorValue in 0..255
+        ) "$majorValue.$minorValue" else null
+    }
+val defaultMajorMinor = defaultAppVersion.substringBefore('-')
+val nativePackageVersion = "${requestedMajorMinor ?: defaultMajorMinor}.$desktopVersionCode"
 
-if (numericPackageBase != appVersion.substringBefore('-')) {
+if (requestedMajorMinor == null) {
     logger.lifecycle(
-        "App version '$appVersion' is a descriptive label; using valid native installer version '$nativePackageVersion'.",
+        "App version '$appVersion' has no valid MAJOR.MINOR prefix; using native installer version '$nativePackageVersion'.",
     )
 }
 
