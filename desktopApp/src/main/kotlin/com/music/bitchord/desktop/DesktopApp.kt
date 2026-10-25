@@ -6007,56 +6007,57 @@ private fun DesktopArtistPage(
                 val artistListState = rememberLazyListState()
                 MaterialTheme(colorScheme = artistScheme) {
                     CompositionLocalProvider(LocalContentColor provides artistForeground) {
-                    Box(Modifier.fillMaxSize().background(artistBackground)) {
-                        LazyColumn(
-                            state = artistListState,
-                            modifier = Modifier.fillMaxSize().desktopTopScrollFade(artistListState),
-                            contentPadding = pagePadding(bottom = 32.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            item(key = "artist-header") {
-                                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                                    val heroHeight = (maxWidth / 2.15f).coerceIn(360.dp, 600.dp)
-                                    DesktopArtistBanner(
-                                        fallbackUrl = artist.thumbnailUrl,
-                                        name = name,
-                                        appleArt = appleArt,
-                                        background = artistBackground,
-                                        heroHeight = heroHeight,
-                                        onPlay = { if (top.isNotEmpty()) onPlaySongs(top, 0) },
-                                        onShuffle = { if (top.isNotEmpty()) onShuffle(top) },
-                                        onToggleSubscription = toggleSubscription,
-                                        subscribed = subscription?.subscribed == true,
-                                    )
-                                }
-                            }
-
-                            // Keep the music immediately after the hero, as on BitChord Web.
-                            // Stats and secondary actions are intentionally below the music shelves.
-                            if (top.isNotEmpty()) {
-                                item(key = "artist-top-songs") {
-                                    Column(Modifier.padding(top = 18.dp, bottom = 6.dp)) {
-                                        SectionTitle(
-                                            "Top Songs",
-                                            gutter = DesktopPageGutter,
+                        Box(Modifier.fillMaxSize().background(artistBackground)) {
+                            LazyColumn(
+                                state = artistListState,
+                                modifier = Modifier.fillMaxSize().desktopTopScrollFade(artistListState),
+                                contentPadding = pagePadding(bottom = 32.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                item(key = "artist-header") {
+                                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                        val heroHeight = (maxWidth / 2.15f).coerceIn(360.dp, 600.dp)
+                                        DesktopArtistBanner(
+                                            fallbackUrl = artist.thumbnailUrl,
+                                            name = name,
+                                            appleArt = appleArt,
+                                            background = artistBackground,
+                                            heroHeight = heroHeight,
+                                            onPlay = { if (top.isNotEmpty()) onPlaySongs(top, 0) },
+                                            onShuffle = { if (top.isNotEmpty()) onShuffle(top) },
+                                            onToggleSubscription = toggleSubscription,
+                                            subscribed = subscription?.subscribed == true,
                                         )
-                                        Spacer(Modifier.height(8.dp))
-                                        BoxWithConstraints {
-                                            val columnWidth = trackColumnWidth(maxWidth)
-                                            ShelfRow(
-                                                contentPadding = PaddingValues(horizontal = DesktopPageGutter),
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            ) {
-                                                items(top.withIndex().chunked(ARTIST_SONGS_PER_COLUMN)) { column ->
-                                                    Column(Modifier.width(columnWidth)) {
-                                                        column.forEach { (index, song) ->
-                                                            CompactTrackRow(
-                                                                title = song.title,
-                                                                subtitle = song.artist,
-                                                                thumbnailUrl = song.thumbnailUrl,
-                                                                onClick = { onPlaySongs(top, index) },
-                                                                onLongPress = { onOpenMenu(song) },
-                                                            )
+                                    }
+                                }
+    
+                                // Keep the music immediately after the hero, as on BitChord Web.
+                                // Statistics follow the shelves; the primary actions live in the hero.
+                                if (top.isNotEmpty()) {
+                                    item(key = "artist-top-songs") {
+                                        Column(Modifier.padding(top = 18.dp, bottom = 6.dp)) {
+                                            SectionTitle(
+                                                "Top Songs",
+                                                gutter = DesktopPageGutter,
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            BoxWithConstraints {
+                                                val columnWidth = trackColumnWidth(maxWidth)
+                                                ShelfRow(
+                                                    contentPadding = PaddingValues(horizontal = DesktopPageGutter),
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                ) {
+                                                    items(top.withIndex().chunked(ARTIST_SONGS_PER_COLUMN)) { column ->
+                                                        Column(Modifier.width(columnWidth)) {
+                                                            column.forEach { (index, song) ->
+                                                                CompactTrackRow(
+                                                                    title = song.title,
+                                                                    subtitle = song.artist,
+                                                                    thumbnailUrl = song.thumbnailUrl,
+                                                                    onClick = { onPlaySongs(top, index) },
+                                                                    onLongPress = { onOpenMenu(song) },
+                                                                )
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -6064,68 +6065,67 @@ private fun DesktopArtistPage(
                                         }
                                     }
                                 }
-                            }
-
-                            artist.sections.forEach { shelf ->
-                                item(key = "artist-shelf-${shelf.title}") {
-                                    Box(Modifier.padding(top = 18.dp)) {
-                                        DesktopShelf(shelf, onItemClick = onShelfItemClick)
+    
+                                artist.sections.forEach { shelf ->
+                                    item(key = "artist-shelf-${shelf.title}") {
+                                        Box(Modifier.padding(top = 18.dp)) {
+                                            DesktopShelf(shelf, onItemClick = onShelfItemClick)
+                                        }
                                     }
                                 }
-                            }
-
-                            artist.description?.takeIf(String::isNotBlank)?.let { blurb ->
-                                item(key = "artist-about") {
-                                    Column(Modifier.padding(top = 22.dp)) {
-                                        SectionTitle("About artist")
-                                        Spacer(Modifier.height(8.dp))
-                                        Text(
-                                            blurb,
-                                            color = artistSecondary,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            modifier = Modifier.padding(horizontal = DesktopPageGutter),
+    
+                                artist.description?.takeIf(String::isNotBlank)?.let { blurb ->
+                                    item(key = "artist-about") {
+                                        Column(Modifier.padding(top = 22.dp)) {
+                                            SectionTitle("About artist")
+                                            Spacer(Modifier.height(8.dp))
+                                            Text(
+                                                blurb,
+                                                color = artistSecondary,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.padding(horizontal = DesktopPageGutter),
+                                            )
+                                        }
+                                    }
+                                }
+    
+                                if (artist.subscriberCountText != null || artist.monthlyListenerCount != null) {
+                                    item(key = "artist-stats") {
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(
+                                                horizontal = DesktopPageGutter,
+                                                vertical = 12.dp,
+                                            ),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            artist.subscriberCountText?.let {
+                                                DesktopStatChip(
+                                                    Icons.Rounded.Person,
+                                                    "${it.substringBefore(' ')} subscribers",
+                                                )
+                                            }
+                                            artist.monthlyListenerCount?.let {
+                                                DesktopStatChip(
+                                                    Icons.Rounded.GraphicEq,
+                                                    "${it.substringBefore(' ')} monthly listeners",
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+    
+                                if (top.isEmpty() && artist.sections.isEmpty()) {
+                                    item(key = "artist-empty") {
+                                        DesktopEmptyPage(
+                                            Icons.Rounded.Person,
+                                            "Nothing to show for $name",
+                                            "YouTube Music has no songs or releases on this page.",
                                         )
                                     }
                                 }
                             }
-
-                            if (artist.subscriberCountText != null || artist.monthlyListenerCount != null) {
-                                item(key = "artist-stats") {
-                                    Row(
-                                        Modifier.fillMaxWidth().padding(
-                                            horizontal = DesktopPageGutter,
-                                            vertical = 12.dp,
-                                        ),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        artist.subscriberCountText?.let {
-                                            DesktopStatChip(
-                                                Icons.Rounded.Person,
-                                                "${it.substringBefore(' ')} subscribers",
-                                            )
-                                        }
-                                        artist.monthlyListenerCount?.let {
-                                            DesktopStatChip(
-                                                Icons.Rounded.GraphicEq,
-                                                "${it.substringBefore(' ')} monthly listeners",
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (top.isEmpty() && artist.sections.isEmpty()) {
-                                item(key = "artist-empty") {
-                                    DesktopEmptyPage(
-                                        Icons.Rounded.Person,
-                                        "Nothing to show for $name",
-                                        "YouTube Music has no songs or releases on this page.",
-                                    )
-                                }
-                            }
                         }
-                    }
-                    }
+                        }
                 }
             }
         }
@@ -6135,7 +6135,7 @@ private fun DesktopArtistPage(
 /**
  * Apple Music-style artist hero: full-bleed photo, the original transparent
  * artist logo when available, and Play inside the image. YouTube artwork and
- * a serif text title remain graceful fallbacks when Apple has no logo.
+ * the app's normal typography remain graceful fallbacks when Apple has no logo.
  */
 @Composable
 private fun DesktopArtistBanner(
