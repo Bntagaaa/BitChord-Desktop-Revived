@@ -46,4 +46,16 @@ class DesktopNowPlayingDetailsTest {
         assertTrue(tinted.blue > tinted.red)
         assertTrue(tinted.red > 0f && tinted.green < 0.5f)
     }
+
+    @Test fun grayscaleArtworkUsesTheSameNeutralSurfaceForCanvasFadeAndLyricsCard() {
+        val grayscale = DesktopArtworkPalette(Color(0xFF808080), Color(0xFF808080))
+        assertEquals(Color(0xFF393939), lyricsPreviewSurfaceColor(grayscale, dark = true))
+    }
+
+    @Test fun colourfulArtworkGivesLyricsSurfaceItsOwnTint() {
+        val greenArtwork = DesktopArtworkPalette(Color(0xFF00A080), Color(0xFF004C40))
+        val surface = lyricsPreviewSurfaceColor(greenArtwork, dark = true)
+        assertTrue(surface.green > surface.red)
+        assertTrue(surface != Color(0xFF393939))
+    }
 }
