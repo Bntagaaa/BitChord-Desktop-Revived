@@ -147,7 +147,8 @@ internal fun DesktopNewPage(
                         key = { index, shelf -> "${shelf.title}-$index" },
                     ) { _, shelf ->
                         when {
-                            shelf.title.contains("trending", ignoreCase = true) ->
+                            shelf.title.contains("trending", ignoreCase = true) ||
+                                shelf.moreBrowseId?.startsWith("VL") == true ->
                                 NewTrendingShelf(
                                     shelf = shelf,
                                     onItemClick = onItemClick,
@@ -155,7 +156,8 @@ internal fun DesktopNewPage(
                                     onOpenMore = onOpenMore,
                                 )
 
-                            shelf.title.contains("video", ignoreCase = true) ->
+                            shelf.title.contains("video", ignoreCase = true) ||
+                                shelf.moreBrowseId == "FEmusic_new_releases_videos" ->
                                 NewVideoShelf(
                                     shelf = shelf,
                                     onItemClick = onItemClick,
