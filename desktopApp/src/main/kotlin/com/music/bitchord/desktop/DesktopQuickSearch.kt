@@ -1,6 +1,9 @@
 package com.music.bitchord.desktop
 
 import com.music.bitchord.ui.screens.desktopTopScrollFade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -233,14 +236,20 @@ private fun QuickSearchRow(item: SearchResult, active: Boolean, onHover: () -> U
         is SearchResult.Browse -> null
     }
     val artist = (item as? SearchResult.Browse)?.item
+    val activeBackground by animateColorAsState(
+        targetValue = if (active) DesktopForeground.copy(alpha = 0.09f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "quick-search-active-background",
+    )
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(5.dp))
+            .background(activeBackground, RoundedCornerShape(5.dp))
             .semantics { selected = active }
             .focusProperties { canFocus = false }
             // Move, rather than Enter, avoids changing selection merely because keyboard scroll
             // places another row underneath a stationary pointer.
             .onPointerEvent(PointerEventType.Move) { onHover() }
-            .desktopNoHoverClickable(onSelect).padding(horizontal = 12.dp, vertical = 8.dp),
+            .desktopNoHoverClickable(onSelect, hoverHighlight = false).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopArtwork(
