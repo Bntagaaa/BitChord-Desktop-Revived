@@ -132,6 +132,43 @@ object DesktopCanvasClient {
         }
     }
 
+    /**
+     * Spotify-only Canvas for the Now Playing Details card.
+     *
+     * Kept separate from the main player's four-provider cache: a square Apple/Tidal
+     * motion cover must never be mistaken for a Spotify Canvas. No Spotify session
+     * means no request, and a missing clip simply leaves the static album artwork.
+     */
+    suspend fun lookupSpotify(song: Song): DesktopCanvasArtwork? {
+        if (DesktopSpotifyToken.cookie().isBlank()) return null
+        if (song.videoId.isBlank() && (song.localUri != null || song.localPath != null)) return null
+        val title = song.title.cleanedForCanvas()
+        val artist = song.artist.cleanedForCanvas()
+        if (title.isBlank() || artist.isBlank()) return null
+        val album = song.albumName
+        // The main player may have already resolved a Spotify clip for this track.
+        cached(song)?.takeIf {
+            // Spotify can index this recording under a different release name from
+            // YouTube Music. The exact track and credited artist are the identity.
+            it.source == DesktopCanvasSource.SPOTIFY && it.matches(title, artist, null)
+        }?.let { return it }
+        // Only cache successful Spotify results. Authentication and Canvas endpoints are
+        // external, so a timeout/401/temporary miss must not poison the next retry.
+        val key = "spotify|song|${song.videoId}|${title}|${artist}"
+        return gate.withLock {
+            synchronized(cache) { cache[key]?.artwork }?.let { return@withLock it }
+            val found = withContext(Dispatchers.IO) {
+                runCatching { DesktopSpotifyCanvas.search(title, artist, album) }
+                    .onFailure { DesktopTrackLog.log("canvas: Spotify lookup failed (${it.message})") }
+                    .getOrNull()
+            }?.takeIf {
+                it.source == DesktopCanvasSource.SPOTIFY && it.matches(title, artist, null)
+            }
+            if (found != null) synchronized(cache) { cache[key] = Entry(found, album != null) }
+            found
+        }
+    }
+
     /** A canvas already worked out for [song], without going near the network. */
     fun cached(song: Song): DesktopCanvasArtwork? =
         synchronized(cache) { cache["song|${song.videoId}"]?.artwork }

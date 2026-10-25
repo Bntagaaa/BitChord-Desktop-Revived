@@ -18,15 +18,20 @@ data class DesktopArtworkPalette(
 }
 
 @Composable
-fun rememberDesktopArtworkPalette(url: String?): DesktopArtworkPalette {
-    val palette by produceState(DesktopArtworkPalette.Default, key1 = url) {
+fun rememberDesktopArtworkPalette(
+    url: String?,
+    bitmapOverride: ImageBitmap? = null,
+): DesktopArtworkPalette {
+    val palette by produceState(DesktopArtworkPalette.Default, key1 = url, key2 = bitmapOverride) {
         value = DesktopArtworkPalette.Default
-        value = withContext(Dispatchers.IO) { DesktopArtworkPalette.from(DesktopArtworkCache.load(url)) }
+        value = withContext(Dispatchers.IO) {
+            DesktopArtworkPalette.fromBitmap(bitmapOverride ?: DesktopArtworkCache.load(url))
+        }
     }
     return palette
 }
 
-private fun DesktopArtworkPalette.Companion.from(bitmap: ImageBitmap?): DesktopArtworkPalette {
+internal fun DesktopArtworkPalette.Companion.fromBitmap(bitmap: ImageBitmap?): DesktopArtworkPalette {
     if (bitmap == null || bitmap.width == 0 || bitmap.height == 0) return DesktopArtworkPalette.Default
     val pixels = IntArray(bitmap.width * bitmap.height)
     bitmap.readPixels(pixels)

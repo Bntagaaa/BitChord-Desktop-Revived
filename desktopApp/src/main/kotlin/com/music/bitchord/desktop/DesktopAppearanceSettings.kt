@@ -12,8 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
  */
 internal enum class DesktopBlurArea(val title: String, val description: String, val preferenceKey: String) {
     SIDE_PANELS(
-        "Lyrics & Queue panels",
-        "The frosted right-hand panel on Home",
+        "Lyrics, Queue & Details panels",
+        "The frosted right-hand panels on Home",
         "blur_side_panels",
     ),
     QUICK_SEARCH(
