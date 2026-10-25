@@ -1,5 +1,8 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -220,11 +223,12 @@ internal fun DesktopAppleArtistHero(
     }
 }
 
-@androidx.compose.runtime.Composable
+@Composable
 internal fun DesktopAppleArtistLogo(
     url: String?,
     contentDescription: String,
     modifier: androidx.compose.ui.Modifier,
+    fallback: @Composable () -> Unit,
 ) {
     val bitmap by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(
         initialValue = null,
@@ -241,5 +245,7 @@ internal fun DesktopAppleArtistLogo(
             contentScale = androidx.compose.ui.layout.ContentScale.Fit,
             modifier = modifier,
         )
+    } else {
+        fallback()
     }
 }
