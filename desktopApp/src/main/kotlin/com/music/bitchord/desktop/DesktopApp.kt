@@ -5996,8 +5996,17 @@ private fun DesktopArtistPage(
                 )
 
                 val top = artist.songs.take(MAX_ARTIST_SONGS)
+                val subscription = artist.subscription
+                val toggle = onToggleSubscription
+                val toggleSubscription: (() -> Unit)? =
+                    if (subscription != null && toggle != null) {
+                        { toggle(subscription) }
+                    } else {
+                        null
+                    }
                 val artistListState = rememberLazyListState()
                 MaterialTheme(colorScheme = artistScheme) {
+                    CompositionLocalProvider(LocalContentColor provides artistForeground) {
                     Box(Modifier.fillMaxSize().background(artistBackground)) {
                         LazyColumn(
                             state = artistListState,
@@ -6011,10 +6020,13 @@ private fun DesktopArtistPage(
                                     DesktopArtistBanner(
                                         fallbackUrl = artist.thumbnailUrl,
                                         name = name,
-                                                                                appleArt = appleArt,
+                                        appleArt = appleArt,
                                         background = artistBackground,
                                         heroHeight = heroHeight,
                                         onPlay = { if (top.isNotEmpty()) onPlaySongs(top, 0) },
+                                        onShuffle = { if (top.isNotEmpty()) onShuffle(top) },
+                                        onToggleSubscription = toggleSubscription,
+                                        subscribed = subscription?.subscribed == true,
                                     )
                                 }
                             }
@@ -6102,35 +6114,6 @@ private fun DesktopArtistPage(
                                 }
                             }
 
-                            item(key = "artist-secondary-actions") {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(
-                                        horizontal = DesktopPageGutter,
-                                        vertical = 10.dp,
-                                    ),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    val subscription = artist.subscription
-                                    if (subscription != null && onToggleSubscription != null) {
-                                        DesktopCircleButton(
-                                            if (subscription.subscribed) BitChordIcons.Check else BitChordIcons.Plus,
-                                            if (subscription.subscribed) {
-                                                DesktopStrings["unsubscribe", "Unsubscribe"]
-                                            } else {
-                                                DesktopStrings["subscribe", "Subscribe"]
-                                            },
-                                            onClick = { onToggleSubscription(subscription) },
-                                        )
-                                    }
-                                    DesktopCircleButton(
-                                        BitChordIcons.Shuffle,
-                                        DesktopStrings["shuffle", "Shuffle"],
-                                        onClick = { onShuffle(top) },
-                                    )
-                                }
-                            }
-
                             if (top.isEmpty() && artist.sections.isEmpty()) {
                                 item(key = "artist-empty") {
                                     DesktopEmptyPage(
@@ -6141,6 +6124,7 @@ private fun DesktopArtistPage(
                                 }
                             }
                         }
+                    }
                     }
                 }
             }
@@ -6161,6 +6145,9 @@ private fun DesktopArtistBanner(
     background: Color,
     heroHeight: Dp,
     onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+    onToggleSubscription: (() -> Unit)?,
+    subscribed: Boolean,
 ) {
     Box(Modifier.fillMaxWidth().height(heroHeight).background(background)) {
         DesktopAppleArtistHero(
@@ -6208,10 +6195,7 @@ private fun DesktopArtistBanner(
                     Text(
                         text = name,
                         style = MaterialTheme.typography.displayLarge.copy(
-                            fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 48.sp,
-                            lineHeight = 54.sp,
                             shadow = Shadow(
                                 color = Color.Black.copy(alpha = 0.32f),
                                 offset = Offset(0f, 2f),
@@ -6226,23 +6210,67 @@ private fun DesktopArtistBanner(
                 },
             )
 
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .shadow(5.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(Color.White)
-                    .clickable(onClick = onPlay),
-                contentAlignment = Alignment.Center,
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.Rounded.PlayArrow,
-                    contentDescription = "Play $name",
-                    tint = appleArt?.keyColor?.let { Color(it) } ?: Color(0xFF654C3A),
-                    modifier = Modifier.size(31.dp),
+                if (onToggleSubscription != null) {
+                    DesktopArtistHeroAction(
+                        icon = if (subscribed) BitChordIcons.Check else BitChordIcons.Plus,
+                        contentDescription = if (subscribed) "Unsubscribe" else "Subscribe",
+                        onClick = onToggleSubscription,
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .shadow(5.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .clickable(onClick = onPlay),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.PlayArrow,
+                        contentDescription = "Play $name",
+                        tint = appleArt?.keyColor?.let { Color(it) } ?: Color(0xFF654C3A),
+                        modifier = Modifier.size(31.dp),
+                    )
+                }
+
+                DesktopArtistHeroAction(
+                    icon = BitChordIcons.Shuffle,
+                    contentDescription = "Shuffle",
+                    onClick = onShuffle,
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun DesktopArtistHeroAction(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(48.dp)
+            .shadow(4.dp, CircleShape)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.30f))
+            .border(0.8.dp, Color.White.copy(alpha = 0.28f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(21.dp),
+        )
     }
 }
 
@@ -8389,13 +8417,13 @@ private fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
                 .size(width)
                 .clip(shape)
                 .background(DesktopGlass)
-                .border(1.dp, DesktopForeground.copy(alpha = 0.12f), shape),
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), shape),
         ) {
             DesktopArtwork(item.thumbnailUrl, Modifier.fillMaxSize())
         }
         Spacer(Modifier.height(8.dp))
-        Text(item.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(item.subtitle, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(item.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(item.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
