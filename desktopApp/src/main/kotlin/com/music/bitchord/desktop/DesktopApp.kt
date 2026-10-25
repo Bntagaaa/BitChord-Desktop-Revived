@@ -6217,6 +6217,17 @@ private fun DesktopArtistPage(
                         null
                     }
                 val artistListState = rememberLazyListState()
+                val animatedArtistBackground by DesktopAppearanceSettings.animatedArtistBackground.collectAsState()
+                val reduceAnimation by DesktopAppearanceSettings.reduceAnimation.collectAsState()
+                val artistWindowFocused = LocalWindowInfo.current.isWindowFocused
+                val artistHeroVisible by remember(artistListState) {
+                    androidx.compose.runtime.derivedStateOf {
+                        artistListState.layoutInfo.visibleItemsInfo.any { it.key == "artist-header" }
+                    }
+                }
+                // No background decoding when off-screen, unfocused or under Reduced Animation.
+                val playArtistMotion = animatedArtistBackground && !reduceAnimation &&
+                    artistWindowFocused && artistHeroVisible
                 MaterialTheme(colorScheme = artistScheme) {
                     CompositionLocalProvider(LocalContentColor provides artistForeground) {
                         Box(Modifier.fillMaxSize().background(artistBackground)) {
@@ -6235,6 +6246,7 @@ private fun DesktopArtistPage(
                                             appleArt = appleArt,
                                             background = artistBackground,
                                             heroHeight = heroHeight,
+                                            playMotion = playArtistMotion,
                                             onPlay = { if (top.isNotEmpty()) onPlaySongs(top, 0) },
                                             onShuffle = { if (top.isNotEmpty()) onShuffle(top) },
                                             onToggleSubscription = toggleSubscription,
@@ -6356,6 +6368,7 @@ private fun DesktopArtistBanner(
     appleArt: DesktopAppleArtistArt?,
     background: Color,
     heroHeight: Dp,
+    playMotion: Boolean,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     onToggleSubscription: (() -> Unit)?,
@@ -6368,6 +6381,17 @@ private fun DesktopArtistBanner(
             fallbackPx = HEADER_ART_PX,
             modifier = Modifier.matchParentSize(),
         )
+        // Keep the artist still visible until the first motion frame has decoded.
+        // An absent/broken clip never blocks hero artwork or the Play / Shuffle controls.
+        val artistVideo = appleArt?.wideVideoUrl ?: appleArt?.squareVideoUrl
+        if (playMotion && artistVideo != null) {
+            DesktopCanvasView(
+                url = artistVideo,
+                fallbackUrl = appleArt?.squareVideoUrl?.takeIf { it != artistVideo },
+                modifier = Modifier.matchParentSize(),
+                publishBackdrop = false,
+            )
+        }
 
         Box(
             Modifier.matchParentSize().background(
@@ -7447,6 +7471,13 @@ private fun DesktopSettingsScreen(
                         DesktopStrings["d_show_motion_artwork_when_it_is_available", "Show motion artwork when it is available"],
                         animatedCanvas,
                         onAnimatedCanvasChange,
+                    )
+                    val animatedArtistBackground by DesktopAppearanceSettings.animatedArtistBackground.collectAsState()
+                    SettingsToggle(
+                        "Animated artist backgrounds",
+                        "Play Apple Music motion artwork in artist headers when visible; Reduce Animation also pauses it",
+                        animatedArtistBackground,
+                        DesktopAppearanceSettings::setAnimatedArtistBackground,
                     )
                     if (animatedCanvas) {
                         SettingsNavigationRow(

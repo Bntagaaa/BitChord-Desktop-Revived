@@ -26,6 +26,8 @@ import java.util.Locale
  */
 internal data class DesktopAppleArtistArt(
     val heroUrl: String,
+    val wideVideoUrl: String?,
+    val squareVideoUrl: String?,
     val logoUrl: String?,
     val logoAspect: Float,
     val backgroundColor: Int,
@@ -100,8 +102,22 @@ internal object DesktopAppleArtistArtRepository {
         val header = findArtistHeader(root) ?: return null
 
         val logo = header.objectAt("artistLogo")?.objectAt("dictionary")
-        val hero = header.objectAt("artwork")?.objectAt("dictionary")
+        val wideArtwork = header.objectAt("wideArtwork")?.objectAt("dictionary")
+        val still = wideArtwork
+            ?: header.objectAt("artwork")?.objectAt("dictionary")
             ?: header.objectAt("colorBackdropArtwork")?.objectAt("dictionary")
+        // Apple serves a wide motion artist loop when available, otherwise a square rendition.
+        // The video URLs are optional: an unavailable/changed Apple response must keep the still.
+        val wideMotion = header.objectAt("wideVideoArtwork")?.objectAt("dictionary")?.let {
+            it.objectAt("motionArtistFullscreen16x9") ?: it.objectAt("motionArtistWide16x9")
+        }
+        val squareMotion = header.objectAt("videoArtwork")?.objectAt("dictionary")
+            ?.objectAt("motionArtistSquare1x1")
+        val wideVideo = wideMotion?.string("video")?.takeIf { it.startsWith("https://") }
+        val squareVideo = squareMotion?.string("video")?.takeIf { it.startsWith("https://") }
+        val hero = wideMotion?.objectAt("previewFrame")?.takeIf { wideVideo != null }
+            ?: still
+            ?: squareMotion?.objectAt("previewFrame")?.takeIf { squareVideo != null }
             ?: return null
 
         val heroWidth = hero.int("width")
@@ -128,12 +144,16 @@ internal object DesktopAppleArtistArtRepository {
             null
         }
 
-        val background = parseAppleColor(hero.string("bgColor")) ?: return null
+        val background = parseAppleColor(hero.string("bgColor"))
+            ?: still?.let { parseAppleColor(it.string("bgColor")) }
+            ?: 0xFF1F1F1F.toInt()
         val textColor = parseAppleColor(hero.string("textColor1")) ?: 0xFFFFFFFF.toInt()
         val keyColor = parseAppleColor(header.string("keyColor"))
 
         return DesktopAppleArtistArt(
             heroUrl = heroUrl,
+            wideVideoUrl = wideVideo,
+            squareVideoUrl = squareVideo,
             logoUrl = logoUrl,
             logoAspect = if (logoUrl != null) logoWidth.toFloat() / logoHeight else 1f,
             backgroundColor = background,
@@ -162,7 +182,11 @@ internal object DesktopAppleArtistArtRepository {
 
     private fun findArtistHeader(node: JsonElement): JsonObject? = when (node) {
         is JsonObject -> {
-            if ("artistLogo" in node) node
+            if ("artistLogo" in node && (
+                    "artwork" in node || "wideArtwork" in node ||
+                        "circleArtwork" in node || "wideVideoArtwork" in node
+                )
+            ) node
             else node.values.firstNotNullOfOrNull(::findArtistHeader)
         }
         is JsonArray -> node.firstNotNullOfOrNull(::findArtistHeader)

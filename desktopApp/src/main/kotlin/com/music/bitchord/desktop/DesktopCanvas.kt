@@ -286,10 +286,12 @@ fun DesktopCanvasView(
     contentScale: ContentScale = ContentScale.Crop,
     /** Tried once if [url] will not decode — the Apple provider's second rendition of the clip. */
     fallbackUrl: String? = null,
+    /** Artist hero loops must not overwrite the playing track's mesh backdrop. */
+    publishBackdrop: Boolean = true,
 ) {
     var frame by remember(url) { mutableStateOf<ImageBitmap?>(null) }
 
-    LaunchedEffect(url, fallbackUrl, isPlaying) {
+    LaunchedEffect(url, fallbackUrl, isPlaying, publishBackdrop) {
         if (!isPlaying) return@LaunchedEffect
         // Round and round until the track ends or the player is closed. A canvas is a few seconds
         // long, so one pass through it is not the feature — and the decoder cannot be relied on to
@@ -334,7 +336,7 @@ fun DesktopCanvasView(
                     // The backdrop reads the first frame and holds it: re-meshing every frame would
                     // be a full resample twenty-five times a second for a wash nobody is watching
                     // closely, and the clip's palette does not change much across it anyway.
-                    if (shown == 1) DesktopCanvasBackdrop.publish(url, next)
+                    if (shown == 1 && publishBackdrop) DesktopCanvasBackdrop.publish(url, next)
                     val spent = System.currentTimeMillis() - started
                     delay((decoder.frameIntervalMillis - spent).coerceAtLeast(0L))
                 }
@@ -350,8 +352,8 @@ fun DesktopCanvasView(
         }
     }
 
-    DisposableEffect(url) {
-        onDispose { DesktopCanvasBackdrop.clear(url) }
+    DisposableEffect(url, publishBackdrop) {
+        onDispose { if (publishBackdrop) DesktopCanvasBackdrop.clear(url) }
     }
 
     // Nothing at all until the first frame: a placeholder here would flash between the still cover

@@ -60,6 +60,7 @@ internal object DesktopAppearanceSettings {
 
     private val _reduceAnimation = flag(KEY_REDUCE_ANIMATION, false)
     private val _reduceDynamicBlur = flag(KEY_REDUCE_DYNAMIC_BLUR, false)
+    private val _animatedArtistBackground = flag(KEY_ANIMATED_ARTIST_BACKGROUND, true)
     private val _blurPreferences = DesktopBlurArea.entries.associateWith { flag(it.preferenceKey, true) }
     // Mica-style navigation is lightweight wallpaper tinting, independent of blur.
     private val _micaSidebar = flag(KEY_MICA_SIDEBAR, DesktopSidebarMica.isSupported)
@@ -74,6 +75,9 @@ internal object DesktopAppearanceSettings {
 
     /** Swaps frosted glass for solid fills across the app. */
     val reduceDynamicBlur: StateFlow<Boolean> = _reduceDynamicBlur
+
+    /** Loads looping artist-header video only while the visible artist page is active. */
+    val animatedArtistBackground: StateFlow<Boolean> = _animatedArtistBackground
 
     /** Individual preferences, observed live by the components that draw the glass. */
     fun blurPreference(area: DesktopBlurArea): StateFlow<Boolean> = requireNotNull(_blurPreferences[area])
@@ -104,6 +108,9 @@ internal object DesktopAppearanceSettings {
 
     fun setReduceDynamicBlur(value: Boolean) = write(KEY_REDUCE_DYNAMIC_BLUR, value, _reduceDynamicBlur)
 
+    fun setAnimatedArtistBackground(value: Boolean) =
+        write(KEY_ANIMATED_ARTIST_BACKGROUND, value, _animatedArtistBackground)
+
     fun setBlurPreference(area: DesktopBlurArea, enabled: Boolean) =
         write(area.preferenceKey, enabled, requireNotNull(_blurPreferences[area]))
 
@@ -125,6 +132,7 @@ internal object DesktopAppearanceSettings {
 
     internal const val KEY_REDUCE_ANIMATION = "reduce_animation"
     internal const val KEY_REDUCE_DYNAMIC_BLUR = "reduce_dynamic_blur"
+    internal const val KEY_ANIMATED_ARTIST_BACKGROUND = "animated_artist_background"
     internal const val KEY_MICA_SIDEBAR = "mica_sidebar"
     internal const val KEY_HIDE_VOLUME_BAR = "hide_volume_bar"
     internal const val KEY_ENABLE_OLD_TOP_MUSIC_PLAYER_STYLE = "enable_old_top_music_player_style"
