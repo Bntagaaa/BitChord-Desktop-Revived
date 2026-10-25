@@ -1,8 +1,14 @@
 package com.music.bitchord.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -11,10 +17,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onPlaced
@@ -86,10 +97,23 @@ fun Modifier.longPressMenuClickable(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
     enabled: Boolean = true,
+    hoverShape: Shape = RoundedCornerShape(8.dp),
+    hoverHighlight: Boolean = true,
 ): Modifier {
     val capture = remember { HoldCapture() }
     val graphicsContext = LocalGraphicsContext.current
     val scope = rememberCoroutineScope()
+    val hoverInteraction = remember { MutableInteractionSource() }
+    val hovered by hoverInteraction.collectIsHoveredAsState()
+    val hoverBackground by animateColorAsState(
+        targetValue = if (hoverHighlight && hovered) {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f)
+        } else {
+            Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "row-hover-background",
+    )
     val longClick = onLongClick?.let { held ->
         {
             capture.coordinates?.takeIf { it.isAttached }?.let { coordinates ->
@@ -102,6 +126,8 @@ fun Modifier.longPressMenuClickable(
         }
     }
     return this
+        .background(hoverBackground, hoverShape)
+        .hoverable(hoverInteraction)
         .onPlaced { capture.coordinates = it }
         .combinedClickable(
             interactionSource = remember { MutableInteractionSource() },
