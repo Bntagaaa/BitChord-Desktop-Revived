@@ -6011,8 +6011,7 @@ private fun DesktopArtistPage(
                                     DesktopArtistBanner(
                                         fallbackUrl = artist.thumbnailUrl,
                                         name = name,
-                                        palette = palette,
-                                        appleArt = appleArt,
+                                                                                appleArt = appleArt,
                                         background = artistBackground,
                                         heroHeight = heroHeight,
                                         onPlay = { if (top.isNotEmpty()) onPlaySongs(top, 0) },
@@ -6158,7 +6157,6 @@ private fun DesktopArtistPage(
 private fun DesktopArtistBanner(
     fallbackUrl: String?,
     name: String,
-    palette: DesktopArtworkPalette,
     appleArt: DesktopAppleArtistArt?,
     background: Color,
     heroHeight: Dp,
