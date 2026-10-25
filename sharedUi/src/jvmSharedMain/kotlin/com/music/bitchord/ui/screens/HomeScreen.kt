@@ -9,6 +9,9 @@ import androidx.compose.foundation.Image
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -874,7 +877,7 @@ private fun HeroCard(
             .thumbnailBorder(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .hoverable(cardHoverInteraction)
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress, hoverShape = RoundedCornerShape(18.dp))
             .contextClick(onLongPress),
     ) {
         ArtworkHover(
@@ -977,9 +980,15 @@ internal fun NewShelfCard(
 ) {
     val cardHoverInteraction = remember { MutableInteractionSource() }
     val cardHovered by cardHoverInteraction.collectIsHoveredAsState()
+    val cardHoverBackground by animateColorAsState(
+        targetValue = if (cardHovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "new-playlist-card-hover-background",
+    )
     Column(
         modifier = modifier
             .hoverable(cardHoverInteraction)
+            .background(cardHoverBackground, RoundedCornerShape(12.dp))
             .clickable(interactionSource = cardHoverInteraction, indication = null, onClick = onClick),
     ) {
         ArtworkHover(
@@ -1080,7 +1089,11 @@ internal fun ShelfCard(
     Column(
         modifier = modifier
             .hoverable(cardHoverInteraction)
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(
+                onClick = onClick,
+                onLongClick = onLongPress,
+                hoverShape = RoundedCornerShape(12.dp),
+            )
             .contextClick(onLongPress),
     ) {
         when (item.browseId) {
