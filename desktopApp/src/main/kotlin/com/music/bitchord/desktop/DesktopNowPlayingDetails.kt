@@ -1,5 +1,13 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -156,9 +164,13 @@ internal fun DesktopNowPlayingDetailsPanel(
                 Box(
                     Modifier.fillMaxSize().background(
                         Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.58f to Color.Transparent,
-                            0.78f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.42f),
+                            // Let the Canvas emerge from the panel surface at the top as well
+                            // as disappear into it at the bottom. The middle stays untouched.
+                            0f to DesktopTheme.palette.lyricsSurface,
+                            0.10f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.58f),
+                            0.22f to Color.Transparent,
+                            0.62f to Color.Transparent,
+                            0.82f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.42f),
                             1f to DesktopTheme.palette.lyricsSurface,
                         ),
                     ),
@@ -310,6 +322,11 @@ internal fun DesktopNowPlayingDetailsPanel(
     }
 }
 
+private const val LYRICS_PREVIEW_MOTION_MS = 420
+private const val LYRICS_PREVIEW_EXIT_MS = 220
+/** Match the same smooth handover curve used by the full lyric animation. */
+private val LYRICS_PREVIEW_EASING = CubicBezierEasing(0.41f, 0f, 0.12f, 0.99f)
+
 /** Use only original, non-empty lyric lines; gaps are never previewed as fake verses. */
 internal fun detailsLyricWindow(lyrics: List<LyricLine>?, positionMs: Long): List<LyricLine> {
     val lines = lyrics.orEmpty().filter { !it.isGap && it.text.isNotBlank() }
@@ -349,17 +366,36 @@ private fun LyricsPreviewCard(
                 fontSize = 14.sp, color = ink.copy(alpha = 0.78f),
             )
         } else {
-            lines.forEachIndexed { i, line ->
-                Text(
-                    line.text,
-                    color = ink.copy(alpha = when (i) { 0 -> 1f; 1 -> 0.76f; else -> 0.40f }),
-                    fontSize = 20.sp,
-                    lineHeight = 25.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(bottom = 7.dp),
-                )
+            AnimatedContent(
+                targetState = lines.map { it.text },
+                transitionSpec = {
+                    (fadeIn(tween(LYRICS_PREVIEW_MOTION_MS, easing = LYRICS_PREVIEW_EASING)) +
+                        slideInVertically(
+                            animationSpec = tween(LYRICS_PREVIEW_MOTION_MS, easing = LYRICS_PREVIEW_EASING),
+                            initialOffsetY = { height -> height / 4 },
+                        )) togetherWith
+                        (fadeOut(tween(LYRICS_PREVIEW_EXIT_MS, easing = LYRICS_PREVIEW_EASING)) +
+                            slideOutVertically(
+                                animationSpec = tween(LYRICS_PREVIEW_EXIT_MS, easing = LYRICS_PREVIEW_EASING),
+                                targetOffsetY = { height -> -height / 6 },
+                            ))
+                },
+                label = "lyricsPreviewMotion",
+            ) { visibleLines ->
+                Column {
+                    visibleLines.forEachIndexed { i, line ->
+                        Text(
+                            line,
+                            color = ink.copy(alpha = when (i) { 0 -> 1f; 1 -> 0.76f; else -> 0.40f }),
+                            fontSize = 20.sp,
+                            lineHeight = 25.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(bottom = 7.dp),
+                        )
+                    }
+                }
             }
         }
     }
