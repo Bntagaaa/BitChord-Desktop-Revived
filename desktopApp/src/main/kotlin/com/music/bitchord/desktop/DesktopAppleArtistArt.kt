@@ -119,7 +119,7 @@ internal object DesktopAppleArtistArtRepository {
         val logoHeight = logo?.int("height") ?: 0
         val logoUrl = if (logoWidth > 0 && logoHeight > 0) {
             fillImageUrl(
-                logo.string("url"),
+                logo?.string("url").orEmpty(),
                 LOGO_WIDTH,
                 (LOGO_WIDTH.toLong() * logoHeight / logoWidth).toInt(),
                 "png",
