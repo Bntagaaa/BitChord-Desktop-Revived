@@ -100,9 +100,9 @@ private const val WASH_MS = 120
  * clickable row with Compose's default hover/press indication.
  */
 internal fun Modifier.desktopNoHoverClickable(
-    onClick: () -> Unit,
     hoverHighlight: Boolean = true,
     hoverShape: Shape = RoundedCornerShape(8.dp),
+    onClick: () -> Unit,
 ): Modifier = composed {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
