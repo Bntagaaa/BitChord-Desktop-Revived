@@ -147,6 +147,55 @@ internal fun DesktopNowPlayingDetailsPanel(
                         isPlaying = isPlaying,
                     )
                 }
+                // Blend only the lower edge into Astra's panel surface. The Canvas itself
+                // stays sharp and keeps its original colours; no full-frame black mask or blur.
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.58f to Color.Transparent,
+                            0.78f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.42f),
+                            1f to DesktopTheme.palette.lyricsSurface,
+                        ),
+                    ),
+                )
+                Row(
+                    Modifier.fillMaxWidth()
+                        .align(Alignment.BottomStart)
+                        .padding(start = 18.dp, end = 10.dp, top = 42.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            song.title,
+                            color = foreground,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            song.artist,
+                            color = secondary,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clickable { onOpenArtist(song.artistId, song.artist) },
+                        )
+                    }
+                    DesktopToolbarButton(
+                        onClick = { onOpenArtist(song.artistId, song.artist) },
+                        size = 32.dp,
+                    ) {
+                        Icon(
+                            Icons.Rounded.Info,
+                            "Artist details",
+                            tint = foreground,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
+                }
             }
         }
         if (spotifyCanvas == null && canvasStatus.isNotEmpty()) {
@@ -171,31 +220,35 @@ internal fun DesktopNowPlayingDetailsPanel(
                 }
             }
         }
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    song.title,
-                    color = foreground,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    song.artist,
-                    color = secondary,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.clickable { onOpenArtist(song.artistId, song.artist) },
-                )
-            }
-            DesktopToolbarButton(onClick = { onOpenArtist(song.artistId, song.artist) }, size = 34.dp) {
-                Icon(Icons.Rounded.Info, "Artist details", tint = secondary, modifier = Modifier.size(19.dp))
+        // Keep the conventional title row for the static-cover fallback. With Spotify
+        // Canvas present, title and artist are composited over its bottom fade like Spotify.
+        if (spotifyCanvas == null) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        song.title,
+                        color = foreground,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        song.artist,
+                        color = secondary,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable { onOpenArtist(song.artistId, song.artist) },
+                    )
+                }
+                DesktopToolbarButton(onClick = { onOpenArtist(song.artistId, song.artist) }, size = 34.dp) {
+                    Icon(Icons.Rounded.Info, "Artist details", tint = secondary, modifier = Modifier.size(19.dp))
+                }
             }
         }
         LyricsPreviewCard(lyrics, lyricsLoading, position, onShowLyrics, tile)
