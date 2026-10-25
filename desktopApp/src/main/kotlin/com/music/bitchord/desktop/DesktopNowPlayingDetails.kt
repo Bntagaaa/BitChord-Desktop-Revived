@@ -7,6 +7,8 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,9 +43,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -130,6 +136,7 @@ internal fun DesktopNowPlayingDetailsPanel(
     // the album artwork so the lyric card is never stuck on a hard-coded brand red.
     val canvasFrame = DesktopCanvasBackdrop.frameFor(spotifyCanvas?.url)
     val artworkPalette = rememberDesktopArtworkPalette(song.thumbnailUrl, canvasFrame)
+    val lyricsCardColor = lyricsPreviewSurfaceColor(artworkPalette, DesktopTheme.isDark)
     val upcoming = queue.withIndex().filter { it.index > queueIndex }.take(2)
 
     Column(
@@ -137,12 +144,22 @@ internal fun DesktopNowPlayingDetailsPanel(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(13.dp),
     ) {
+        // Keep the Canvas and Lyrics Preview in one visual group. The fade below the
+        // moving artwork meets the lyric surface directly instead of leaving a hard strip.
+        Column(
+            Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(if (spotifyCanvas != null) 0.dp else 13.dp),
+        ) {
         // Spotify Canvas clips are portrait loops. Keep the still cover underneath
         // until the video decoder produces its first frame, or whenever no clip exists.
         Box(
             Modifier.fillMaxWidth()
                 .aspectRatio(if (spotifyCanvas != null) 0.78f else 1f)
-                .clip(shape),
+                .clip(
+                    if (spotifyCanvas != null) {
+                        RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
+                    } else shape,
+                ),
         ) {
             DesktopArtwork(
                 url = song.thumbnailUrl,
@@ -164,14 +181,17 @@ internal fun DesktopNowPlayingDetailsPanel(
                 Box(
                     Modifier.fillMaxSize().background(
                         Brush.verticalGradient(
-                            // Let the Canvas emerge from the panel surface at the top as well
-                            // as disappear into it at the bottom. The middle stays untouched.
-                            0f to DesktopTheme.palette.lyricsSurface,
-                            0.10f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.58f),
-                            0.22f to Color.Transparent,
-                            0.62f to Color.Transparent,
-                            0.82f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.42f),
-                            1f to DesktopTheme.palette.lyricsSurface,
+                            // Keep the top scrim light; feather the bottom over a longer
+                            // distance and resolve into the exact Lyrics Preview surface.
+                            0f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.48f),
+                            0.10f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.22f),
+                            0.20f to Color.Transparent,
+                            0.48f to Color.Transparent,
+                            0.60f to lyricsCardColor.copy(alpha = 0.10f),
+                            0.72f to lyricsCardColor.copy(alpha = 0.30f),
+                            0.84f to lyricsCardColor.copy(alpha = 0.62f),
+                            0.94f to lyricsCardColor.copy(alpha = 0.90f),
+                            1f to lyricsCardColor,
                         ),
                     ),
                 )
@@ -276,7 +296,15 @@ internal fun DesktopNowPlayingDetailsPanel(
                 }
             }
         }
-        LyricsPreviewCard(lyrics, lyricsLoading, position, onShowLyrics, artworkPalette)
+        LyricsPreviewCard(
+            lyrics = lyrics,
+            loading = lyricsLoading,
+            position = position,
+            onShowLyrics = onShowLyrics,
+            surfaceColor = lyricsCardColor,
+            mergeWithCanvas = spotifyCanvas != null,
+        )
+        }
         ArtistOverviewCard(
             artistName = artistPage?.name?.takeIf(String::isNotBlank) ?: song.artist,
             artistImage = artistPage?.thumbnailUrl,
@@ -322,7 +350,7 @@ internal fun DesktopNowPlayingDetailsPanel(
     }
 }
 
-private const val LYRICS_PREVIEW_MOTION_MS = 420
+private const val LYRICS_PREVIEW_MOTION_MS = 400
 private const val LYRICS_PREVIEW_EXIT_MS = 220
 /** Match the same smooth handover curve used by the full lyric animation. */
 private val LYRICS_PREVIEW_EASING = CubicBezierEasing(0.41f, 0f, 0.12f, 0.99f)
@@ -341,18 +369,24 @@ private fun LyricsPreviewCard(
     loading: Boolean,
     position: PlaybackPosition,
     onShowLyrics: () -> Unit,
-    artworkPalette: DesktopArtworkPalette,
+    surfaceColor: Color,
+    mergeWithCanvas: Boolean,
 ) {
     val dark = DesktopTheme.isDark
-    // Keep Spotify's muted, artwork-led surface: preserve a neutral base luminance
-    // and tint it with the Canvas/cover's chroma rather than painting the card red.
-    val base = if (dark) Color(0xFF393939) else Color(0xFFE5E9F0)
-    val source = if (artworkPalette == DesktopArtworkPalette.Default) Color(0xFF808080) else artworkPalette.primary
-    val cardColor = tintSurfaceFromArtwork(base, source, if (dark) 0.28f else 0.22f)
+    val cardColor = surfaceColor
     val ink = if (dark) Color.White else Color(0xFF1B2230)
+    val panelBlurEnabled = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.SIDE_PANELS)
+    val lyricsBlur by DesktopPlayerSettings.lyricsBlur.collectAsState()
+    val reduceAnimation by DesktopAppearanceSettings.reduceAnimation.collectAsState()
+    val allowLineBlur = panelBlurEnabled && lyricsBlur
+    val motionMs = if (reduceAnimation) 0 else LYRICS_PREVIEW_MOTION_MS
+    val exitMs = if (reduceAnimation) 0 else LYRICS_PREVIEW_EXIT_MS
     val lines = detailsLyricWindow(lyrics, position.positionMs)
+    val cardShape = if (mergeWithCanvas) {
+        RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 9.dp, bottomEnd = 9.dp)
+    } else RoundedCornerShape(9.dp)
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
+        Modifier.fillMaxWidth().clip(cardShape)
             .background(cardColor).clickable(onClick = onShowLyrics).padding(17.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -369,14 +403,14 @@ private fun LyricsPreviewCard(
             AnimatedContent(
                 targetState = lines.map { it.text },
                 transitionSpec = {
-                    (fadeIn(tween(LYRICS_PREVIEW_MOTION_MS, easing = LYRICS_PREVIEW_EASING)) +
+                    (fadeIn(tween(motionMs, easing = LYRICS_PREVIEW_EASING)) +
                         slideInVertically(
-                            animationSpec = tween(LYRICS_PREVIEW_MOTION_MS, easing = LYRICS_PREVIEW_EASING),
+                            animationSpec = tween(motionMs, easing = LYRICS_PREVIEW_EASING),
                             initialOffsetY = { height -> height / 4 },
                         )) togetherWith
-                        (fadeOut(tween(LYRICS_PREVIEW_EXIT_MS, easing = LYRICS_PREVIEW_EASING)) +
+                        (fadeOut(tween(exitMs, easing = LYRICS_PREVIEW_EASING)) +
                             slideOutVertically(
-                                animationSpec = tween(LYRICS_PREVIEW_EXIT_MS, easing = LYRICS_PREVIEW_EASING),
+                                animationSpec = tween(exitMs, easing = LYRICS_PREVIEW_EASING),
                                 targetOffsetY = { height -> -height / 6 },
                             ))
                 },
@@ -384,15 +418,53 @@ private fun LyricsPreviewCard(
             ) { visibleLines ->
                 Column {
                     visibleLines.forEachIndexed { i, line ->
+                        // Same settle treatment as the full Lyrics panel: active text is
+                        // crisp; the following lines ease back in opacity, blur and scale.
+                        val lineBlur by animateDpAsState(
+                            targetValue = when {
+                                !allowLineBlur || i == 0 -> 0.dp
+                                i == 1 -> 1.dp
+                                else -> 1.dp
+                            },
+                            animationSpec = tween(
+                                durationMillis = if (reduceAnimation) 0 else LYRICS_PREVIEW_MOTION_MS,
+                                easing = LYRICS_PREVIEW_EASING,
+                            ),
+                            label = "lyricsPreviewBlur$i",
+                        )
+                        val lineAlpha by animateFloatAsState(
+                            targetValue = when (i) { 0 -> 1f; 1 -> 0.8f; else -> 0.7f },
+                            animationSpec = tween(
+                                durationMillis = if (reduceAnimation) 0 else LYRICS_PREVIEW_MOTION_MS,
+                                easing = LYRICS_PREVIEW_EASING,
+                            ),
+                            label = "lyricsPreviewAlpha$i",
+                        )
+                        val lineScale by animateFloatAsState(
+                            targetValue = if (i == 0) 1f else 0.98f,
+                            animationSpec = tween(
+                                durationMillis = if (reduceAnimation) 0 else LYRICS_PREVIEW_MOTION_MS,
+                                easing = LYRICS_PREVIEW_EASING,
+                            ),
+                            label = "lyricsPreviewScale$i",
+                        )
                         Text(
                             line,
-                            color = ink.copy(alpha = when (i) { 0 -> 1f; 1 -> 0.76f; else -> 0.40f }),
+                            color = ink,
                             fontSize = 20.sp,
                             lineHeight = 25.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(bottom = 7.dp),
+                            modifier = Modifier
+                                .graphicsLayer {
+                                    alpha = lineAlpha
+                                    scaleX = lineScale
+                                    scaleY = lineScale
+                                    transformOrigin = TransformOrigin(0f, 0.5f)
+                                }
+                                .blur(lineBlur, BlurredEdgeTreatment.Unbounded)
+                                .padding(bottom = 7.dp),
                         )
                     }
                 }
@@ -483,6 +555,12 @@ private fun CreditsPreviewCard(
             }
         }
     }
+}
+
+internal fun lyricsPreviewSurfaceColor(artworkPalette: DesktopArtworkPalette, dark: Boolean): Color {
+    val base = if (dark) Color(0xFF393939) else Color(0xFFE5E9F0)
+    val source = if (artworkPalette == DesktopArtworkPalette.Default) Color(0xFF808080) else artworkPalette.primary
+    return tintSurfaceFromArtwork(base, source, if (dark) 0.28f else 0.22f)
 }
 
 internal fun tintSurfaceFromArtwork(base: Color, source: Color, amount: Float): Color {
