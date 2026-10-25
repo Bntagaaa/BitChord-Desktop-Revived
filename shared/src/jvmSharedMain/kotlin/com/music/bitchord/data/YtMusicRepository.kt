@@ -256,6 +256,12 @@ object YtMusicRepository {
     private suspend fun shelvesOf(browseId: String): List<HomeShelf> =
         InnertubeParser.parseHome(Innertube.browse(browseId))
 
+    /** A See All page rendered as album/video cards rather than a playlist track list. */
+    suspend fun browseShelves(browseId: String, params: String? = null): Result<List<HomeShelf>> =
+        call("browse-shelves:$browseId") {
+            InnertubeParser.parseHome(Innertube.browse(browseId, params))
+        }
+
     /** The server-defined mood and genre categories used by Explore. */
     suspend fun moodAndGenres(): Result<List<MoodGenreSection>> = call("moods-and-genres") {
         InnertubeParser.parseMoodAndGenres(Innertube.browse("FEmusic_moods_and_genres"))
