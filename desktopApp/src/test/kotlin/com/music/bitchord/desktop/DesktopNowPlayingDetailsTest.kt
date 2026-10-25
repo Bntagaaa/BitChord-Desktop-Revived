@@ -1,6 +1,7 @@
 package com.music.bitchord.desktop
 
 import com.music.bitchord.data.lyrics.LyricLine
+import androidx.compose.ui.graphics.Color
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -31,5 +32,18 @@ class DesktopNowPlayingDetailsTest {
     @Test fun handlesUnavailableLyrics() {
         assertTrue(detailsLyricWindow(null, 1000L).isEmpty())
         assertTrue(detailsLyricWindow(emptyList(), 1000L).isEmpty())
+    }
+
+    @Test fun grayscaleCanvasKeepsLyricsSurfaceNeutral() {
+        val base = Color(0xFF393939)
+        assertEquals(base, tintSurfaceFromArtwork(base, Color(0xFF808080), 0.28f))
+    }
+
+    @Test fun colorfulCanvasTintsLyricsSurfaceWithoutReplacingItsBase() {
+        val base = Color(0xFF393939)
+        val tinted = tintSurfaceFromArtwork(base, Color(0xFF00A080), 0.28f)
+        assertTrue(tinted.green > tinted.red)
+        assertTrue(tinted.blue > tinted.red)
+        assertTrue(tinted.red > 0f && tinted.green < 0.5f)
     }
 }
