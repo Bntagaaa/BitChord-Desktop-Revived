@@ -97,20 +97,15 @@ internal fun DesktopSidePanelColumn(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(when (which) {
-                                        DesktopSidePanel.LYRICS, DesktopSidePanel.DETAILS -> HEADER_HEIGHT
-                                        DesktopSidePanel.QUEUE -> QUEUE_HEADER_HEIGHT
-                                    })
+                                    .height(HEADER_HEIGHT)
                                     .padding(start = 18.dp, end = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                // The queue heads itself ("Queue", then its sections); only the lyrics
-                                // need a name over them.
                                 Text(
                                     text = when (which) {
                                         DesktopSidePanel.LYRICS -> DesktopStrings["lyrics", "Lyrics"]
                                         DesktopSidePanel.DETAILS -> "Now playing"
-                                        DesktopSidePanel.QUEUE -> ""
+                                        DesktopSidePanel.QUEUE -> "Queue"
                                     },
                                     color = DesktopForeground,
                                     fontSize = 15.sp,
@@ -180,6 +175,5 @@ private val LIGHT_PANEL_INACTIVE = Color(0xFF3E485A)
 
 private val SIDE_PANEL_WIDTH = 360.dp
 private val HEADER_HEIGHT = 46.dp
-private val QUEUE_HEADER_HEIGHT = 30.dp
 private const val SLIDE_MS = 260
 private const val CROSSFADE_MS = 180
