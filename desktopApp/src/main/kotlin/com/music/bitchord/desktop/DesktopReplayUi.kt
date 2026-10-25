@@ -223,13 +223,13 @@ private fun LazyListScope.chart(
         )
     }
     items(rows, key = { "$key-${it.key}" }) { row ->
-        ChartRow(row, circular) { onClick(row.rank - 1) }
+        ChartRow(row, circular, playable = key == "songs") { onClick(row.rank - 1) }
     }
     item("$key-gap") { Spacer(Modifier.height(20.dp)) }
 }
 
 @Composable
-private fun ChartRow(row: DesktopReplayRow, circular: Boolean, onClick: () -> Unit) {
+private fun ChartRow(row: DesktopReplayRow, circular: Boolean, playable: Boolean, onClick: () -> Unit) {
     val shape = if (circular) CircleShape else RoundedCornerShape(6.dp)
     val rowHoverInteraction = remember { MutableInteractionSource() }
     val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
@@ -247,7 +247,7 @@ private fun ChartRow(row: DesktopReplayRow, circular: Boolean, onClick: () -> Un
                 row.artworkUrl,
                 Modifier.size(48.dp).clip(shape),
                 px = ROW_ART_PX,
-                hoverMode = if (circular) ArtworkHoverMode.DARKEN_ONLY else ArtworkHoverMode.DARKEN_AND_PLAY,
+                hoverMode = if (playable) ArtworkHoverMode.DARKEN_AND_PLAY else ArtworkHoverMode.DARKEN_ONLY,
                 hovered = rowHovered,
             )
         }
