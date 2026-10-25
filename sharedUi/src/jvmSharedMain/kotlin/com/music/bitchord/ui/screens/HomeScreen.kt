@@ -480,19 +480,15 @@ private fun RecentTrackRow(
     isCurrent: Boolean,
     isPlaying: Boolean,
 ) {
-    // Give Recents the roomier vertical rhythm used by BitChord Web without
-    // changing CompactTrackRow spacing on other pages.
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        CompactTrackRow(
-            title = item.title,
-            subtitle = item.subtitle,
-            thumbnailUrl = item.thumbnailUrl,
-            onClick = onClick,
-            onLongPress = onLongPress,
-            isCurrent = isCurrent,
-            isPlaying = isPlaying,
-        )
-    }
+    CompactTrackRow(
+        title = item.title,
+        subtitle = item.subtitle,
+        thumbnailUrl = item.thumbnailUrl,
+        onClick = onClick,
+        onLongPress = onLongPress,
+        isCurrent = isCurrent,
+        isPlaying = isPlaying,
+    )
 }
 
 /**
