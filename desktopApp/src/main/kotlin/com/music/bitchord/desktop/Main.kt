@@ -31,8 +31,12 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
+    DesktopStartupDiagnostics.mark("process-entry")
     // Read the per-install welcome marker before services initialize or write preferences.
     val welcomeLaunch = DesktopWelcomeOnboarding.inspectStartup()
+    // Decide before Presence or other services write their first-run preferences. Existing
+    // installations retain FULL; only an empty preference store gets hardware-based defaults.
+    DesktopAppearanceSettings.graphicsProfile
     // Before any WebView exists, so sign-in and PoToken pages share the same cookie jar.
     DesktopWebCookies.install()
     // The player is the phone's, from the shared UI module; this is what it reads underneath.
@@ -66,6 +70,7 @@ fun main() {
     )
     // The public "apps open right now" count; see Presence.
     DesktopPresence.install()
+    DesktopStartupDiagnostics.mark("bootstrap-ready")
     desktopMain(welcomeLaunch)
 }
 
@@ -96,6 +101,10 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         resizable = true,
     ) {
         val composeWindow = window
+        DisposableEffect(composeWindow) {
+            DesktopStartupDiagnostics.mark("window-created")
+            onDispose { }
+        }
         val isDarkTheme = DesktopTheme.isDark
         // System mode follows changes while the app remains open. Native probes run off the UI thread.
         LaunchedEffect(Unit) {
@@ -179,7 +188,9 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         }
         CompositionLocalProvider(LocalDensity provides uiDensity) {
             DesktopFlyoutHost {
-                BitChordDesktopApp(welcomeLaunch)
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.startupDrawMilestone("shell-first-draw")) {
+                    BitChordDesktopApp(welcomeLaunch)
+                }
             }
         }
     }

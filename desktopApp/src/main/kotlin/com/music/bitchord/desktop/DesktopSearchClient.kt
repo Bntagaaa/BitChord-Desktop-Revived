@@ -87,7 +87,7 @@ object DesktopSearchClient {
 
     suspend fun trackLinks(videoId: String): Result<Song> = YtMusicRepository.trackLinks(videoId)
 
-    suspend fun library(): Result<LibraryPage> = YtMusicRepository.library()
+    suspend fun library(full: Boolean = true): Result<LibraryPage> = YtMusicRepository.library(full)
 
     /** Follows Liked Music's pages past the first, handing each page's ids over as it lands. */
     suspend fun syncLikedIds(firstToken: String, onIds: suspend (Set<String>) -> Unit) {

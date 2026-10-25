@@ -1,6 +1,7 @@
 package com.music.bitchord.desktop
 
 import com.music.bitchord.data.model.Song
+import kotlinx.coroutines.ensureActive
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -14,14 +15,15 @@ import kotlin.io.path.nameWithoutExtension
 object DesktopLocalMusic {
     private val supportedExtensions = setOf("aac", "flac", "m4a", "mp3", "ogg", "wav", "webm")
 
-    fun scan(): List<Song> {
-        val filterNonMusic = DesktopPersistence().boolean(KEY_FILTER_NON_MUSIC_AUDIO, false)
-        return roots()
-            .filter(Files::isDirectory)
-            .flatMap { scanDirectory(it, filterNonMusic) }
-            .distinctBy(Song::localPath)
-            .sortedBy { it.title.lowercase() }
-    }
+    suspend fun scan(): List<Song> = scan(
+        roots(), DesktopPersistence().boolean(KEY_FILTER_NON_MUSIC_AUDIO, false),
+    )
+
+    internal suspend fun scan(roots: List<Path>, filterNonMusic: Boolean): List<Song> = roots
+        .filter(Files::isDirectory)
+        .flatMap { scanDirectory(it, filterNonMusic) }
+        .distinctBy(Song::localPath)
+        .sortedBy { it.title.lowercase() }
 
     /**
      * Where to look: the chosen folder, or the usual two when none has been chosen.
@@ -66,13 +68,25 @@ object DesktopLocalMusic {
         chooser.selectedFile?.toPath()
     }.getOrNull()
 
-    private fun scanDirectory(root: Path, filterNonMusic: Boolean): List<Song> = buildList {
-        runCatching {
-            Files.walk(root, 4).use { files ->
-                files.filter(Files::isRegularFile)
-                    .filter { it.extension.lowercase() in supportedExtensions }
-                    .filter { !filterNonMusic || isMusic(it) }
-                    .forEach { path -> add(path.toSong()) }
+    private suspend fun scanDirectory(root: Path, filterNonMusic: Boolean): List<Song> {
+        val context = kotlinx.coroutines.currentCoroutineContext()
+        return buildList {
+            try {
+                Files.walk(root, 4).use { files ->
+                    files.peek { context.ensureActive() }
+                        .filter(Files::isRegularFile)
+                        .filter { it.extension.lowercase() in supportedExtensions }
+                        .filter { !filterNonMusic || isMusic(it) }
+                        .forEach { path -> add(path.toSong()) }
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: java.io.IOException) {
+                // Keep readable tracks if a subtree is disconnected during the walk.
+            } catch (_: java.io.UncheckedIOException) {
+                // Streams wrap late filesystem errors in UncheckedIOException.
+            } catch (_: SecurityException) {
+                // Preserve the other readable roots when access to one is revoked.
             }
         }
     }

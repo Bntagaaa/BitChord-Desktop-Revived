@@ -27,6 +27,7 @@ internal object DesktopAnalysisRuntime {
 
     fun ensureStarted() {
         if (!started.compareAndSet(false, true)) return
+        DesktopStartupDiagnostics.mark("analyzer-initialize")
         AnalysisLog.install { message, error ->
             DesktopTrackLog.log(
                 when {
@@ -70,7 +71,10 @@ internal object DesktopAnalysisRuntime {
     }
 
     /** The absolute path of a model, unpacked on first use. */
-    fun modelPath(asset: String): String = unpack("/models/$asset", asset).toString()
+    fun modelPath(asset: String): String {
+        DesktopStartupDiagnostics.mark("analyzer-model-unpack")
+        return unpack("/models/$asset", asset).toString()
+    }
 
     /**
      * Copies a classpath resource to [name] under [home], skipping the copy when the file already

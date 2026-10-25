@@ -483,7 +483,9 @@ object YtMusicRepository {
      * parallel and a feed that fails or is simply empty (a fresh account has
      * no saved albums) is dropped rather than failing the whole page.
      */
-    suspend fun library(): Result<LibraryPage> = call("library") {
+    // Desktop may defer secondary collections; likes and paged playlists remain available.
+    // Existing callers retain the full library by default.
+    suspend fun library(full: Boolean = true): Result<LibraryPage> = call("library") {
         coroutineScope {
             // Liked Music is read one page at a time. The first page is what
             // the Library tab needs to fill and is published straight away;
@@ -492,8 +494,8 @@ object YtMusicRepository {
             // liked without holding this page open behind the whole list —
             // see [syncLikedMusic] and MainViewModel's fetchLibrary.
             val liked = async { browseSongs(LIKED_MUSIC).getOrNull() }
-            val added = async { runCatching { songsPaged(LIBRARY_SONGS) }.getOrDefault(emptyList()) }
-            val shelves = LIBRARY_FEEDS
+            val added = async { if (full) runCatching { songsPaged(LIBRARY_SONGS) }.getOrDefault(emptyList()) else emptyList() }
+            val shelves = LIBRARY_FEEDS.filter { (title, _) -> full || title == PLAYLISTS_SHELF }
                 .map { (title, browseId) ->
                     async {
                         HomeShelf(title, runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList()))

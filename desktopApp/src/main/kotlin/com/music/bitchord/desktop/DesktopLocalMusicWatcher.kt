@@ -1,5 +1,6 @@
 package com.music.bitchord.desktop
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,23 +52,37 @@ internal object DesktopLocalMusicWatcher {
     private const val WATCH_DEPTH = 4
 
     /** (Re)starts watching whatever [DesktopLocalMusic.roots] currently names. */
-    @Synchronized
-    fun restart() {
-        job?.cancel()
-        job = scope.launch { watch() }
+    suspend fun restart() {
+        val ready = CompletableDeferred<Unit>()
+        synchronized(this) {
+            val previous = job
+            previous?.cancel()
+            job = scope.launch {
+                try {
+                    previous?.join()
+                    watch(ready)
+                } finally {
+                    // Unavailable roots/watch services still allow an ordinary one-shot scan.
+                    ready.complete(Unit)
+                }
+            }
+        }
+        ready.await()
     }
 
+    @Synchronized
     fun stop() {
         job?.cancel()
-        job = null
     }
 
-    private suspend fun watch() {
+    private suspend fun watch(ready: CompletableDeferred<Unit>) {
         val service = runCatching { FileSystems.getDefault().newWatchService() }.getOrNull() ?: return
         try {
-            val registered = DesktopLocalMusic.roots()
-                .filter(Files::isDirectory)
-                .sumOf { register(it, service) }
+            val context = kotlin.coroutines.coroutineContext
+            val roots = DesktopLocalMusic.roots().filter(Files::isDirectory)
+            val registered = roots.sumOf { register(it, service, WATCH_DEPTH) { context[Job]?.isActive != false } }
+            DesktopStartupDiagnostics.mark("local-watcher-register")
+            ready.complete(Unit)
             if (registered == 0) return
 
             var pendingSince = 0L
@@ -76,14 +91,30 @@ internal object DesktopLocalMusicWatcher {
                 // be reported without waiting for the next edit to arrive.
                 val key = service.poll(250, TimeUnit.MILLISECONDS)
                 if (key != null) {
-                    val interesting = key.pollEvents().any { event ->
-                        val changed = event.context() as? Path ?: return@any false
-                        changed.toString().substringAfterLast('.', "").lowercase() in AUDIO_EXTENSIONS
+                    var interesting = false
+                    key.pollEvents().forEach { event ->
+                        if (event.kind() == StandardWatchEventKinds.OVERFLOW) {
+                            interesting = true
+                        } else {
+                            val changed = event.context() as? Path ?: return@forEach
+                            val parent = key.watchable() as? Path
+                            val target = parent?.resolve(changed)
+                            if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE && target != null && Files.isDirectory(target)) {
+                                val root = roots.firstOrNull { target.startsWith(it) }
+                                val depth = root?.let { WATCH_DEPTH - it.relativize(target).nameCount } ?: 0
+                                if (depth > 0) register(target, service, depth) { context[Job]?.isActive != false }
+                                interesting = true
+                            }
+                            // A removed directory cannot be stat'ed, but may have held music.
+                            if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE ||
+                                changed.toString().substringAfterLast('.', "").lowercase() in AUDIO_EXTENSIONS
+                            ) interesting = true
+                        }
                     }
                     key.reset()
-                    if (interesting) pendingSince = System.currentTimeMillis()
+                    if (interesting) pendingSince = (System.nanoTime() / 1_000_000)
                 }
-                if (pendingSince > 0L && System.currentTimeMillis() - pendingSince >= SETTLE_MS) {
+                if (pendingSince > 0L && (System.nanoTime() / 1_000_000) - pendingSince >= SETTLE_MS) {
                     pendingSince = 0L
                     _changes.tryEmit(Unit)
                 }
@@ -100,15 +131,16 @@ internal object DesktopLocalMusicWatcher {
     }
 
     /** Registers [root] and everything under it, returning how many directories were taken. */
-    private fun register(root: Path, service: WatchService): Int {
+    private fun register(root: Path, service: WatchService, depth: Int, active: () -> Boolean): Int {
         var count = 0
         runCatching {
             Files.walkFileTree(
                 root,
                 emptySet(),
-                WATCH_DEPTH,
+                depth,
                 object : SimpleFileVisitor<Path>() {
                     override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                        if (!active()) return FileVisitResult.TERMINATE
                         runCatching {
                             dir.register(
                                 service,

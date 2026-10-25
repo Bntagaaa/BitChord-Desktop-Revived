@@ -80,6 +80,8 @@ object DesktopListeningStats {
 
     private val preferences: Preferences = Preferences.userRoot().node("com.music.bitchord.desktop.stats")
     private val lock = Any()
+    private var revision = 0L
+    private val summaries = DesktopRevisionCache<DesktopReplayPeriod, DesktopReplaySummary>(3)
 
     /** A month's listening. */
     internal data class Bucket(
@@ -107,14 +109,19 @@ object DesktopListeningStats {
             val day = at.toLocalDate().toString()
             bucket.days[day] = (bucket.days[day] ?: 0L) + added
             write(buckets.values.toList())
+            revision++
         }
     }
 
     fun summary(period: DesktopReplayPeriod = DesktopReplayPeriod.ALL_TIME): DesktopReplaySummary =
-        synchronized(lock) { summarise(read(), period, LocalDate.now()) }
+        synchronized(lock) {
+            val today = LocalDate.now()
+            summaries.get(period, revision to today) { summarise(read(), period, today) }
+        }
 
     /** Everything recorded, thrown away. */
     fun clear() = synchronized(lock) {
+        revision++
         DesktopPreferenceChunks.write(preferences, KEY_BUCKETS, "")
         DesktopPreferenceChunks.write(preferences, KEY_ENTRIES, "")
     }

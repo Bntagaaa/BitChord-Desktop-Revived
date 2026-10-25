@@ -58,6 +58,31 @@ internal object DesktopAppearanceSettings {
     private fun flag(key: String, default: Boolean) =
         MutableStateFlow(DesktopPersistence().boolean(key, default))
 
+    private const val KEY_PROFILE = "graphics_profile_v1"
+    private val _profile = MutableStateFlow(run {
+        val store = DesktopPersistence()
+        runCatching { DesktopGraphicsProfile.valueOf(store.string(KEY_PROFILE)) }.getOrNull()
+            ?: initialGraphicsProfile(
+                existingPreferences = store.preferences.keys().isNotEmpty(),
+                cores = Runtime.getRuntime().availableProcessors(),
+                memoryBytes = runCatching {
+                    (java.lang.management.ManagementFactory.getOperatingSystemMXBean() as? com.sun.management.OperatingSystemMXBean)?.totalMemorySize
+                }.getOrNull(),
+            ).also { store.saveString(KEY_PROFILE, it.name) }
+    })
+    val graphicsProfile: StateFlow<DesktopGraphicsProfile> = _profile
+
+    fun setGraphicsProfile(profile: DesktopGraphicsProfile) {
+        DesktopPersistence().saveString(KEY_PROFILE, profile.name)
+        _profile.value = profile
+    }
+
+    @Composable
+    fun blurScale(): Float {
+        val profile by graphicsProfile.collectAsState()
+        return profileBlurScale(profile)
+    }
+
     private val _reduceAnimation = flag(KEY_REDUCE_ANIMATION, false)
     private val _reduceDynamicBlur = flag(KEY_REDUCE_DYNAMIC_BLUR, false)
     private val _blurPreferences = DesktopBlurArea.entries.associateWith { flag(it.preferenceKey, true) }
@@ -83,7 +108,8 @@ internal object DesktopAppearanceSettings {
     fun blurEnabled(area: DesktopBlurArea): Boolean {
         val reduced by reduceDynamicBlur.collectAsState()
         val selected by blurPreference(area).collectAsState()
-        return effectiveDesktopBlur(reduced, selected)
+        val profile by graphicsProfile.collectAsState()
+        return effectiveDesktopBlur(reduced, selected, profile, area)
     }
 
     /** Windows 11 wallpaper-tinted, opaque navigation material. */

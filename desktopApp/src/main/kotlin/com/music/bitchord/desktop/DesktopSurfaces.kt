@@ -255,7 +255,8 @@ internal fun Modifier.desktopSearchGlass(
     reduceBlur: Boolean,
 ): Modifier {
     val fill = DesktopSearchFill
-    val surface = if (reduceBlur) {
+    val scale = DesktopAppearanceSettings.blurScale()
+    val surface = if (reduceBlur || !DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.SEARCH_PAGE)) {
         Modifier.background(fill)
     } else {
         // Paint underneath the effect, so an unattached/unsupported source cannot flash clear.
@@ -263,7 +264,7 @@ internal fun Modifier.desktopSearchGlass(
         Modifier.background(fill).hazeEffect(state = haze) {
             blurEnabled = true
             backgroundColor = fill
-            blurRadius = 32.dp
+            blurRadius = (32 * scale).dp
             tints = listOf(HazeTint(fill.copy(alpha = 0.82f)))
             fallbackTint = HazeTint(fill)
             noiseFactor = 0.02f

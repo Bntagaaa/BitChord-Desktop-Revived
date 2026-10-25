@@ -59,6 +59,7 @@ internal fun DesktopSidePanelColumn(
     // Held through the exit, so the column slides out with what it had in it rather than empty.
     var shown by remember { mutableStateOf(panel) }
     if (panel != null) shown = panel
+    val blurScale = DesktopAppearanceSettings.blurScale()
     val haze = LocalDesktopHaze.current
     val glassActive = blurBackground && haze != null &&
         DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.SIDE_PANELS)
@@ -74,7 +75,7 @@ internal fun DesktopSidePanelColumn(
         val glass = if (glassActive) {
             Modifier.hazeEffect(state = requireNotNull(haze)) {
                 blurEnabled = true
-                blurRadius = 40.dp
+                blurRadius = (40 * blurScale).dp
                 backgroundColor = panelFill
                 tints = listOf(HazeTint(panelFill.copy(alpha = 0.73f)))
             }
