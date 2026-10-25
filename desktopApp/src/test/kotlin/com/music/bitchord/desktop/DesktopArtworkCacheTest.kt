@@ -20,8 +20,11 @@ class DesktopArtworkCacheTest {
     @Test
     fun theBudgetIsAFractionOfTheHeapRatherThanEverything() {
         val budget = DesktopArtworkCache.budgetBytes
-        assertTrue(budget >= 32L * 1024 * 1024, "a small heap should still cache something: $budget")
-        assertTrue(budget <= 128L * 1024 * 1024, "the cache should not grow without reason: $budget")
+        val expected = (Runtime.getRuntime().maxMemory() / 12)
+            .coerceIn(12L * 1024 * 1024, 24L * 1024 * 1024)
+        assertEquals(expected, budget, "artwork cache must follow the new heap/12 policy")
+        assertTrue(budget >= 12L * 1024 * 1024, "a small heap should still cache something: $budget")
+        assertTrue(budget <= 24L * 1024 * 1024, "decoded artwork must stay bounded: $budget")
     }
 
     @Test
