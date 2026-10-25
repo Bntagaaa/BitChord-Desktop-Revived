@@ -249,7 +249,7 @@ private fun QuickSearchRow(item: SearchResult, active: Boolean, onHover: () -> U
             // Move, rather than Enter, avoids changing selection merely because keyboard scroll
             // places another row underneath a stationary pointer.
             .onPointerEvent(PointerEventType.Move) { onHover() }
-            .desktopNoHoverClickable(onSelect, hoverHighlight = false).padding(horizontal = 12.dp, vertical = 8.dp),
+            .desktopNoHoverClickable(hoverHighlight = false, onClick = onSelect).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopArtwork(
