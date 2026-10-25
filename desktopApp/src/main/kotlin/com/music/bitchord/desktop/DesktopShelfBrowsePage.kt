@@ -37,6 +37,7 @@ import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.UiState
+import com.music.bitchord.ui.screens.desktopTopScrollFade
 
 /** Full grid opened by a shelf's chevron; playlist see-all targets use the collection page instead. */
 @Composable
