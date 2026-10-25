@@ -3996,7 +3996,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                                     activeProfileId = DesktopAccounts.activeProfileId()
                                 }
                             },
-                            onOpenSettings = { overlays.accounts = false; openSettings() },
                             onDismiss = { overlays.accounts = false },
                         )
                     }
