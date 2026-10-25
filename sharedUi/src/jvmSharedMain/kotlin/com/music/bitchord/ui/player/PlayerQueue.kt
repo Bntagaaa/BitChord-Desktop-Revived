@@ -2,11 +2,16 @@ package com.music.bitchord.ui.player
 
 import com.music.bitchord.sharedui.resources.*
 import com.music.bitchord.ui.components.ExplicitSongTitle
+import com.music.bitchord.ui.components.ArtworkHover
+import com.music.bitchord.ui.components.ArtworkHoverMode
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -719,14 +724,20 @@ private fun InlineQueueRow(
     onDragEnd: () -> Unit = {},
 ) {
     val colors = LocalQueuePanelColors.current
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .hoverable(rowHoverInteraction)
             .clip(RoundedCornerShape(8.dp))
             .background(if (lifted) colors.primary.copy(alpha = 0.06f) else Color.Transparent)
-            // Disabled rather than ignored: a tap that ripples and then does
-            // nothing reads as the app having missed it.
-            .clickable(enabled = !locked, onClick = onClick)
+            .clickable(
+                interactionSource = rowHoverInteraction,
+                indication = null,
+                enabled = !locked,
+                onClick = onClick,
+            )
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -754,15 +765,18 @@ private fun InlineQueueRow(
             )
             Spacer(Modifier.width(4.dp))
         }
-        AsyncImage(
-            model = rememberRemoteArtworkUrl(song),
-            contentDescription = null,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .thumbnailBorder(RoundedCornerShape(6.dp))
-                .background(colors.primary.copy(alpha = 0.08f)),
-        )
+        ArtworkHover(
+            modifier = Modifier.size(44.dp).thumbnailBorder(RoundedCornerShape(6.dp)),
+            shape = RoundedCornerShape(6.dp),
+            mode = ArtworkHoverMode.DARKEN_AND_PLAY,
+            hovered = rowHovered,
+        ) {
+            AsyncImage(
+                model = rememberRemoteArtworkUrl(song),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().background(colors.primary.copy(alpha = 0.08f)),
+            )
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             ExplicitSongTitle(
