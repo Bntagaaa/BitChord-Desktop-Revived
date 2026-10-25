@@ -107,7 +107,7 @@ internal object DesktopSpotifyCanvas {
      * than the public REST search with a browser-session token.
      */
     private fun searchViaPathfinder(title: String, artist: String, album: String?, token: String): TrackHit? {
-        val clientToken = DesktopSpotifyLibraryAuth.cachedClientToken() ?: return null
+        val clientToken = DesktopSpotifyLibraryAuth.canvasClientToken() ?: return null
         val searchTerm = listOfNotNull(title, artist, album).joinToString(" ")
         val variables = buildJsonObject {
             put("searchTerm", searchTerm)
@@ -320,7 +320,7 @@ internal object DesktopSpotifyCanvas {
      * a 429 that reads exactly like rate limiting. Omitted rather than fatal when minting fails. */
     private fun authHeaders(token: String): Map<String, String> = buildMap {
         put("Authorization", "Bearer $token")
-        DesktopSpotifyLibraryAuth.cachedClientToken()?.let { put("Client-Token", it) }
+        DesktopSpotifyLibraryAuth.canvasClientToken()?.let { put("Client-Token", it) }
     }
 
     private fun get(url: String, token: String): JsonObject? =
