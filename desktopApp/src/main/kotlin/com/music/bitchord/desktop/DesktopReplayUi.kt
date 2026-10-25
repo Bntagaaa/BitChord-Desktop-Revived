@@ -237,7 +237,7 @@ private fun ChartRow(row: DesktopReplayRow, circular: Boolean, playable: Boolean
         Modifier
             .fillMaxWidth()
             .hoverable(rowHoverInteraction)
-            .desktopNoHoverClickable(onClick)
+            .desktopNoHoverClickable(onClick = onClick)
             .padding(horizontal = GUTTER, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
