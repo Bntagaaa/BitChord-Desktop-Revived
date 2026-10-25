@@ -51,7 +51,7 @@ internal fun DesktopShelfBrowsePage(
     modifier: Modifier = Modifier,
 ) {
     val gridState = rememberLazyGridState()
-    val items = (state as? UiState.Success)?.data.orEmpty()
+    val shelfItems = (state as? UiState.Success)?.data.orEmpty()
         .flatMap(HomeShelf::items)
         .distinctBy { it.browseId ?: it.videoId ?: "${it.title}\n${it.subtitle}" }
 
@@ -107,7 +107,7 @@ internal fun DesktopShelfBrowsePage(
             }
 
             is UiState.Success -> {
-                if (items.isEmpty()) {
+                if (shelfItems.isEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "browse-empty") {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
@@ -120,7 +120,7 @@ internal fun DesktopShelfBrowsePage(
                     }
                 } else {
                     items(
-                        items = items,
+                        items = shelfItems,
                         key = { it.browseId ?: it.videoId ?: "${it.title}-${it.subtitle}" },
                     ) { item ->
                         DesktopBrowseGridCard(
