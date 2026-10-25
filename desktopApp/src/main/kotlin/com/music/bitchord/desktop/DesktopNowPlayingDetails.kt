@@ -118,6 +118,10 @@ internal fun DesktopNowPlayingDetailsPanel(
     val tile = if (DesktopTheme.isDark) Color(0xFF222222) else Color(0xFFE5E9F0)
     val foreground = DesktopForeground
     val secondary = DesktopSecondary
+    // The first decoded Canvas frame is the best colour source. Until it exists, sample
+    // the album artwork so the lyric card is never stuck on a hard-coded brand red.
+    val canvasFrame = DesktopCanvasBackdrop.frameFor(spotifyCanvas?.url)
+    val artworkPalette = rememberDesktopArtworkPalette(song.thumbnailUrl, canvasFrame)
     val upcoming = queue.withIndex().filter { it.index > queueIndex }.take(2)
 
     Column(
@@ -129,7 +133,7 @@ internal fun DesktopNowPlayingDetailsPanel(
         // until the video decoder produces its first frame, or whenever no clip exists.
         Box(
             Modifier.fillMaxWidth()
-                .aspectRatio(if (spotifyCanvas != null) 9f / 16f else 1f)
+                .aspectRatio(if (spotifyCanvas != null) 0.78f else 1f)
                 .clip(shape),
         ) {
             DesktopArtwork(
@@ -159,6 +163,15 @@ internal fun DesktopNowPlayingDetailsPanel(
                         ),
                     ),
                 )
+                Text(
+                    song.title,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 16.dp, top = 17.dp, end = 16.dp),
+                )
                 Row(
                     Modifier.fillMaxWidth()
                         .align(Alignment.BottomStart)
@@ -169,7 +182,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                     Column(Modifier.weight(1f)) {
                         Text(
                             song.title,
-                            color = foreground,
+                            color = Color.White,
                             fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2,
@@ -177,7 +190,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                         )
                         Text(
                             song.artist,
-                            color = secondary,
+                            color = Color.White.copy(alpha = 0.82f),
                             fontSize = 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -191,7 +204,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                         Icon(
                             Icons.Rounded.Info,
                             "Artist details",
-                            tint = foreground,
+                            tint = Color.White,
                             modifier = Modifier.size(19.dp),
                         )
                     }
@@ -251,7 +264,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                 }
             }
         }
-        LyricsPreviewCard(lyrics, lyricsLoading, position, onShowLyrics, tile)
+        LyricsPreviewCard(lyrics, lyricsLoading, position, onShowLyrics, artworkPalette)
         ArtistOverviewCard(
             artistName = artistPage?.name?.takeIf(String::isNotBlank) ?: song.artist,
             artistImage = artistPage?.thumbnailUrl,
@@ -311,11 +324,15 @@ private fun LyricsPreviewCard(
     loading: Boolean,
     position: PlaybackPosition,
     onShowLyrics: () -> Unit,
-    tile: Color,
+    artworkPalette: DesktopArtworkPalette,
 ) {
     val dark = DesktopTheme.isDark
-    val cardColor = if (dark) Color(0xFF760012) else Color(0xFFF3C8CD)
-    val ink = if (dark) Color.White else Color(0xFF5F0618)
+    // Keep Spotify's muted, artwork-led surface: preserve a neutral base luminance
+    // and tint it with the Canvas/cover's chroma rather than painting the card red.
+    val base = if (dark) Color(0xFF393939) else Color(0xFFE5E9F0)
+    val source = if (artworkPalette == DesktopArtworkPalette.Default) Color(0xFF808080) else artworkPalette.primary
+    val cardColor = tintSurfaceFromArtwork(base, source, if (dark) 0.28f else 0.22f)
+    val ink = if (dark) Color.White else Color(0xFF1B2230)
     val lines = detailsLyricWindow(lyrics, position.positionMs)
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
@@ -430,6 +447,15 @@ private fun CreditsPreviewCard(
             }
         }
     }
+}
+
+private fun tintSurfaceFromArtwork(base: Color, source: Color, amount: Float): Color {
+    val average = (source.red + source.green + source.blue) / 3f
+    return Color(
+        red = (base.red + (source.red - average) * amount).coerceIn(0f, 1f),
+        green = (base.green + (source.green - average) * amount).coerceIn(0f, 1f),
+        blue = (base.blue + (source.blue - average) * amount).coerceIn(0f, 1f),
+    )
 }
 
 @Composable
