@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -400,6 +401,7 @@ private fun LyricsPreviewCard(
                 fontSize = 14.sp, color = ink.copy(alpha = 0.78f),
             )
         } else {
+            Box(Modifier.fillMaxWidth()) {
             AnimatedContent(
                 targetState = lines.map { it.text },
                 transitionSpec = {
@@ -468,6 +470,19 @@ private fun LyricsPreviewCard(
                         )
                     }
                 }
+            }
+                // A second, card-local fade lets the final lyric recede into the same
+                // surface, instead of leaving the last row visibly cut off.
+                Box(
+                    Modifier.matchParentSize().background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.58f to Color.Transparent,
+                            0.82f to cardColor.copy(alpha = 0.58f),
+                            1f to cardColor,
+                        ),
+                    ),
+                )
             }
         }
     }
