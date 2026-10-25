@@ -83,6 +83,12 @@ internal object DesktopSpotifyLibraryAuth {
     fun cachedClientToken(): String? =
         cachedClientToken?.takeIf { System.currentTimeMillis() < clientTokenExpiresAtMs - 30_000 }
 
+    /**
+     * Canvas follows the upstream provider and actively retries minting its client token
+     * when the cache is empty or expired, rather than silently skipping Pathfinder.
+     */
+    internal fun canvasClientToken(): String? = clientToken()
+
     private fun useCookie(cookie: String) {
         if (cachedCookie == cookie) return
         synchronized(this) {
