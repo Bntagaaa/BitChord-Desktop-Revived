@@ -12,6 +12,7 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.RepeatMode
@@ -534,22 +535,27 @@ private fun SongRowContent(
         targetValue = if (isCurrent) activeTint else MaterialTheme.colorScheme.onBackground,
         label = "song row title",
     )
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
     val activeBackground by animateColorAsState(
-        targetValue = if (isCurrent || selected) activeTint.copy(alpha = 0.14f) else Color.Transparent,
+        targetValue = when {
+            isCurrent || selected -> activeTint.copy(alpha = 0.14f)
+            rowHovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f)
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
         label = "song row background",
     )
     // A Spotify track still being matched to a YouTube Music song, or one that
     // has no match: shown, but not something a tap or a menu can act on.
     val matching = song.isMatchPending
     val unavailable = song.isMatchMissing
-    val rowHoverInteraction = remember { MutableInteractionSource() }
-    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
     Row(
         modifier = modifier
             .fillMaxWidth()
             .hoverable(rowHoverInteraction)
             .alpha(if (unavailable) 0.45f else 1f)
-            .background(activeBackground)
+            .background(activeBackground, RoundedCornerShape(8.dp))
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
             .contextClick(onMore ?: onLongPress)
             .padding(horizontal = PAGE_GUTTER, vertical = 4.dp),
