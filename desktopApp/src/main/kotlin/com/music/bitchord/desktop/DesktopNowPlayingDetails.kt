@@ -144,22 +144,12 @@ internal fun DesktopNowPlayingDetailsPanel(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(13.dp),
     ) {
-        // Keep the Canvas and Lyrics Preview in one visual group. The fade below the
-        // moving artwork meets the lyric surface directly instead of leaving a hard strip.
-        Column(
-            Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(if (spotifyCanvas != null) 0.dp else 13.dp),
-        ) {
         // Spotify Canvas clips are portrait loops. Keep the still cover underneath
         // until the video decoder produces its first frame, or whenever no clip exists.
         Box(
             Modifier.fillMaxWidth()
                 .aspectRatio(if (spotifyCanvas != null) 0.78f else 1f)
-                .clip(
-                    if (spotifyCanvas != null) {
-                        RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
-                    } else shape,
-                ),
+                .clip(shape),
         ) {
             DesktopArtwork(
                 url = song.thumbnailUrl,
@@ -176,22 +166,19 @@ internal fun DesktopNowPlayingDetailsPanel(
                         isPlaying = isPlaying,
                     )
                 }
-                // Feather both edges into Astra's panel surface while leaving the middle of
-                // the Canvas sharp and true to its original colours; no full-frame mask or blur.
+                // Blend only the lower edge into Astra's panel surface. The Canvas itself
+                // stays sharp and keeps its original colours; no full-frame black mask or blur.
                 Box(
                     Modifier.fillMaxSize().background(
                         Brush.verticalGradient(
-                            // Keep the top scrim light; feather the bottom over a longer
-                            // distance and resolve into the exact Lyrics Preview surface.
-                            0f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.48f),
-                            0.10f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.22f),
-                            0.20f to Color.Transparent,
-                            0.48f to Color.Transparent,
-                            0.60f to lyricsCardColor.copy(alpha = 0.10f),
-                            0.72f to lyricsCardColor.copy(alpha = 0.30f),
-                            0.84f to lyricsCardColor.copy(alpha = 0.62f),
-                            0.94f to lyricsCardColor.copy(alpha = 0.90f),
-                            1f to lyricsCardColor,
+                            // Let the Canvas emerge from the panel surface at the top as well
+                            // as disappear into it at the bottom. The middle stays untouched.
+                            0f to DesktopTheme.palette.lyricsSurface,
+                            0.10f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.58f),
+                            0.22f to Color.Transparent,
+                            0.62f to Color.Transparent,
+                            0.82f to DesktopTheme.palette.lyricsSurface.copy(alpha = 0.42f),
+                            1f to DesktopTheme.palette.lyricsSurface,
                         ),
                     ),
                 )
@@ -302,9 +289,7 @@ internal fun DesktopNowPlayingDetailsPanel(
             position = position,
             onShowLyrics = onShowLyrics,
             surfaceColor = lyricsCardColor,
-            mergeWithCanvas = spotifyCanvas != null,
         )
-        }
         ArtistOverviewCard(
             artistName = artistPage?.name?.takeIf(String::isNotBlank) ?: song.artist,
             artistImage = artistPage?.thumbnailUrl,
@@ -370,7 +355,6 @@ private fun LyricsPreviewCard(
     position: PlaybackPosition,
     onShowLyrics: () -> Unit,
     surfaceColor: Color,
-    mergeWithCanvas: Boolean,
 ) {
     val dark = DesktopTheme.isDark
     val cardColor = surfaceColor
@@ -382,9 +366,7 @@ private fun LyricsPreviewCard(
     val motionMs = if (reduceAnimation) 0 else LYRICS_PREVIEW_MOTION_MS
     val exitMs = if (reduceAnimation) 0 else LYRICS_PREVIEW_EXIT_MS
     val lines = detailsLyricWindow(lyrics, position.positionMs)
-    val cardShape = if (mergeWithCanvas) {
-        RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 9.dp, bottomEnd = 9.dp)
-    } else RoundedCornerShape(9.dp)
+    val cardShape = RoundedCornerShape(9.dp)
     Column(
         Modifier.fillMaxWidth().clip(cardShape)
             .background(cardColor).clickable(onClick = onShowLyrics).padding(17.dp),
