@@ -234,6 +234,8 @@ internal fun InlineQueue(
     onRevealPlayer: () -> Unit = {},
     onHidePlayer: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** The desktop side panel supplies the shared Lyrics / Queue / Now playing header. */
+    showTitle: Boolean = true,
 ) {
     val colors = LocalQueuePanelColors.current
     val listState = rememberLazyListState()
@@ -271,21 +273,27 @@ internal fun InlineQueue(
     }
 
     Column(modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(Res.string.queue),
-                style = MaterialTheme.typography.titleLarge,
-                color = colors.primary,
-                modifier = Modifier.weight(1f),
-            )
-            if (tracks.user.isNotEmpty()) {
-                QueueClearButton(MaterialTheme.typography.titleMedium, controlsLocked, onClear)
+        if (showTitle || tracks.user.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (showTitle) {
+                    Text(
+                        text = stringResource(Res.string.queue),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = colors.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                if (tracks.user.isNotEmpty()) {
+                    QueueClearButton(MaterialTheme.typography.titleMedium, controlsLocked, onClear)
+                }
             }
+            Spacer(Modifier.height(4.dp))
         }
-        Spacer(Modifier.height(4.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
