@@ -5974,7 +5974,7 @@ private fun DesktopArtistPage(
                 }
 
                 val palette = rememberDesktopArtworkPalette(appleArt?.heroUrl ?: artist.thumbnailUrl)
-                val artistBackground = appleArt?.backgroundColor?.let(::Color) ?: DesktopBackground
+                val artistBackground = appleArt?.backgroundColor?.let { Color(it) } ?: DesktopBackground
                 val isLightBackground =
                     (artistBackground.red * 0.2126f + artistBackground.green * 0.7152f +
                         artistBackground.blue * 0.0722f) > 0.58f
@@ -6236,11 +6236,27 @@ private fun DesktopArtistBanner(
                 Icon(
                     Icons.Rounded.PlayArrow,
                     contentDescription = "Play $name",
-                    tint = appleArt?.keyColor?.let(::Color) ?: Color(0xFF654C3A),
+                    tint = appleArt?.keyColor?.let { Color(it) } ?: Color(0xFF654C3A),
                     modifier = Modifier.size(31.dp),
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun DesktopStatChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+            .border(0.5.dp, MaterialTheme.colorScheme.outline, CircleShape)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(7.dp))
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
