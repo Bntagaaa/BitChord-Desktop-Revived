@@ -556,7 +556,7 @@ private fun SongRowContent(
             .hoverable(rowHoverInteraction)
             .alpha(if (unavailable) 0.45f else 1f)
             .background(activeBackground, RoundedCornerShape(8.dp))
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress, hoverHighlight = false)
             .contextClick(onMore ?: onLongPress)
             .padding(horizontal = PAGE_GUTTER, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
