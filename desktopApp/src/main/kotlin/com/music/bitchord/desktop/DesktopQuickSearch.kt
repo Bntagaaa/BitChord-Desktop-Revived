@@ -59,6 +59,7 @@ import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.BrowseType
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.ui.components.ArtworkHoverMode
 import com.music.bitchord.ui.icons.BitChordIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -234,19 +235,20 @@ private fun QuickSearchRow(item: SearchResult, active: Boolean, onHover: () -> U
     val artist = (item as? SearchResult.Browse)?.item
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(5.dp))
-            .background(if (active) DesktopRowHover else Color.Transparent)
             .semantics { selected = active }
             .focusProperties { canFocus = false }
             // Move, rather than Enter, avoids changing selection merely because keyboard scroll
             // places another row underneath a stationary pointer.
             .onPointerEvent(PointerEventType.Move) { onHover() }
-            .clickable(onClick = onSelect).padding(horizontal = 12.dp, vertical = 8.dp),
+            .desktopNoHoverClickable(onSelect).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopArtwork(
             song?.thumbnailUrl ?: artist?.thumbnailUrl,
             Modifier.size(40.dp).clip(if (artist != null) CircleShape else RoundedCornerShape(5.dp)),
             px = ROW_ART_PX,
+            hoverMode = if (song != null) ArtworkHoverMode.DARKEN_AND_PLAY else ArtworkHoverMode.DARKEN_ONLY,
+            hovered = active,
         )
         Spacer(Modifier.width(13.dp))
         Column(Modifier.weight(1f)) {
