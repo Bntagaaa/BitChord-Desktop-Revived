@@ -106,25 +106,12 @@ internal fun DesktopNowPlayingDetailsPanel(
     var spotifyCanvas by remember(song.videoId, song.title, song.artist) {
         mutableStateOf<DesktopCanvasArtwork?>(null)
     }
-    var canvasStatus by remember(song.videoId) { mutableStateOf("") }
-    var canvasRetry by remember(song.videoId) { androidx.compose.runtime.mutableIntStateOf(0) }
-    LaunchedEffect(song.videoId, song.title, song.artist, song.albumName, animatedCanvas, canvasRetry) {
+    // Look for Canvas silently. When it is unavailable, the album artwork remains the
+    // fallback; the details panel does not need to expose lookup diagnostics to listeners.
+    LaunchedEffect(song.videoId, song.title, song.artist, song.albumName, animatedCanvas) {
         spotifyCanvas = null
-        when {
-            !animatedCanvas -> canvasStatus = "Animated Canvas is disabled in Settings"
-            DesktopSpotifyToken.cookie().isBlank() -> canvasStatus = "Connect Spotify in Settings to show Canvas"
-            else -> {
-                canvasStatus = "Looking for Spotify Canvas…"
-                // Preserve explicit failures in the UI instead of treating every exception
-                // as proof that Spotify does not have a Canvas for this track.
-                val result = runCatching { DesktopCanvasClient.lookupSpotify(song) }
-                spotifyCanvas = result.getOrNull()
-                canvasStatus = when {
-                    result.isFailure -> "Spotify Canvas request failed"
-                    spotifyCanvas == null -> "No Spotify Canvas found for this track"
-                    else -> ""
-                }
-            }
+        if (animatedCanvas && DesktopSpotifyToken.cookie().isNotBlank()) {
+            spotifyCanvas = runCatching { DesktopCanvasClient.lookupSpotify(song) }.getOrNull()
         }
     }
 
@@ -227,28 +214,6 @@ internal fun DesktopNowPlayingDetailsPanel(
                             modifier = Modifier.size(19.dp),
                         )
                     }
-                }
-            }
-        }
-        if (spotifyCanvas == null && canvasStatus.isNotEmpty()) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 3.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(canvasStatus, color = secondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                if (animatedCanvas && DesktopSpotifyToken.cookie().isNotBlank() &&
-                    canvasStatus != "Looking for Spotify Canvas…"
-                ) {
-                    Text(
-                        "Retry",
-                        fontSize = 11.sp,
-                        color = foreground,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp))
-                            .clickable { canvasRetry++ }
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                    )
                 }
             }
         }
