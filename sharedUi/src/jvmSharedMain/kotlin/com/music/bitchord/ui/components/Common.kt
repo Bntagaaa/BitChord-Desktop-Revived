@@ -8,7 +8,13 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -44,6 +50,7 @@ import com.music.bitchord.ui.haptics.rememberHaptics
 import kotlin.math.abs
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -98,6 +105,58 @@ import androidx.compose.foundation.border
  * heading starts at the same place whichever page it is on.
  */
 val PAGE_GUTTER = 16.dp
+
+/** Artwork hover treatment shared by song rows and square music cards. */
+enum class ArtworkHoverMode {
+    DARKEN_ONLY,
+    DARKEN_AND_PLAY,
+}
+
+/**
+ * Darkens only the artwork when its parent row/card is hovered, with an optional
+ * Play glyph that fades in for track rows. The surrounding surface stays clear.
+ */
+@Composable
+fun ArtworkHover(
+    modifier: Modifier = Modifier,
+    shape: Shape,
+    mode: ArtworkHoverMode,
+    hovered: Boolean? = null,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val locallyHovered by interaction.collectIsHoveredAsState()
+    val isHovered = hovered ?: locallyHovered
+    val progress by animateFloatAsState(
+        targetValue = if (isHovered) 1f else 0f,
+        animationSpec = tween(durationMillis = 170),
+        label = "artwork-hover",
+    )
+
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .then(if (hovered == null) Modifier.hoverable(interaction) else Modifier),
+    ) {
+        content()
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(Color.Black.copy(alpha = 0.38f * progress)),
+        )
+        if (mode == ArtworkHoverMode.DARKEN_AND_PLAY) {
+            Icon(
+                imageVector = Icons.Rounded.PlayArrow,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(26.dp)
+                    .alpha(progress),
+            )
+        }
+    }
+}
 
 /**
  * The inset the floating chrome sits at: the mini player, the tab bar and the
@@ -476,8 +535,15 @@ private fun SongRowContent(
         targetValue = if (isCurrent) activeTint else MaterialTheme.colorScheme.onBackground,
         label = "song row title",
     )
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
     val activeBackground by animateColorAsState(
-        targetValue = if (isCurrent || selected) activeTint.copy(alpha = 0.14f) else Color.Transparent,
+        targetValue = when {
+            isCurrent || selected -> activeTint.copy(alpha = 0.14f)
+            rowHovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f)
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
         label = "song row background",
     )
     // A Spotify track still being matched to a YouTube Music song, or one that
@@ -487,9 +553,10 @@ private fun SongRowContent(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .hoverable(rowHoverInteraction)
             .alpha(if (unavailable) 0.45f else 1f)
-            .background(activeBackground)
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .background(activeBackground, RoundedCornerShape(8.dp))
+            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress, hoverHighlight = false)
             .contextClick(onMore ?: onLongPress)
             .padding(horizontal = PAGE_GUTTER, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -521,15 +588,16 @@ private fun SongRowContent(
                 }
             }
         } else {
-            Box(Modifier.size(52.dp)) {
+            ArtworkHover(
+                modifier = Modifier.size(52.dp).thumbnailBorder(RoundedCornerShape(8.dp)),
+                shape = RoundedCornerShape(8.dp),
+                mode = ArtworkHoverMode.DARKEN_AND_PLAY,
+                hovered = rowHovered,
+            ) {
                 AsyncImage(
                     model = com.music.bitchord.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
                     contentDescription = null,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clip(RoundedCornerShape(8.dp))
-                        .thumbnailBorder(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
                 )
                 if (searchPlayingStyle && isCurrent && isPlaying) {
                     SearchPlayingBars(Modifier.align(Alignment.Center))
