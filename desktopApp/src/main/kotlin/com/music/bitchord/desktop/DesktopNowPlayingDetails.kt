@@ -159,8 +159,8 @@ internal fun DesktopNowPlayingDetailsPanel(
                         isPlaying = isPlaying,
                     )
                 }
-                // Blend only the lower edge into Astra's panel surface. The Canvas itself
-                // stays sharp and keeps its original colours; no full-frame black mask or blur.
+                // Feather both edges into Astra's panel surface while leaving the middle of
+                // the Canvas sharp and true to its original colours; no full-frame mask or blur.
                 Box(
                     Modifier.fillMaxSize().background(
                         Brush.verticalGradient(
