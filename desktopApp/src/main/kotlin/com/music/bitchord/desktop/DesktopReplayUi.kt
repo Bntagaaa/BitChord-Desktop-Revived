@@ -250,7 +250,7 @@ private fun ChartRow(row: DesktopReplayRow, circular: Boolean, playable: Boolean
                 hoverMode = if (playable) ArtworkHoverMode.DARKEN_AND_PLAY else ArtworkHoverMode.DARKEN_ONLY,
                 hovered = rowHovered,
             )
-        }
+        } else {
             InitialTile(row.title, 48.dp, shape)
         }
         Spacer(Modifier.width(12.dp))
