@@ -449,7 +449,7 @@ private fun CreditsPreviewCard(
     }
 }
 
-private fun tintSurfaceFromArtwork(base: Color, source: Color, amount: Float): Color {
+internal fun tintSurfaceFromArtwork(base: Color, source: Color, amount: Float): Color {
     val average = (source.red + source.green + source.blue) / 3f
     return Color(
         red = (base.red + (source.red - average) * amount).coerceIn(0f, 1f),
