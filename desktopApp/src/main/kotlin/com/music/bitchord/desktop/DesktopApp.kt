@@ -5974,7 +5974,11 @@ private fun DesktopArtistPage(
                 }
 
                 val palette = rememberDesktopArtworkPalette(appleArt?.heroUrl ?: artist.thumbnailUrl)
-                val artistBackground = appleArt?.backgroundColor?.let { Color(it) } ?: Color(\n                    palette.primary.red * 0.42f,\n                    palette.primary.green * 0.42f,\n                    palette.primary.blue * 0.42f,\n                )
+                val artistBackground = appleArt?.backgroundColor?.let { Color(it) } ?: Color(
+                    palette.primary.red * 0.42f,
+                    palette.primary.green * 0.42f,
+                    palette.primary.blue * 0.42f,
+                )
                 val isLightBackground =
                     (artistBackground.red * 0.2126f + artistBackground.green * 0.7152f +
                         artistBackground.blue * 0.0722f) > 0.58f
