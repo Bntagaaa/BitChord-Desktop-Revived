@@ -206,12 +206,14 @@ private fun NewSectionHeader(
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(3.dp))
-        Icon(
-            imageVector = BitChordIcons.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
+        if (shelf.moreBrowseId != null) {
+            Icon(
+                imageVector = BitChordIcons.ChevronRight,
+                contentDescription = "Open ${shelf.title}",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }
 
