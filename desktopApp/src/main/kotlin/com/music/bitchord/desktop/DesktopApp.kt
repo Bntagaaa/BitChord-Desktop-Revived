@@ -12,6 +12,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateListOf
 import com.music.bitchord.ui.components.PAGE_GUTTER
+import com.music.bitchord.ui.components.ArtworkHoverMode
 import com.music.bitchord.ui.components.trackColumnWidth
 import com.music.bitchord.ui.replay.ReplayCreditCard
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -6406,8 +6407,15 @@ private fun DesktopLibrarySongContent(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             gridItems(songs, key = Song::videoId) { song ->
-                Column(Modifier.fillMaxWidth().clickable { onSongClick(song) }) {
-                    DesktopArtwork(song.thumbnailUrl, Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(12.dp)))
+                val artworkHoverInteraction = remember { MutableInteractionSource() }
+                val artworkHovered by artworkHoverInteraction.collectIsHoveredAsState()
+                Column(Modifier.fillMaxWidth().hoverable(artworkHoverInteraction).desktopNoHoverClickable { onSongClick(song) }) {
+                    DesktopArtwork(
+                        song.thumbnailUrl,
+                        Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(12.dp)),
+                        hoverMode = ArtworkHoverMode.DARKEN_ONLY,
+                        hovered = artworkHovered,
+                    )
                     Spacer(Modifier.height(7.dp))
                     Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
                     Text(song.artist, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -6455,8 +6463,15 @@ private fun DesktopLibraryGroupingContent(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             gridItems(groups, key = { it.key }) { group ->
-                Column(Modifier.fillMaxWidth().clickable { onGroupClick(group.key to group.value) }) {
-                    DesktopArtwork(group.value.firstOrNull()?.thumbnailUrl, Modifier.fillMaxWidth().height(150.dp).clip(CircleShape))
+                val artworkHoverInteraction = remember { MutableInteractionSource() }
+                val artworkHovered by artworkHoverInteraction.collectIsHoveredAsState()
+                Column(Modifier.fillMaxWidth().hoverable(artworkHoverInteraction).desktopNoHoverClickable { onGroupClick(group.key to group.value) }) {
+                    DesktopArtwork(
+                        group.value.firstOrNull()?.thumbnailUrl,
+                        Modifier.fillMaxWidth().height(150.dp).clip(CircleShape),
+                        hoverMode = ArtworkHoverMode.DARKEN_ONLY,
+                        hovered = artworkHovered,
+                    )
                     Spacer(Modifier.height(7.dp))
                     Text(group.key, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
                     Text("${group.value.size} songs", color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
@@ -6471,11 +6486,18 @@ private fun DesktopLibraryGroupingContent(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             items(groups, key = { it.key }) { group ->
+                val artworkHoverInteraction = remember { MutableInteractionSource() }
+                val artworkHovered by artworkHoverInteraction.collectIsHoveredAsState()
                 Row(
-                    Modifier.fillMaxWidth().clickable { onGroupClick(group.key to group.value) }.padding(vertical = 8.dp),
+                    Modifier.fillMaxWidth().hoverable(artworkHoverInteraction).desktopNoHoverClickable { onGroupClick(group.key to group.value) }.padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    DesktopArtwork(group.value.firstOrNull()?.thumbnailUrl, Modifier.size(54.dp).clip(CircleShape))
+                    DesktopArtwork(
+                        group.value.firstOrNull()?.thumbnailUrl,
+                        Modifier.size(54.dp).clip(CircleShape),
+                        hoverMode = ArtworkHoverMode.DARKEN_ONLY,
+                        hovered = artworkHovered,
+                    )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(group.key, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
@@ -7886,12 +7908,15 @@ private fun DesktopCollectionSongRow(
     /** Takes this row out of the playlist being read. */
     onRemove: ((Song) -> Unit)? = null,
 ) {
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
     Row(
         Modifier
             .fillMaxWidth()
+            .hoverable(rowHoverInteraction)
             .clip(RoundedCornerShape(6.dp))
             .background(if (striped) DesktopForeground.copy(alpha = 0.04f) else Color.Transparent)
-            .clickable { onClick(song) }
+            .desktopNoHoverClickable { onClick(song) }
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -7906,7 +7931,13 @@ private fun DesktopCollectionSongRow(
         Spacer(Modifier.width(12.dp))
         // No sleeve on an album's rows.
         if (collectionType != BrowseType.ALBUM) {
-            DesktopArtwork(song.thumbnailUrl, Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)), px = ROW_ART_PX)
+            DesktopArtwork(
+                song.thumbnailUrl,
+                Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)),
+                px = ROW_ART_PX,
+                hoverMode = ArtworkHoverMode.DARKEN_AND_PLAY,
+                hovered = rowHovered,
+            )
             Spacer(Modifier.width(12.dp))
         }
         Text(
@@ -8261,13 +8292,16 @@ internal fun BoxScope.DesktopShelfArrow(
 private fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
     val width = 158.dp
     val shape = RoundedCornerShape(10.dp)
+    val artworkHoverInteraction = remember { MutableInteractionSource() }
+    val artworkHovered by artworkHoverInteraction.collectIsHoveredAsState()
     Column(
         Modifier
             .width(width)
+            .hoverable(artworkHoverInteraction)
             // The whole card answers the pointer, artwork and captions together, so the two do not
             // move independently of each other.
             .desktopHoverLift(shape)
-            .clickable { onClick(item) },
+            .desktopNoHoverClickable { onClick(item) },
     ) {
         Box(
             Modifier
@@ -8276,7 +8310,7 @@ private fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
                 .background(DesktopGlass)
                 .border(1.dp, DesktopForeground.copy(alpha = 0.12f), shape),
         ) {
-            DesktopArtwork(item.thumbnailUrl, Modifier.fillMaxSize())
+            DesktopArtwork(item.thumbnailUrl, Modifier.fillMaxSize(), hoverMode = ArtworkHoverMode.DARKEN_ONLY, hovered = artworkHovered)
         }
         Spacer(Modifier.height(8.dp))
         Text(item.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -8298,12 +8332,15 @@ private fun DesktopSongRow(
     /** The row's own "…", when the page has a menu to give it. */
     menu: (@Composable (Song) -> Unit)? = null,
 ) {
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
     Row(
         Modifier
             .fillMaxWidth()
+            .hoverable(rowHoverInteraction)
             .clip(RoundedCornerShape(10.dp))
             .background(if (DesktopTheme.isDark) DesktopGlass.copy(alpha = 0.38f) else DesktopTheme.palette.cardInsetFill)
-            .clickable { onClick(song) }
+            .desktopNoHoverClickable { onClick(song) }
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -8321,6 +8358,8 @@ private fun DesktopSongRow(
             song.thumbnailUrl,
             Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
             px = ROW_ART_PX,
+            hoverMode = ArtworkHoverMode.DARKEN_AND_PLAY,
+            hovered = rowHovered,
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
