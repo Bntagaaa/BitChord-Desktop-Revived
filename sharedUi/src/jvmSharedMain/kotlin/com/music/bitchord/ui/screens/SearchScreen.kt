@@ -5,6 +5,9 @@ import androidx.compose.ui.unit.Dp
 import com.music.bitchord.sharedui.resources.*
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -701,10 +704,19 @@ private fun SuggestionRow(
     onFill: (() -> Unit)?,
     onClick: () -> Unit,
 ) {
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
+    val rowHoverBackground by animateColorAsState(
+        targetValue = if (rowHovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "search-suggestion-hover-background",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .hoverable(rowHoverInteraction)
+            .background(rowHoverBackground, RoundedCornerShape(8.dp))
+            .clickable(interactionSource = rowHoverInteraction, indication = null, onClick = onClick)
             .padding(
                 start = PAGE_GUTTER,
                 end = 8.dp,
@@ -925,10 +937,16 @@ private fun RecentSearchEntityRow(
 ) {
     val rowHoverInteraction = remember { MutableInteractionSource() }
     val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
+    val rowHoverBackground by animateColorAsState(
+        targetValue = if (rowHovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "search-history-hover-background",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(rowHoverInteraction)
+            .background(rowHoverBackground, RoundedCornerShape(8.dp))
             .clickable(interactionSource = rowHoverInteraction, indication = null, onClick = onClick)
             .padding(start = PAGE_GUTTER, end = 8.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
