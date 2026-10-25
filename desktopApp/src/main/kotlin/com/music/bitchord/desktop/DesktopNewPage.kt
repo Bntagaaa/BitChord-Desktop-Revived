@@ -3,6 +3,9 @@ package com.music.bitchord.desktop
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,19 +32,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.UiState
+import com.music.bitchord.ui.components.ArtworkHover
+import com.music.bitchord.ui.components.ArtworkHoverMode
 import com.music.bitchord.ui.components.PAGE_GUTTER
+import com.music.bitchord.ui.screens.CompactTrackRow
+import com.music.bitchord.ui.screens.LocalDesktopCompactHeadings
 import com.music.bitchord.ui.icons.BitChordIcons
 
 /**
@@ -73,17 +79,12 @@ internal fun DesktopNewPage(
         item(key = "new-page-title") {
             Text(
                 text = "New",
-                modifier = Modifier.padding(
-                    start = PAGE_GUTTER,
-                    end = PAGE_GUTTER,
-                    top = 10.dp,
-                    bottom = 16.dp,
-                ),
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp,
-                ),
+                modifier = Modifier.padding(horizontal = PAGE_GUTTER, vertical = 8.dp),
+                style = if (LocalDesktopCompactHeadings.current) {
+                    MaterialTheme.typography.headlineLarge
+                } else {
+                    MaterialTheme.typography.displayLarge
+                },
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
             )
@@ -188,8 +189,7 @@ private fun NewSectionHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = PAGE_GUTTER, vertical = 8.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .padding(horizontal = PAGE_GUTTER, vertical = 10.dp)
             .combinedClickable(
                 enabled = shelf.moreBrowseId != null,
                 onClick = { onOpenMore(shelf) },
@@ -199,21 +199,22 @@ private fun NewSectionHeader(
     ) {
         Text(
             text = shelf.title,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
+            style = if (LocalDesktopCompactHeadings.current) {
+                MaterialTheme.typography.titleLarge
+            } else {
+                MaterialTheme.typography.headlineMedium
+            },
             color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(3.dp))
         if (shelf.moreBrowseId != null) {
             Icon(
                 imageVector = BitChordIcons.ChevronRight,
                 contentDescription = "Open ${shelf.title}",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.padding(start = 8.dp).size(20.dp),
             )
         }
     }
@@ -241,37 +242,46 @@ private fun NewAlbumShelf(
                 items = shelf.items,
                 key = { it.browseId ?: it.videoId ?: "${it.title}-${it.subtitle}" },
             ) { item ->
+                val hoverInteraction = remember { MutableInteractionSource() }
+                val hovered by hoverInteraction.collectIsHoveredAsState()
                 Column(
                     modifier = Modifier
                         .width(208.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .hoverable(hoverInteraction)
                         .combinedClickable(
+                            interactionSource = hoverInteraction,
+                            indication = null,
                             onClick = { onItemClick(item, shelf.title) },
                             onLongClick = { onItemLongPress?.invoke(item) },
                         ),
                 ) {
-                    AsyncImage(
-                        model = item.thumbnailUrl,
-                        contentDescription = item.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-                    )
-                    Spacer(Modifier.height(6.dp))
+                    ArtworkHover(
+                        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        mode = ArtworkHoverMode.DARKEN_ONLY,
+                        hovered = hovered,
+                    ) {
+                        AsyncImage(
+                            model = item.thumbnailUrl,
+                            contentDescription = item.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
                     Text(
                         text = item.title,
                         color = MaterialTheme.colorScheme.onBackground,
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                        style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = item.subtitle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -311,50 +321,16 @@ private fun NewTrendingShelf(
                 columns.forEach { columnItems ->
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
                         columnItems.forEach { item ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .combinedClickable(
-                                        onClick = { onItemClick(item, shelf.title) },
-                                        onLongClick = { onItemLongPress?.invoke(item) },
-                                    )
-                                    .padding(4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                AsyncImage(
-                                    model = item.thumbnailUrl,
-                                    contentDescription = item.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(42.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.title,
-                                        color = MaterialTheme.colorScheme.onBackground,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        text = item.subtitle,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
+                            CompactTrackRow(
+                                title = item.title,
+                                subtitle = item.subtitle,
+                                thumbnailUrl = item.thumbnailUrl,
+                                onClick = { onItemClick(item, shelf.title) },
+                                onLongPress = onItemLongPress?.let { callback -> { callback(item) } },
+                            )
                         }
                     }
                 }
@@ -385,40 +361,46 @@ private fun NewVideoShelf(
                 items = shelf.items,
                 key = { it.browseId ?: it.videoId ?: "${it.title}-${it.subtitle}" },
             ) { item ->
+                val hoverInteraction = remember { MutableInteractionSource() }
+                val hovered by hoverInteraction.collectIsHoveredAsState()
                 Column(
                     modifier = Modifier
                         .width(260.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .hoverable(hoverInteraction)
                         .combinedClickable(
+                            interactionSource = hoverInteraction,
+                            indication = null,
                             onClick = { onItemClick(item, shelf.title) },
                             onLongClick = { onItemLongPress?.invoke(item) },
                         ),
                 ) {
-                    AsyncImage(
-                        model = item.thumbnailUrl,
-                        contentDescription = item.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-                    )
-                    Spacer(Modifier.height(6.dp))
+                    ArtworkHover(
+                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+                        shape = RoundedCornerShape(12.dp),
+                        mode = ArtworkHoverMode.DARKEN_ONLY,
+                        hovered = hovered,
+                    ) {
+                        AsyncImage(
+                            model = item.thumbnailUrl,
+                            contentDescription = item.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
                     Text(
                         text = item.title,
                         color = MaterialTheme.colorScheme.onBackground,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                        ),
+                        style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = item.subtitle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

@@ -494,18 +494,15 @@ private fun RecentTrackRow(
     isCurrent: Boolean,
     isPlaying: Boolean,
 ) {
-    // Give Recents a roomier vertical rhythm without changing shared track rows.
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        CompactTrackRow(
-            title = item.title,
-            subtitle = item.subtitle,
-            thumbnailUrl = item.thumbnailUrl,
-            onClick = onClick,
-            onLongPress = onLongPress,
-            isCurrent = isCurrent,
-            isPlaying = isPlaying,
-        )
-    }
+    CompactTrackRow(
+        title = item.title,
+        subtitle = item.subtitle,
+        thumbnailUrl = item.thumbnailUrl,
+        onClick = onClick,
+        onLongPress = onLongPress,
+        isCurrent = isCurrent,
+        isPlaying = isPlaying,
+    )
 }
 
 /**

@@ -8648,17 +8648,18 @@ internal fun BoxScope.DesktopShelfArrow(
 @Composable
 private fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
     val width = 158.dp
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(12.dp)
     val artworkHoverInteraction = remember { MutableInteractionSource() }
     val artworkHovered by artworkHoverInteraction.collectIsHoveredAsState()
     Column(
         Modifier
             .width(width)
             .hoverable(artworkHoverInteraction)
-            // The whole card answers the pointer, artwork and captions together, so the two do not
-            // move independently of each other.
-            .desktopHoverLift(shape)
-            .desktopNoHoverClickable { onClick(item) },
+            .clickable(
+                interactionSource = artworkHoverInteraction,
+                indication = null,
+                onClick = { onClick(item) },
+            ),
     ) {
         Box(
             Modifier
@@ -8667,11 +8668,29 @@ private fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
                 .background(DesktopGlass)
                 .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), shape),
         ) {
-            DesktopArtwork(item.thumbnailUrl, Modifier.fillMaxSize(), hoverMode = ArtworkHoverMode.DARKEN_ONLY, hovered = artworkHovered)
+            DesktopArtwork(
+                item.thumbnailUrl,
+                Modifier.fillMaxSize(),
+                hoverMode = ArtworkHoverMode.DARKEN_ONLY,
+                hovered = artworkHovered,
+            )
         }
-        Spacer(Modifier.height(8.dp))
-        Text(item.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(item.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            item.title,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            item.subtitle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
