@@ -449,6 +449,41 @@ object BitChordIcons {
             }
         }.build()
 
+    /**
+     * Favorite, the way Apple Music draws it: a five-point star with softened tips.
+     * Filled when set so the liked state remains visible over any artwork.
+     */
+    val Star: ImageVector by lazy { star("bc_star", filled = false) }
+
+    val StarFilled: ImageVector by lazy { star("bc_star_filled", filled = true) }
+
+    private fun star(name: String, filled: Boolean): ImageVector =
+        ImageVector.Builder(
+            name = name,
+            defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply {
+            path(
+                stroke = stroke,
+                strokeLineWidth = STROKE,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+                fill = if (filled) stroke else null,
+            ) {
+                moveTo(12f, 3.86f)
+                lineTo(14.33f, 9.66f)
+                lineTo(20.56f, 10.08f)
+                lineTo(15.77f, 14.08f)
+                lineTo(17.29f, 20.14f)
+                lineTo(12f, 16.82f)
+                lineTo(6.71f, 20.14f)
+                lineTo(8.23f, 14.08f)
+                lineTo(3.44f, 10.08f)
+                lineTo(9.67f, 9.66f)
+                close()
+            }
+        }.build()
+
     /** Adding something — a new playlist, on the library shelf. */
     val Plus: ImageVector by lazy {
         ImageVector.Builder(
