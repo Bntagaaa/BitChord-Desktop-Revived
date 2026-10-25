@@ -6178,124 +6178,163 @@ private fun DesktopArtistPage(
             is UiState.Success -> {
                 val artist = state.data
                 val name = artist.name?.takeIf(String::isNotBlank) ?: fallbackName
-                val palette = rememberDesktopArtworkPalette(artist.thumbnailUrl)
-                // Android caps the top-songs block and pages it sideways so the release shelves are
-                // not buried under a hundred rows.
+                var appleArt by remember(name) {
+                    mutableStateOf(DesktopAppleArtistArtRepository.cached(name))
+                }
+                LaunchedEffect(name) {
+                    appleArt = DesktopAppleArtistArtRepository.artFor(name) ?: appleArt
+                }
+
+                val palette = rememberDesktopArtworkPalette(appleArt?.heroUrl ?: artist.thumbnailUrl)
+                val artistBackground = appleArt?.backgroundColor?.let { Color(it) } ?: Color(
+                    palette.primary.red * 0.42f,
+                    palette.primary.green * 0.42f,
+                    palette.primary.blue * 0.42f,
+                )
+                val isLightBackground =
+                    (artistBackground.red * 0.2126f + artistBackground.green * 0.7152f +
+                        artistBackground.blue * 0.0722f) > 0.58f
+                val artistForeground = if (isLightBackground) Color(0xFF171717) else Color.White
+                val artistSecondary = artistForeground.copy(alpha = if (isLightBackground) 0.68f else 0.72f)
+                val artistScheme = MaterialTheme.colorScheme.copy(
+                    background = artistBackground,
+                    surface = artistBackground,
+                    surfaceVariant = artistBackground.copy(alpha = 0.94f),
+                    onBackground = artistForeground,
+                    onSurface = artistForeground,
+                    onSurfaceVariant = artistSecondary,
+                    outline = artistForeground.copy(alpha = 0.18f),
+                    outlineVariant = artistForeground.copy(alpha = 0.10f),
+                )
+
                 val top = artist.songs.take(MAX_ARTIST_SONGS)
+                val subscription = artist.subscription
+                val toggle = onToggleSubscription
+                val toggleSubscription: (() -> Unit)? =
+                    if (subscription != null && toggle != null) {
+                        { toggle(subscription) }
+                    } else {
+                        null
+                    }
                 val artistListState = rememberLazyListState()
-                Box(Modifier.fillMaxSize()) {
-                    LazyColumn(
-                        state = artistListState,
-                        modifier = Modifier.fillMaxSize().desktopTopScrollFade(artistListState),
-                        contentPadding = pagePadding(bottom = 32.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        item(key = "artist-header") {
-                            DesktopArtistBanner(artist.thumbnailUrl, name, palette)
-                        }
-                        if (artist.subscriberCountText != null || artist.monthlyListenerCount != null) {
-                            item(key = "artist-stats") {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(horizontal = DesktopPageGutter, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    // YouTube's own text already reads "1.2M subscribers" in full,
-                                    // so only the number is kept and the label re-said in the app's
-                                    // words.
-                                    artist.subscriberCountText?.let {
-                                        DesktopStatChip(Icons.Rounded.Person, "${it.substringBefore(' ')} subscribers")
-                                    }
-                                    artist.monthlyListenerCount?.let {
-                                        DesktopStatChip(Icons.Rounded.GraphicEq, "${it.substringBefore(' ')} monthly listeners")
-                                    }
-                                }
-                            }
-                        }
-                        item(key = "artist-actions") {
-                            // The phone's artist controls: subscribing first, where saving sits on a
-                            // release, then the labelled Play pill and Shuffle.
-                            Row(
-                                Modifier.fillMaxWidth().padding(horizontal = DesktopPageGutter, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                MaterialTheme(colorScheme = artistScheme) {
+                    CompositionLocalProvider(LocalContentColor provides artistForeground) {
+                        Box(Modifier.fillMaxSize().background(artistBackground)) {
+                            LazyColumn(
+                                state = artistListState,
+                                modifier = Modifier.fillMaxSize().desktopTopScrollFade(artistListState),
+                                contentPadding = pagePadding(bottom = 32.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
-                                val subscription = artist.subscription
-                                if (subscription != null && onToggleSubscription != null) {
-                                    DesktopCircleButton(
-                                        if (subscription.subscribed) BitChordIcons.Check else BitChordIcons.Plus,
-                                        if (subscription.subscribed) {
-                                            DesktopStrings["unsubscribe", "Unsubscribe"]
-                                        } else {
-                                            DesktopStrings["subscribe", "Subscribe"]
-                                        },
-                                        onClick = { onToggleSubscription(subscription) },
-                                    )
+                                item(key = "artist-header") {
+                                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                        val heroHeight = (maxWidth / 2.15f).coerceIn(360.dp, 600.dp)
+                                        DesktopArtistBanner(
+                                            fallbackUrl = artist.thumbnailUrl,
+                                            name = name,
+                                            appleArt = appleArt,
+                                            background = artistBackground,
+                                            heroHeight = heroHeight,
+                                            onPlay = { if (top.isNotEmpty()) onPlaySongs(top, 0) },
+                                            onShuffle = { if (top.isNotEmpty()) onShuffle(top) },
+                                            onToggleSubscription = toggleSubscription,
+                                            subscribed = subscription?.subscribed == true,
+                                        )
+                                    }
                                 }
-                                DesktopPlayPill(
-                                    label = DesktopStrings["play", "Play"],
-                                    onClick = { if (top.isNotEmpty()) onPlaySongs(top, 0) },
-                                )
-                                DesktopCircleButton(BitChordIcons.Shuffle, DesktopStrings["shuffle", "Shuffle"], onClick = { onShuffle(top) })
-                            }
-                        }
-                        artist.description?.takeIf(String::isNotBlank)?.let { blurb ->
-                            item(key = "artist-about") {
-                                Column(Modifier.padding(top = 16.dp)) {
-                                    SectionTitle(DesktopStrings["d_about_artist", "About artist"])
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(
-                                        blurb,
-                                        color = DesktopSecondary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.padding(horizontal = DesktopPageGutter),
-                                    )
-                                }
-                            }
-                        }
-                        if (top.isNotEmpty()) {
-                            // Paged sideways four to a column, the way Home lists Recents.
-                            item(key = "artist-top-songs") {
-                                Column(Modifier.padding(top = 20.dp, bottom = 6.dp)) {
-                                    SectionTitle(DesktopStrings["top_songs", "Top songs"])
-                                    Spacer(Modifier.height(8.dp))
-                                    BoxWithConstraints {
-                                        val columnWidth = trackColumnWidth(maxWidth)
-                                        ShelfRow(
-                                            contentPadding = PaddingValues(horizontal = DesktopPageGutter),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        ) {
-                                            items(top.withIndex().chunked(ARTIST_SONGS_PER_COLUMN)) { column ->
-                                                Column(Modifier.width(columnWidth)) {
-                                                    column.forEach { (index, song) ->
-                                                        CompactTrackRow(
-                                                            title = song.title,
-                                                            subtitle = song.artist,
-                                                            thumbnailUrl = song.thumbnailUrl,
-                                                            onClick = { onPlaySongs(top, index) },
-                                                            onLongPress = { onOpenMenu(song) },
-                                                        )
+    
+                                // Keep the music immediately after the hero, as on BitChord Web.
+                                // Statistics follow the shelves; the primary actions live in the hero.
+                                if (top.isNotEmpty()) {
+                                    item(key = "artist-top-songs") {
+                                        Column(Modifier.padding(top = 18.dp, bottom = 6.dp)) {
+                                            SectionTitle(
+                                                "Top Songs",
+                                                gutter = DesktopPageGutter,
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            BoxWithConstraints {
+                                                val columnWidth = trackColumnWidth(maxWidth)
+                                                ShelfRow(
+                                                    contentPadding = PaddingValues(horizontal = DesktopPageGutter),
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                ) {
+                                                    items(top.withIndex().chunked(ARTIST_SONGS_PER_COLUMN)) { column ->
+                                                        Column(Modifier.width(columnWidth)) {
+                                                            column.forEach { (index, song) ->
+                                                                CompactTrackRow(
+                                                                    title = song.title,
+                                                                    subtitle = song.artist,
+                                                                    thumbnailUrl = song.thumbnailUrl,
+                                                                    onClick = { onPlaySongs(top, index) },
+                                                                    onLongPress = { onOpenMenu(song) },
+                                                                )
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
-                        }
-                        artist.sections.forEach { shelf ->
-                            item(key = "artist-shelf-${shelf.title}") {
-                                Box(Modifier.padding(top = 18.dp)) {
-                                    DesktopShelf(shelf, onItemClick = onShelfItemClick)
+    
+                                artist.sections.forEach { shelf ->
+                                    item(key = "artist-shelf-${shelf.title}") {
+                                        Box(Modifier.padding(top = 18.dp)) {
+                                            DesktopShelf(shelf, onItemClick = onShelfItemClick)
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                        if (top.isEmpty() && artist.sections.isEmpty()) {
-                            item {
-                                DesktopEmptyPage(
-                                    Icons.Rounded.Person,
-                                    "Nothing to show for $name",
-                                    "YouTube Music has no songs or releases on this page.",
-                                )
+    
+                                artist.description?.takeIf(String::isNotBlank)?.let { blurb ->
+                                    item(key = "artist-about") {
+                                        Column(Modifier.padding(top = 22.dp)) {
+                                            SectionTitle("About artist")
+                                            Spacer(Modifier.height(8.dp))
+                                            Text(
+                                                blurb,
+                                                color = artistSecondary,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.padding(horizontal = DesktopPageGutter),
+                                            )
+                                        }
+                                    }
+                                }
+    
+                                if (artist.subscriberCountText != null || artist.monthlyListenerCount != null) {
+                                    item(key = "artist-stats") {
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(
+                                                horizontal = DesktopPageGutter,
+                                                vertical = 12.dp,
+                                            ),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            artist.subscriberCountText?.let {
+                                                DesktopStatChip(
+                                                    Icons.Rounded.Person,
+                                                    "${it.substringBefore(' ')} subscribers",
+                                                )
+                                            }
+                                            artist.monthlyListenerCount?.let {
+                                                DesktopStatChip(
+                                                    Icons.Rounded.GraphicEq,
+                                                    "${it.substringBefore(' ')} monthly listeners",
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+    
+                                if (top.isEmpty() && artist.sections.isEmpty()) {
+                                    item(key = "artist-empty") {
+                                        DesktopEmptyPage(
+                                            Icons.Rounded.Person,
+                                            "Nothing to show for $name",
+                                            "YouTube Music has no songs or releases on this page.",
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -6305,40 +6344,145 @@ private fun DesktopArtistPage(
     }
 }
 
-/** The photograph, and the name across the foot of it. */
+/**
+ * Apple Music-style artist hero: full-bleed photo, the original transparent
+ * artist logo when available, and Play inside the image. YouTube artwork and
+ * the app's normal typography remain graceful fallbacks when Apple has no logo.
+ */
 @Composable
-private fun DesktopArtistBanner(url: String?, name: String, palette: DesktopArtworkPalette) {
-    Box(Modifier.fillMaxWidth().height(ARTIST_BANNER_HEIGHT)) {
-        DesktopArtwork(url, Modifier.matchParentSize(), px = HEADER_ART_PX)
-        // Two washes rather than one.
+private fun DesktopArtistBanner(
+    fallbackUrl: String?,
+    name: String,
+    appleArt: DesktopAppleArtistArt?,
+    background: Color,
+    heroHeight: Dp,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+    onToggleSubscription: (() -> Unit)?,
+    subscribed: Boolean,
+) {
+    Box(Modifier.fillMaxWidth().height(heroHeight).background(background)) {
+        DesktopAppleArtistHero(
+            fallbackUrl = fallbackUrl,
+            appleUrl = appleArt?.heroUrl,
+            fallbackPx = HEADER_ART_PX,
+            modifier = Modifier.matchParentSize(),
+        )
+
         Box(
             Modifier.matchParentSize().background(
                 Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.55f to palette.primary.copy(alpha = 0.18f),
-                    1f to DesktopSurface,
+                    0f to Color.Black.copy(alpha = 0.04f),
+                    0.42f to Color.Transparent,
+                    0.72f to background.copy(alpha = 0.46f),
+                    1f to background,
                 ),
             ),
         )
         Box(
             Modifier.matchParentSize().background(
                 Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.35f),
-                    0.4f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = 0.45f),
+                    0f to Color.Black.copy(alpha = 0.10f),
+                    0.38f to Color.Transparent,
+                    1f to Color.Transparent,
                 ),
             ),
         )
-        Text(
-            name,
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
-            color = DesktopForeground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+
+        Column(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = DesktopPageGutter, end = DesktopPageGutter, bottom = 18.dp),
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = DesktopPageGutter, vertical = 26.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            DesktopAppleArtistLogo(
+                url = appleArt?.logoUrl,
+                contentDescription = name,
+                modifier = Modifier
+                    .fillMaxWidth(0.82f)
+                    .heightIn(max = (heroHeight * 0.30f).coerceAtMost(150.dp)),
+                fallback = {
+                    Text(
+                        text = name,
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.32f),
+                                offset = Offset(0f, 2f),
+                                blurRadius = 16f,
+                            ),
+                        ),
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (onToggleSubscription != null) {
+                    DesktopArtistHeroAction(
+                        icon = if (subscribed) BitChordIcons.Check else BitChordIcons.Plus,
+                        contentDescription = if (subscribed) "Unsubscribe" else "Subscribe",
+                        onClick = onToggleSubscription,
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .shadow(5.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .clickable(onClick = onPlay),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.PlayArrow,
+                        contentDescription = "Play $name",
+                        tint = appleArt?.keyColor?.let { Color(it) } ?: Color(0xFF654C3A),
+                        modifier = Modifier.size(31.dp),
+                    )
+                }
+
+                DesktopArtistHeroAction(
+                    icon = BitChordIcons.Shuffle,
+                    contentDescription = "Shuffle",
+                    onClick = onShuffle,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopArtistHeroAction(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    // Keep the shape explicit at every layer. Compose Desktop's elevated shadow
+    // was making these small translucent circles look faceted against bright art.
+    Box(
+        Modifier
+            .size(48.dp)
+            .background(Color.Black.copy(alpha = 0.30f), CircleShape)
+            .border(0.8.dp, Color.White.copy(alpha = 0.28f), CircleShape)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(21.dp),
         )
     }
 }
@@ -6348,14 +6492,14 @@ private fun DesktopStatChip(icon: androidx.compose.ui.graphics.vector.ImageVecto
     Row(
         Modifier
             .clip(CircleShape)
-            .background(if (DesktopTheme.isDark) DesktopGlass.copy(alpha = 0.55f) else DesktopSubtleFill)
-            .border(0.5.dp, DesktopBarEdge, CircleShape)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+            .border(0.5.dp, MaterialTheme.colorScheme.outline, CircleShape)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = DesktopSecondary, modifier = Modifier.size(15.dp))
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(7.dp))
-        Text(text, style = MaterialTheme.typography.bodySmall, color = DesktopForeground)
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -8521,13 +8665,13 @@ private fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
                 .size(width)
                 .clip(shape)
                 .background(DesktopGlass)
-                .border(1.dp, DesktopForeground.copy(alpha = 0.12f), shape),
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), shape),
         ) {
             DesktopArtwork(item.thumbnailUrl, Modifier.fillMaxSize(), hoverMode = ArtworkHoverMode.DARKEN_ONLY, hovered = artworkHovered)
         }
         Spacer(Modifier.height(8.dp))
-        Text(item.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(item.subtitle, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(item.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(item.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
