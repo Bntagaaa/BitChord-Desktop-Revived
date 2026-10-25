@@ -552,6 +552,47 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     var welcomeBusy by remember { mutableStateOf<String?>(null) }
     var welcomeError by remember { mutableStateOf<String?>(null) }
     val persistence = remember { DesktopPersistence() }
+    // One non-blocking check per application launch, after the first-run welcome closes.
+    var availableUpdate by remember { mutableStateOf<DesktopUpdateChecker.UpdateInfo?>(null) }
+    var updateCheckCompleted by remember { mutableStateOf(false) }
+    LaunchedEffect(showFirstLaunchWelcome) {
+        if (showFirstLaunchWelcome || updateCheckCompleted) return@LaunchedEffect
+        updateCheckCompleted = true
+        availableUpdate = withContext(Dispatchers.IO) { DesktopUpdateChecker.check() }
+    }
+    availableUpdate?.let { update ->
+        AlertDialog(
+            onDismissRequest = { availableUpdate = null },
+            title = { Text("Update available") },
+            text = {
+                Column(modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    Text("BitChord Desktop Revived ${update.version} is available. You have ${DesktopUpdateChecker.currentVersion}.")
+                    update.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                        Spacer(Modifier.height(12.dp))
+                        Text(notes)
+                    }
+                    if (DesktopUpdateChecker.packagePlatform == DesktopUpdateChecker.PackagePlatform.ARCH_X64) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            if (update.downloadUrl == null)
+                                "Arch/CachyOS: no native package is attached to this release yet. Check the release page and use the AUR or pacman when available. Do not install the Debian package."
+                            else
+                                "Arch/CachyOS: the native pacman package will open in your browser. Installation remains manual; use your existing package manager to avoid duplicate installations.",
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    DesktopExternalLinks.open(update.downloadUrl ?: update.releaseUrl)
+                    availableUpdate = null
+                }) { Text(if (update.downloadUrl == null) "View release" else "Download") }
+            },
+            dismissButton = {
+                TextButton(onClick = { availableUpdate = null }) { Text("Later") }
+            },
+        )
+    }
     var sidebarCollapsed by remember { mutableStateOf(persistence.string("sidebar_collapsed", "false") == "true") }
     // Expanded drawer is temporary and must not change the saved desktop preference.
     var sidebarDrawerOpen by remember { mutableStateOf(false) }
