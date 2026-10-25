@@ -14,6 +14,14 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.FullscreenExit
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -87,7 +95,20 @@ internal fun DesktopPlayerSheet(
                     },
                 ),
         ) {
-            content(windowWidth, windowHeight)
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.music.bitchord.ui.player.LocalCenteredLyrics provides true,
+            ) { content(windowWidth, windowHeight) }
+            val fullscreen by DesktopWindowMode.fullScreen.collectAsState()
+            Box(Modifier.align(Alignment.TopStart).padding(8.dp)) {
+                DesktopToolbarButton(onClick = onDismiss, size = 32.dp) {
+                    Icon(Icons.Rounded.KeyboardArrowDown, "Minimize player", tint = DesktopForeground, modifier = Modifier.size(20.dp))
+                }
+            }
+            Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                DesktopToolbarButton(onClick = { DesktopWindowMode.toggle() }, size = 32.dp) {
+                    Icon(if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen, "Toggle fullscreen", tint = DesktopForeground, modifier = Modifier.size(20.dp))
+                }
+            }
             // The handle the landscape player draws at its top edge, made to do
             // on a click what it promises for a drag.
             Box(

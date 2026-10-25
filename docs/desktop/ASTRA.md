@@ -1,0 +1,13 @@
+# ASTRA desktop visual implementation
+
+Reference: the eight-page ASTRA.pdf supplied on 2026-10-24. Branch `visual-astra1.8.3` was created from `main` at `7e0af6f4`.
+
+- The bottom player dock stays visible before playback. It shows the BitChord logo and disables playback buttons until a track is selected. Lyrics and Up Next show an empty message when opened without a track.
+- Home keeps the live feed at full width beneath the Lyrics/Queue panel. Only the shelf's right arrow moves inward by the animated panel width, and paging uses the visible shelf width. Other pages reserve a solid column without panel blur. Both page and panel keep their composition identity across these layout changes, preserving scroll state and panel slide animations. The feed screenshot capture was removed.
+- Song context menus, app dropdowns, and the account selector share a dark glass treatment. Their menu entries and callbacks remain as before.
+- Desktop lyrics provider selection uses a compact dark menu at the lyrics footer. It keeps the existing provider status and selection behavior; the Android drawer stays in place.
+- The expanded player restores its original cover width, makes the lyrics viewport shorter, starts a new track at the top, then brings later active lines toward the center. Minimize and fullscreen controls remain; the transport row stays in place.
+- The desktop provider menu uses text rows without icons or row pills and is centered over the footer provider label. The song context menu renders as a sibling above the entire client area and cannot consume the page's layout space. Its blur source includes the expanded player. Mouse menus open by the click, flip above the anchor when necessary, and clamp to the window; keyboard openings use the anchor bounds. Dismissal restores shortcut focus.
+- Home Lyrics/Queue glass uses fixed 73% tint opacity and a 40 dp blur radius. The temporary sliders and their preference readers were removed. Expanded lyrics keep the first lines at the top and begin following toward the center only as the song progresses.
+
+Validation: `:desktopApp:compileKotlin :desktopApp:test` passed with writable Java preferences and cache paths. `DesktopPanelMenuTest` renders Compose offscreen and checks real pixel mixing across the menu blur, expanded-player capture, menu placement at 100%/150% scaling, bottom-right clamping, action/Escape dismissal, Home panel blur, the solid panel on other destinations, slide animation, shelf arrow clearance, and preservation of the feed composition. Interactive checks with the actual Windows/Linux window and live music remain pending. The earlier `:sharedUi:jvmTest` attempt was blocked by DNS resolving `kotlinx-datetime:0.6.0`.

@@ -137,7 +137,7 @@ internal fun DesktopAccountSelector(
                 .clip(shape)
                 // The same frosted pane the floating bars are made of, sampling the page underneath
                 // rather than sitting on a flat fill.
-                .desktopBarGlass(shape),
+                .desktopMenuGlass(shape),
         ) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 8.dp),
@@ -320,7 +320,7 @@ internal fun DesktopSignInDialog(
                 .widthIn(max = 520.dp)
                 .fillMaxWidth()
                 .clip(shape)
-                .desktopBarGlass(shape)
+                .desktopMenuGlass(shape)
                 .padding(bottom = 8.dp),
         ) {
             Text(

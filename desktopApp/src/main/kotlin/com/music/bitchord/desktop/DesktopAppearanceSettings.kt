@@ -1,7 +1,51 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * Each area has a separate persisted preference. Existing installations keep their previous
+ * appearance because all six areas start enabled; Reduce dynamic blur remains authoritative.
+ */
+internal enum class DesktopBlurArea(val title: String, val description: String, val preferenceKey: String) {
+    SIDE_PANELS(
+        "Lyrics & Queue panels",
+        "The frosted right-hand panel on Home",
+        "blur_side_panels",
+    ),
+    QUICK_SEARCH(
+        "Quick Search",
+        "The Ctrl+K search popup",
+        "blur_quick_search",
+    ),
+    SEARCH_PAGE(
+        "Search",
+        "The search field, suggestions and Explore landing",
+        "blur_search_page",
+    ),
+    FLOATING_PLAYER(
+        "Floating player",
+        "The bottom music player and compact navigation",
+        "blur_floating_player",
+    ),
+    MENUS_POPUPS(
+        "Menus & popups",
+        "Profile selector, sign-in prompts and dropdown menus",
+        "blur_menus_popups",
+    ),
+    APP_CHROME(
+        "Top bar & navigation",
+        "The in-app toolbar and navigation glass, not the native title bar",
+        "blur_app_chrome",
+    ),
+}
+
+/** Master override: saved per-area preferences are never destroyed by Reduce Blur. */
+internal fun effectiveDesktopBlur(reduceDynamicBlur: Boolean, selected: Boolean): Boolean =
+    !reduceDynamicBlur && selected
 
 /**
  * The toggles read far from the Settings sheet that sets them.
@@ -16,6 +60,7 @@ internal object DesktopAppearanceSettings {
 
     private val _reduceAnimation = flag(KEY_REDUCE_ANIMATION, false)
     private val _reduceDynamicBlur = flag(KEY_REDUCE_DYNAMIC_BLUR, false)
+    private val _blurPreferences = DesktopBlurArea.entries.associateWith { flag(it.preferenceKey, true) }
     // Mica-style navigation is lightweight wallpaper tinting, independent of blur.
     private val _micaSidebar = flag(KEY_MICA_SIDEBAR, DesktopSidebarMica.isSupported)
     private val _hideVolumeBar = flag(KEY_HIDE_VOLUME_BAR, false)
@@ -29,6 +74,17 @@ internal object DesktopAppearanceSettings {
 
     /** Swaps frosted glass for solid fills across the app. */
     val reduceDynamicBlur: StateFlow<Boolean> = _reduceDynamicBlur
+
+    /** Individual preferences, observed live by the components that draw the glass. */
+    fun blurPreference(area: DesktopBlurArea): StateFlow<Boolean> = requireNotNull(_blurPreferences[area])
+
+    /** Includes the master override, so no caller can accidentally ignore Reduce dynamic blur. */
+    @Composable
+    fun blurEnabled(area: DesktopBlurArea): Boolean {
+        val reduced by reduceDynamicBlur.collectAsState()
+        val selected by blurPreference(area).collectAsState()
+        return effectiveDesktopBlur(reduced, selected)
+    }
 
     /** Windows 11 wallpaper-tinted, opaque navigation material. */
     val micaSidebar: StateFlow<Boolean> = _micaSidebar
@@ -47,6 +103,9 @@ internal object DesktopAppearanceSettings {
     fun setReduceAnimation(value: Boolean) = write(KEY_REDUCE_ANIMATION, value, _reduceAnimation)
 
     fun setReduceDynamicBlur(value: Boolean) = write(KEY_REDUCE_DYNAMIC_BLUR, value, _reduceDynamicBlur)
+
+    fun setBlurPreference(area: DesktopBlurArea, enabled: Boolean) =
+        write(area.preferenceKey, enabled, requireNotNull(_blurPreferences[area]))
 
     fun setMicaSidebar(value: Boolean) = write(KEY_MICA_SIDEBAR, value, _micaSidebar)
 

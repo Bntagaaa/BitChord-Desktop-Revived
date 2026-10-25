@@ -380,7 +380,9 @@ internal val DesktopSubtleFill: Color get() = DesktopTheme.palette.subtleFill
 private val DesktopBarGlass: Color get() = DesktopTheme.palette.barGlass
 
 /** The backdrop the floating bars blur. */
-private val LocalDesktopHaze = staticCompositionLocalOf<HazeState?> { null }
+internal val LocalDesktopHaze = staticCompositionLocalOf<HazeState?> { null }
+/** Only the shelf controls move clear of the Home panel; the feed keeps its full viewport. */
+internal val LocalDesktopShelfEndInset = staticCompositionLocalOf<() -> Int> { { 0 } }
 
 /** How much a page's scrollable should keep clear of the floating bars. */
 private val LocalDesktopBottomInset = staticCompositionLocalOf { 0.dp }
@@ -560,6 +562,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     val searchRows by searchSession.rows
     var searchJob by remember { mutableStateOf<Job?>(null) }
     val fullSearchHaze = remember { HazeState() }
+    val menuPortal = remember { DesktopMenuPortalState() }
     // What has been searched before, and what YouTube thinks is being typed.
     val searchHistory by DesktopSearchHistory.recent.collectAsState()
     // Whether anything has been searched for since the field was last emptied: until then the
@@ -573,8 +576,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     val shortcutDispatcher = remember { DesktopShortcutDispatcher() }
     val quickSearchState = remember { DesktopQuickSearchState<SearchResult> { quickSearchEntryKey(it) } }
     val quickSearchKeys = remember { DesktopQuickSearchKeys() }
-    // Search suggestions reuse the app-wide blur preference; no second toggle is created.
-    val searchBlurReduced by DesktopAppearanceSettings.reduceDynamicBlur.collectAsState()
+    // Search's own blur preference is still overridden by the global Reduce Blur switch.
+    val searchBlurReduced = !DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.SEARCH_PAGE)
     val quickSearchFocusRequester = remember { FocusRequester() }
     var quickSearchRestorePending by remember { mutableStateOf(false) }
     val shortcutWindowInfo = LocalWindowInfo.current
@@ -3269,6 +3272,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                 showFirstLaunchWelcome || overlays.shortcuts || overlays.quickSearch
             },
         ) {
+            val homePanelOverlaysFeed = destination == DesktopDestination.LISTEN_NOW &&
+                overlays.settingsPage == null && !overlays.replay && openedArtist == null && openedCollection == null
             DesktopFrame(
                 // The phone's page is black, not the near-black of its cards.
                 containerColor = DesktopBackground,
@@ -3279,7 +3284,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                     persistence.saveString("sidebar_collapsed", collapsed.toString())
                 },
                 onSidebarDrawerOpenChange = { sidebarDrawerOpen = it },
-                hasFloatingPlayer = selectedSong != null,
+                hasFloatingPlayer = !oldTopPlayerEnabled,
+                homePanelOverlay = homePanelOverlaysFeed,
+                menuPortal = menuPortal,
+                onMenuClosed = { runCatching { shortcutRootFocusRequester.requestFocus() } },
                 // Only Replay dresses itself; everywhere else the chrome sits on the plain surface.
                 backdrop = { transparentBase ->
                     Box(Modifier.fillMaxSize().then(
@@ -3347,6 +3355,12 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                         if (overlays.quickSearch) {
                             // The opening Ctrl+K was captured by the normal dispatcher.
                             return@onPreviewKeyEvent !pressed && shortcutDispatcher.release(shortcutKey.keyCode)
+                        }
+                        if (menuPortal.entry.value != null) {
+                            // The in-window menu owns keys while open, just as the old focusable
+                            // Popup did. Keep dispatcher release bookkeeping in sync.
+                            if (!pressed) shortcutDispatcher.release(shortcutKey.keyCode)
+                            return@onPreviewKeyEvent false
                         }
 
                         // Release bookkeeping before looking at the current focus/modal state.
@@ -3571,10 +3585,19 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                 trailing = {
                     val current = selectedSong
                     DesktopSidePanelColumn(
-                        panel = overlays.sidePanel.takeIf { current != null },
+                        panel = overlays.sidePanel,
+                        blurBackground = homePanelOverlaysFeed,
                         onClose = { overlays.sidePanel = null },
                     ) { which ->
-                        if (current == null) return@DesktopSidePanelColumn
+                        if (current == null) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    if (which == DesktopSidePanel.LYRICS) "Play a song to see its lyrics here." else "Nothing in Up Next",
+                                    color = DesktopSecondary,
+                                )
+                            }
+                            return@DesktopSidePanelColumn
+                        }
                         when (which) {
                             DesktopSidePanel.LYRICS -> LyricsSidePanel(
                                 song = current,
@@ -5390,7 +5413,7 @@ private fun DesktopBottomChrome(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (showPlayer && song != null) {
+        if (showPlayer) {
             DesktopMiniPlayer(
                 song = song,
                 isPlaying = isPlaying,
@@ -5444,7 +5467,7 @@ private fun DesktopFloatingNavigation(
             .widthIn(max = 440.dp)
             .fillMaxWidth()
             .clip(shape)
-            .desktopBarGlass(shape),
+            .desktopBarGlass(shape, DesktopBlurArea.FLOATING_PLAYER),
         shape = shape,
         color = Color.Transparent,
         tonalElevation = 0.dp,
@@ -5476,7 +5499,7 @@ private fun DesktopFloatingNavigation(
 
 @Composable
 private fun DesktopMiniPlayer(
-    song: Song,
+    song: Song?,
     isPlaying: Boolean,
     isLoading: Boolean,
     previousEnabled: Boolean,
@@ -5497,13 +5520,12 @@ private fun DesktopMiniPlayer(
     onOpenQueue: () -> Unit,
 ) {
     val shape = RoundedCornerShape(16.dp)
-    val reduceDynamicBlur by DesktopAppearanceSettings.reduceDynamicBlur.collectAsState()
-    val dockSurface = if (reduceDynamicBlur) {
+    val dockSurface = if (DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.FLOATING_PLAYER)) {
+        Modifier.desktopBarGlass(shape, DesktopBlurArea.FLOATING_PLAYER)
+    } else {
         Modifier
             .background(DesktopTheme.palette.floatingPlayerSurface, shape)
             .border(0.5.dp, DesktopBarEdge, shape)
-    } else {
-        Modifier.desktopBarGlass(shape)
     }
     Surface(
         modifier = Modifier
@@ -5519,7 +5541,7 @@ private fun DesktopMiniPlayer(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onExpand)
+                    .clickable(enabled = song != null, onClick = onExpand)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -5530,14 +5552,14 @@ private fun DesktopMiniPlayer(
                 DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = 34.dp) {
                     Icon(painterResource(Res.drawable.player_transport_previous), "Previous", tint = if (previousEnabled) DesktopForeground else DesktopSecondary.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
                 }
-                DesktopToolbarButton(onClick = onPlayPause, size = 36.dp) {
+                DesktopToolbarButton(onClick = onPlayPause, enabled = song != null, size = 36.dp) {
                     if (isLoading) {
                         CircularProgressIndicator(Modifier.size(18.dp), color = DesktopForeground, strokeWidth = 2.dp)
                     } else {
                         Icon(painterResource(if (isPlaying) Res.drawable.player_transport_pause else Res.drawable.player_transport_play), if (isPlaying) "Pause" else "Play", tint = DesktopForeground, modifier = Modifier.size(23.dp))
                     }
                 }
-                DesktopToolbarButton(onClick = onNext, size = 34.dp) {
+                DesktopToolbarButton(onClick = onNext, enabled = song != null, size = 34.dp) {
                     Icon(painterResource(Res.drawable.player_transport_next), "Next", tint = DesktopForeground, modifier = Modifier.size(20.dp))
                 }
                 DesktopToolbarButton(onClick = { onRepeatModeChange(repeatMode.next()) }, size = 34.dp) {
@@ -5556,10 +5578,14 @@ private fun DesktopMiniPlayer(
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                DesktopArtwork(song.thumbnailUrl, Modifier.size(42.dp).clip(RoundedCornerShape(7.dp)), px = ROW_ART_PX)
+                if (song == null) {
+                    Icon(painterResource(Res.drawable.bitchord_logo_original), "BitChord", tint = DesktopSecondary, modifier = Modifier.size(42.dp))
+                } else {
+                    DesktopArtwork(song.thumbnailUrl, Modifier.size(42.dp).clip(RoundedCornerShape(7.dp)), px = ROW_ART_PX)
+                }
                 Column(Modifier.weight(1f).padding(start = 8.dp, end = 8.dp)) {
-                    Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(song.artist, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(song?.title ?: "BitChord", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text(song?.artist ?: "", color = DesktopSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(1.dp)) {
                     DesktopToolbarButton(onClick = onOpenLyrics, size = 32.dp) {
@@ -5615,14 +5641,14 @@ internal fun DesktopSearchField(
     val searchShape = if (pill) RoundedCornerShape(percent = 50) else RoundedCornerShape(7.dp)
     val onShortcutFocusChanged = LocalDesktopShortcutTextFocus.current
     val shortcutModalVisible = LocalDesktopShortcutModalVisible.current
-    val reduceDynamicBlur by DesktopAppearanceSettings.reduceDynamicBlur.collectAsState()
+    val searchBlurReduced = !DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.SEARCH_PAGE)
     val searchSurface = if (searchHaze != null) {
-        Modifier.desktopSearchGlass(searchHaze, searchShape, reduceDynamicBlur)
-    } else if (reduceDynamicBlur) {
+        Modifier.desktopSearchGlass(searchHaze, searchShape, searchBlurReduced)
+    } else if (searchBlurReduced) {
         Modifier.background(DesktopSearchFill, searchShape)
             .border(1.dp, DesktopForeground.copy(alpha = 0.10f), searchShape)
     } else {
-        Modifier.desktopBarGlass(searchShape)
+        Modifier.desktopBarGlass(searchShape, DesktopBlurArea.SEARCH_PAGE)
     }
     Box(
         modifier
@@ -5704,9 +5730,12 @@ internal fun DesktopSearchField(
 }
 
 @Composable
-private fun DesktopFrame(
+internal fun DesktopFrame(
     containerColor: Color,
     hasFloatingPlayer: Boolean,
+    homePanelOverlay: Boolean,
+    menuPortal: DesktopMenuPortalState,
+    onMenuClosed: () -> Unit,
     modifier: Modifier = Modifier,
     sidebarCollapsed: Boolean,
     sidebarDrawerOpen: Boolean,
@@ -5729,12 +5758,18 @@ private fun DesktopFrame(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val haze = remember { HazeState() }
+    val menuHaze = remember { HazeState() }
+    menuPortal.onClosed = onMenuClosed
     val oldTopPlayerEnabled by DesktopAppearanceSettings.enableOldTopMusicPlayerStyle.collectAsState()
-    CompositionLocalProvider(LocalDesktopHaze provides haze) {
-        Box(modifier.fillMaxSize().background(containerColor)) {
+    CompositionLocalProvider(
+        LocalDesktopHaze provides haze,
+        LocalDesktopMenuPortal provides menuPortal,
+    ) {
+        Box(modifier.fillMaxSize().background(containerColor).desktopMenuPointer(menuPortal)) {
             // Preserve blur for the floating player; the sidebar itself remains opaque.
             Box(Modifier.fillMaxSize().hazeSource(haze)) { backdrop(false) }
-            Column(Modifier.fillMaxSize()) {
+            // Capture the visible page and expanded player, excluding the menu itself.
+            Column(Modifier.fillMaxSize().hazeSource(menuHaze)) {
                 Box(Modifier.fillMaxWidth().weight(1f)) {
                     BoxWithConstraints(Modifier.fillMaxSize()) {
                         val narrow = DesktopSidebarWidthPolicy.shouldUseRail(maxWidth.value)
@@ -5761,8 +5796,12 @@ private fun DesktopFrame(
                             Column(Modifier.weight(1f).fillMaxHeight()) {
                                 // Only the legacy top player uses compact chrome at narrow widths.
                                 topBar(narrow)
-                                Row(Modifier.fillMaxWidth().weight(1f)) {
-                                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                                DesktopPageWithSidePanel(
+                                    overlayPanel = homePanelOverlay,
+                                    modifier = Modifier.fillMaxWidth().weight(1f),
+                                    panel = trailing,
+                                ) {
+                                    Box(Modifier.fillMaxSize()) {
                                         Box(Modifier.fillMaxSize().hazeSource(haze)) {
                                             content(
                                                 PaddingValues(
@@ -5777,10 +5816,21 @@ private fun DesktopFrame(
                                                 ),
                                             )
                                         }
-                                        // Navigation stays in the rail, never in the mobile bar.
-                                        Box(Modifier.align(Alignment.BottomCenter)) { bottomBar(false) }
+                                        // Home paints beneath the frosted panel, but the floating player
+                                        // must be laid out within the uncovered area just like Search.
+                                        // Read the panel's animated measured width to avoid overlap
+                                        // while opening, closing, or resizing the desktop window.
+                                        val shelfEndInset = LocalDesktopShelfEndInset.current
+                                        val density = LocalDensity.current
+                                        val playerEndPadding = with(density) { shelfEndInset().coerceAtLeast(0).toDp() }
+                                        Box(
+                                            Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .fillMaxWidth()
+                                                .padding(end = playerEndPadding),
+                                            contentAlignment = Alignment.BottomCenter,
+                                        ) { bottomBar(false) }
                                     }
-                                    Box(Modifier.fillMaxHeight()) { trailing() }
                                 }
                             }
                         }
@@ -5829,6 +5879,10 @@ private fun DesktopFrame(
                     }
                     overlay()
                 }
+            }
+            // Menus overlay the entire client area. They must never take space in the Column.
+            CompositionLocalProvider(LocalDesktopHaze provides menuHaze) {
+                DesktopMenuPortal(menuPortal)
             }
         }
     }
@@ -6753,7 +6807,7 @@ private fun DesktopSettingsScreen(
                             DesktopStrings["app_language", "App language"],
                             DesktopStrings.languageLabel(),
                         ) { languageMenuOpen = true }
-                        DropdownMenu(languageMenuOpen, onDismissRequest = { languageMenuOpen = false }) {
+                        DesktopDropdownMenu(languageMenuOpen, onDismissRequest = { languageMenuOpen = false }) {
                             DesktopStrings.available.forEach { language ->
                                 DropdownMenuItem(
                                     text = { Text(language.label) },
@@ -6901,7 +6955,7 @@ private fun DesktopSettingsScreen(
                                     Spacer(Modifier.width(4.dp))
                                     Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null)
                                 }
-                                DropdownMenu(
+                                DesktopDropdownMenu(
                                     expanded = uiScaleMenuOpen,
                                     onDismissRequest = { uiScaleMenuOpen = false },
                                 ) {
@@ -6944,6 +6998,13 @@ private fun DesktopSettingsScreen(
                         reduceDynamicBlur,
                         DesktopAppearanceSettings::setReduceDynamicBlur,
                     )
+                    if (settingsRowVisible(
+                            "Customize blur",
+                            "Choose blur for Lyrics & Queue panels, Quick Search, Search, floating player, menus and top bar",
+                        )
+                    ) {
+                        DesktopBlurCustomization(reduceDynamicBlur)
+                    }
                     if (DesktopSidebarMica.isSupported) {
                         val micaSidebar by DesktopAppearanceSettings.micaSidebar.collectAsState()
                         SettingsToggle(
@@ -7703,7 +7764,7 @@ private fun DesktopCollectionPage(
                             )
                             Box {
                                 DesktopCircleButton(Icons.Rounded.MoreHoriz, DesktopStrings["more", "More"], onClick = { moreOpen = true })
-                                DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                                DesktopDropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                                     DropdownMenuItem(
                                         text = { Text(DesktopStrings["download_all", "Download all"]) },
                                         leadingIcon = { Icon(BitChordIcons.Download, null) },
@@ -7935,10 +7996,26 @@ private val LocalNowPlaying = compositionLocalOf<Song?> { null }
 @Composable
 private fun Song.isNowPlaying(): Boolean = isSameTrackAs(LocalNowPlaying.current)
 
-/** The frosted pane the floating bars are made of. */
+/** The frosted pane shared by floating bars, Search, and Quick Search. */
 @Composable
-internal fun Modifier.desktopBarGlass(shape: Shape): Modifier =
-    desktopFrosted(DesktopBarGlass, tintAlpha = 0.55f).border(0.5.dp, DesktopBarEdge, shape)
+internal fun Modifier.desktopBarGlass(
+    shape: Shape,
+    area: DesktopBlurArea = DesktopBlurArea.APP_CHROME,
+): Modifier =
+    desktopFrosted(
+        DesktopBarGlass,
+        tintAlpha = 0.55f,
+        allowBlur = DesktopAppearanceSettings.blurEnabled(area),
+    ).border(0.5.dp, DesktopBarEdge, shape)
+
+/** Dense glass shared by desktop context menus and the account selector. */
+@Composable
+internal fun Modifier.desktopMenuGlass(shape: Shape, tintAlpha: Float = 0.82f): Modifier =
+    clip(shape).desktopFrosted(
+        DesktopCardFill,
+        tintAlpha = tintAlpha,
+        allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.MENUS_POPUPS),
+    ).border(0.5.dp, DesktopCardEdge, shape)
 
 /** The edge of a chrome pane that meets the page, and so has to dissolve into it. */
 internal enum class DesktopChromeEdge { NONE, BOTTOM, END }
@@ -7957,6 +8034,7 @@ internal fun Modifier.desktopChromeGlass(
 ): Modifier = desktopFrosted(
     opaque = DesktopTheme.palette.chromeSurface.copy(alpha = 0.88f),
     tintAlpha = 0.46f,
+    allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.APP_CHROME),
     edge = edge,
     fade = fade,
 )
@@ -7981,12 +8059,12 @@ internal fun desktopChromeDivider(): Color = DesktopDivider
 private fun Modifier.desktopFrosted(
     opaque: Color,
     tintAlpha: Float,
+    allowBlur: Boolean,
     edge: DesktopChromeEdge = DesktopChromeEdge.NONE,
     fade: Float = 0f,
 ): Modifier {
     val haze = LocalDesktopHaze.current
-    val reduceDynamicBlur by DesktopAppearanceSettings.reduceDynamicBlur.collectAsState()
-    if (haze == null || reduceDynamicBlur) {
+    if (haze == null || !allowBlur) {
         return this.background(edge.dissolve(opaque, fade) ?: SolidColor(opaque))
     }
     val dissolve = edge.dissolve(DesktopTheme.palette.chromeSurface, fade)
@@ -8099,11 +8177,12 @@ internal object DesktopShelfRowChrome : ShelfRowChrome {
         val scope = rememberCoroutineScope()
         val interaction = remember { MutableInteractionSource() }
         val hovered by interaction.collectIsHoveredAsState()
+        val endInset = LocalDesktopShelfEndInset.current
 
         /** One screenful, less a sliver so the card at the edge stays in view. */
         fun page(forward: Boolean) {
             val viewport = state.layoutInfo.let { it.viewportEndOffset - it.viewportStartOffset }
-            val distance = (viewport - SHELF_PAGE_OVERLAP_PX).coerceAtLeast(SHELF_PAGE_OVERLAP_PX)
+            val distance = (viewport - endInset() - SHELF_PAGE_OVERLAP_PX).coerceAtLeast(SHELF_PAGE_OVERLAP_PX)
             scope.launch { state.animateScrollBy(if (forward) distance.toFloat() else -distance.toFloat()) }
         }
 
@@ -8137,6 +8216,7 @@ internal object DesktopShelfRowChrome : ShelfRowChrome {
                 icon = BitChordIcons.ChevronRight,
                 description = DesktopStrings["d_scroll_right", "Scroll right"],
                 visible = hovered && state.canScrollForward,
+                modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset(-endInset(), 0) },
                 onClick = { page(forward = true) },
             )
         }
@@ -8155,13 +8235,14 @@ internal fun BoxScope.DesktopShelfArrow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     description: String,
     visible: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(),
         exit = fadeOut(),
-        modifier = Modifier.align(alignment).padding(horizontal = 6.dp),
+        modifier = modifier.align(alignment).padding(horizontal = 6.dp),
     ) {
         Box(
             Modifier

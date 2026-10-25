@@ -1,10 +1,19 @@
 package com.music.bitchord.ui.player
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -60,11 +70,48 @@ internal fun LyricsProviderSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val reduceBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val savedOrder by PlayerSettings.lyricsSourceOrder.collectAsStateWithLifecycle()
     val sources = remember(savedOrder) { LyricsSource.ordered(savedOrder) }
     var requestedSource by remember { mutableStateOf<LyricsSource?>(null) }
     LaunchedEffect(currentSource, requestedSource) {
         if (requestedSource != null && currentSource == requestedSource) onDismiss()
+    }
+
+    if (!drawerFollowsListScroll) {
+        PlayerBackHandler(enabled = true, onBack = onDismiss)
+        BoxWithConstraints(modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().clickable(
+                interactionSource = remember { MutableInteractionSource() }, indication = null,
+                onClick = onDismiss,
+            ))
+            val shape = RoundedCornerShape(12.dp)
+            Column(
+                Modifier.align(Alignment.BottomCenter)
+                    .offset(x = if (LocalCenteredLyrics.current) maxWidth / 4 else 0.dp)
+                    .padding(bottom = 42.dp)
+                    .width(280.dp).heightIn(max = 420.dp).clip(shape)
+                    .hazeEffect(hazeState) {
+                        blurEnabled = !reduceBlur
+                        blurRadius = 30.dp
+                        backgroundColor = Color(0xFF1C1C1E)
+                        tints = listOf(HazeTint(Color(0xFF1C1C1E).copy(alpha = 0.62f)))
+                    }
+                    .border(0.5.dp, Color.White.copy(alpha = 0.12f), shape)
+                    .verticalScroll(rememberScrollState()).padding(vertical = 6.dp),
+            ) {
+                sources.forEach { source ->
+                    LyricsProviderMenuRow(source, source == currentSource,
+                        enabled = source != currentSource && states[source] != LyricsProviderState.NOT_FOUND,
+                        onClick = {
+                            requestedSource = source
+                            onSelect(source)
+                            if (states[source] == LyricsProviderState.FOUND) onDismiss()
+                        })
+                }
+            }
+        }
+        return
     }
 
     PlayerDrawer(
@@ -95,11 +142,28 @@ internal fun LyricsProviderSheet(
 }
 
 @Composable
+private fun LyricsProviderMenuRow(
+    source: LyricsSource,
+    current: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = if (current) "✓  ${source.label}" else source.label,
+        color = Color.White.copy(alpha = if (enabled || current) 0.9f else 0.4f),
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
 private fun LyricsProviderRow(
     source: LyricsSource,
     state: LyricsProviderState,
     current: Boolean,
     onClick: () -> Unit,
+    compact: Boolean = false,
 ) {
     val haptics = rememberHaptics()
     // A running automatic request can still be selected: it is marked as the
@@ -126,12 +190,12 @@ private fun LyricsProviderRow(
                 haptics.play(Haptic.Select)
                 onClick()
             }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = if (compact) 6.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(if (compact) 24.dp else 40.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = if (current) 0.16f else 0.08f)),
             contentAlignment = Alignment.Center,
@@ -162,7 +226,7 @@ private fun LyricsProviderRow(
                 )
             }
         }
-        Spacer(Modifier.width(13.dp))
+        Spacer(Modifier.width(if (compact) 8.dp else 13.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = source.label,
