@@ -5,6 +5,7 @@ import com.music.bitchord.ui.components.ExplicitSongTitle
 import com.music.bitchord.ui.components.ArtworkHover
 import com.music.bitchord.ui.components.ArtworkHoverMode
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -727,12 +728,21 @@ private fun InlineQueueRow(
     val colors = LocalQueuePanelColors.current
     val rowHoverInteraction = remember { MutableInteractionSource() }
     val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
+    val rowBackground by animateColorAsState(
+        targetValue = when {
+            lifted -> colors.primary.copy(alpha = 0.06f)
+            rowHovered -> colors.primary.copy(alpha = 0.075f)
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "queue-row-hover-background",
+    )
     Row(
         modifier = modifier
             .fillMaxWidth()
             .hoverable(rowHoverInteraction)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (lifted) colors.primary.copy(alpha = 0.06f) else Color.Transparent)
+            .background(rowBackground, RoundedCornerShape(8.dp))
             .clickable(
                 interactionSource = rowHoverInteraction,
                 indication = null,
