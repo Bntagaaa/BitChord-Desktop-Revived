@@ -201,6 +201,7 @@ object InnertubeParser {
         return sections.mapNotNull { section ->
             section.o("musicCarouselShelfRenderer")?.let(::carouselShelf)
                 ?: section.o("musicShelfRenderer")?.let(::plainShelf)
+                ?: section.o("gridRenderer")?.let(::gridShelf)
         }
     }
 
@@ -280,14 +281,33 @@ object InnertubeParser {
         val header = carousel.o("header").o("musicCarouselShelfBasicHeaderRenderer")
         val title = header.o("title").runs()
         val strapline = header.o("strapline").runs()
-        // Whole shelves like "Video charts" carry nothing but video
-        // compilations — each card would fail its own video check on the
-        // way to a dead-end page, so the shelf is dropped outright.
-        if (VIDEO_WORD.containsMatchIn(title)) return null
+        // Video charts are often compilation albums that cannot be opened as
+        // playable releases. Keep real music-video shelves and the country
+        // Trending playlist, including its official-video entries.
+        if (VIDEO_WORD.containsMatchIn(title) && title.contains("chart", ignoreCase = true)) return null
+
+        val moreEndpoint = header.o("title").a("runs")?.firstNotNullOfOrNull {
+            it.o("navigationEndpoint").o("browseEndpoint")
+        }
+            ?: header.o("moreContentButton").o("buttonRenderer")
+                .o("navigationEndpoint").o("browseEndpoint")
+            ?: header.o("moreContentButton").o("musicMoreContentButtonRenderer")
+                .o("navigationEndpoint").o("browseEndpoint")
+            ?: header.a("endIcons")?.firstNotNullOfOrNull {
+                it.o("musicNavigationButtonRenderer").o("clickCommand").o("browseEndpoint")
+                    ?: it.o("musicNavigationButtonRenderer").o("navigationEndpoint").o("browseEndpoint")
+            }
+            ?: header.o("navigationEndpoint").o("browseEndpoint")
+        val moreBrowseId = moreEndpoint.s("browseId")
+        val moreParams = moreEndpoint.s("params")
+        val allowVideos = VIDEO_WORD.containsMatchIn(title) ||
+            title.contains("trending", ignoreCase = true) ||
+            moreBrowseId?.startsWith("VL") == true
+
         val items = carousel.a("contents").orEmpty().mapNotNull { item ->
-            parseTwoRowItem(item.o("musicTwoRowItemRenderer"))
+            parseTwoRowItem(item.o("musicTwoRowItemRenderer"), allowVideos = allowVideos)
                 ?: parseResponsiveListItem(item.o("musicResponsiveListItemRenderer"))
-                    ?.takeUnless { it.isVideo }
+                    ?.takeIf { allowVideos || !it.isVideo }
                     ?.let { song ->
                         ShelfItem(song.title, song.artist, song.thumbnailUrl, song.videoId, null)
                     }
@@ -296,17 +316,49 @@ object InnertubeParser {
                 // (it demands a videoId) and used to drop the whole shelf.
                 ?: parseArtistRow(item.o("musicResponsiveListItemRenderer"))
         }
-        return if (items.isEmpty()) null else HomeShelf(title.ifBlank { "For you" }, items, strapline)
+        return if (items.isEmpty()) null else HomeShelf(
+            title = title.ifBlank { "For you" },
+            items = items,
+            subtitle = strapline,
+            moreBrowseId = moreBrowseId,
+            moreParams = moreParams,
+        )
     }
 
     private fun plainShelf(shelf: JsonObject): HomeShelf? {
         val title = shelf.o("title").runs()
-        if (VIDEO_WORD.containsMatchIn(title)) return null
+        if (VIDEO_WORD.containsMatchIn(title) && title.contains("chart", ignoreCase = true)) return null
+        val allowVideos = VIDEO_WORD.containsMatchIn(title)
         val items = shelf.a("contents").orEmpty().mapNotNull {
             parseResponsiveListItem(it.o("musicResponsiveListItemRenderer"))
-        }.filterNot { it.isVideo }
+        }.filter { allowVideos || !it.isVideo }
             .map { ShelfItem(it.title, it.artist, it.thumbnailUrl, it.videoId, null) }
-        return if (items.isEmpty()) null else HomeShelf(title.ifBlank { "For you" }, items)
+        val moreEndpoint = shelf.o("title").a("runs")?.firstNotNullOfOrNull {
+            it.o("navigationEndpoint").o("browseEndpoint")
+        }
+            ?: shelf.o("bottomEndpoint").o("browseEndpoint")
+            ?: shelf.o("bottomButton").o("buttonRenderer").o("navigationEndpoint").o("browseEndpoint")
+        return if (items.isEmpty()) null else HomeShelf(
+            title = title.ifBlank { "For you" },
+            items = items,
+            moreBrowseId = moreEndpoint.s("browseId"),
+            moreParams = moreEndpoint.s("params"),
+        )
+    }
+
+    /** Grid-based See All pages use the same card model as carousel shelves. */
+    private fun gridShelf(grid: JsonObject): HomeShelf? {
+        val header = grid.o("header").o("gridHeaderRenderer")
+        val title = header.o("title").runs()
+        if (VIDEO_WORD.containsMatchIn(title) && title.contains("chart", ignoreCase = true)) return null
+        val allowVideos = VIDEO_WORD.containsMatchIn(title)
+        val items = grid.a("items").orEmpty().mapNotNull { item ->
+            parseTwoRowItem(item.o("musicTwoRowItemRenderer"), allowVideos = allowVideos)
+                ?: parseResponsiveListItem(item.o("musicResponsiveListItemRenderer"))
+                    ?.takeIf { allowVideos || !it.isVideo }
+                    ?.let { song -> ShelfItem(song.title, song.artist, song.thumbnailUrl, song.videoId, null) }
+        }
+        return if (items.isEmpty()) null else HomeShelf(title.ifBlank { "Browse" }, items)
     }
 
     /**
@@ -1352,7 +1404,7 @@ object InnertubeParser {
             )
         }
 
-    private fun parseTwoRowItem(renderer: JsonObject?): ShelfItem? {
+    private fun parseTwoRowItem(renderer: JsonObject?, allowVideos: Boolean = false): ShelfItem? {
         if (renderer == null) return null
         val title = renderer.o("title").runs()
         if (title.isBlank()) return null
@@ -1368,11 +1420,10 @@ object InnertubeParser {
         val thumbnails = renderer.o("thumbnailRenderer").o("musicThumbnailRenderer")
             .o("thumbnail").a("thumbnails")
         val subtitle = renderer.o("subtitle").runs()
-        // A card with no browse target is a playable track, not an album,
-        // playlist or artist; widescreen art on one of those means it's a
-        // music-video upload rather than the catalogue track — drop it, same
-        // as the equivalent check in parseResponsiveListItem.
-        if (resolvedBrowseId == null && videoId != null && thumbnails.isNotSquare()) return null
+        // Wide video artwork belongs on the New music videos shelf. Other
+        // shelves keep the catalogue-only behavior so video uploads don't
+        // silently replace an album or single card.
+        if (!allowVideos && resolvedBrowseId == null && videoId != null && thumbnails.isNotSquare()) return null
         // An album/playlist billed as a video chart/compilation — "N videos"
         // in the subtitle, or "video" in the card's own title (e.g. "Daily
         // Top Music Videos") — is the same dead-end as in parseBrowseItem.
