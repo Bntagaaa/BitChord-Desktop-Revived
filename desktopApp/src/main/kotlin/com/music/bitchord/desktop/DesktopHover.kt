@@ -3,6 +3,7 @@ package com.music.bitchord.desktop
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.runtime.Composable
@@ -88,3 +89,16 @@ internal fun Modifier.desktopHoverWash(): Modifier = composed {
 }
 
 private const val WASH_MS = 120
+
+/**
+ * Keeps music-row hover feedback on the artwork instead of painting the whole
+ * clickable row with Compose's default hover/press indication.
+ */
+internal fun Modifier.desktopNoHoverClickable(onClick: () -> Unit): Modifier = composed {
+    val interaction = remember { MutableInteractionSource() }
+    clickable(
+        interactionSource = interaction,
+        indication = null,
+        onClick = onClick,
+    )
+}
