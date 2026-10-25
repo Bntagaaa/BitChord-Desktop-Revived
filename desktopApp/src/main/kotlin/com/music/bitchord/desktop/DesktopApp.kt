@@ -6125,7 +6125,7 @@ private fun DesktopArtistPage(
                                 }
                             }
                         }
-                        }
+                    }
                 }
             }
         }
