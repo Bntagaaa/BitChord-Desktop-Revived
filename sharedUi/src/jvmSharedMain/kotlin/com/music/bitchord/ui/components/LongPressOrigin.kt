@@ -78,8 +78,7 @@ object LongPressOrigin {
  * Nothing is paid until a hold actually lands: the coordinates are kept by
  * reference, and the item's drawing is recorded once, on the frame after the
  * hold, into a layer that is turned into a bitmap and released. The recording
- * sits inside the click's own ripple, so the picture is of the item and not of
- * the press highlight over it.
+ * captures the item itself rather than any hover or press treatment over it.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
