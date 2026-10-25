@@ -502,6 +502,7 @@ internal fun desktopTypography(): Typography {
 
 private enum class DesktopDestination(val id: String, val label: String) {
     LISTEN_NOW("listen-now", "Home"),
+    NEW("new", "New"),
     EXPLORE("explore", "Explore"),
     LIBRARY("library", "Library"),
     SPOTIFY("spotify", "Spotify"),
@@ -606,6 +607,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     var homeRecentsLoading by remember { mutableStateOf(false) }
     // Held out here so a page keeps its place when another is visited and it is come back to.
     val homeListState = rememberLazyListState()
+    val newListState = rememberLazyListState()
     val exploreListState = rememberLazyListState()
     val moodGenreListState = rememberLazyListState()
     val searchListState = rememberLazyListState()
@@ -624,6 +626,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     var homeGeneration by remember { mutableStateOf(0) }
     var homeIdentity by remember { mutableStateOf<String?>(null) }
     var exploreState by remember { mutableStateOf<UiState<List<MoodGenreSection>>>(UiState.Loading) }
+    var newState by remember { mutableStateOf<UiState<List<HomeShelf>>>(UiState.Loading) }
+    var newReloads by remember { mutableStateOf(0) }
     var selectedMoodGenre by remember { mutableStateOf<MoodGenre?>(null) }
     // Bumped by a retry so the loaders below re-run without the state they are keyed on having to
     // change to something and back again.
@@ -2713,6 +2717,36 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         }
     }
 
+    suspend fun loadNew() {
+        if (!youtubeSourceEnabled) {
+            newState = UiState.Error("YouTube Music is disabled")
+            return
+        }
+        newState = UiState.Loading
+        val releases = DesktopSearchClient.homeSupplement("FEmusic_new_releases")
+        val extra = DesktopSearchClient.homeSupplement("FEmusic_explore")
+        val shelves = (releases.getOrDefault(emptyList()) + extra.getOrDefault(emptyList()))
+            .filter { it.items.isNotEmpty() }
+            .distinctBy { it.title.trim().lowercase() }
+        newState = if (shelves.isNotEmpty()) {
+            UiState.Success(shelves)
+        } else {
+            UiState.Error(
+                releases.exceptionOrNull()?.message
+                    ?: extra.exceptionOrNull()?.message
+                    ?: "Could not load new music",
+            )
+        }
+    }
+
+    LaunchedEffect(destination, newReloads) {
+        if (destination == DesktopDestination.NEW &&
+            (newState is UiState.Loading || newReloads > 0)
+        ) {
+            loadNew()
+        }
+    }
+
     // Category buttons carry no artwork of their own, so a few are resolved at a time from the
     // shelves they open.
     LaunchedEffect(exploreState) {
@@ -4445,6 +4479,25 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             recentlyPlayedLoading = homeRecentsLoading,
                             leadHero = false,
                         )
+                        destination == DesktopDestination.NEW -> DesktopNewPage(
+                            state = newState,
+                            listState = newListState,
+                            onItemClick = { item, shelfTitle -> openShelfItem(item, shelfTitle) },
+                            onItemLongPress = { item -> if (item.videoId != null) openMenu(item.toSong()) },
+                            onRetry = { newReloads++ },
+                            onOpenMore = { shelf ->
+                                val browseId = shelf.moreBrowseId
+                                if (browseId != null) {
+                                    openCollection(
+                                        browseId,
+                                        BrowseItem(browseId, shelf.title, shelf.subtitle, null, BrowseType.OTHER),
+                                    )
+                                } else {
+                                    newReloads++
+                                }
+                            },
+                            contentPadding = sharedPagePadding,
+                        )
                         (destination == DesktopDestination.SEARCH || destination == DesktopDestination.EXPLORE) && selectedMoodGenre != null -> Column(Modifier.fillMaxSize()) {
                             MoodGenrePlaylistsScreen(
                                 title = selectedMoodGenre!!.title,
@@ -5200,6 +5253,9 @@ private fun DesktopSidebar(
             DesktopSidebarItem(BitChordIcons.Home, DesktopStrings["home", "Home"], !settingsOpen && destination == DesktopDestination.LISTEN_NOW, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LISTEN_NOW)
             }
+            DesktopSidebarItem(BitChordIcons.TabExplore, "New", !settingsOpen && destination == DesktopDestination.NEW, collapsed = collapsed) {
+                onDestinationSelected(DesktopDestination.NEW)
+            }
             DesktopSidebarItem(BitChordIcons.Search, "Search",
                 !settingsOpen && (destination == DesktopDestination.SEARCH || destination == DesktopDestination.EXPLORE), collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.SEARCH)
@@ -5449,6 +5505,7 @@ private fun DesktopFloatingNavigation(
     // Mirror the full sidebar when the desktop window becomes compact: Search replaces Explore.
     val tabs = listOf(
         DesktopDestination.LISTEN_NOW to (BitChordIcons.Home to "Home"),
+        DesktopDestination.NEW to (BitChordIcons.TabExplore to "New"),
         DesktopDestination.SEARCH to (BitChordIcons.Search to "Search"),
         DesktopDestination.LIBRARY to (BitChordIcons.Library to "Library"),
     )
