@@ -21,43 +21,122 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.FileTime
+import java.security.MessageDigest
+import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlin.coroutines.coroutineContext
 
-/**
- * Decoded artwork, kept to a budget.
- *
- * It used to be an unbounded map. Every distinct URL a session ever loaded stayed decoded for the
- * life of the process, so browsing Explore and Search for a while was hundreds of megabytes of
- * bitmaps nothing would ever ask for again — which is where the gigabyte people reported was going.
- */
+/** Decoded-artwork LRU with an encoded disk cache to avoid refetching evicted covers. */
 internal object DesktopArtworkCache {
-
-    /**
-     * A sixth of the heap, within reason.
-     *
-     * Derived rather than fixed so the budget still makes sense against whatever `-Xmx` the
-     * launcher was given, and clamped at both ends so a small heap still caches something and a
-     * large one does not decide it may hold half a gigabyte of thumbnails.
-     */
     internal val budgetBytes: Long =
-        (Runtime.getRuntime().maxMemory() / 6).coerceIn(32L * 1024 * 1024, 128L * 1024 * 1024)
-
-    /** Four bytes a pixel, which is what every format here decodes to. */
+        (Runtime.getRuntime().maxMemory() / 12).coerceIn(12L * 1024 * 1024, 24L * 1024 * 1024)
     private val images = DesktopByteBudgetLru<ImageBitmap>(budgetBytes) {
         it.width.toLong() * it.height.toLong() * 4L
     }
+    private const val DISK_BUDGET_BYTES = 128L * 1024 * 1024
+    private val slots = Semaphore(12)
+    private val diskLock = Any()
+    private val directory: Path by lazy {
+        val cacheRoot = System.getenv("XDG_CACHE_HOME")?.takeIf(String::isNotBlank)
+            ?: Path.of(System.getProperty("user.home"), ".cache").toString()
+        Path.of(cacheRoot, "bitchord", "artwork").also { Files.createDirectories(it) }
+    }
 
-    /** Everything held, dropped — what the Storage settings' "Clear image cache" does. */
-    fun clear() = images.clear()
+    private fun pathFor(url: String): Path {
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(url.toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        return directory.resolve("$hash.img")
+    }
+
+    private fun fromDisk(url: String): ByteArray? = runCatching {
+        synchronized(diskLock) {
+            val path = pathFor(url)
+            if (!Files.isRegularFile(path)) return@synchronized null
+            Files.readAllBytes(path).takeIf(ByteArray::isNotEmpty)?.also {
+                Files.setLastModifiedTime(path, FileTime.fromMillis(System.currentTimeMillis()))
+            }
+        }
+    }.getOrNull()
+
+    private fun toDisk(url: String, bytes: ByteArray) {
+        if (bytes.isEmpty()) return
+        runCatching {
+            synchronized(diskLock) {
+                val path = pathFor(url)
+                val temporary = Files.createTempFile(directory, "artwork-", ".tmp")
+                try {
+                    Files.write(temporary, bytes)
+                    Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING)
+                } finally {
+                    Files.deleteIfExists(temporary)
+                }
+                trimDisk()
+            }
+        }
+    }
+
+    private fun trimDisk() {
+        val paths = Files.list(directory).use { stream ->
+            stream.filter { Files.isRegularFile(it) }.toList()
+        }
+        var total = paths.sumOf { runCatching { Files.size(it) }.getOrDefault(0L) }
+        if (total <= DISK_BUDGET_BYTES) return
+        for (path in paths.sortedBy {
+            runCatching { Files.getLastModifiedTime(it).toMillis() }.getOrDefault(0L)
+        }) {
+            if (total <= DISK_BUDGET_BYTES) break
+            val size = runCatching { Files.size(path) }.getOrDefault(0L)
+            if (runCatching { Files.deleteIfExists(path) }.getOrDefault(false)) total -= size
+        }
+    }
+
+    /** Clear both decoded and encoded artwork when the Storage cache action is used. */
+    fun clear() {
+        images.clear()
+        runCatching {
+            synchronized(diskLock) {
+                Files.list(directory).use { stream ->
+                    stream.filter { Files.isRegularFile(it) }.forEach { Files.deleteIfExists(it) }
+                }
+            }
+        }
+    }
 
     suspend fun load(url: String?): ImageBitmap? {
         if (url.isNullOrBlank()) return null
         images.get(url)?.let { return it }
-        return runCatching {
-            URI(url).toURL().openConnection().apply {
-                connectTimeout = 10_000
-                readTimeout = 10_000
-            }.getInputStream().use { stream -> stream.readBytes().decodeToImageBitmap() }
-        }.getOrNull()?.also { images.put(url, it) }
+        return withContext(Dispatchers.IO) {
+            coroutineContext.ensureActive()
+            val cached = fromDisk(url)
+            val bytes = cached ?: slots.withPermit {
+                coroutineContext.ensureActive()
+                val fetched = runCatching {
+                    val address = URI(url)
+                    require(address.scheme == "http" || address.scheme == "https")
+                    address.toURL().openConnection().apply {
+                        connectTimeout = 10_000
+                        readTimeout = 10_000
+                    }.getInputStream().use { it.readBytes() }
+                }.getOrNull()
+                coroutineContext.ensureActive()
+                if (fetched != null) toDisk(url, fetched)
+                fetched
+            }
+            coroutineContext.ensureActive()
+            val bitmap = runCatching { bytes?.decodeToImageBitmap() }.getOrNull()
+            if (bitmap == null && cached != null) {
+                runCatching { synchronized(diskLock) { Files.deleteIfExists(pathFor(url)) } }
+            }
+            coroutineContext.ensureActive()
+            bitmap?.also { images.put(url, it) }
+        }
     }
 }
 
