@@ -329,7 +329,17 @@ object InnertubeParser {
             parseResponsiveListItem(it.o("musicResponsiveListItemRenderer"))
         }.filter { allowVideos || !it.isVideo }
             .map { ShelfItem(it.title, it.artist, it.thumbnailUrl, it.videoId, null) }
-        return if (items.isEmpty()) null else HomeShelf(title.ifBlank { "For you" }, items)
+        val moreEndpoint = shelf.o("title").a("runs")?.firstNotNullOfOrNull {
+            it.o("navigationEndpoint").o("browseEndpoint")
+        }
+            ?: shelf.o("bottomEndpoint").o("browseEndpoint")
+            ?: shelf.o("bottomButton").o("buttonRenderer").o("navigationEndpoint").o("browseEndpoint")
+        return if (items.isEmpty()) null else HomeShelf(
+            title = title.ifBlank { "For you" },
+            items = items,
+            moreBrowseId = moreEndpoint.s("browseId"),
+            moreParams = moreEndpoint.s("params"),
+        )
     }
 
     /** Grid-based See All pages use the same card model as carousel shelves. */
