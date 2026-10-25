@@ -9,7 +9,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
 import org.jsoup.Jsoup
 import java.net.HttpURLConnection
 import java.net.URL
@@ -48,7 +47,7 @@ internal object DesktopAppleArtistArtRepository {
             "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
     private val cache = object : LinkedHashMap<String, DesktopAppleArtistArt>(CACHE_SIZE, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DesktopAppleArtistArt>?): Boolean =
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DesktopAppleArtistArt>): Boolean =
             size > CACHE_SIZE
     }
 
@@ -192,4 +191,55 @@ internal object DesktopAppleArtistArtRepository {
     private fun String.normalized(): String =
         Normalizer.normalize(lowercase(Locale.ROOT), Normalizer.Form.NFD)
             .filter(Char::isLetterOrDigit)
+}
+
+
+@androidx.compose.runtime.Composable
+internal fun DesktopAppleArtistHero(
+    fallbackUrl: String?,
+    appleUrl: String?,
+    fallbackPx: Int,
+    modifier: androidx.compose.ui.Modifier,
+) {
+    val appleBitmap by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(
+        initialValue = null,
+        key1 = appleUrl,
+    ) {
+        value = if (appleUrl.isNullOrBlank()) null else withContext(Dispatchers.IO) {
+            DesktopArtworkCache.load(appleUrl)
+        }
+    }
+    DesktopArtwork(fallbackUrl, modifier, px = fallbackPx)
+    if (appleBitmap != null) {
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.graphics.painter.BitmapPainter(appleBitmap!!),
+            contentDescription = null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = modifier,
+        )
+    }
+}
+
+@androidx.compose.runtime.Composable
+internal fun DesktopAppleArtistLogo(
+    url: String?,
+    contentDescription: String,
+    modifier: androidx.compose.ui.Modifier,
+) {
+    val bitmap by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(
+        initialValue = null,
+        key1 = url,
+    ) {
+        value = if (url.isNullOrBlank()) null else withContext(Dispatchers.IO) {
+            DesktopArtworkCache.load(url)
+        }
+    }
+    if (bitmap != null) {
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.graphics.painter.BitmapPainter(bitmap!!),
+            contentDescription = contentDescription,
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            modifier = modifier,
+        )
+    }
 }
