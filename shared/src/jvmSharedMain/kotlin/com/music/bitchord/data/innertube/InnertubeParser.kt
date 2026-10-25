@@ -282,22 +282,10 @@ object InnertubeParser {
         val title = header.o("title").runs()
         val strapline = header.o("strapline").runs()
         // Video charts are often compilation albums that cannot be opened as
-        // playable releases. Keep real music-video shelves (e.g. "New music videos")
-        // and their wide video artwork, but omit the chart-compilation shelf.
+        // playable releases. Keep real music-video shelves and the country
+        // Trending playlist, including its official-video entries.
         if (VIDEO_WORD.containsMatchIn(title) && title.contains("chart", ignoreCase = true)) return null
-        val allowVideos = VIDEO_WORD.containsMatchIn(title)
-        val items = carousel.a("contents").orEmpty().mapNotNull { item ->
-            parseTwoRowItem(item.o("musicTwoRowItemRenderer"), allowVideos = allowVideos)
-                ?: parseResponsiveListItem(item.o("musicResponsiveListItemRenderer"))
-                    ?.takeIf { allowVideos || !it.isVideo }
-                    ?.let { song ->
-                        ShelfItem(song.title, song.artist, song.thumbnailUrl, song.videoId, null)
-                    }
-                // A chart row with nothing to play — "Top artists" lists the
-                // artist alone, no track — falls through parseResponsiveListItem
-                // (it demands a videoId) and used to drop the whole shelf.
-                ?: parseArtistRow(item.o("musicResponsiveListItemRenderer"))
-        }
+
         val moreEndpoint = header.o("title").a("runs")?.firstNotNullOfOrNull {
             it.o("navigationEndpoint").o("browseEndpoint")
         }
@@ -312,6 +300,22 @@ object InnertubeParser {
             ?: header.o("navigationEndpoint").o("browseEndpoint")
         val moreBrowseId = moreEndpoint.s("browseId")
         val moreParams = moreEndpoint.s("params")
+        val allowVideos = VIDEO_WORD.containsMatchIn(title) ||
+            title.contains("trending", ignoreCase = true) ||
+            moreBrowseId?.startsWith("VL") == true
+
+        val items = carousel.a("contents").orEmpty().mapNotNull { item ->
+            parseTwoRowItem(item.o("musicTwoRowItemRenderer"), allowVideos = allowVideos)
+                ?: parseResponsiveListItem(item.o("musicResponsiveListItemRenderer"))
+                    ?.takeIf { allowVideos || !it.isVideo }
+                    ?.let { song ->
+                        ShelfItem(song.title, song.artist, song.thumbnailUrl, song.videoId, null)
+                    }
+                // A chart row with nothing to play — "Top artists" lists the
+                // artist alone, no track — falls through parseResponsiveListItem
+                // (it demands a videoId) and used to drop the whole shelf.
+                ?: parseArtistRow(item.o("musicResponsiveListItemRenderer"))
+        }
         return if (items.isEmpty()) null else HomeShelf(
             title = title.ifBlank { "For you" },
             items = items,
