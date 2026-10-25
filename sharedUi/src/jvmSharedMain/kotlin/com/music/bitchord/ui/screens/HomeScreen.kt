@@ -203,6 +203,8 @@ fun HomeScreen(
     leadHero: Boolean = true,
     currentSong: Song? = null,
     isPlaying: Boolean = false,
+    /** Opens a shelf's See All destination when the feed supplies one. */
+    onShelfOpen: ((HomeShelf) -> Unit)? = null,
 ) {
     val recentsViewType by AppUi.host.homeRecentsViewType.collectAsStateWithLifecycle()
     val compactHeadings = LocalDesktopCompactHeadings.current
@@ -275,6 +277,7 @@ fun HomeScreen(
                                 },
                             )
                         },
+                        onShelfOpen = onShelfOpen,
                     )
                     if (loadingMore) feedMoreSkeleton()
                 }
@@ -315,6 +318,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     firstIsHero: Boolean = true,
     recentsViewType: LibraryViewType,
     onRecentsViewTypeToggle: () -> Unit,
+    onShelfOpen: ((HomeShelf) -> Unit)?,
 ) {
     shelves.forEachIndexed { index, shelf ->
         item(key = shelf.title + index) {
@@ -336,6 +340,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                     onItemLongPress = onItemLongPress,
                     currentSong = currentSong,
                     isPlaying = isPlaying,
+                    onShelfOpen = onShelfOpen,
                 )
             } else {
                 Shelf(
@@ -344,6 +349,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                     onItemLongPress = onItemLongPress,
                     currentSong = currentSong,
                     isPlaying = isPlaying,
+                    onShelfOpen = onShelfOpen,
                 )
             }
         }
@@ -597,13 +603,19 @@ private const val LOGO_ASPECT = 730f / 484f
  * Home and Explore never pass it, so their heading is unchanged.
  */
 @Composable
-internal fun SectionHeader(title: String, subtitle: String = "", onShowAll: (() -> Unit)? = null) {
+internal fun SectionHeader(
+    title: String,
+    subtitle: String = "",
+    onShowAll: (() -> Unit)? = null,
+    onOpen: (() -> Unit)? = null,
+) {
     val displayTitle = localizeShelfTitle(title)
     val displaySubtitle = localizeShelfSubtitle(subtitle)
     Row(
         modifier = Modifier
             .padding(horizontal = PAGE_GUTTER, vertical = 10.dp)
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -624,7 +636,14 @@ internal fun SectionHeader(title: String, subtitle: String = "", onShowAll: (() 
                 )
             }
         }
-        if (onShowAll != null) {
+        if (onOpen != null) {
+            Icon(
+                imageVector = BitChordIcons.ChevronRight,
+                contentDescription = "Open $displayTitle",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp).size(20.dp),
+            )
+        } else if (onShowAll != null) {
             Text(
                 text = stringResource(Res.string.show_all),
                 style = MaterialTheme.typography.titleSmall,
@@ -813,9 +832,11 @@ private fun HeroShelf(
     onItemLongPress: ((ShelfItem) -> Unit)? = null,
     currentSong: Song? = null,
     isPlaying: Boolean = false,
+    onShelfOpen: ((HomeShelf) -> Unit)? = null,
 ) {
+    val openShelf = onShelfOpen?.takeIf { shelf.moreBrowseId != null }?.let { callback -> { callback(shelf) } }
     Column(Modifier.padding(bottom = 26.dp)) {
-        SectionHeader(shelf.title, shelf.subtitle)
+        SectionHeader(shelf.title, shelf.subtitle, onOpen = openShelf)
         // Measured rather than taken as a share of the parent, because the card
         // has a ceiling as well as a fraction — see [heroCardWidth]. A fixed
         // width is also the only one of the two the aspect ratio below can turn
@@ -917,9 +938,11 @@ internal fun Shelf(
     leadingCard: (@Composable () -> Unit)? = null,
     currentSong: Song? = null,
     isPlaying: Boolean = false,
+    onShelfOpen: ((HomeShelf) -> Unit)? = null,
 ) {
+    val openShelf = onShelfOpen?.takeIf { shelf.moreBrowseId != null }?.let { callback -> { callback(shelf) } }
     Column(Modifier.padding(bottom = 26.dp)) {
-        SectionHeader(shelf.title, shelf.subtitle)
+        SectionHeader(shelf.title, shelf.subtitle, onOpen = openShelf)
         ShelfRow(
             contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
