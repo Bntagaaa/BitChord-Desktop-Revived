@@ -3633,6 +3633,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                                 onMove = ::moveInQueue,
                                 onClear = ::clearQueue,
                                 modifier = Modifier.fillMaxSize(),
+                                showTitle = false,
                             )
                             DesktopSidePanel.DETAILS -> DesktopNowPlayingDetailsPanel(
                                 song = current,
