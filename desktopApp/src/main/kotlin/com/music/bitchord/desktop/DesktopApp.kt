@@ -2204,6 +2204,18 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         }
     }
 
+    fun openBrowseShelf(browseId: String, title: String, params: String? = null) {
+        openedArtist = null
+        openedCollection = null
+        selectedMoodGenre = null
+        libraryShowAll = null
+        overlays.replay = false
+        overlays.settingsPage = null
+        openedBrowse = DesktopBrowseTarget(browseId, title, params)
+        browseState = UiState.Loading
+        browseReloads++
+    }
+
     fun openShelfDestination(shelf: HomeShelf) {
         val browseId = shelf.moreBrowseId ?: return
         val fallback = BrowseItem(
@@ -2218,30 +2230,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             browseTypeOf(browseId) == BrowseType.ALBUM ||
                 browseId.startsWith("VL") || browseId.startsWith("PL") ||
                 browseId.startsWith("OLAK") -> openCollection(browseId, fallback)
-            else -> {
-                openedArtist = null
-                openedCollection = null
-                selectedMoodGenre = null
-                libraryShowAll = null
-                overlays.replay = false
-                overlays.settingsPage = null
-                openedBrowse = DesktopBrowseTarget(browseId, shelf.title, shelf.moreParams)
-                browseState = UiState.Loading
-                browseReloads++
-            }
+            else -> openBrowseShelf(browseId, shelf.title, shelf.moreParams)
         }
-    }
-
-    fun openBrowseShelf(browseId: String, title: String, params: String? = null) {
-        openedArtist = null
-        openedCollection = null
-        selectedMoodGenre = null
-        libraryShowAll = null
-        overlays.replay = false
-        overlays.settingsPage = null
-        openedBrowse = DesktopBrowseTarget(browseId, title, params)
-        browseState = UiState.Loading
-        browseReloads++
     }
 
     fun openShelfItem(item: ShelfItem, shelfTitle: String? = null) {
