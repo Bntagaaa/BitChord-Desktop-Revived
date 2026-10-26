@@ -58,8 +58,10 @@ import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.model.ArtistPage
 import com.music.bitchord.data.model.ArtistRef
+import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.playback.PlaybackPosition
+import com.music.bitchord.ui.icons.BitChordIcons
 
 /**
  * The compact Spotify-style track details view. It deliberately uses BitChord's existing
@@ -74,6 +76,9 @@ import com.music.bitchord.playback.PlaybackPosition
 internal fun DesktopNowPlayingDetailsPanel(
     song: Song,
     isPlaying: Boolean,
+    signedIn: Boolean,
+    likeStatus: LikeStatus,
+    onToggleLike: () -> Unit,
     lyrics: List<LyricLine>?,
     lyricsLoading: Boolean,
     position: PlaybackPosition,
@@ -124,6 +129,8 @@ internal fun DesktopNowPlayingDetailsPanel(
     val canvasFrame = DesktopCanvasBackdrop.frameFor(spotifyCanvas?.url)
     val artworkPalette = rememberDesktopArtworkPalette(song.thumbnailUrl, canvasFrame)
     val lyricsCardColor = lyricsPreviewSurfaceColor(artworkPalette, DesktopTheme.isDark)
+    val liked = likeStatus == LikeStatus.LIKE
+    val showLike = signedIn && song.localUri == null
     val upcoming = queue.withIndex().filter { it.index > queueIndex }.take(2)
 
     Column(
@@ -203,6 +210,16 @@ internal fun DesktopNowPlayingDetailsPanel(
                             modifier = Modifier.clickable { onOpenArtist(song.artistId, song.artist) },
                         )
                     }
+                    if (showLike) {
+                        DesktopToolbarButton(onClick = onToggleLike, size = 32.dp) {
+                            Icon(
+                                imageVector = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
+                                contentDescription = if (liked) "Remove from liked" else "Add to liked",
+                                tint = if (liked) DesktopAccent else Color.White,
+                                modifier = Modifier.size(19.dp),
+                            )
+                        }
+                    }
                     DesktopToolbarButton(
                         onClick = { onOpenArtist(song.artistId, song.artist) },
                         size = 32.dp,
@@ -242,6 +259,16 @@ internal fun DesktopNowPlayingDetailsPanel(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.clickable { onOpenArtist(song.artistId, song.artist) },
                     )
+                }
+                if (showLike) {
+                    DesktopToolbarButton(onClick = onToggleLike, size = 34.dp) {
+                        Icon(
+                            imageVector = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
+                            contentDescription = if (liked) "Remove from liked" else "Add to liked",
+                            tint = if (liked) DesktopAccent else secondary,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
                 }
                 DesktopToolbarButton(onClick = { onOpenArtist(song.artistId, song.artist) }, size = 34.dp) {
                     Icon(Icons.Rounded.Info, "Artist details", tint = secondary, modifier = Modifier.size(19.dp))

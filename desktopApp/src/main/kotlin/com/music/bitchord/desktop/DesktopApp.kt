@@ -3131,13 +3131,12 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         onStartRadio = ::startRadio,
         onPlayNext = ::playNext,
         onAddToQueue = ::addToQueue,
-        // Both leave the player, the way opening a page from Android's sheet collapses it.
+        // Albums replace the player; opening an artist keeps Now Playing visible.
         onOpenAlbum = { id ->
             overlays.nowPlaying = false
             openAlbum(id)
         },
         onOpenArtist = { id ->
-            overlays.nowPlaying = false
             openArtist(id, song.artist)
         },
         onSleepTimer = { minutes ->
@@ -3776,6 +3775,13 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             DesktopSidePanel.DETAILS -> DesktopNowPlayingDetailsPanel(
                                 song = current,
                                 isPlaying = playback.isPlaying,
+                                signedIn = youtubeSignedIn,
+                                likeStatus = when (current.videoId) {
+                                    in likedIds -> LikeStatus.LIKE
+                                    in dislikedIds -> LikeStatus.DISLIKE
+                                    else -> LikeStatus.INDIFFERENT
+                                },
+                                onToggleLike = { toggleLike(current) },
                                 lyrics = sharedLyrics,
                                 lyricsLoading = lyricsLoading,
                                 position = playerPosition,
@@ -3785,7 +3791,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                                 onShowQueue = { overlays.sidePanel = DesktopSidePanel.QUEUE },
                                 onPlayQueueIndex = ::playQueueIndex,
                                 onOpenArtist = { id, name ->
-                                    overlays.sidePanel = null
+                                    // Keep Now Playing open while the artist page changes underneath it.
                                     if (id != null) {
                                         openArtist(id, name)
                                     } else {
@@ -3890,7 +3896,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             // exactly, so a fragment like "2115" opens nothing
                             // rather than White 2115.
                             onOpenArtist = { id, name ->
-                                overlays.nowPlaying = false
+                                // Keep the player sheet visible while navigating to the artist.
                                 if (id != null) {
                                     openArtist(id, name)
                                 } else {
