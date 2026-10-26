@@ -2,228 +2,200 @@ package com.music.bitchord.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
+import org.jsoup.Jsoup
+import java.net.HttpURLConnection
+import java.net.URL
 import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.text.Normalizer
 import java.util.LinkedHashMap
 import java.util.Locale
 
 /**
- * The header Apple Music's artist page draws: a still, the looping clip that replaces it, the
- * artist's stylized name as a transparent logo, Apple's colours for the picture, and the bio.
- *
- * Colours are ARGB ints. [logoAspect] is the logo's width over its height.
+ * Public Apple Music artwork for an artist page. The logo is Apple's own
+ * transparent title artwork, not a locally guessed font.
  */
-data class DesktopAppleArtistArt(
+internal data class DesktopAppleArtistArt(
     val heroUrl: String,
-    val portraitUrl: String?,
-    val wideVideoUrl: String?,
-    val squareVideoUrl: String?,
     val logoUrl: String?,
     val logoAspect: Float,
-    val background: Int,
-    val accent: Int,
+    val backgroundColor: Int,
+    val textColor: Int,
     val keyColor: Int?,
-    val bio: String?,
-    val pageUrl: String,
-) {
-    // Preserve the existing Revived artist colour API while importing the richer metadata.
-    val backgroundColor: Int get() = background
-    val textColor: Int get() = accent
-    val hasMotion: Boolean get() = !wideVideoUrl.isNullOrBlank() || !squareVideoUrl.isNullOrBlank()
-}
+)
 
 /**
- * Finds [DesktopAppleArtistArt] from an artist's name: the iTunes search turns it into an Apple
- * artist page, whose hydration JSON carries the header. That JSON is not a published API, so any
- * surprise reads as "no art" and the YouTube header stays.
+ * Reads the public artist page metadata Apple embeds for its web player.
+ *
+ * This deliberately needs no Apple Music account or cookies. The YouTube
+ * Music artist image remains the immediate fallback while the lookup runs,
+ * and also remains the fallback whenever Apple has no matching artwork.
  */
 internal object DesktopAppleArtistArtRepository {
-
-    private const val CACHE_SIZE = 96
-    private const val HERO_WIDTH = 1600
+    private const val CACHE_SIZE = 64
+    private const val HERO_WIDTH = 1200
     private const val LOGO_WIDTH = 1000
+    private const val TIMEOUT_MS = 8_000
+    private const val USER_AGENT =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
-    private class Entry(val art: DesktopAppleArtistArt?, val time: Long = System.currentTimeMillis()) {
-        fun reusable(): Boolean = art?.hasMotion == true || System.currentTimeMillis() - time < 15_000L
+    private val cache = object : LinkedHashMap<String, DesktopAppleArtistArt>(CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DesktopAppleArtistArt>): Boolean =
+            size > CACHE_SIZE
     }
 
-    private val cache = object : LinkedHashMap<String, Entry>(CACHE_SIZE, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry>) = size > CACHE_SIZE
+    fun cached(artistName: String): DesktopAppleArtistArt? {
+        val key = artistName.normalized()
+        return synchronized(cache) { cache[key] }
     }
 
-    private val _updates = MutableStateFlow(0)
-    val updates: StateFlow<Int> = _updates
+    suspend fun artFor(artistName: String): DesktopAppleArtistArt? {
+        val key = artistName.normalized()
+        if (key.isBlank()) return null
+        synchronized(cache) { cache[key]?.let { return it } }
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+        val result = withContext(Dispatchers.IO) {
+            runCatching { lookup(artistName, key) }.getOrNull()
+        } ?: return null
 
-    fun cached(artistName: String): DesktopAppleArtistArt? =
-        synchronized(cache) { cache[artistName.key()] }?.art
-
-    fun isSettled(artistName: String): Boolean =
-        synchronized(cache) { cache[artistName.key()]?.reusable() == true }
-
-    /**
-     * A cached motion clip is stable; a still or miss is provisional. The artist page may
-     * refresh a few times while continuing to display the current image.
-     */
-    suspend fun artFor(artistName: String, forceRefresh: Boolean = false): DesktopAppleArtistArt? {
-        val key = artistName.key()
-        if (key.isEmpty()) return null
-        if (!forceRefresh) {
-            synchronized(cache) { cache[key] }?.let { if (it.reusable()) return it.art }
-        }
-        val fetched = withContext(Dispatchers.IO) {
-            runCatching { lookup(canonicalAppleArtistName(artistName), key) }
-                .onFailure { DesktopTrackLog.log("Apple artist: lookup failed for $artistName (${it.javaClass.simpleName})") }
-                .getOrNull()
-        }
-        val art = synchronized(cache) {
-            val old = cache[key]?.art
-            val fresh = fetched?.art
-            val chosen = when {
-                fresh?.hasMotion == true -> fresh
-                old?.hasMotion == true -> old
-                fresh != null -> fresh
-                else -> old
-            }
-            cache[key] = Entry(chosen)
-            chosen
-        }
-        _updates.value++
-        return art
+        synchronized(cache) { cache[key] = result }
+        return result
     }
 
-    private fun lookup(name: String, key: String): Entry? {
-        val search = canvasGet(
-            "https://itunes.apple.com/search?term=" +
-                URLEncoder.encode(name, StandardCharsets.UTF_8) +
-                "&entity=musicArtist&limit=8&country=gb",
+    private fun lookup(artistName: String, key: String): DesktopAppleArtistArt? {
+        val encodedName = URLEncoder.encode(artistName, Charsets.UTF_8.name())
+        val searchUrl =
+            "https://itunes.apple.com/search?term=$encodedName&entity=musicArtist&limit=5"
+        val searchJson = getText(searchUrl) ?: return null
+        val results = runCatching {
+            Json.parseToJsonElement(searchJson).asObject()?.get("results").asArray()
+        }.getOrNull() ?: return null
+
+        val match = results.firstNotNullOfOrNull { element ->
+            val candidate = element.asObject() ?: return@firstNotNullOfOrNull null
+            candidate.takeIf { it.string("artistName").normalized() == key }
+        } ?: return null
+
+        val artistUrl = match.string("artistLinkUrl").substringBefore('?').takeIf(String::isNotBlank)
+            ?: match.int("artistId").takeIf { it > 0 }?.let { "https://music.apple.com/us/artist/$it" }
+            ?: return null
+
+        val html = getText(artistUrl) ?: return null
+        val script = runCatching {
+            Jsoup.parse(html).selectFirst("script#serialized-server-data")
+        }.getOrNull() ?: return null
+        val serialized = script.data().ifBlank { script.html() }
+        if (serialized.isBlank()) return null
+        val root = runCatching { Json.parseToJsonElement(serialized) }.getOrNull() ?: return null
+        val header = findArtistHeader(root) ?: return null
+
+        val logo = header.objectAt("artistLogo")?.objectAt("dictionary")
+        val hero = header.objectAt("artwork")?.objectAt("dictionary")
+            ?: header.objectAt("colorBackdropArtwork")?.objectAt("dictionary")
+            ?: return null
+
+        val heroWidth = hero.int("width")
+        val heroHeight = hero.int("height")
+        if (heroWidth <= 0 || heroHeight <= 0) return null
+
+        val heroUrl = fillImageUrl(
+            hero.string("url"),
+            HERO_WIDTH,
+            (HERO_WIDTH.toLong() * heroHeight / heroWidth).toInt(),
+            "jpg",
         ) ?: return null
-        val results = (json.parseToJsonElement(search) as? JsonObject)?.get("results") as? JsonArray
-            ?: return null
-        val page = results.asSequence()
-            .mapNotNull { it as? JsonObject }
-            .firstOrNull { it.text("artistName")?.key() == key }
-            ?.let { hit ->
-                hit.text("artistLinkUrl")?.substringBefore('?')?.takeIf { it.isNotBlank() }
-                    ?: hit.text("artistId")?.let { "https://music.apple.com/gb/artist/$it" }
-            }
-            ?: return Entry(null)
-        val html = canvasGet(page) ?: return null
-        return parse(html, page)?.let(::Entry)
-    }
 
-    private fun parse(html: String, pageUrl: String): DesktopAppleArtistArt? {
-        val marker = html.indexOf("id=\"serialized-server-data\"")
-        if (marker < 0) return null
-        val start = html.indexOf('>', marker) + 1
-        val end = html.indexOf("</script>", start)
-        if (start <= 0 || end < 0) return null
-        val header = findHeader(json.parseToJsonElement(html.substring(start, end))) ?: return null
-
-        val expectedId = pageUrl.substringBefore('?').substringAfterLast('/')
-        val headerId = header.obj("contentDescriptor")?.obj("identifiers")?.text("storeAdamID")
-        if (headerId != null && headerId != expectedId) return null
-        val logo = header.dict("artistLogo")
-        val wideStill = header.dict("wideArtwork")
-        val portrait = header.dict("circleArtwork") ?: header.dict("artwork")
-        val still = wideStill ?: portrait ?: header.dict("colorBackdropArtwork")
-        val wideClip = header.dict("wideVideoArtwork")?.let {
-            it.obj("motionArtistFullscreen16x9") ?: it.obj("motionArtistWide16x9")
+        val logoWidth = logo?.int("width") ?: 0
+        val logoHeight = logo?.int("height") ?: 0
+        val logoUrl = if (logoWidth > 0 && logoHeight > 0) {
+            fillImageUrl(
+                logo?.string("url").orEmpty(),
+                LOGO_WIDTH,
+                (LOGO_WIDTH.toLong() * logoHeight / logoWidth).toInt(),
+                "png",
+            )
+        } else {
+            null
         }
-        val squareClip = header.dict("videoArtwork")?.obj("motionArtistSquare1x1")
-        val wideVideo = wideClip?.text("video")?.takeIf { it.startsWith("http") }
-        val squareVideo = squareClip?.text("video")?.takeIf { it.startsWith("http") }
 
-        // A wide header wants the wide clip's own still when there is one; it matches the loop.
-        val heroSource = wideClip?.obj("previewFrame")?.takeIf { wideVideo != null }
-            ?: still
-            ?: squareClip?.obj("previewFrame")
-            ?: return null
-        val portraitUrl = portrait?.takeIf { wideVideo == null && squareVideo == null && wideStill == null }?.image(380, "jpg")
-        val heroUrl = heroSource.image(if (portraitUrl != null) 600 else HERO_WIDTH, "jpg") ?: return null
+        val background = parseAppleColor(hero.string("bgColor")) ?: return null
+        val textColor = parseAppleColor(hero.string("textColor1")) ?: 0xFFFFFFFF.toInt()
+        val keyColor = parseAppleColor(header.string("keyColor"))
 
-        val logoW = logo?.int("width") ?: 0
-        val logoH = logo?.int("height") ?: 0
-        val logoUrl = if (logo != null && logoW > 0 && logoH > 0) logo.image(LOGO_WIDTH, "png", aspect = 3f) else null
-
-        val colours = heroSource
-        val background = colours.text("bgColor")?.toArgb() ?: still?.text("bgColor")?.toArgb() ?: 0xFF1F1F1F.toInt()
-        val accent = colours.text("textColor1")?.toArgb() ?: 0xFFFFFFFF.toInt()
         return DesktopAppleArtistArt(
             heroUrl = heroUrl,
-            portraitUrl = portraitUrl,
-            wideVideoUrl = wideVideo,
-            squareVideoUrl = squareVideo,
             logoUrl = logoUrl,
-            logoAspect = 3f,
-            background = background,
-            accent = accent,
-            keyColor = header.text("keyColor")?.toArgb(),
-            bio = header.text("bio")?.takeIf { it.isNotBlank() },
-            pageUrl = pageUrl,
+            logoAspect = if (logoUrl != null) logoWidth.toFloat() / logoHeight else 1f,
+            backgroundColor = background,
+            textColor = textColor,
+            keyColor = keyColor,
         )
     }
 
-    private fun findHeader(node: JsonElement): JsonObject? {
-        when (node) {
-            is JsonObject -> {
-                if (node.containsKey("artistLogo") &&
-                    (node.dict("artwork") != null || node.dict("wideArtwork") != null || node.dict("circleArtwork") != null || node.dict("wideVideoArtwork") != null)
-                ) return node
-                for (child in node.values) findHeader(child)?.let { return it }
-            }
-            is JsonArray -> for (child in node) findHeader(child)?.let { return it }
-            else -> Unit
+    private fun getText(address: String): String? {
+        val connection = runCatching { URL(address).openConnection() as HttpURLConnection }.getOrNull()
+            ?: return null
+        return try {
+            connection.connectTimeout = TIMEOUT_MS
+            connection.readTimeout = TIMEOUT_MS
+            connection.instanceFollowRedirects = true
+            connection.setRequestProperty("User-Agent", USER_AGENT)
+            connection.setRequestProperty("Accept", "text/html,application/json;q=0.9,*/*;q=0.8")
+            if (connection.responseCode !in 200..299) return null
+            connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        } catch (_: Exception) {
+            null
+        } finally {
+            connection.disconnect()
         }
-        return null
     }
 
-    private fun JsonObject.obj(key: String): JsonObject? = this[key] as? JsonObject
+    private fun findArtistHeader(node: JsonElement): JsonObject? = when (node) {
+        is JsonObject -> {
+            if ("artistLogo" in node) node
+            else node.values.firstNotNullOfOrNull(::findArtistHeader)
+        }
+        is JsonArray -> node.firstNotNullOfOrNull(::findArtistHeader)
+        else -> null
+    }
 
-    private fun JsonObject.dict(key: String): JsonObject? = obj(key)?.obj("dictionary")
-
-    private fun JsonObject.text(key: String): String? =
-        (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.contentOrNull
-
-    private fun JsonObject.int(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
-
-    private fun JsonObject.image(width: Int, format: String, aspect: Float? = null): String? {
-        val template = text("url")?.takeIf { it.contains("{w}") } ?: return null
-        val w = int("width")?.takeIf { it > 0 } ?: return null
-        val h = int("height")?.takeIf { it > 0 } ?: return null
-        val outW = minOf(width, w)
-        val outH = if (aspect != null) (outW / aspect).toInt() else (outW.toLong() * h / w).toInt()
+    private fun fillImageUrl(template: String, width: Int, height: Int, format: String): String? {
+        if (!template.contains("{w}")) return null
         return template
-            .replace("{w}", outW.toString())
-            .replace("{h}", outH.toString())
+            .replace("{w}", width.toString())
+            .replace("{h}", height.toString())
             .replace("{c}", "bb")
             .replace("{f}", format)
     }
 
-    private fun String.toArgb(): Int? =
-        takeIf { it.length == 6 }?.toIntOrNull(16)?.let { 0xFF000000.toInt() or it }
+    private fun parseAppleColor(value: String): Int? {
+        if (!value.matches(Regex("[0-9a-fA-F]{6}"))) return null
+        return (0xFF000000L or value.toLong(16)).toInt()
+    }
 
-    private fun String.key(): String = Normalizer.normalize(canonicalAppleArtistName(this), Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}+"), "").lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]"), "")
+    private fun JsonElement?.asObject(): JsonObject? = this as? JsonObject
+    private fun JsonElement?.asArray(): JsonArray? = this as? JsonArray
+    private fun JsonElement?.asString(): String? = (this as? JsonPrimitive)?.contentOrNull
+
+    private fun JsonObject.objectAt(key: String): JsonObject? = this[key].asObject()
+    private fun JsonObject.string(key: String): String = this[key].asString().orEmpty()
+    private fun JsonObject.int(key: String): Int = (this[key] as? JsonPrimitive)?.intOrNull ?: 0
+
+    private fun String.normalized(): String =
+        Normalizer.normalize(lowercase(Locale.ROOT), Normalizer.Form.NFD)
+            .filter(Char::isLetterOrDigit)
 }
 
-internal fun canonicalAppleArtistName(name: String): String = name
-    .replace(Regex("""\s*(?:-\s*Topic|VEVO|\s+-\s+Official(?:\s+Channel)?)$""", RegexOption.IGNORE_CASE), "")
-    .trim()
 
 @androidx.compose.runtime.Composable
 internal fun DesktopAppleArtistHero(

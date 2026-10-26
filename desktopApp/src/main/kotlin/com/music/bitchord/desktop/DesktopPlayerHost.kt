@@ -53,15 +53,10 @@ internal object DesktopPlayerHost : PlayerHost {
 
     override val settings: DesktopPlayerSettings = DesktopPlayerSettings
 
-    // Spotify Canvas is exclusive to Now Playing Details, never the shared/fullscreen player.
-    // Guard cached entries too, including ones produced by older app versions.
-    override fun cachedCanvas(song: Song): CanvasArtwork? =
-        DesktopCanvasClient.cached(song)?.takeUnless { it.source == DesktopCanvasSource.SPOTIFY }?.toShared()
+    override fun cachedCanvas(song: Song): CanvasArtwork? = DesktopCanvasClient.cached(song)?.toShared()
 
     override suspend fun canvasFor(song: Song): CanvasArtwork? =
-        withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(song) }
-            ?.takeUnless { it.source == DesktopCanvasSource.SPOTIFY }
-            ?.toShared()
+        withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(song) }?.toShared()
 
     @Composable
     override fun CanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) = DesktopCanvasVideo(spec, modifier)

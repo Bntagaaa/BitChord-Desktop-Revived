@@ -3,18 +3,19 @@ package com.music.bitchord.desktop
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,57 +33,117 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-/** An inline Appearance page section, not another modal obstructing Settings. */
+/** Unified Graphics Profile, Reduce Dynamic Blur, and Per-Area Blur Customization component. */
 @Composable
-internal fun DesktopBlurCustomization(reduceDynamicBlur: Boolean) {
-    var expanded by remember { mutableStateOf(false) }
+internal fun DesktopUnifiedGraphicsAndBlurSettings() {
+    val performanceProfile by DesktopAppearanceSettings.performanceProfile.collectAsState()
+    val reduceDynamicBlur by DesktopAppearanceSettings.reduceDynamicBlur.collectAsState()
+    var expandedCustomize by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
 
-    Column(Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clip(shape)
+            .background(DesktopCardInsetFill)
+            .border(0.5.dp, DesktopCardEdge, shape)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Section 1: Graphics Profile
+        Column(Modifier.fillMaxWidth()) {
+            Text("Graphics profile", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Adaptive profile for rendering performance and dynamic blur effects",
+                color = DesktopSecondary,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DesktopPerformanceProfile.entries.forEach { option ->
+                    FilterChip(
+                        colors = desktopChipColors(),
+                        selected = performanceProfile == option,
+                        onClick = { DesktopAppearanceSettings.setPerformanceProfile(option) },
+                        label = { Text(option.label) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (performanceProfile == DesktopPerformanceProfile.AUTO) {
+                    "${performanceProfile.description} (Active: ${performanceProfile.resolved().label})"
+                } else {
+                    performanceProfile.description
+                },
+                color = DesktopSecondary,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        HorizontalDivider(color = DesktopCardEdge, thickness = 0.5.dp)
+
+        // Section 2: Master Reduce Dynamic Blur
         Row(
-            modifier = Modifier.fillMaxWidth()
-                .desktopRowClickable { expanded = !expanded }
-                .padding(vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Customize blur", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Text("Reduce dynamic blur", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                 Text(
-                    "Choose exactly where BitChord uses frosted glass",
+                    "Swaps frosted glass for solid fills across all UI surfaces",
+                    color = DesktopSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(
+                checked = reduceDynamicBlur,
+                onCheckedChange = DesktopAppearanceSettings::setReduceDynamicBlur,
+                colors = desktopSwitchColors(),
+            )
+        }
+
+        HorizontalDivider(color = DesktopCardEdge, thickness = 0.5.dp)
+
+        // Section 3: Expandable Per-Area Blur Customization
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .desktopRowClickable { expandedCustomize = !expandedCustomize }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Customize blur per area", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                Text(
+                    "Choose exactly which UI components use frosted glass",
                     color = DesktopSecondary,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
             Spacer(Modifier.width(12.dp))
             Icon(
-                if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse blur options" else "Expand blur options",
+                if (expandedCustomize) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                contentDescription = if (expandedCustomize) "Collapse per-area options" else "Expand per-area options",
                 tint = DesktopSecondary,
             )
         }
 
-        AnimatedVisibility(visible = expanded) {
-            val shape = RoundedCornerShape(12.dp)
+        AnimatedVisibility(visible = expandedCustomize) {
             Column(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(bottom = 14.dp)
-                    .clip(shape)
-                    .background(DesktopCardInsetFill)
-                    .border(0.5.dp, DesktopCardEdge, shape)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Text(
-                    "Each choice is saved separately. The global Reduce dynamic blur switch always takes priority.",
-                    color = DesktopSecondary,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(bottom = 6.dp),
-                )
                 if (reduceDynamicBlur) {
                     Text(
-                        "All blur is currently off. Your choices below are saved and will apply when Reduce dynamic blur is turned off.",
+                        "All dynamic blur is currently overridden by 'Reduce dynamic blur'. Your choices below are saved and will apply when master override is turned off.",
                         color = DesktopForeground,
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(bottom = 8.dp),
+                        modifier = Modifier.padding(bottom = 6.dp),
                     )
                 }
                 DesktopBlurArea.entries.forEachIndexed { index, area ->
@@ -95,7 +156,7 @@ internal fun DesktopBlurCustomization(reduceDynamicBlur: Boolean) {
                             .desktopRowClickable {
                                 DesktopAppearanceSettings.setBlurPreference(area, !enabled)
                             }
-                            .padding(vertical = 11.dp),
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -113,4 +174,10 @@ internal fun DesktopBlurCustomization(reduceDynamicBlur: Boolean) {
             }
         }
     }
+}
+
+/** Backward compatibility wrapper */
+@Composable
+internal fun DesktopBlurCustomization(reduceDynamicBlur: Boolean) {
+    DesktopUnifiedGraphicsAndBlurSettings()
 }

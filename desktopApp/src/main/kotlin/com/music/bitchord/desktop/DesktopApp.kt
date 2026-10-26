@@ -6268,16 +6268,7 @@ private fun DesktopArtistPage(
                     mutableStateOf(DesktopAppleArtistArtRepository.cached(name))
                 }
                 LaunchedEffect(name) {
-                    // Keep the still visible while attempting a few bounded video refreshes.
-                    // Do not keep polling artists who have no motion artwork.
-                    repeat(3) { attempt ->
-                        if (attempt > 0) delay(3_000L)
-                        val refreshed = DesktopAppleArtistArtRepository.artFor(
-                            name, forceRefresh = attempt > 0,
-                        )
-                        if (refreshed != null) appleArt = refreshed
-                        if (refreshed?.hasMotion == true) return@LaunchedEffect
-                    }
+                    appleArt = DesktopAppleArtistArtRepository.artFor(name) ?: appleArt
                 }
 
                 val palette = rememberDesktopArtworkPalette(appleArt?.heroUrl ?: artist.thumbnailUrl)
@@ -6463,18 +6454,6 @@ private fun DesktopArtistBanner(
             fallbackPx = HEADER_ART_PX,
             modifier = Modifier.matchParentSize(),
         )
-        // The original still remains underneath until the first decoded frame is ready.
-        // This reuses Continued's HLS/FFmpeg renderer instead of creating a second player.
-        val motionUrl = appleArt?.wideVideoUrl ?: appleArt?.squareVideoUrl
-        if (motionUrl != null) {
-            DesktopCanvasView(
-                url = motionUrl,
-                modifier = Modifier.matchParentSize(),
-                fallbackUrl = appleArt?.squareVideoUrl?.takeIf { it != motionUrl },
-                maxEdge = 960,
-                publishBackdrop = false,
-            )
-        }
 
         Box(
             Modifier.matchParentSize().background(
@@ -7466,7 +7445,6 @@ private fun DesktopSettingsScreen(
                             }
                         }
                     }
-                    val reduceDynamicBlur by DesktopAppearanceSettings.reduceDynamicBlur.collectAsState()
                     val oldTopPlayerEnabled by DesktopAppearanceSettings.enableOldTopMusicPlayerStyle.collectAsState()
                     val useOldExploreCards by DesktopAppearanceSettings.useOldExploreCards.collectAsState()
                     SettingsToggle(
@@ -7481,12 +7459,9 @@ private fun DesktopSettingsScreen(
                         oldTopPlayerEnabled,
                         DesktopAppearanceSettings::setEnableOldTopMusicPlayerStyle,
                     )
-                    SettingsToggle(
-                        DesktopStrings["reduce_dynamic_blur", "Reduce dynamic blur"],
-                        DesktopStrings["reduce_dynamic_blur_subtitle", "Swaps frosted glass for solid fills across the app"],
-                        reduceDynamicBlur,
-                        DesktopAppearanceSettings::setReduceDynamicBlur,
-                    )
+                    if (settingsRowVisible("Graphics profile & blur", "Graphics profile, reduce dynamic blur and customize blur")) {
+                        DesktopUnifiedGraphicsAndBlurSettings()
+                    }
                     if (DesktopSidebarMica.isSupported) {
                         val micaSidebar by DesktopAppearanceSettings.micaSidebar.collectAsState()
                         SettingsToggle(
