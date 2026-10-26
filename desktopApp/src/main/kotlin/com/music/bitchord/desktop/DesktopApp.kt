@@ -3117,16 +3117,17 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     var playerMenuOpen by remember(selectedSong?.videoId) { mutableStateOf(false) }
 
     /**
-     * An artist opened from fullscreen must be visible immediately, not hidden
-     * beneath the player. In a normal (non-fullscreen) player, keep Now Playing
-     * open as before. The Details side panel uses its own navigation callback.
+     * The expanded Now Playing sheet covers the entire page even when the OS
+     * window itself is not fullscreen. Always dismiss that sheet before opening
+     * an artist, and exit true window fullscreen if it is enabled.
+     *
+     * Artist navigation from the Details side panel continues to call openArtist
+     * directly, so that panel stays visible over the destination artist page.
      */
     fun openArtistFromPlayer(browseId: String, name: String) {
-        if (DesktopWindowMode.fullScreen.value) {
-            DesktopWindowMode.exit()
-            overlays.nowPlaying = false
-            playerMenuOpen = false
-        }
+        DesktopWindowMode.exit()
+        overlays.nowPlaying = false
+        playerMenuOpen = false
         openArtist(browseId, name)
     }
 
@@ -3145,7 +3146,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         onStartRadio = ::startRadio,
         onPlayNext = ::playNext,
         onAddToQueue = ::addToQueue,
-        // Albums replace the player. Artist navigation only dismisses a fullscreen player.
+        // Expanded Now Playing closes for both album and artist navigation.
         onOpenAlbum = { id ->
             overlays.nowPlaying = false
             openAlbum(id)
@@ -3910,8 +3911,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             // exactly, so a fragment like "2115" opens nothing
                             // rather than White 2115.
                             onOpenArtist = { id, name ->
-                                // Fullscreen exits to reveal the artist; the normal player
-                                // stays open. Apply this to both direct IDs and name lookups.
+                                // Dismiss the expanded player even when the desktop window
+                                // is not fullscreen. Keep the separate Details panel unchanged.
                                 if (id != null) {
                                     openArtistFromPlayer(id, name)
                                 } else {
