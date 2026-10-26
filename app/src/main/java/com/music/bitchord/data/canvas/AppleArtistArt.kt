@@ -157,8 +157,13 @@ object AppleArtistArtRepository {
         } else {
             null
         }
-        val clip = header.optJSONObject("videoArtwork")?.optJSONObject("dictionary")
-            ?.optJSONObject("motionArtistSquare1x1")
+        val wideDict = header.optJSONObject("wideVideoArtwork")?.optJSONObject("dictionary")
+        val squareDict = header.optJSONObject("videoArtwork")?.optJSONObject("dictionary")
+        val clip = listOfNotNull(
+            wideDict?.optJSONObject("motionArtistFullscreen16x9"),
+            wideDict?.optJSONObject("motionArtistWide16x9"),
+            squareDict?.optJSONObject("motionArtistSquare1x1"),
+        ).firstOrNull { it.optString("video").startsWith("http") }
         val video = clip?.optString("video")?.takeIf { it.startsWith("http") }
         // The clip is a different picture from the still, with its own colours
         // — the page has to match whichever one is on screen.
