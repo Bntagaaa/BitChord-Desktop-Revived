@@ -229,6 +229,24 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+
+            <!--
+              "Open with" for an audio file: a file manager, a downloads list, a
+              tapped attachment. Typed rather than matched on extension, which
+              is what every sender actually fills in — and the two Ogg/FLAC
+              spellings are there because some file managers still type those
+              files as applications. Answered by MusicLink.LocalFile.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
+                <data android:mimeType="application/x-ogg" />
+                <data android:mimeType="application/x-flac" />
+            </intent-filter>
         </activity>
 
         <service
