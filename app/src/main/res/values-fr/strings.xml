@@ -179,6 +179,7 @@
     <string name="italian">Italien</string>
     <string name="turkish">Turc</string>
     <string name="thai">Thaï</string>
+    <string name="korean">Coréen</string>
     <string name="show_all">Tout afficher</string>
     <string name="grid_view">Grille</string>
     <string name="list_view">Liste</string>
@@ -448,6 +449,8 @@
     <string name="signed_in_as">Connecté en tant que %1$s</string>
     <string name="signing_in">Connexion en cours…</string>
     <string name="sleep_timer">Minuteur de veille</string>
+    <string name="sleep_timer_custom">Personnalisé</string>
+    <string name="start_sleep_timer">Démarrer le minuteur</string>
     <string name="sources_no_lossless">Aucune source activée ne peut fournir de l\'audio sans perte. Ajoutez un module personnalisé pour lire les fichiers sans perte disponibles sans transcodage.</string>
     <string name="sources_order_footer">Si une source n\'a pas un titre ou est inaccessible, BitChord essaie la suivante. Les sources situées au-dessus de YouTube peuvent remplacer son enregistrement lorsqu\'elles renvoient une meilleure version.</string>
     <string name="sources_order_header">Sources, testées dans cet ordre</string>
