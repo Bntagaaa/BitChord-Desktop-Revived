@@ -288,6 +288,7 @@ fun DesktopCanvasView(
 
     LaunchedEffect(url, fallbackUrl, isPlaying) {
         if (!isPlaying) return@LaunchedEffect
+        var retryDelayMs = 1_000L
         // Round and round until the track ends or the player is closed. A canvas is a few seconds
         // long, so one pass through it is not the feature — and the decoder cannot be relied on to
         // rewind itself: its own seek does not take on an HLS manifest, which is what Apple serves,
@@ -311,9 +312,13 @@ fun DesktopCanvasView(
                 last
             }
             if (opened.isFailure) {
-                DesktopTrackLog.log("canvas: ${opened.exceptionOrNull()?.message}")
+                DesktopTrackLog.log(
+                    "canvas: open failed; retrying in ${retryDelayMs}ms (${opened.exceptionOrNull()?.message})",
+                )
                 withContext(Dispatchers.IO) { decoder.close() }
-                return@LaunchedEffect
+                delay(retryDelayMs)
+                retryDelayMs = (retryDelayMs * 2).coerceAtMost(10_000L)
+                continue
             }
             var shown = 0
             try {
@@ -338,11 +343,16 @@ fun DesktopCanvasView(
             } finally {
                 withContext(NonCancellable + Dispatchers.IO) { decoder.close() }
             }
-            // A pass that drew nothing would spin: reopening cannot fix a clip that has no frames
-            // in it, and retrying immediately is a busy loop over the network.
+            // HLS can fail mid-stream or return an empty pass intermittently. Reopen the
+            // manifest with bounded backoff instead of leaving a frozen frame forever.
             if (shown == 0) {
-                DesktopTrackLog.log("canvas: the clip decoded no frames; not looping it")
-                return@LaunchedEffect
+                DesktopTrackLog.log("canvas: stream decoded no frames; retrying in ${retryDelayMs}ms")
+                delay(retryDelayMs)
+                retryDelayMs = (retryDelayMs * 2).coerceAtMost(10_000L)
+            } else {
+                retryDelayMs = 1_000L
+                // Reopen a fresh HLS demuxer at EOF without spinning at full CPU.
+                delay(250L)
             }
         }
     }
