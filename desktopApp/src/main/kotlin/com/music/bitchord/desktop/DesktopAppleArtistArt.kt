@@ -47,6 +47,7 @@ internal object DesktopAppleArtistArtRepository {
     private const val HERO_WIDTH = 1200
     private const val LOGO_WIDTH = 1000
     private const val TIMEOUT_MS = 8_000
+    private const val MOTION_RETRY_AFTER_MS = 10 * 60 * 1_000L
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -55,6 +56,9 @@ internal object DesktopAppleArtistArtRepository {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DesktopAppleArtistArt>): Boolean =
             size > CACHE_SIZE
     }
+    // A still-art hit does not prove Apple supplied motion metadata. Allow revisits to retry,
+    // but avoid hammering Apple's endpoints on every page open.
+    private val motionCheckedAt = HashMap<String, Long>()
 
     fun cached(artistName: String): DesktopAppleArtistArt? {
         val key = artistName.normalized()
@@ -64,14 +68,26 @@ internal object DesktopAppleArtistArtRepository {
     suspend fun artFor(artistName: String): DesktopAppleArtistArt? {
         val key = artistName.normalized()
         if (key.isBlank()) return null
-        synchronized(cache) { cache[key]?.let { return it } }
+        val now = System.currentTimeMillis()
+        val existing = synchronized(cache) { cache[key] }
+        if (existing?.videoUrl != null) return existing
+        if (existing != null) {
+            val checkedAt = synchronized(cache) { motionCheckedAt[key] ?: 0L }
+            if (now - checkedAt < MOTION_RETRY_AFTER_MS) return existing
+        }
 
         val result = withContext(Dispatchers.IO) {
-            runCatching { lookup(artistName, key) }.getOrNull()
-        } ?: return null
+            runCatching { lookup(artistName, key) }
+                .onFailure { DesktopTrackLog.log("artist motion: lookup failed for $artistName: ${it.message}") }
+                .getOrNull()
+        } ?: return existing
 
-        synchronized(cache) { cache[key] = result }
-        return result
+        synchronized(cache) {
+            // A transient response without motion must not replace a previously discovered clip.
+            cache[key] = if (result.videoUrl == null && existing?.videoUrl != null) existing else result
+            motionCheckedAt[key] = now
+        }
+        return synchronized(cache) { cache[key] }
     }
 
     private fun lookup(artistName: String, key: String): DesktopAppleArtistArt? {
@@ -131,9 +147,16 @@ internal object DesktopAppleArtistArtRepository {
         }
 
         // Match the upstream BitChord artist header source; this is distinct from Spotify Canvas.
+        // Apple can store videoArtwork outside the selected hero/logo header object.
         val motion = header.objectAt("videoArtwork")?.objectAt("dictionary")
             ?.objectAt("motionArtistSquare1x1")
-        val videoUrl = motion?.string("video")?.takeIf { it.startsWith("https://") }
+            ?: findMotionArtist(root)
+        val videoUrl = motion?.string("video")
+            ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+        DesktopTrackLog.log(
+            "artist motion: $artistName: " +
+                if (videoUrl == null) "no motion URL in Apple metadata" else "motion URL found"
+        )
         val colors = motion?.objectAt("previewFrame")?.takeIf { videoUrl != null } ?: hero
         val background = parseAppleColor(colors.string("bgColor"))
             ?: parseAppleColor(hero.string("bgColor")) ?: return null
@@ -176,6 +199,17 @@ internal object DesktopAppleArtistArtRepository {
             else node.values.firstNotNullOfOrNull(::findArtistHeader)
         }
         is JsonArray -> node.firstNotNullOfOrNull(::findArtistHeader)
+        else -> null
+    }
+
+    /** Finds motion video even when Apple nests it outside the selected header object. */
+    private fun findMotionArtist(node: JsonElement): JsonObject? = when (node) {
+        is JsonObject -> {
+            node["motionArtistSquare1x1"].asObject()
+                ?.takeIf { it.string("video").startsWith("http") }
+                ?: node.values.firstNotNullOfOrNull(::findMotionArtist)
+        }
+        is JsonArray -> node.firstNotNullOfOrNull(::findMotionArtist)
         else -> null
     }
 
