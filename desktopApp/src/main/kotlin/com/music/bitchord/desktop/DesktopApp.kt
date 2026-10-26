@@ -6455,6 +6455,16 @@ private fun DesktopArtistBanner(
             modifier = Modifier.matchParentSize(),
         )
 
+        // Apple's motion artist video is only mounted while this artist banner is composed.
+        // The still hero remains underneath until the first HLS frame is decoded.
+        appleArt?.videoUrl?.let { url ->
+            DesktopCanvasView(
+                url = url,
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+
         Box(
             Modifier.matchParentSize().background(
                 Brush.verticalGradient(
