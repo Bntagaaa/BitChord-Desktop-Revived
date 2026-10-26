@@ -109,25 +109,14 @@ internal fun DesktopLastfmLoginDialog(onDismiss: () -> Unit) {
 }
 
 /**
- * The `sp_dc` cookie Spotify Canvas needs.
- *
- * Android's `SpotifyCanvasAuthScreen`, with its four steps unchanged — they name a browser's
- * developer tools, which is where a desktop listener already is.
+ * Direct web sign-in for Spotify.
  */
 @Composable
 internal fun DesktopSpotifyCanvasDialog(onDismiss: () -> Unit, onSaved: (String) -> Unit) {
     var token by remember { mutableStateOf(DesktopSpotifyToken.cookie()) }
     var signingIn by remember { mutableStateOf(false) }
     var signInError by remember { mutableStateOf<String?>(null) }
-    val focus = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-
-    fun save() {
-        DesktopSpotifyToken.setCookie(token.trim())
-        onSaved(token.trim())
-        onDismiss()
-    }
 
     fun signIn() {
         if (signingIn) return
@@ -158,46 +147,11 @@ internal fun DesktopSpotifyCanvasDialog(onDismiss: () -> Unit, onSaved: (String)
             },
             isError = signInError != null,
         )
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = panelInset(22.dp)),
-            horizontalArrangement = Arrangement.Start,
-        ) {
-            TextButton(onClick = ::signIn, enabled = !signingIn) {
-                Text(
-                    if (signingIn) "Waiting for Spotify sign-in…" else if (token.isNotBlank()) "Switch Spotify account" else "Sign in to Spotify",
-                    color = DesktopSecondary,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-        Text(
-            "Or connect manually: sign in at open.spotify.com, open Developer Tools → Application → Cookies, then paste the value of the sp_dc cookie below.",
-            modifier = Modifier.fillMaxWidth().padding(horizontal = panelInset(22.dp), vertical = 4.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = DesktopSecondary,
-        )
-        Spacer(Modifier.height(12.dp))
-        DialogField(
-            value = token,
-            onValueChange = { token = it },
-            placeholder = DesktopStrings["spdc_token", "sp_dc token"],
-            isPassword = true,
-            onSubmit = ::save,
-            modifier = Modifier.focusRequester(focus),
-        )
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = panelInset(22.dp)),
-            horizontalArrangement = Arrangement.Start,
-        ) {
-            TextButton(onClick = { DesktopExternalLinks.open("https://open.spotify.com/") }) {
-                Text(DesktopStrings["d_open_spotify", "Open Spotify"], color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
-            }
-        }
         DialogActions(
-            confirm = DesktopStrings["save", "Save"],
-            confirmEnabled = token.isNotBlank(),
+            confirm = if (signingIn) "Waiting for Spotify sign-in…" else if (token.isNotBlank()) "Switch account" else "Sign in to Spotify",
+            confirmEnabled = !signingIn,
             busy = signingIn,
-            onConfirm = ::save,
+            onConfirm = ::signIn,
             onDismiss = onDismiss,
         )
     }

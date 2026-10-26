@@ -10,12 +10,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -38,10 +36,8 @@ import com.music.bitchord.R
 fun SpotifyCanvasAuthScreen(
     onNavigateUp: () -> Unit
 ) {
-    val currentToken by AppSettings.spotifySpdcToken.collectAsStateWithLifecycle()
     val autoHidePlayer by AppSettings.spotifyCanvasAutoHide.collectAsStateWithLifecycle()
     val prioritizeSpotify by AppSettings.prioritizeSpotifyCanvas.collectAsStateWithLifecycle()
-    var tokenInput by remember(currentToken) { mutableStateOf(currentToken) }
 
     Scaffold(
         topBar = {
@@ -65,12 +61,6 @@ fun SpotifyCanvasAuthScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                text = stringResource(R.string.spotify_canvas_setup_description),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
             SpotifyCanvasSettingToggle(
                 title = stringResource(R.string.spotify_canvas_auto_hide),
                 subtitle = stringResource(R.string.spotify_canvas_auto_hide_subtitle),
@@ -84,30 +74,6 @@ fun SpotifyCanvasAuthScreen(
                 checked = prioritizeSpotify,
                 onCheckedChange = AppSettings::setPrioritizeSpotifyCanvas,
             )
-            
-            Text(
-                text = stringResource(R.string.spotify_canvas_setup_steps),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
-            )
-
-            OutlinedTextField(
-                value = tokenInput,
-                onValueChange = { tokenInput = it },
-                label = { Text(stringResource(R.string.spdc_token)) },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                singleLine = true
-            )
-
-            Button(
-                onClick = { 
-                    AppSettings.setSpotifySpdcToken(tokenInput.trim())
-                    onNavigateUp()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.save))
-            }
         }
     }
 }
