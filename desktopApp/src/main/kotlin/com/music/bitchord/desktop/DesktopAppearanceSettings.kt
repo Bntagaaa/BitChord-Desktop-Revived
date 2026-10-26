@@ -43,9 +43,45 @@ internal enum class DesktopBlurArea(val title: String, val description: String, 
     ),
 }
 
-/** Master override: saved per-area preferences are never destroyed by Reduce Blur. */
-internal fun effectiveDesktopBlur(reduceDynamicBlur: Boolean, selected: Boolean): Boolean =
-    !reduceDynamicBlur && selected
+internal enum class DesktopPerformanceProfile(val label: String, val description: String) {
+    FULL("Full", "Full visual richness and frosted glass effects across all surfaces"),
+    BALANCED("Balanced", "Balanced aesthetic with optimized blur effects"),
+    PERFORMANCE("Performance", "Maximum rendering responsiveness with minimal blur"),
+    AUTO("Auto", "Automatically select based on system CPU and memory capabilities"),
+    ;
+
+    fun resolved(): DesktopPerformanceProfile = when (this) {
+        AUTO -> detectHardwareProfile()
+        else -> this
+    }
+}
+
+internal fun detectHardwareProfile(): DesktopPerformanceProfile {
+    return runCatching {
+        val cores = Runtime.getRuntime().availableProcessors()
+        val maxMemoryMb = Runtime.getRuntime().maxMemory() / (1024 * 1024)
+        when {
+            cores <= 1 || maxMemoryMb < 512 -> DesktopPerformanceProfile.PERFORMANCE
+            cores in 2..4 -> DesktopPerformanceProfile.BALANCED
+            else -> DesktopPerformanceProfile.FULL
+        }
+    }.getOrDefault(DesktopPerformanceProfile.BALANCED)
+}
+
+/**
+ * Master override invariant: Whenever reduceDynamicBlur is true, ALL dynamic blur effects
+ * MUST be disabled regardless of performance profile, per-area preferences, or component.
+ */
+internal fun effectiveDesktopBlur(
+    reduceDynamicBlur: Boolean,
+    selected: Boolean,
+    profile: DesktopPerformanceProfile = DesktopPerformanceProfile.FULL,
+): Boolean {
+    if (reduceDynamicBlur) return false
+    val effectiveProfile = profile.resolved()
+    if (effectiveProfile == DesktopPerformanceProfile.PERFORMANCE) return false
+    return selected
+}
 
 /**
  * The toggles read far from the Settings sheet that sets them.
@@ -61,6 +97,11 @@ internal object DesktopAppearanceSettings {
     private val _reduceAnimation = flag(KEY_REDUCE_ANIMATION, false)
     private val _reduceDynamicBlur = flag(KEY_REDUCE_DYNAMIC_BLUR, false)
     private val _blurPreferences = DesktopBlurArea.entries.associateWith { flag(it.preferenceKey, true) }
+    private val _performanceProfile = MutableStateFlow(
+        runCatching {
+            DesktopPerformanceProfile.valueOf(DesktopPersistence().string(KEY_PERFORMANCE_PROFILE, "AUTO"))
+        }.getOrDefault(DesktopPerformanceProfile.AUTO),
+    )
     // Mica-style navigation is lightweight wallpaper tinting, independent of blur.
     private val _micaSidebar = flag(KEY_MICA_SIDEBAR, DesktopSidebarMica.isSupported)
     private val _hideVolumeBar = flag(KEY_HIDE_VOLUME_BAR, false)
@@ -75,6 +116,9 @@ internal object DesktopAppearanceSettings {
     /** Swaps frosted glass for solid fills across the app. */
     val reduceDynamicBlur: StateFlow<Boolean> = _reduceDynamicBlur
 
+    /** Performance profile for graphics rendering. */
+    val performanceProfile: StateFlow<DesktopPerformanceProfile> = _performanceProfile
+
     /** Individual preferences, observed live by the components that draw the glass. */
     fun blurPreference(area: DesktopBlurArea): StateFlow<Boolean> = requireNotNull(_blurPreferences[area])
 
@@ -83,7 +127,8 @@ internal object DesktopAppearanceSettings {
     fun blurEnabled(area: DesktopBlurArea): Boolean {
         val reduced by reduceDynamicBlur.collectAsState()
         val selected by blurPreference(area).collectAsState()
-        return effectiveDesktopBlur(reduced, selected)
+        val profile by performanceProfile.collectAsState()
+        return effectiveDesktopBlur(reduced, selected, profile)
     }
 
     /** Windows 11 wallpaper-tinted, opaque navigation material. */
@@ -103,6 +148,11 @@ internal object DesktopAppearanceSettings {
     fun setReduceAnimation(value: Boolean) = write(KEY_REDUCE_ANIMATION, value, _reduceAnimation)
 
     fun setReduceDynamicBlur(value: Boolean) = write(KEY_REDUCE_DYNAMIC_BLUR, value, _reduceDynamicBlur)
+
+    fun setPerformanceProfile(profile: DesktopPerformanceProfile) {
+        DesktopPersistence().saveString(KEY_PERFORMANCE_PROFILE, profile.name)
+        _performanceProfile.value = profile
+    }
 
     fun setBlurPreference(area: DesktopBlurArea, enabled: Boolean) =
         write(area.preferenceKey, enabled, requireNotNull(_blurPreferences[area]))
@@ -125,6 +175,7 @@ internal object DesktopAppearanceSettings {
 
     internal const val KEY_REDUCE_ANIMATION = "reduce_animation"
     internal const val KEY_REDUCE_DYNAMIC_BLUR = "reduce_dynamic_blur"
+    internal const val KEY_PERFORMANCE_PROFILE = "performance_profile"
     internal const val KEY_MICA_SIDEBAR = "mica_sidebar"
     internal const val KEY_HIDE_VOLUME_BAR = "hide_volume_bar"
     internal const val KEY_ENABLE_OLD_TOP_MUSIC_PLAYER_STYLE = "enable_old_top_music_player_style"

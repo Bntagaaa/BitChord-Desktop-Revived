@@ -31,6 +31,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
+    DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.PROCESS_ENTRY)
     // Read the per-install welcome marker before services initialize or write preferences.
     val welcomeLaunch = DesktopWelcomeOnboarding.inspectStartup()
     // Before any WebView exists, so sign-in and PoToken pages share the same cookie jar.
@@ -152,11 +153,13 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
                 repeat(10) {
                     if (DesktopWindowsCaptionAppearance.attach(composeWindow)) {
                         DesktopWindowBackdrop.apply()
+                        DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.WINDOW_CREATED)
                         return@LaunchedEffect
                     }
                     delay(50)
                 }
                 DesktopWindowBackdrop.apply()
+                DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.WINDOW_CREATED)
             } else {
                 // Preserve the established Linux sizing path, including its startup correction.
                 val transform = composeWindow.graphicsConfiguration.defaultTransform
@@ -168,6 +171,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
                     (openingSize.width.value * transform.scaleX).roundToInt(),
                     (openingSize.height.value * transform.scaleY).roundToInt(),
                 )
+                DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.WINDOW_CREATED)
             }
         }
         // Apply app-wide UI scale inside Compose, preserving native window frame sizing
