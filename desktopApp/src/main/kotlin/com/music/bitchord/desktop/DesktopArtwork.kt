@@ -46,6 +46,8 @@ internal object DesktopArtworkCache {
         it.width.toLong() * it.height.toLong() * 4L
     }
 
+    val heldBytes: Long get() = images.heldBytes
+
     /** Everything held, dropped — what the Storage settings' "Clear image cache" does. */
     fun clear() = images.clear()
 

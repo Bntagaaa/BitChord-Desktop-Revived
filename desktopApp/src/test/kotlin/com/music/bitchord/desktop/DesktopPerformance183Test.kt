@@ -116,6 +116,13 @@ class DesktopPerformance183Test {
     }
 
     @Test
+    fun testWindowHiddenMemoryOptimizer() {
+        // Calling onWindowHidden should execute safely without exceptions
+        DesktopMemoryOptimizer.onWindowHidden()
+        assertEquals(0L, DesktopArtworkCache.heldBytes)
+    }
+
+    @Test
     fun testDownloadVerificationFiltering() {
         val tempFile = File.createTempFile("bitchord_test_dl_", ".mp3")
         tempFile.writeBytes(ByteArray(100))

@@ -84,6 +84,11 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     LaunchedEffect(state) {
         snapshotFlow { state.placement }.collect(DesktopWindowMode::adopt)
     }
+    LaunchedEffect(visible, state.isMinimized) {
+        if (!visible || state.isMinimized) {
+            DesktopMemoryOptimizer.onWindowHidden()
+        }
+    }
     Window(
         onCloseRequest = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },
         visible = visible,
