@@ -6260,7 +6260,14 @@ private fun DesktopArtistPage(
         mutableStateOf(DesktopAppleArtistArtRepository.cached(artistName))
     }
     LaunchedEffect(artistName) {
-        appleArt = DesktopAppleArtistArtRepository.artFor(artistName) ?: appleArt
+        // Keep the still artist image visible while searching. Retry in the background every
+        // 15 seconds until Apple provides a motion URL; stop polling as soon as we have one.
+        while (isActive && appleArt?.videoUrl == null) {
+            val latest = DesktopAppleArtistArtRepository.artFor(artistName)
+            if (latest != null) appleArt = latest
+            if (appleArt?.videoUrl != null) break
+            delay(15_000L)
+        }
     }
     DesktopPageScaffold(contentPadding) {
         when (state) {
