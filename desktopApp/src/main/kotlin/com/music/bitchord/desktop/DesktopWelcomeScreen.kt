@@ -90,7 +90,7 @@ internal fun DesktopWelcomeScreen(
     DesktopDialogPanel(onDismiss = {}, maxWidth = 460) {
         Box(Modifier.fillMaxWidth().heightIn(min = 445.dp), contentAlignment = Alignment.TopCenter) {
             Image(
-                // The existing pink-gradient icon keeps the white mark visible on light surfaces.
+                // The new dark app icon keeps the white mark visible on light surfaces.
                 // Dark mode keeps the original white waveform used by the approved prototype.
                 painter = painterResource(
                     if (DesktopTheme.isLight) Res.drawable.logo else Res.drawable.bitchord_logo_original
