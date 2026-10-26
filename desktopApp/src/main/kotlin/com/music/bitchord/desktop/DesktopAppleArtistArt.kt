@@ -28,6 +28,8 @@ internal data class DesktopAppleArtistArt(
     val heroUrl: String,
     val logoUrl: String?,
     val logoAspect: Float,
+    /** Apple Music motionArtistSquare1x1 HLS video, when available. */
+    val videoUrl: String?,
     val backgroundColor: Int,
     val textColor: Int,
     val keyColor: Int?,
@@ -128,14 +130,22 @@ internal object DesktopAppleArtistArtRepository {
             null
         }
 
-        val background = parseAppleColor(hero.string("bgColor")) ?: return null
-        val textColor = parseAppleColor(hero.string("textColor1")) ?: 0xFFFFFFFF.toInt()
+        // Match the upstream BitChord artist header source; this is distinct from Spotify Canvas.
+        val motion = header.objectAt("videoArtwork")?.objectAt("dictionary")
+            ?.objectAt("motionArtistSquare1x1")
+        val videoUrl = motion?.string("video")?.takeIf { it.startsWith("https://") }
+        val colors = motion?.objectAt("previewFrame")?.takeIf { videoUrl != null } ?: hero
+        val background = parseAppleColor(colors.string("bgColor"))
+            ?: parseAppleColor(hero.string("bgColor")) ?: return null
+        val textColor = parseAppleColor(colors.string("textColor1"))
+            ?: parseAppleColor(hero.string("textColor1")) ?: 0xFFFFFFFF.toInt()
         val keyColor = parseAppleColor(header.string("keyColor"))
 
         return DesktopAppleArtistArt(
             heroUrl = heroUrl,
             logoUrl = logoUrl,
             logoAspect = if (logoUrl != null) logoWidth.toFloat() / logoHeight else 1f,
+            videoUrl = videoUrl,
             backgroundColor = background,
             textColor = textColor,
             keyColor = keyColor,
