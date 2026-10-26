@@ -28,7 +28,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.ManageAccounts
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -97,8 +96,8 @@ internal fun DesktopAccountButton(
 }
 
 /**
- * The account switcher: every login this app holds, the channels under each, and the actions that
- * change the set.
+ * A compact, web-style account menu anchored above the sidebar account button.
+ * It uses the shared menu glass, so the Menus & popups preference and Reduce Blur stay authoritative.
  */
 @Composable
 internal fun DesktopAccountSelector(
@@ -109,52 +108,59 @@ internal fun DesktopAccountSelector(
     onSelect: (DesktopGoogleAccount, DesktopYouTubeProfile) -> Unit,
     onAddAccount: () -> Unit,
     onRemoveAccount: (DesktopGoogleAccount) -> Unit,
-    onOpenSettings: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     DesktopRegisterFlyout(DesktopFlyoutLayer.ACCOUNT, onDismiss = onDismiss)
     var managing by remember { mutableStateOf(false) }
     val accountsListState = rememberLazyListState()
+    val activeAccount = accounts.firstOrNull { it.accountId == activeAccountId } ?: accounts.firstOrNull()
+    val heading = activeAccount?.name?.takeIf(String::isNotBlank)
+        ?: activeAccount?.email?.takeIf(String::isNotBlank)
+        ?: "Accounts"
+
     Box(Modifier.fillMaxSize()) {
-        // The scrim is its own layer rather than a modifier on the container.
+        // Keep outside-click dismissal without dimming the page behind the menu.
         Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss,
-                ),
+            Modifier.fillMaxSize().clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            ),
         )
-        val shape = RoundedCornerShape(20.dp)
+        val shape = RoundedCornerShape(16.dp)
         Column(
             Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 64.dp, end = 24.dp)
-                .widthIn(max = 380.dp)
+                .align(Alignment.BottomStart)
+                .padding(start = 24.dp, bottom = 64.dp)
+                .widthIn(max = 292.dp)
                 .fillMaxWidth()
                 .clip(shape)
-                // The same frosted pane the floating bars are made of, sampling the page underneath
-                // rather than sitting on a flat fill.
-                .desktopBarGlass(shape),
+                .desktopMenuGlass(shape, tintAlpha = 0.82f),
         ) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 8.dp),
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 13.dp, bottom = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    if (accounts.isEmpty()) "Accounts" else "Switch account",
-                    style = MaterialTheme.typography.titleMedium,
+                    heading,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = DesktopForeground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.weight(1f))
-                if (busy) CircularProgressIndicator(color = DesktopAccent, modifier = Modifier.size(16.dp))
+                if (busy) {
+                    CircularProgressIndicator(
+                        color = DesktopAccent,
+                        modifier = Modifier.padding(start = 8.dp).size(15.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
             }
             LazyColumn(
                 state = accountsListState,
-                modifier = Modifier.heightIn(max = 460.dp).desktopTopScrollFade(accountsListState),
+                modifier = Modifier.heightIn(max = 360.dp).desktopTopScrollFade(accountsListState),
             ) {
                 if (accounts.isEmpty()) {
                     item {
@@ -166,20 +172,24 @@ internal fun DesktopAccountSelector(
                             ],
                             style = MaterialTheme.typography.bodySmall,
                             color = DesktopSecondary,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
                     }
                 }
                 accounts.forEach { account ->
-                    item(key = "header-${account.accountId}") {
-                        Text(
-                            account.email.ifBlank { account.name.ifBlank { "Account" } },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = DesktopSecondary,
-                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp),
-                        )
+                    if (accounts.size > 1 || account.profiles.size > 1) {
+                        item(key = "header-${account.accountId}") {
+                            Text(
+                                account.email.ifBlank { account.name.ifBlank { "Account" } },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DesktopSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 7.dp, bottom = 3.dp),
+                            )
+                        }
                     }
-                    items(account.profiles.size, key = { "p-${account.accountId}-$it" }) { index ->
+                    items(account.profiles.size, key = { "p-${account.accountId}-${it}" }) { index ->
                         val profile = account.profiles[index]
                         DesktopProfileRow(
                             profile = profile,
@@ -191,6 +201,13 @@ internal fun DesktopAccountSelector(
                         )
                     }
                 }
+                item {
+                    androidx.compose.material3.HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        thickness = 0.5.dp,
+                        color = DesktopCardEdge,
+                    )
+                }
                 item { DesktopSelectorAction(BitChordIcons.Plus, "Add account", onAddAccount) }
                 if (accounts.isNotEmpty()) {
                     item {
@@ -199,8 +216,7 @@ internal fun DesktopAccountSelector(
                         }
                     }
                 }
-                item { DesktopSelectorAction(Icons.Rounded.Settings, "Settings", onOpenSettings) }
-                item { Spacer(Modifier.height(10.dp)) }
+                item { Spacer(Modifier.height(6.dp)) }
             }
         }
     }
@@ -217,15 +233,18 @@ private fun DesktopProfileRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
+            .padding(horizontal = 8.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected && !managing) DesktopForeground.copy(alpha = 0.075f) else Color.Transparent)
             .clickable(onClick = if (managing) onRemove else onClick)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .heightIn(min = 50.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (profile.avatar != null) {
             DesktopArtwork(
                 profile.avatar,
-                Modifier.size(38.dp).clip(CircleShape),
+                Modifier.size(32.dp).clip(CircleShape),
                 contentScale = ContentScale.Crop,
                 px = 128,
             )
@@ -234,12 +253,18 @@ private fun DesktopProfileRow(
                 Icons.Rounded.Person,
                 null,
                 tint = DesktopSecondary,
-                modifier = Modifier.size(38.dp),
+                modifier = Modifier.size(32.dp),
             )
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(profile.name, color = DesktopForeground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                profile.name,
+                color = DesktopForeground,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 profile.handle.ifBlank { if (profile.isBrandAccount) "Brand account" else "Personal" },
                 style = MaterialTheme.typography.bodySmall,
@@ -249,8 +274,17 @@ private fun DesktopProfileRow(
             )
         }
         when {
-            managing -> Text(DesktopStrings["sign_out", "Sign out"], color = DesktopDestructive, style = MaterialTheme.typography.labelMedium)
-            selected -> Icon(BitChordIcons.Check, DesktopStrings["selected", "Selected"], tint = DesktopAccent, modifier = Modifier.size(20.dp))
+            managing -> Text(
+                DesktopStrings["sign_out", "Sign out"],
+                color = DesktopDestructive,
+                style = MaterialTheme.typography.labelSmall,
+            )
+            selected -> Icon(
+                BitChordIcons.Check,
+                DesktopStrings["selected", "Selected"],
+                tint = DesktopForeground.copy(alpha = 0.92f),
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
@@ -264,14 +298,19 @@ private fun DesktopSelectorAction(
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
+            .heightIn(min = 44.dp)
+            .clip(RoundedCornerShape(9.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = DesktopForeground.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(16.dp))
-        Text(label, color = DesktopForeground)
+        Icon(icon, null, tint = DesktopForeground.copy(alpha = 0.88f), modifier = Modifier.size(19.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(
+            label,
+            color = DesktopForeground,
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
@@ -320,7 +359,7 @@ internal fun DesktopSignInDialog(
                 .widthIn(max = 520.dp)
                 .fillMaxWidth()
                 .clip(shape)
-                .desktopBarGlass(shape)
+                .desktopMenuGlass(shape)
                 .padding(bottom = 8.dp),
         ) {
             Text(

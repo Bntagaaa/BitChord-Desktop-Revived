@@ -43,6 +43,9 @@ object DesktopSearchClient {
     suspend fun homeSupplement(browseId: String): Result<List<HomeShelf>> =
         YtMusicRepository.homeSupplement(browseId)
 
+    suspend fun browseShelves(browseId: String, params: String? = null): Result<List<HomeShelf>> =
+        YtMusicRepository.browseShelves(browseId, params)
+
     val HOME_SUPPLEMENT_BROWSE_IDS: List<String> get() = YtMusicRepository.HOME_SUPPLEMENT_BROWSE_IDS
 
     suspend fun moodAndGenres(): Result<List<MoodGenreSection>> = YtMusicRepository.moodAndGenres()

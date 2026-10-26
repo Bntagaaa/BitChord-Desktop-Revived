@@ -8,6 +8,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.ui.icons.BitChordIcons
+import com.music.bitchord.ui.components.ArtworkHoverMode
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -218,24 +223,33 @@ private fun LazyListScope.chart(
         )
     }
     items(rows, key = { "$key-${it.key}" }) { row ->
-        ChartRow(row, circular) { onClick(row.rank - 1) }
+        ChartRow(row, circular, playable = key == "songs") { onClick(row.rank - 1) }
     }
     item("$key-gap") { Spacer(Modifier.height(20.dp)) }
 }
 
 @Composable
-private fun ChartRow(row: DesktopReplayRow, circular: Boolean, onClick: () -> Unit) {
+private fun ChartRow(row: DesktopReplayRow, circular: Boolean, playable: Boolean, onClick: () -> Unit) {
     val shape = if (circular) CircleShape else RoundedCornerShape(6.dp)
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .hoverable(rowHoverInteraction)
+            .desktopNoHoverClickable(onClick = onClick)
             .padding(horizontal = GUTTER, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RankBadge(row.rank)
         if (row.artworkUrl != null) {
-            DesktopArtwork(row.artworkUrl, Modifier.size(48.dp).clip(shape), px = ROW_ART_PX)
+            DesktopArtwork(
+                row.artworkUrl,
+                Modifier.size(48.dp).clip(shape),
+                px = ROW_ART_PX,
+                hoverMode = if (playable) ArtworkHoverMode.DARKEN_AND_PLAY else ArtworkHoverMode.DARKEN_ONLY,
+                hovered = rowHovered,
+            )
         } else {
             InitialTile(row.title, 48.dp, shape)
         }

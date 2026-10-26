@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class GeniusTest {
@@ -109,6 +110,13 @@ class GeniusTest {
 
     @Test
     fun `live genius search and scraping test with noisy titles`() = kotlinx.coroutines.runBlocking {
+        // This is an external integration smoke test, not a deterministic unit test.
+        // Genius can rate-limit or change markup independently of our code, so it must
+        // not break every pull-request build. Opt in explicitly when testing the provider.
+        assumeTrue(
+            "Set BITCHORD_LIVE_GENIUS_TEST=1 to run live Genius integration tests",
+            System.getenv("BITCHORD_LIVE_GENIUS_TEST") == "1",
+        )
         println("--- TEST 1: Queen - Bohemian Rhapsody (Official Video) ---")
         val lyrics1 = Genius.lyrics("Bohemian Rhapsody (Official Video)", "Queen")
         assertNotNull(lyrics1)

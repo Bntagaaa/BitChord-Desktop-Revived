@@ -190,7 +190,7 @@ internal fun DesktopLibrarySortMenu() {
         DesktopToolbarButton(onClick = { open = true }) {
             Icon(Icons.AutoMirrored.Rounded.Sort, DesktopStrings["sort_library", "Sort library"], tint = DesktopForeground)
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DesktopDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             LibrarySort.entries.forEach { option ->
                 DropdownMenuItem(
                     text = {

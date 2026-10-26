@@ -31,6 +31,11 @@ jobs:
 
       - run: chmod +x gradlew
 
+      # A single-component label used by Build tes Appimage must not become
+      # the invalid Windows installer version "1.29" during Gradle configuration.
+      - name: Validate short numeric test label
+        run: ./gradlew :desktopApp:help "-Pbitchord.version=1"
+
       # Regression coverage for the packaging failure: the app may use a descriptive
       # test label, but native installer metadata must remain a valid numeric version.
       - name: Tests

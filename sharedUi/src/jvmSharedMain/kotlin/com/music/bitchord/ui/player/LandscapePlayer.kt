@@ -205,7 +205,8 @@ internal fun LandscapePlayerLayout(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxHeight(),
+                        .fillMaxHeight()
+                        .padding(vertical = if (!drawerFollowsListScroll && pane == PlayerPane.Lyrics) 64.dp else 0.dp),
                     label = "landscapePane",
                 ) { shown ->
                     when (shown) {

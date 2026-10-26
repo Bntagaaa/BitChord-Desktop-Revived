@@ -1,14 +1,18 @@
 package com.music.bitchord.desktop
 
 import com.music.bitchord.data.model.artworkAt
+import com.music.bitchord.ui.components.ArtworkHover
+import com.music.bitchord.ui.components.ArtworkHoverMode
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
@@ -42,6 +46,8 @@ internal object DesktopArtworkCache {
         it.width.toLong() * it.height.toLong() * 4L
     }
 
+    val heldBytes: Long get() = images.heldBytes
+
     /** Everything held, dropped — what the Storage settings' "Clear image cache" does. */
     fun clear() = images.clear()
 
@@ -65,6 +71,8 @@ fun DesktopArtwork(
     contentScale: ContentScale = ContentScale.Crop,
     contentDescription: String? = null,
     px: Int? = null,
+    hoverMode: ArtworkHoverMode? = null,
+    hovered: Boolean? = null,
 ) {
     val sized = if (px != null) url.artworkAt(px) else url
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = sized) {
@@ -72,14 +80,35 @@ fun DesktopArtwork(
             DesktopArtworkCache.load(sized)
         }
     }
-    if (bitmap == null) {
-        Box(modifier.background(Color(0xFF2B2B35)))
+
+    if (hoverMode == null) {
+        if (bitmap == null) {
+            Box(modifier.background(Color(0xFF2B2B35)))
+        } else {
+            Image(
+                painter = BitmapPainter(bitmap!!),
+                contentDescription = contentDescription,
+                contentScale = contentScale,
+                modifier = modifier,
+            )
+        }
     } else {
-        Image(
-            painter = BitmapPainter(bitmap!!),
-            contentDescription = contentDescription,
-            contentScale = contentScale,
+        ArtworkHover(
             modifier = modifier,
-        )
+            shape = RectangleShape,
+            mode = hoverMode,
+            hovered = hovered,
+        ) {
+            if (bitmap == null) {
+                Box(Modifier.fillMaxSize().background(Color(0xFF2B2B35)))
+            } else {
+                Image(
+                    painter = BitmapPainter(bitmap!!),
+                    contentDescription = contentDescription,
+                    contentScale = contentScale,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
     }
 }
