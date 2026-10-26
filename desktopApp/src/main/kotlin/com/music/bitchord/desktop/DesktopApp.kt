@@ -7445,36 +7445,6 @@ private fun DesktopSettingsScreen(
                             }
                         }
                     }
-                    val performanceProfile by DesktopAppearanceSettings.performanceProfile.collectAsState()
-                    val profileTitle = "Graphics profile"
-                    val profileSubtitle = "Adaptive profile for rendering and dynamic blur effects"
-                    if (settingsRowVisible(profileTitle, profileSubtitle)) {
-                        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                            Text(profileTitle, fontWeight = FontWeight.Medium)
-                            Text(profileSubtitle, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
-                            Spacer(Modifier.height(10.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                DesktopPerformanceProfile.entries.forEach { option ->
-                                    FilterChip(
-                                        colors = desktopChipColors(),
-                                        selected = performanceProfile == option,
-                                        onClick = { DesktopAppearanceSettings.setPerformanceProfile(option) },
-                                        label = { Text(option.label) },
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                if (performanceProfile == DesktopPerformanceProfile.AUTO) {
-                                    "${performanceProfile.description} (Active: ${performanceProfile.resolved().label})"
-                                } else {
-                                    performanceProfile.description
-                                },
-                                color = DesktopSecondary,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
                     val reduceDynamicBlur by DesktopAppearanceSettings.reduceDynamicBlur.collectAsState()
                     val oldTopPlayerEnabled by DesktopAppearanceSettings.enableOldTopMusicPlayerStyle.collectAsState()
                     val useOldExploreCards by DesktopAppearanceSettings.useOldExploreCards.collectAsState()
@@ -7496,13 +7466,6 @@ private fun DesktopSettingsScreen(
                         reduceDynamicBlur,
                         DesktopAppearanceSettings::setReduceDynamicBlur,
                     )
-                    if (settingsRowVisible(
-                            "Customize blur",
-                            "Choose blur for Lyrics & Queue panels, Quick Search, Search, floating player, menus and top bar",
-                        )
-                    ) {
-                        DesktopBlurCustomization(reduceDynamicBlur)
-                    }
                     if (DesktopSidebarMica.isSupported) {
                         val micaSidebar by DesktopAppearanceSettings.micaSidebar.collectAsState()
                         SettingsToggle(
