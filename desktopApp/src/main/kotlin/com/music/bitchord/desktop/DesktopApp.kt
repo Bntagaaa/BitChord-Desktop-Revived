@@ -3116,6 +3116,20 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     // The menu the shared player's "…" opens.
     var playerMenuOpen by remember(selectedSong?.videoId) { mutableStateOf(false) }
 
+    /**
+     * An artist opened from fullscreen must be visible immediately, not hidden
+     * beneath the player. In a normal (non-fullscreen) player, keep Now Playing
+     * open as before. The Details side panel uses its own navigation callback.
+     */
+    fun openArtistFromPlayer(browseId: String, name: String) {
+        if (DesktopWindowMode.fullScreen.value) {
+            DesktopWindowMode.exit()
+            overlays.nowPlaying = false
+            playerMenuOpen = false
+        }
+        openArtist(browseId, name)
+    }
+
     /** The song menu's verbs for [song], as the player sheet offers them. */
     fun playerSongActions(song: Song) = DesktopSongActions(
         signedIn = youtubeSignedIn,
@@ -3131,13 +3145,13 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         onStartRadio = ::startRadio,
         onPlayNext = ::playNext,
         onAddToQueue = ::addToQueue,
-        // Albums replace the player; opening an artist keeps Now Playing visible.
+        // Albums replace the player. Artist navigation only dismisses a fullscreen player.
         onOpenAlbum = { id ->
             overlays.nowPlaying = false
             openAlbum(id)
         },
         onOpenArtist = { id ->
-            openArtist(id, song.artist)
+            openArtistFromPlayer(id, song.artist)
         },
         onSleepTimer = { minutes ->
             if (minutes == null) DesktopSleepTimer.cancel() else DesktopSleepTimer.start(minutes)
@@ -3896,13 +3910,14 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             // exactly, so a fragment like "2115" opens nothing
                             // rather than White 2115.
                             onOpenArtist = { id, name ->
-                                // Keep the player sheet visible while navigating to the artist.
+                                // Fullscreen exits to reveal the artist; the normal player
+                                // stays open. Apply this to both direct IDs and name lookups.
                                 if (id != null) {
-                                    openArtist(id, name)
+                                    openArtistFromPlayer(id, name)
                                 } else {
                                     scope.launch {
                                         YtMusicRepository.findArtistPageId(name).getOrNull()
-                                            ?.let { found -> openArtist(found, name) }
+                                            ?.let { found -> openArtistFromPlayer(found, name) }
                                     }
                                 }
                             },
