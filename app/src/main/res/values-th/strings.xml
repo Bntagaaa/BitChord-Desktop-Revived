@@ -185,6 +185,7 @@
     <string name="italian">อิตาลี</string>
     <string name="turkish">ตุรกี</string>
     <string name="thai">ไทย</string>
+    <string name="korean">เกาหลี</string>
     <string name="show_all">แสดงทั้งหมด</string>
     <string name="grid_view">กริด</string>
     <string name="list_view">รายการ</string>
@@ -461,6 +462,8 @@
     <string name="signed_in_as">ลงชื่อเข้าใช้ในชื่อ %1$s</string>
     <string name="signing_in">กำลังลงชื่อเข้าใช้…</string>
     <string name="sleep_timer">ตัวจับเวลาปิดเพลง</string>
+    <string name="sleep_timer_custom">กำหนดเอง</string>
+    <string name="start_sleep_timer">เริ่มตั้งเวลา</string>
     <string name="sources_no_lossless">ไม่มีแหล่งข้อมูลที่เปิดใช้งานสามารถให้เสียงแบบไม่สูญเสียคุณภาพได้ เพิ่มแอดออนเพื่อเล่นไฟล์ไม่สูญเสียคุณภาพโดยไม่ต้องแปลงไฟล์</string>
     <string name="sources_order_footer">หากแหล่งข้อมูลหนึ่งไม่มีแทร็กหรือเชื่อมต่อไม่ได้ BitChord จะลองแหล่งถัดไป แหล่งข้อมูลที่อยู่เหนือ YouTube สามารถแทนที่การบันทึกของ YouTube ได้เมื่อให้เวอร์ชันที่ดีกว่า</string>
     <string name="sources_order_header">แหล่งข้อมูล เรียงตามลำดับที่ลอง</string>
@@ -850,9 +853,7 @@
 
     <string name="dolby_atmos_unavailable">This device can\'t play Atmos, so these songs play in their usual version</string>
 
-    <string name="prefer_music_only">Prefer music-only version</string>
 
-    <string name="prefer_music_only_subtitle">For music videos, show the video details while finding and loading the catalogue audio version</string>
     <string name="smart_version_alignment">จัดตำแหน่งเสียงอัจฉริยะ</string>
     <string name="smart_version_alignment_subtitle">วิเคราะห์รูปคลื่นเสียงเพื่อหาจุดเล่นที่ตรงกันพอดี</string>
 

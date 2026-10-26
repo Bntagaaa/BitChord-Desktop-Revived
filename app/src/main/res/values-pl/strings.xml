@@ -180,6 +180,7 @@
     <string name="italian">Włoski</string>
     <string name="turkish">Turecki</string>
     <string name="thai">Tajski</string>
+    <string name="korean">Koreański</string>
     <string name="show_all">Pokaż wszystkie</string>
     <string name="audio_quality">Jakość audio</string>
     <string name="playback">Odtwarzanie</string>
@@ -409,6 +410,8 @@
     <string name="signed_in_as">Zalogowano jako %1$s</string>
     <string name="signing_in">Logowanie…</string>
     <string name="sleep_timer">Wyłącznik czasowy</string>
+    <string name="sleep_timer_custom">Własny</string>
+    <string name="start_sleep_timer">Uruchom minutnik</string>
     <string name="sources_no_lossless">Żadne włączone źródło nie może dostarczyć bezstratnego dźwięku. Dodaj moduł niestandardowy, aby odtwarzać dostępne pliki bezstratne bez transkodowania.</string>
     <string name="sources_order_footer">Jeśli źródło nie ma utworu lub jest niedostępne, BitChord próbuje następne. Źródła przed YouTube mogą je zastąpić, gdy znajdą lepszą wersję.</string>
     <string name="sources_order_header">Źródła, sprawdzane w tej kolejności</string>
@@ -1091,9 +1094,7 @@
 
     <string name="settings_search_empty">No settings match “%1$s”</string>
 
-    <string name="prefer_music_only">Preferuj wersję muzyczną</string>
 
-    <string name="prefer_music_only_subtitle">Dla teledysków pokazuje szczegóły wideo podczas wyszukiwania i ładowania wersji audio z katalogu</string>
 
     <string name="smart_version_alignment">Inteligentne dopasowanie dźwięku</string>
 
