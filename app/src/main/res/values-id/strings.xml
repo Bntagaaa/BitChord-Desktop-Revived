@@ -173,6 +173,7 @@
     <string name="italian">Italia</string>
     <string name="turkish">Turki</string>
     <string name="thai">Thai</string>
+    <string name="korean">Korea</string>
     <string name="show_all">Lihat semua</string>
     <string name="grid_view">Grid</string>
     <string name="list_view">Daftar</string>
@@ -433,6 +434,8 @@
     <string name="signed_in_as">Masuk sebagai %1$s</string>
     <string name="signing_in">Sedang masuk…</string>
     <string name="sleep_timer">Timer tidur</string>
+    <string name="sleep_timer_custom">Kustom</string>
+    <string name="start_sleep_timer">Mulai timer</string>
     <string name="sources_no_lossless">Tidak ada sumber aktif yang dapat menyediakan audio lossless. Tambahkan modul kustom untuk memutar file lossless yang tersedia tanpa transcoding.</string>
     <string name="sources_order_footer">Jika suatu sumber tidak memiliki trek atau tidak dapat dijangkau, BitChord mencoba sumber berikutnya. Sumber di atas YouTube dapat menggantikan rekamannya saat menghasilkan versi yang lebih baik.</string>
     <string name="sources_order_header">Sumber, dicoba dalam urutan ini</string>
@@ -1032,9 +1035,7 @@
 
     <string name="settings_search_empty">No settings match “%1$s”</string>
 
-    <string name="prefer_music_only">Prefer music-only version</string>
 
-    <string name="prefer_music_only_subtitle">For music videos, show the video details while finding and loading the catalogue audio version</string>
     <string name="smart_version_alignment">Penyelarasan audio cerdas</string>
     <string name="smart_version_alignment_subtitle">Menganalisis gelombang audio untuk mencocokkan momen pemutaran yang tepat</string>
 

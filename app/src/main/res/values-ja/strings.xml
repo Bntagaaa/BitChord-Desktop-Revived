@@ -173,6 +173,7 @@
     <string name="italian">イタリア語</string>
     <string name="turkish">トルコ語</string>
     <string name="thai">タイ語</string>
+    <string name="korean">韓国語</string>
     <string name="show_all">すべて表示</string>
     <string name="grid_view">グリッド表示</string>
     <string name="list_view">リスト表示</string>
@@ -433,6 +434,8 @@
     <string name="signed_in_as">%1$sとしてログイン済み</string>
     <string name="signing_in">ログイン中…</string>
     <string name="sleep_timer">スリープタイマー</string>
+    <string name="sleep_timer_custom">カスタム</string>
+    <string name="start_sleep_timer">タイマーを開始</string>
     <string name="sources_no_lossless">有効なソースの中にロスレスオーディオを提供できるものがありません。トランスコードなしでロスレスファイルを再生するにはカスタムモジュールを追加してください。</string>
     <string name="sources_order_footer">ソースにトラックがない、またはアクセスできない場合、BitChordは次のソースを試します。YouTubeより上のソースは、より良いバージョンが見つかった場合にその録音を置き換えられます。</string>
     <string name="sources_order_header">ソース（この順番で試行）</string>
@@ -1033,9 +1036,7 @@
 
     <string name="settings_search_empty">No settings match “%1$s”</string>
 
-    <string name="prefer_music_only">Prefer music-only version</string>
 
-    <string name="prefer_music_only_subtitle">For music videos, show the video details while finding and loading the catalogue audio version</string>
     <string name="smart_version_alignment">スマート音声同期</string>
     <string name="smart_version_alignment_subtitle">波形を解析して、対応する再生位置を正確に合わせます</string>
 
