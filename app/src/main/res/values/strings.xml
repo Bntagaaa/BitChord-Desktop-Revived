@@ -106,6 +106,8 @@
         <item quantity="other">Downloading %1$d songs</item>
     </plurals>
     <string name="source">Sources</string>
+    <string name="direct_source_stream">Direct Source Stream</string>
+    <string name="direct_source_stream_in_party">Off while you\'re in a Listen Together party</string>
     <string name="lossless_audio">Lossless audio</string>
     <string name="prefer_lossless">Prefer lossless</string>
     <string name="lossless_source_subtitle">FLAC and ALAC straight from the source</string>
@@ -228,6 +230,7 @@
     <string name="italian">Italian</string>
     <string name="turkish">Turkish</string>
     <string name="thai">Thai</string>
+    <string name="korean">Korean</string>
     <string name="show_all">Show all</string>
     <string name="grid_view">Grid</string>
     <string name="list_view">List</string>
@@ -259,8 +262,6 @@
     <string name="skip_silence">Skip silence</string>
     <string name="skip_silence_subtitle">Trim gaps longer than a second</string>
     <string name="skip_silence_float_subtitle">Unavailable on 32-bit float output</string>
-    <string name="prefer_music_only">Prefer music-only version</string>
-    <string name="prefer_music_only_subtitle">For music videos, show the video details while finding and loading the catalogue audio version</string>
     <string name="smart_version_alignment">Smart audio alignment</string>
     <string name="smart_version_alignment_subtitle">Analyze audio waveforms to match the exact corresponding playback moment</string>
     <string name="equalizer">Equalizer</string>
@@ -315,6 +316,7 @@
     <string name="reduce_dynamic_blur_subtitle">Swaps frosted glass for solid fills across the app</string>
     <string name="liquid_glass">Liquid Glass</string>
     <string name="liquid_glass_subtitle">Real refracting glass on the floating nav bar. Android 12+ only; uses more GPU.</string>
+    <string name="progressive_blur">Progressive Blur</string>
     <string name="liquid_glass_unavailable">Requires Android 12 or newer</string>
     <string name="full_screen_cover_art">Full-screen cover art</string>
     <string name="legacy_mesh_gradient">Legacy mesh gradient</string>
@@ -475,6 +477,7 @@
     <string name="starting">Starting</string>
     <string name="start_radio">Start radio</string>
     <string name="shared_link">Shared link</string>
+    <string name="opened_file">Opened file</string>
     <string name="radio_started">%1$s radio started</string>
     <string name="saved_to_bitchord_folder">Saved to Music/BitChord</string>
     <string name="nothing_downloading">Nothing downloading</string>
@@ -623,6 +626,8 @@
     <string name="signed_in_as">Signed in as %1$s</string>
     <string name="signing_in">Signing in…</string>
     <string name="sleep_timer">Sleep timer</string>
+    <string name="sleep_timer_custom">Custom</string>
+    <string name="start_sleep_timer">Start timer</string>
     <string name="sources_no_lossless">No enabled source can provide lossless audio. Add an addon to play lossless files without transcoding.</string>
     <string name="sources_order_footer">If a source does not have a track or cannot be reached, BitChord tries the next one. Sources above YouTube can replace its recording when they return a better version.</string>
     <string name="sources_order_header">Sources, tried in this order</string>
@@ -743,8 +748,8 @@
         <item quantity="other">%1$s artists</item>
     </plurals>
     <plurals name="replay_play_count">
-        <item quantity="one">%1$s Play</item>
-        <item quantity="other">%1$s Plays</item>
+        <item quantity="one">%1$s play</item>
+        <item quantity="other">%1$s plays</item>
     </plurals>
     <plurals name="replay_song_count">
         <item quantity="one">%1$s song</item>
@@ -1123,6 +1128,13 @@
     <string name="spotify_import_done">Imported \'%1$s\'</string>
     <string name="spotify_import_unmatched">%1$d songs weren\'t found on YouTube Music</string>
     <string name="local_playlist_subtitle">%1$d songs · On this device</string>
+    <!-- Local Music's own playlists and folders: the offline player. -->
+    <string name="folders">Folders</string>
+    <string name="folder">Folder</string>
+    <string name="no_local_folders">No folders with music in them</string>
+    <string name="offline_playlist_empty">Nothing in this playlist yet. Add songs to it from their menu.</string>
+    <string name="offline_liked_empty">Songs you like on this device show up here</string>
+    <string name="saved_on_this_device">Saved on this device</string>
     <string name="spotify_import_empty_playlist">No songs in this playlist</string>
     <string name="spotify_library_subtitle">Your Spotify playlists</string>
 </resources>
