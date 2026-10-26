@@ -6470,7 +6470,7 @@ private fun DesktopArtistBanner(
             DesktopCanvasView(
                 url = motionUrl,
                 modifier = Modifier.matchParentSize(),
-                fallbackUrl = appleArt.squareVideoUrl?.takeIf { it != motionUrl },
+                fallbackUrl = appleArt?.squareVideoUrl?.takeIf { it != motionUrl },
                 maxEdge = 960,
                 publishBackdrop = false,
             )
