@@ -2706,7 +2706,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             onActivate = {
                 DesktopWindowVisibility.show()
                 releaseShortcutTextFocus()
-                overlays.nowPlaying = true
             },
             onPlayPause = { if (selectedSong != null) togglePlayPauseFromUser() },
         )
@@ -2736,7 +2735,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             onOpenPlayer = {
                 DesktopWindowVisibility.show()
                 releaseShortcutTextFocus()
-                overlays.nowPlaying = true
             },
             onOpenSettings = {
                 DesktopWindowVisibility.show()
