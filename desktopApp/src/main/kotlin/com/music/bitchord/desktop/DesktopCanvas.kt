@@ -77,9 +77,8 @@ data class DesktopCanvasArtwork(
 /**
  * The four providers, asked in turn until one answers with a clip that is really this track's.
  *
- * Apple and Tidal first because their clips are square and belong to the release; the community
- * index next because it is the only one covering back catalogue; Spotify last because it is the
- * one that needs a credential.
+ * General-purpose motion artwork for the main player uses Apple, Tidal and community sources.
+ * Spotify Canvas is reserved for the Now Playing Details card via lookupSpotify().
  */
 object DesktopCanvasClient {
 
@@ -127,7 +126,6 @@ object DesktopCanvasClient {
                 { DesktopAppleMusicCanvas.search(title, artist, album) },
                 { DesktopTidalCanvas.search(title, artist, album) },
                 { DesktopCommunityCanvas.search(title, artist, album) },
-                { DesktopSpotifyCanvas.search(title, artist, album) },
             ) { it.matches(title, artist, album) }
         }
     }
@@ -146,7 +144,7 @@ object DesktopCanvasClient {
         val artist = song.artist.cleanedForCanvas()
         if (title.isBlank() || artist.isBlank()) return null
         val album = song.albumName
-        // The main player may have already resolved a Spotify clip for this track.
+        // Keep this dedicated to Now Playing Details; the general player never requests Spotify.
         cached(song)?.takeIf {
             // Spotify can index this recording under a different release name from
             // YouTube Music. The exact track and credited artist are the identity.
@@ -188,7 +186,6 @@ object DesktopCanvasClient {
                 { DesktopAppleMusicCanvas.searchAlbum(name, credit) },
                 { DesktopTidalCanvas.searchAlbum(name, credit) },
                 { DesktopCommunityCanvas.searchAlbum(name, credit) },
-                { DesktopSpotifyCanvas.searchAlbum(name, credit) },
             ) { it.matches(name, credit, name) }
         }
     }
