@@ -45,8 +45,8 @@ internal object DesktopAppleArtistArtRepository {
     private const val CACHE_SIZE = 64
     private const val HERO_WIDTH = 1200
     private const val LOGO_WIDTH = 1000
-    private const val TIMEOUT_MS = 8_000
-    private const val MOTION_RETRY_AFTER_MS = 10 * 60 * 1_000L
+    private const val TIMEOUT_MS = 4_000
+    private const val MOTION_RETRY_AFTER_MS = 15_000L
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
