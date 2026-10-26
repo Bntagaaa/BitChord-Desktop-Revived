@@ -80,6 +80,8 @@ object DesktopListeningStats {
 
     private val preferences: Preferences = Preferences.userRoot().node("com.music.bitchord.desktop.stats")
     private val lock = Any()
+    private var cachedPeriod: DesktopReplayPeriod? = null
+    private var cachedSummary: DesktopReplaySummary? = null
 
     /** A month's listening. */
     internal data class Bucket(
@@ -93,6 +95,8 @@ object DesktopListeningStats {
         if (song.videoId.isBlank() || (playedMs <= 0L && !countsAsPlay)) return
         val at = Instant.now().atZone(ZoneId.systemDefault())
         synchronized(lock) {
+            cachedPeriod = null
+            cachedSummary = null
             val buckets = read().associateByTo(LinkedHashMap(), Bucket::month)
             val key = YearMonth.from(at).toString()
             val bucket = buckets.getOrPut(key) { Bucket(key) }
@@ -111,10 +115,20 @@ object DesktopListeningStats {
     }
 
     fun summary(period: DesktopReplayPeriod = DesktopReplayPeriod.ALL_TIME): DesktopReplaySummary =
-        synchronized(lock) { summarise(read(), period, LocalDate.now()) }
+        synchronized(lock) {
+            if (cachedPeriod == period && cachedSummary != null) {
+                return cachedSummary!!
+            }
+            val res = summarise(read(), period, LocalDate.now())
+            cachedPeriod = period
+            cachedSummary = res
+            res
+        }
 
     /** Everything recorded, thrown away. */
     fun clear() = synchronized(lock) {
+        cachedPeriod = null
+        cachedSummary = null
         DesktopPreferenceChunks.write(preferences, KEY_BUCKETS, "")
         DesktopPreferenceChunks.write(preferences, KEY_ENTRIES, "")
     }

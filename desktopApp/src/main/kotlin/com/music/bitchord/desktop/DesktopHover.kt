@@ -1,8 +1,12 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.runtime.Composable
@@ -12,7 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
@@ -88,3 +94,33 @@ internal fun Modifier.desktopHoverWash(): Modifier = composed {
 }
 
 private const val WASH_MS = 120
+
+/**
+ * Keeps music-row hover feedback on the artwork instead of painting the whole
+ * clickable row with Compose's default hover/press indication.
+ */
+internal fun Modifier.desktopNoHoverClickable(
+    hoverHighlight: Boolean = true,
+    hoverShape: Shape = RoundedCornerShape(8.dp),
+    onClick: () -> Unit,
+): Modifier = composed {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val hoverBackground by animateColorAsState(
+        targetValue = if (hoverHighlight && hovered) {
+            DesktopForeground.copy(alpha = if (DesktopTheme.isDark) 0.09f else 0.075f)
+        } else {
+            Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "desktop-row-hover-background",
+    )
+    this
+        .background(hoverBackground, hoverShape)
+        .hoverable(interaction)
+        .clickable(
+            interactionSource = interaction,
+            indication = null,
+            onClick = onClick,
+        )
+}

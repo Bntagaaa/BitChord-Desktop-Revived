@@ -5,6 +5,9 @@ import androidx.compose.ui.unit.Dp
 import com.music.bitchord.sharedui.resources.*
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,6 +15,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import com.music.bitchord.ui.components.longPressMenuClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -87,6 +93,8 @@ import com.music.bitchord.data.model.SearchHistoryEntity
 import com.music.bitchord.data.model.EntityType
 import com.music.bitchord.ui.components.MessageState
 import com.music.bitchord.ui.components.PAGE_GUTTER
+import com.music.bitchord.ui.components.ArtworkHover
+import com.music.bitchord.ui.components.ArtworkHoverMode
 import com.music.bitchord.ui.components.RowMoreButton
 import com.music.bitchord.ui.components.PlayingAccent
 import com.music.bitchord.ui.components.ROW_DIVIDER_INSET
@@ -577,9 +585,12 @@ private fun TopResultCard(
     onPlaylist: () -> Unit,
     onLongPress: () -> Unit,
 ) {
+    val cardHoverInteraction = remember { MutableInteractionSource() }
+    val cardHovered by cardHoverInteraction.collectIsHoveredAsState()
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .hoverable(cardHoverInteraction)
             .padding(start = PAGE_GUTTER, end = PAGE_GUTTER, top = 18.dp, bottom = 8.dp)
             .longPressMenuClickable(onClick = onPlay, onLongClick = onLongPress)
             .contextClick(onLongPress),
@@ -591,11 +602,18 @@ private fun TopResultCard(
         )
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = song.thumbnailUrl?.artworkAt(ROW_ART_PX),
-                contentDescription = null,
-                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)),
-            )
+            ArtworkHover(
+                modifier = Modifier.size(72.dp),
+                shape = RoundedCornerShape(10.dp),
+                mode = ArtworkHoverMode.DARKEN_AND_PLAY,
+                hovered = cardHovered,
+            ) {
+                AsyncImage(
+                    model = song.thumbnailUrl?.artworkAt(ROW_ART_PX),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -686,10 +704,19 @@ private fun SuggestionRow(
     onFill: (() -> Unit)?,
     onClick: () -> Unit,
 ) {
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
+    val rowHoverBackground by animateColorAsState(
+        targetValue = if (rowHovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "search-suggestion-hover-background",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .hoverable(rowHoverInteraction)
+            .background(rowHoverBackground, RoundedCornerShape(8.dp))
+            .clickable(interactionSource = rowHoverInteraction, indication = null, onClick = onClick)
             .padding(
                 start = PAGE_GUTTER,
                 end = 8.dp,
@@ -803,23 +830,27 @@ private fun TypeaheadSongRow(
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
 ) {
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .hoverable(rowHoverInteraction)
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
             .contextClick(onLongPress)
             .padding(horizontal = PAGE_GUTTER, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(52.dp)) {
+        ArtworkHover(
+            modifier = Modifier.size(52.dp).thumbnailBorder(RoundedCornerShape(8.dp)),
+            shape = RoundedCornerShape(8.dp),
+            mode = ArtworkHoverMode.DARKEN_AND_PLAY,
+            hovered = rowHovered,
+        ) {
             AsyncImage(
                 model = song.artworkAt(ROW_ART_PX),
                 contentDescription = null,
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .thumbnailBorder(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
             )
             if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
         }
@@ -904,22 +935,32 @@ private fun RecentSearchEntityRow(
     onClick: () -> Unit,
     onRemove: () -> Unit,
 ) {
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
+    val rowHoverBackground by animateColorAsState(
+        targetValue = if (rowHovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "search-history-hover-background",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .hoverable(rowHoverInteraction)
+            .background(rowHoverBackground, RoundedCornerShape(8.dp))
+            .clickable(interactionSource = rowHoverInteraction, indication = null, onClick = onClick)
             .padding(start = PAGE_GUTTER, end = 8.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(52.dp)) {
+        ArtworkHover(
+            modifier = Modifier.size(52.dp).thumbnailBorder(RoundedCornerShape(8.dp)),
+            shape = RoundedCornerShape(8.dp),
+            mode = if (entity.entityType == EntityType.TRACK) ArtworkHoverMode.DARKEN_AND_PLAY else ArtworkHoverMode.DARKEN_ONLY,
+            hovered = rowHovered,
+        ) {
             AsyncImage(
                 model = entity.artworkUrl,
                 contentDescription = null,
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .thumbnailBorder(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
             )
             if (isCurrent && isPlaying) {
                 SearchPlayingBars(Modifier.align(Alignment.Center))
@@ -963,29 +1004,30 @@ private fun RecentSearchEntityRow(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BrowseRow(item: BrowseItem, onClick: () -> Unit, onLongPress: (() -> Unit)? = null) {
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
+    val artworkShape = if (item.type == BrowseType.ARTIST) CircleShape else RoundedCornerShape(8.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .hoverable(rowHoverInteraction)
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
             .contextClick(onLongPress)
             .padding(horizontal = PAGE_GUTTER, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(
-            model = item.thumbnailUrl.artworkAt(ROW_ART_PX),
-            contentDescription = null,
-            modifier = Modifier
-                .size(52.dp)
-                .clip(
-                    if (item.type == BrowseType.ARTIST) CircleShape
-                    else RoundedCornerShape(8.dp),
-                )
-                .thumbnailBorder(
-                    if (item.type == BrowseType.ARTIST) CircleShape
-                    else RoundedCornerShape(8.dp),
-                )
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        )
+        ArtworkHover(
+            modifier = Modifier.size(52.dp).thumbnailBorder(artworkShape),
+            shape = artworkShape,
+            mode = ArtworkHoverMode.DARKEN_ONLY,
+            hovered = rowHovered,
+        ) {
+            AsyncImage(
+                model = item.thumbnailUrl.artworkAt(ROW_ART_PX),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+            )
+        }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(

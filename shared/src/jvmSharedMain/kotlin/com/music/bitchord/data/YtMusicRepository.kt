@@ -256,6 +256,12 @@ object YtMusicRepository {
     private suspend fun shelvesOf(browseId: String): List<HomeShelf> =
         InnertubeParser.parseHome(Innertube.browse(browseId))
 
+    /** A See All page rendered as album/video cards rather than a playlist track list. */
+    suspend fun browseShelves(browseId: String, params: String? = null): Result<List<HomeShelf>> =
+        call("browse-shelves:$browseId") {
+            InnertubeParser.parseHome(Innertube.browse(browseId, params))
+        }
+
     /** The server-defined mood and genre categories used by Explore. */
     suspend fun moodAndGenres(): Result<List<MoodGenreSection>> = call("moods-and-genres") {
         InnertubeParser.parseMoodAndGenres(Innertube.browse("FEmusic_moods_and_genres"))
@@ -968,6 +974,14 @@ object YtMusicRepository {
 
     suspend fun deletePlaylist(playlistId: String): Result<Unit> =
         call("playlist:delete") { Innertube.deletePlaylist(playlistId) }
+
+    /**
+     * Lightweight artist header for Now Playing Details. Unlike [artistPage], this
+     * deliberately skips fetching all of the artist's releases and top songs.
+     */
+    suspend fun artistOverview(browseId: String): Result<ArtistPage> = call("artistOverview:$browseId") {
+        InnertubeParser.parseArtistPage(Innertube.browse(browseId))
+    }
 
     /**
      * Artist page. The landing page only lists ~5 songs, so the linked

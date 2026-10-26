@@ -2,11 +2,17 @@ package com.music.bitchord.ui.player
 
 import com.music.bitchord.sharedui.resources.*
 import com.music.bitchord.ui.components.ExplicitSongTitle
+import com.music.bitchord.ui.components.ArtworkHover
+import com.music.bitchord.ui.components.ArtworkHoverMode
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +22,7 @@ import androidx.compose.ui.draw.alpha
 import kotlin.math.abs
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -48,6 +55,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,6 +87,16 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.playback.autoplaySectionStart
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
+/** Queue colors are overridable in the desktop sidebar; Android and the fullscreen player stay white. */
+data class QueuePanelColors(
+    val primary: Color = Color.White,
+    val secondary: Color = Color.White.copy(alpha = 0.55f),
+    val heading: Color = Color.White.copy(alpha = 0.75f),
+    val muted: Color = Color.White.copy(alpha = 0.40f),
+)
+
+val LocalQueuePanelColors = staticCompositionLocalOf { QueuePanelColors() }
 
 /**
  * Swallows whatever scroll the queue list itself didn't use. The player is a
@@ -223,7 +241,10 @@ internal fun InlineQueue(
     onRevealPlayer: () -> Unit = {},
     onHidePlayer: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** The desktop side panel supplies the shared Lyrics / Queue / Now playing header. */
+    showTitle: Boolean = true,
 ) {
+    val colors = LocalQueuePanelColors.current
     val listState = rememberLazyListState()
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }.collect(onScrollingChange)
@@ -259,21 +280,27 @@ internal fun InlineQueue(
     }
 
     Column(modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(Res.string.queue),
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                modifier = Modifier.weight(1f),
-            )
-            if (tracks.user.isNotEmpty()) {
-                QueueClearButton(MaterialTheme.typography.titleMedium, controlsLocked, onClear)
+        if (showTitle || tracks.user.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (showTitle) {
+                    Text(
+                        text = stringResource(Res.string.queue),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = colors.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                if (tracks.user.isNotEmpty()) {
+                    QueueClearButton(MaterialTheme.typography.titleMedium, controlsLocked, onClear)
+                }
             }
+            Spacer(Modifier.height(4.dp))
         }
-        Spacer(Modifier.height(4.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -401,11 +428,12 @@ private fun QueueHeading(
     modifier: Modifier = Modifier,
     trailing: @Composable () -> Unit = {},
 ) {
+    val colors = LocalQueuePanelColors.current
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = Color.White.copy(alpha = 0.75f),
+            color = colors.heading,
             modifier = Modifier.weight(1f),
         )
         trailing()
@@ -414,10 +442,11 @@ private fun QueueHeading(
 
 @Composable
 private fun QueueClearButton(style: TextStyle, locked: Boolean, onClear: () -> Unit) {
+    val colors = LocalQueuePanelColors.current
     Text(
         text = stringResource(Res.string.clear),
         style = style,
-        color = Color.White.copy(alpha = if (locked) 0.25f else 0.75f),
+        color = colors.primary.copy(alpha = if (locked) 0.25f else 0.75f),
         modifier = Modifier
             .clip(RoundedCornerShape(percent = 50))
             .clickable(enabled = !locked, onClick = onClear)
@@ -427,6 +456,7 @@ private fun QueueClearButton(style: TextStyle, locked: Boolean, onClear: () -> U
 
 @Composable
 private fun AutoplayHeading(hasTracks: Boolean, modifier: Modifier = Modifier) {
+    val colors = LocalQueuePanelColors.current
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -436,7 +466,7 @@ private fun AutoplayHeading(hasTracks: Boolean, modifier: Modifier = Modifier) {
         Icon(
             BitChordIcons.Infinity,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.75f),
+            tint = colors.heading,
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(8.dp))
@@ -444,14 +474,14 @@ private fun AutoplayHeading(hasTracks: Boolean, modifier: Modifier = Modifier) {
             Text(
                 text = stringResource(Res.string.autoplay),
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
+                color = colors.primary,
             )
             Text(
                 text = stringResource(
                     if (hasTracks) Res.string.autoplay_queue_description else Res.string.autoplay_empty_description,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.55f),
+                color = colors.secondary,
             )
         }
     }
@@ -703,14 +733,30 @@ private fun InlineQueueRow(
     onDrag: (Float) -> Unit = {},
     onDragEnd: () -> Unit = {},
 ) {
+    val colors = LocalQueuePanelColors.current
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
+    val rowBackground by animateColorAsState(
+        targetValue = when {
+            lifted -> colors.primary.copy(alpha = 0.06f)
+            rowHovered -> colors.primary.copy(alpha = 0.075f)
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "queue-row-hover-background",
+    )
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .hoverable(rowHoverInteraction)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (lifted) Color.White.copy(alpha = 0.06f) else Color.Transparent)
-            // Disabled rather than ignored: a tap that ripples and then does
-            // nothing reads as the app having missed it.
-            .clickable(enabled = !locked, onClick = onClick)
+            .background(rowBackground, RoundedCornerShape(8.dp))
+            .clickable(
+                interactionSource = rowHoverInteraction,
+                indication = null,
+                enabled = !locked,
+                onClick = onClick,
+            )
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -718,7 +764,7 @@ private fun InlineQueueRow(
             Icon(
                 Icons.Rounded.DragHandle,
                 contentDescription = stringResource(Res.string.drag_to_reorder),
-                tint = Color.White.copy(alpha = 0.4f),
+                tint = colors.muted,
                 modifier = Modifier
                     .size(20.dp)
                     // The glyph sits well inset in its own box; this pulls it
@@ -738,26 +784,29 @@ private fun InlineQueueRow(
             )
             Spacer(Modifier.width(4.dp))
         }
-        AsyncImage(
-            model = rememberRemoteArtworkUrl(song),
-            contentDescription = null,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .thumbnailBorder(RoundedCornerShape(6.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
-        )
+        ArtworkHover(
+            modifier = Modifier.size(44.dp).thumbnailBorder(RoundedCornerShape(6.dp)),
+            shape = RoundedCornerShape(6.dp),
+            mode = ArtworkHoverMode.DARKEN_AND_PLAY,
+            hovered = rowHovered,
+        ) {
+            AsyncImage(
+                model = rememberRemoteArtworkUrl(song),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().background(colors.primary.copy(alpha = 0.08f)),
+            )
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             ExplicitSongTitle(
                 song = song,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (isCurrent) Color.White else Color.White.copy(alpha = 0.92f),
+                color = if (isCurrent) colors.primary else colors.primary.copy(alpha = 0.92f),
             )
             Text(
                 text = song.artist,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.55f),
+                color = colors.secondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -766,7 +815,7 @@ private fun InlineQueueRow(
             Icon(
                 Icons.Rounded.GraphicEq,
                 contentDescription = stringResource(Res.string.now_playing),
-                tint = Color.White,
+                tint = colors.primary,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(10.dp))
@@ -782,7 +831,7 @@ private fun InlineQueueRow(
                 Icon(
                     Icons.Rounded.Close,
                     contentDescription = stringResource(Res.string.remove_from_queue),
-                    tint = Color.White.copy(alpha = 0.55f),
+                    tint = colors.secondary,
                     modifier = Modifier.size(18.dp),
                 )
             }

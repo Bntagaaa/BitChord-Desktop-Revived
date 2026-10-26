@@ -1,6 +1,9 @@
 package com.music.bitchord.desktop
 
 import com.music.bitchord.ui.screens.desktopTopScrollFade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -59,6 +62,7 @@ import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.BrowseType
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.ui.components.ArtworkHoverMode
 import com.music.bitchord.ui.icons.BitChordIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -232,21 +236,28 @@ private fun QuickSearchRow(item: SearchResult, active: Boolean, onHover: () -> U
         is SearchResult.Browse -> null
     }
     val artist = (item as? SearchResult.Browse)?.item
+    val activeBackground by animateColorAsState(
+        targetValue = if (active) DesktopForeground.copy(alpha = 0.09f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "quick-search-active-background",
+    )
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(5.dp))
-            .background(if (active) DesktopRowHover else Color.Transparent)
+            .background(activeBackground, RoundedCornerShape(5.dp))
             .semantics { selected = active }
             .focusProperties { canFocus = false }
             // Move, rather than Enter, avoids changing selection merely because keyboard scroll
             // places another row underneath a stationary pointer.
             .onPointerEvent(PointerEventType.Move) { onHover() }
-            .clickable(onClick = onSelect).padding(horizontal = 12.dp, vertical = 8.dp),
+            .desktopNoHoverClickable(hoverHighlight = false, onClick = onSelect).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopArtwork(
             song?.thumbnailUrl ?: artist?.thumbnailUrl,
             Modifier.size(40.dp).clip(if (artist != null) CircleShape else RoundedCornerShape(5.dp)),
             px = ROW_ART_PX,
+            hoverMode = if (song != null) ArtworkHoverMode.DARKEN_AND_PLAY else ArtworkHoverMode.DARKEN_ONLY,
+            hovered = active,
         )
         Spacer(Modifier.width(13.dp))
         Column(Modifier.weight(1f)) {

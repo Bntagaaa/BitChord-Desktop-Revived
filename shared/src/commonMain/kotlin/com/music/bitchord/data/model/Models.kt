@@ -393,9 +393,16 @@ data class HomeShelf(
 fun List<HomeShelf>.withoutRepeatsOf(existing: List<HomeShelf>): List<HomeShelf> {
     val shown = existing.toMutableList()
     return filter { shelf ->
-        val keys = shelf.browseKeys()
+        val releaseFeed = shelf.releaseFeedId()
+        val keys = if (releaseFeed != null) shelf.releaseFeedKeys() else shelf.browseKeys()
         val repeat = keys.isNotEmpty() && shown.any { other ->
-            val shared = other.browseKeys().count { it in keys }
+            val sameReleaseFeed = releaseFeed != null && releaseFeed == other.releaseFeedId()
+            val otherKeys = when {
+                sameReleaseFeed -> other.releaseFeedKeys()
+                releaseFeed == null -> other.browseKeys()
+                else -> emptySet()
+            }
+            val shared = otherKeys.count { it in keys }
             shared > 0 && shared >= REPEAT_SHELF_SHARE * minOf(shelf.items.size, other.items.size)
         }
         if (!repeat) shown += shelf
@@ -407,6 +414,15 @@ fun List<HomeShelf>.withoutRepeatsOf(existing: List<HomeShelf>): List<HomeShelf>
 private const val REPEAT_SHELF_SHARE = 0.6
 
 private fun HomeShelf.browseKeys(): Set<String> = items.mapNotNullTo(HashSet()) { it.browseId }
+
+/** Release and music-video shelves share a See All endpoint even when cards are video IDs, not browse IDs. */
+private fun HomeShelf.releaseFeedId(): String? = moreBrowseId?.takeIf {
+    it == "FEmusic_new_releases_albums" || it == "FEmusic_new_releases_videos"
+}
+
+private fun HomeShelf.releaseFeedKeys(): Set<String> = items.mapNotNullTo(HashSet()) {
+    it.browseId ?: it.videoId
+}
 
 /** A page of the Home feed, plus the token for the next one — null once exhausted. */
 data class HomeFeed(

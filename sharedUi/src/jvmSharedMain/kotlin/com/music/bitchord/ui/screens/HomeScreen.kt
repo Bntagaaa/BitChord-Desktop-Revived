@@ -9,8 +9,14 @@ import androidx.compose.foundation.Image
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import com.music.bitchord.ui.components.longPressMenuClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,6 +87,8 @@ import com.music.bitchord.data.settings.LibraryViewType
 import com.music.bitchord.ui.components.HERO_CARD_RATIO
 import com.music.bitchord.ui.components.MessageState
 import com.music.bitchord.ui.components.PAGE_GUTTER
+import com.music.bitchord.ui.components.ArtworkHover
+import com.music.bitchord.ui.components.ArtworkHoverMode
 import com.music.bitchord.ui.components.RowMoreButton
 import com.music.bitchord.ui.components.PlayingAccent
 import com.music.bitchord.ui.components.PullToRefresh
@@ -203,6 +211,8 @@ fun HomeScreen(
     leadHero: Boolean = true,
     currentSong: Song? = null,
     isPlaying: Boolean = false,
+    /** Opens a shelf's See All destination when the feed supplies one. */
+    onShelfOpen: ((HomeShelf) -> Unit)? = null,
 ) {
     val recentsViewType by AppUi.host.homeRecentsViewType.collectAsStateWithLifecycle()
     val compactHeadings = LocalDesktopCompactHeadings.current
@@ -275,6 +285,7 @@ fun HomeScreen(
                                 },
                             )
                         },
+                        onShelfOpen = onShelfOpen,
                     )
                     if (loadingMore) feedMoreSkeleton()
                 }
@@ -315,6 +326,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     firstIsHero: Boolean = true,
     recentsViewType: LibraryViewType,
     onRecentsViewTypeToggle: () -> Unit,
+    onShelfOpen: ((HomeShelf) -> Unit)?,
 ) {
     shelves.forEachIndexed { index, shelf ->
         item(key = shelf.title + index) {
@@ -336,6 +348,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                     onItemLongPress = onItemLongPress,
                     currentSong = currentSong,
                     isPlaying = isPlaying,
+                    onShelfOpen = onShelfOpen,
                 )
             } else {
                 Shelf(
@@ -344,6 +357,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                     onItemLongPress = onItemLongPress,
                     currentSong = currentSong,
                     isPlaying = isPlaying,
+                    onShelfOpen = onShelfOpen,
                 )
             }
         }
@@ -506,24 +520,28 @@ fun CompactTrackRow(
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
 ) {
+    val rowHoverInteraction = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .hoverable(rowHoverInteraction)
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
             .contextClick(onLongPress)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(48.dp)) {
+        ArtworkHover(
+            modifier = Modifier.size(48.dp).thumbnailBorder(RoundedCornerShape(7.dp)),
+            shape = RoundedCornerShape(7.dp),
+            mode = ArtworkHoverMode.DARKEN_AND_PLAY,
+            hovered = rowHovered,
+        ) {
             AsyncImage(
                 model = thumbnailUrl.artworkAt(ROW_ART_PX),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .thumbnailBorder(RoundedCornerShape(7.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
             )
             if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
         }
@@ -597,13 +615,19 @@ private const val LOGO_ASPECT = 730f / 484f
  * Home and Explore never pass it, so their heading is unchanged.
  */
 @Composable
-internal fun SectionHeader(title: String, subtitle: String = "", onShowAll: (() -> Unit)? = null) {
+internal fun SectionHeader(
+    title: String,
+    subtitle: String = "",
+    onShowAll: (() -> Unit)? = null,
+    onOpen: (() -> Unit)? = null,
+) {
     val displayTitle = localizeShelfTitle(title)
     val displaySubtitle = localizeShelfSubtitle(subtitle)
     Row(
         modifier = Modifier
             .padding(horizontal = PAGE_GUTTER, vertical = 10.dp)
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -624,7 +648,14 @@ internal fun SectionHeader(title: String, subtitle: String = "", onShowAll: (() 
                 )
             }
         }
-        if (onShowAll != null) {
+        if (onOpen != null) {
+            Icon(
+                imageVector = BitChordIcons.ChevronRight,
+                contentDescription = "Open $displayTitle",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp).size(20.dp),
+            )
+        } else if (onShowAll != null) {
             Text(
                 text = stringResource(Res.string.show_all),
                 style = MaterialTheme.typography.titleSmall,
@@ -813,9 +844,11 @@ private fun HeroShelf(
     onItemLongPress: ((ShelfItem) -> Unit)? = null,
     currentSong: Song? = null,
     isPlaying: Boolean = false,
+    onShelfOpen: ((HomeShelf) -> Unit)? = null,
 ) {
+    val openShelf = onShelfOpen?.takeIf { shelf.moreBrowseId != null }?.let { callback -> { callback(shelf) } }
     Column(Modifier.padding(bottom = 26.dp)) {
-        SectionHeader(shelf.title, shelf.subtitle)
+        SectionHeader(shelf.title, shelf.subtitle, onOpen = openShelf)
         // Measured rather than taken as a share of the parent, because the card
         // has a ceiling as well as a fraction — see [heroCardWidth]. A fixed
         // width is also the only one of the two the aspect ratio below can turn
@@ -853,22 +886,32 @@ private fun HeroCard(
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
 ) {
+    val cardHoverInteraction = remember { MutableInteractionSource() }
+    val cardHovered by cardHoverInteraction.collectIsHoveredAsState()
     Box(
         modifier = modifier
             .aspectRatio(HERO_CARD_RATIO)
             .clip(RoundedCornerShape(18.dp))
             .thumbnailBorder(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .hoverable(cardHoverInteraction)
+            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress, hoverShape = RoundedCornerShape(18.dp))
             .contextClick(onLongPress),
     ) {
-        AsyncImage(
-            model = item.thumbnailUrl.artworkAt(HEADER_ART_PX),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
+        ArtworkHover(
             modifier = Modifier.fillMaxSize(),
-        )
-        if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
+            shape = RoundedCornerShape(18.dp),
+            mode = ArtworkHoverMode.DARKEN_ONLY,
+            hovered = cardHovered,
+        ) {
+            AsyncImage(
+                model = item.thumbnailUrl.artworkAt(HEADER_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -917,9 +960,11 @@ internal fun Shelf(
     leadingCard: (@Composable () -> Unit)? = null,
     currentSong: Song? = null,
     isPlaying: Boolean = false,
+    onShelfOpen: ((HomeShelf) -> Unit)? = null,
 ) {
+    val openShelf = onShelfOpen?.takeIf { shelf.moreBrowseId != null }?.let { callback -> { callback(shelf) } }
     Column(Modifier.padding(bottom = 26.dp)) {
-        SectionHeader(shelf.title, shelf.subtitle)
+        SectionHeader(shelf.title, shelf.subtitle, onOpen = openShelf)
         ShelfRow(
             contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -953,33 +998,46 @@ internal fun NewShelfCard(
     /** A full-colour mark drawn in place of [icon], for a card that stands for a brand. */
     logo: DrawableResource? = null,
 ) {
+    val cardHoverInteraction = remember { MutableInteractionSource() }
+    val cardHovered by cardHoverInteraction.collectIsHoveredAsState()
+    val cardHoverBackground by animateColorAsState(
+        targetValue = if (cardHovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "new-playlist-card-hover-background",
+    )
     Column(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier
+            .hoverable(cardHoverInteraction)
+            .background(cardHoverBackground, RoundedCornerShape(12.dp))
+            .clickable(interactionSource = cardHoverInteraction, indication = null, onClick = onClick),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
+        ArtworkHover(
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            shape = RoundedCornerShape(12.dp),
+            mode = ArtworkHoverMode.DARKEN_ONLY,
+            hovered = cardHovered,
         ) {
-            if (logo != null) {
-                // The mark is a disc with the bars cut out, so tinting it
-                // leaves the bars clear: white on dark, black on light.
-                Icon(
-                    painter = painterResource(logo),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(44.dp),
-                )
-            } else {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(34.dp),
-                )
+            Box(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (logo != null) {
+                    // The mark is a disc with the bars cut out, so tinting it
+                    // leaves the bars clear: white on dark, black on light.
+                    Icon(
+                        painter = painterResource(logo),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(44.dp),
+                    )
+                } else {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(34.dp),
+                    )
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -1006,27 +1064,31 @@ internal fun NewShelfCard(
  * copies of the same box.
  */
 @Composable
-private fun ServiceCard(colors: List<Color>, trackKey: String, icon: ImageVector) {
+private fun ServiceCard(colors: List<Color>, trackKey: String, icon: ImageVector, hovered: Boolean) {
     val palette = remember { MeshPalette(colors) }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(12.dp)),
-        contentAlignment = Alignment.Center,
+    ArtworkHover(
+        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+        shape = RoundedCornerShape(12.dp),
+        mode = ArtworkHoverMode.DARKEN_ONLY,
+        hovered = hovered,
     ) {
-        MeshGradientBackground(
-            palette = palette,
-            trackKey = trackKey,
-            continuous = true,
-            blurRadius = 24.dp,
-        )
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(40.dp),
-        )
+        Box(
+            Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            MeshGradientBackground(
+                palette = palette,
+                trackKey = trackKey,
+                continuous = true,
+                blurRadius = 24.dp,
+            )
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(40.dp),
+            )
+        }
     }
 }
 
@@ -1042,54 +1104,69 @@ internal fun ShelfCard(
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
 ) {
+    val cardHoverInteraction = remember { MutableInteractionSource() }
+    val cardHovered by cardHoverInteraction.collectIsHoveredAsState()
     Column(
         modifier = modifier
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .hoverable(cardHoverInteraction)
+            .longPressMenuClickable(
+                onClick = onClick,
+                onLongClick = onLongPress,
+                hoverShape = RoundedCornerShape(12.dp),
+            )
             .contextClick(onLongPress),
     ) {
         when (item.browseId) {
             "local:downloads" -> {
                 val palette = remember { MeshPalette(listOf(Color(0xFF1E3C72), Color(0xFF2A5298))) }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center,
+                ArtworkHover(
+                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    mode = ArtworkHoverMode.DARKEN_ONLY,
+                    hovered = cardHovered,
                 ) {
-                    MeshGradientBackground(
-                        palette = palette,
-                        trackKey = "local:downloads",
-                        continuous = true,
-                        blurRadius = 24.dp,
-                    )
-                    Icon(
-                        imageVector = BitChordIcons.Download,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(40.dp),
-                    )
+                    Box(
+                        Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MeshGradientBackground(
+                            palette = palette,
+                            trackKey = "local:downloads",
+                            continuous = true,
+                            blurRadius = 24.dp,
+                        )
+                        Icon(
+                            imageVector = BitChordIcons.Download,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
                 }
             }
             "local:all" -> ServiceCard(
                 colors = listOf(Color(0xFF134E5E), Color(0xFF71B280)),
                 trackKey = "local:all",
                 icon = Icons.Rounded.LibraryMusic,
+                hovered = cardHovered,
             )
             "local:cache" -> ServiceCard(
                 colors = listOf(Color(0xFF42275A), Color(0xFF734B6D)),
                 trackKey = "local:cache",
                 icon = Icons.Rounded.Cached,
+                hovered = cardHovered,
             )
             "local:webdav" -> ServiceCard(
                 colors = listOf(Color(0xFF3A1C71), Color(0xFFD76D77)),
                 trackKey = "local:webdav",
                 icon = Icons.Rounded.Folder,
+                hovered = cardHovered,
             )
             "local:smb" -> ServiceCard(
                 colors = listOf(Color(0xFF0F2027), Color(0xFF2C5364)),
                 trackKey = "local:smb",
                 icon = Icons.Rounded.Storage,
+                hovered = cardHovered,
             )
             else -> {
                 Box(
@@ -1097,16 +1174,22 @@ internal fun ShelfCard(
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(12.dp))
-                        .thumbnailBorder(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 ) {
-                    AsyncImage(
-                        model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
-                        contentDescription = null,
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
+                    ArtworkHover(
+                        modifier = Modifier.fillMaxSize().thumbnailBorder(RoundedCornerShape(12.dp)),
+                        shape = RoundedCornerShape(12.dp),
+                        mode = ArtworkHoverMode.DARKEN_ONLY,
+                        hovered = cardHovered,
+                    ) {
+                        AsyncImage(
+                            model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
+                            contentDescription = null,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                        )
+                        if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
+                    }
                 }
             }
         }

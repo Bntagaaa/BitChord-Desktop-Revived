@@ -145,6 +145,8 @@ fun QueueSidePanel(
     onMove: (Int, Int) -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The desktop panel draws Queue in the same shared header as Lyrics and Now playing. */
+    showTitle: Boolean = true,
 ) {
     InlineQueue(
         queue = queue,
@@ -156,5 +158,6 @@ fun QueueSidePanel(
         onMove = onMove,
         onClear = onClear,
         modifier = modifier,
+        showTitle = showTitle,
     )
 }

@@ -49,6 +49,7 @@ internal object DesktopWindowVisibility {
         // the app having broken rather than as it having been hidden.
         DesktopWindowMode.exit()
         _visible.value = false
+        DesktopMemoryOptimizer.onWindowHidden()
         DesktopTrackLog.log("window closed to the tray; playback continues")
         return false
     }

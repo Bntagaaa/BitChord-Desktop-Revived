@@ -1,7 +1,87 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * Each area has a separate persisted preference. Existing installations keep their previous
+ * appearance because all six areas start enabled; Reduce dynamic blur remains authoritative.
+ */
+internal enum class DesktopBlurArea(val title: String, val description: String, val preferenceKey: String) {
+    SIDE_PANELS(
+        "Lyrics, Queue & Details panels",
+        "The frosted right-hand panels on Home",
+        "blur_side_panels",
+    ),
+    QUICK_SEARCH(
+        "Quick Search",
+        "The Ctrl+K search popup",
+        "blur_quick_search",
+    ),
+    SEARCH_PAGE(
+        "Search",
+        "The search field, suggestions and Explore landing",
+        "blur_search_page",
+    ),
+    FLOATING_PLAYER(
+        "Floating player",
+        "The bottom music player and compact navigation",
+        "blur_floating_player",
+    ),
+    MENUS_POPUPS(
+        "Menus & popups",
+        "Profile selector, sign-in prompts and dropdown menus",
+        "blur_menus_popups",
+    ),
+    APP_CHROME(
+        "Top bar & navigation",
+        "The in-app toolbar and navigation glass, not the native title bar",
+        "blur_app_chrome",
+    ),
+}
+
+internal enum class DesktopPerformanceProfile(val label: String, val description: String) {
+    FULL("Full", "Full visual richness and frosted glass effects across all surfaces"),
+    BALANCED("Balanced", "Balanced aesthetic with optimized blur effects"),
+    PERFORMANCE("Performance", "Maximum rendering responsiveness with minimal blur"),
+    AUTO("Auto", "Automatically select based on system CPU and memory capabilities"),
+    ;
+
+    fun resolved(): DesktopPerformanceProfile = when (this) {
+        AUTO -> detectHardwareProfile()
+        else -> this
+    }
+}
+
+internal fun detectHardwareProfile(): DesktopPerformanceProfile {
+    return runCatching {
+        val cores = Runtime.getRuntime().availableProcessors()
+        val maxMemoryMb = Runtime.getRuntime().maxMemory() / (1024 * 1024)
+        when {
+            cores <= 1 || maxMemoryMb < 512 -> DesktopPerformanceProfile.PERFORMANCE
+            cores in 2..4 -> DesktopPerformanceProfile.BALANCED
+            else -> DesktopPerformanceProfile.FULL
+        }
+    }.getOrDefault(DesktopPerformanceProfile.BALANCED)
+}
+
+/**
+ * Master override invariant: Whenever reduceDynamicBlur is true, ALL dynamic blur effects
+ * MUST be disabled regardless of performance profile, per-area preferences, or component.
+ */
+internal fun effectiveDesktopBlur(
+    reduceDynamicBlur: Boolean,
+    selected: Boolean,
+    profile: DesktopPerformanceProfile = DesktopPerformanceProfile.FULL,
+): Boolean {
+    if (reduceDynamicBlur) return false
+    val effectiveProfile = profile.resolved()
+    if (effectiveProfile == DesktopPerformanceProfile.PERFORMANCE) return false
+    return selected
+}
 
 /**
  * The toggles read far from the Settings sheet that sets them.
@@ -16,6 +96,12 @@ internal object DesktopAppearanceSettings {
 
     private val _reduceAnimation = flag(KEY_REDUCE_ANIMATION, false)
     private val _reduceDynamicBlur = flag(KEY_REDUCE_DYNAMIC_BLUR, false)
+    private val _blurPreferences = DesktopBlurArea.entries.associateWith { flag(it.preferenceKey, true) }
+    private val _performanceProfile = MutableStateFlow(
+        runCatching {
+            DesktopPerformanceProfile.valueOf(DesktopPersistence().string(KEY_PERFORMANCE_PROFILE, "AUTO"))
+        }.getOrDefault(DesktopPerformanceProfile.AUTO),
+    )
     // Mica-style navigation is lightweight wallpaper tinting, independent of blur.
     private val _micaSidebar = flag(KEY_MICA_SIDEBAR, DesktopSidebarMica.isSupported)
     private val _hideVolumeBar = flag(KEY_HIDE_VOLUME_BAR, false)
@@ -29,6 +115,21 @@ internal object DesktopAppearanceSettings {
 
     /** Swaps frosted glass for solid fills across the app. */
     val reduceDynamicBlur: StateFlow<Boolean> = _reduceDynamicBlur
+
+    /** Performance profile for graphics rendering. */
+    val performanceProfile: StateFlow<DesktopPerformanceProfile> = _performanceProfile
+
+    /** Individual preferences, observed live by the components that draw the glass. */
+    fun blurPreference(area: DesktopBlurArea): StateFlow<Boolean> = requireNotNull(_blurPreferences[area])
+
+    /** Includes the master override, so no caller can accidentally ignore Reduce dynamic blur. */
+    @Composable
+    fun blurEnabled(area: DesktopBlurArea): Boolean {
+        val reduced by reduceDynamicBlur.collectAsState()
+        val selected by blurPreference(area).collectAsState()
+        val profile by performanceProfile.collectAsState()
+        return effectiveDesktopBlur(reduced, selected, profile)
+    }
 
     /** Windows 11 wallpaper-tinted, opaque navigation material. */
     val micaSidebar: StateFlow<Boolean> = _micaSidebar
@@ -48,6 +149,14 @@ internal object DesktopAppearanceSettings {
 
     fun setReduceDynamicBlur(value: Boolean) = write(KEY_REDUCE_DYNAMIC_BLUR, value, _reduceDynamicBlur)
 
+    fun setPerformanceProfile(profile: DesktopPerformanceProfile) {
+        DesktopPersistence().saveString(KEY_PERFORMANCE_PROFILE, profile.name)
+        _performanceProfile.value = profile
+    }
+
+    fun setBlurPreference(area: DesktopBlurArea, enabled: Boolean) =
+        write(area.preferenceKey, enabled, requireNotNull(_blurPreferences[area]))
+
     fun setMicaSidebar(value: Boolean) = write(KEY_MICA_SIDEBAR, value, _micaSidebar)
 
     fun setHideVolumeBar(value: Boolean) = write(KEY_HIDE_VOLUME_BAR, value, _hideVolumeBar)
@@ -66,6 +175,7 @@ internal object DesktopAppearanceSettings {
 
     internal const val KEY_REDUCE_ANIMATION = "reduce_animation"
     internal const val KEY_REDUCE_DYNAMIC_BLUR = "reduce_dynamic_blur"
+    internal const val KEY_PERFORMANCE_PROFILE = "performance_profile"
     internal const val KEY_MICA_SIDEBAR = "mica_sidebar"
     internal const val KEY_HIDE_VOLUME_BAR = "hide_volume_bar"
     internal const val KEY_ENABLE_OLD_TOP_MUSIC_PLAYER_STYLE = "enable_old_top_music_player_style"

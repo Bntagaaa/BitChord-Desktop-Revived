@@ -7,33 +7,32 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
+import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Looks at the repo's "latest release" on GitHub once per launch and says whether it is newer
- * than the running build. The installer is not run from here: the dialog opens the asset in the
- * browser, so the user installs it the way they installed the first one.
- *
- * GitHub's "latest" skips pre-releases and drafts, so a `-beta` desktop build is only ever
- * nudged toward a published release.
+ * Checks BitChord Desktop Revived's published stable GitHub release once at startup.
+ * Download opens a browser; no updater process, package-manager command, or
+ * installation runs inside the application.
  */
 internal object DesktopUpdateChecker {
 
     data class UpdateInfo(
         val version: String,
         val releaseUrl: String,
-        /** The installer for this platform, or null when the release has none. */
+        /** The matching package for this platform, or null if the release has none. */
         val downloadUrl: String?,
         val notes: String?,
     )
 
+    internal enum class PackagePlatform { WINDOWS_X64, LINUX_X64, ARCH_X64, UNSUPPORTED }
+
     private const val LATEST_RELEASE_URL =
-        "https://api.github.com/repos/kushagrasinghx/BitChord/releases/latest"
+        "https://api.github.com/repos/Bntagaaa/BitChord-Desktop-Revived/releases/latest"
 
     val currentVersion: String = System.getProperty("bitchord.version") ?: "1.8-beta1"
 
@@ -46,9 +45,44 @@ internal object DesktopUpdateChecker {
         }
     }
 
+    /**
+     * OS identification is intentionally independent of the desktop environment:
+     * CachyOS KDE, GNOME, Niri and other shells all read the same /etc/os-release.
+     * Unknown architectures never receive a mismatched x86_64 installer.
+     */
+    internal fun targetPlatform(osName: String, osRelease: String, architecture: String): PackagePlatform {
+        if (architecture.lowercase() !in setOf("amd64", "x86_64", "x64")) return PackagePlatform.UNSUPPORTED
+        return when {
+            osName.startsWith("Windows", ignoreCase = true) -> PackagePlatform.WINDOWS_X64
+            osName.contains("Linux", ignoreCase = true) && isArchFamily(osRelease) -> PackagePlatform.ARCH_X64
+            osName.contains("Linux", ignoreCase = true) -> PackagePlatform.LINUX_X64
+            else -> PackagePlatform.UNSUPPORTED
+        }
+    }
+
+    /** Match os-release ID/ID_LIKE tokens rather than arbitrary product-name substrings. */
+    private fun isArchFamily(osRelease: String): Boolean {
+        val identifiers = osRelease.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("ID=") || it.startsWith("ID_LIKE=") }
+            .flatMap { it.substringAfter('=').trim().trim('"', '\'').lowercase().splitToSequence(' ', '\t') }
+            .filter(String::isNotBlank)
+            .toSet()
+        return identifiers.any { it in setOf("arch", "archlinux", "cachyos", "manjaro", "endeavouros", "garuda", "artix") }
+    }
+
+    val packagePlatform: PackagePlatform by lazy {
+        targetPlatform(
+            osName = System.getProperty("os.name").orEmpty(),
+            osRelease = runCatching { File("/etc/os-release").readText() }.getOrDefault(""),
+            architecture = System.getProperty("os.arch").orEmpty(),
+        )
+    }
+
     suspend fun check(): UpdateInfo? = runCatching {
         val response = http.get(LATEST_RELEASE_URL) {
             header("Accept", "application/vnd.github+json")
+            header("User-Agent", "BitChord-Desktop-Revived-updater")
         }
         if (!response.status.isSuccess()) return@runCatching null
         val release = json.parseToJsonElement(response.bodyAsText()) as? JsonObject
@@ -63,47 +97,60 @@ internal object DesktopUpdateChecker {
             downloadUrl = installerUrl(release),
             notes = release["body"]?.jsonPrimitive?.contentOrNull,
         )
-    }.getOrNull()
+    }.getOrNull() // Offline, invalid or rate-limited responses must not interrupt playback.
 
     /**
-     * The release names its files `BitChord-<version>-windows-x64-setup.exe` and
-     * `BitChord-<version>-linux-x86_64.AppImage` (see .github/workflows/release.yml); match on the
-     * platform part so a version change does not matter.
+     * Names are produced by release.yml (and its Arch companion, once merged).
+     * Arch packages take precedence on Arch/CachyOS; NEVER fall through to a
+     * Debian installer or AppImage when the native package has not been released.
+     * The dialog then links to the release page for a manual choice.
      */
-    private fun installerUrl(release: JsonObject): String? {
-        val suffixes = when {
-            DesktopPlatform.isWindows -> listOf("-windows-x64-setup.exe")
-            DesktopPlatform.isLinux -> listOf(".AppImage", "-linux-amd64.deb")
-            else -> return null
+    internal fun installerUrl(
+        release: JsonObject,
+        platform: PackagePlatform = packagePlatform,
+    ): String? {
+        val suffixes = when (platform) {
+            PackagePlatform.WINDOWS_X64 -> listOf("-windows-x64-setup.exe")
+            PackagePlatform.LINUX_X64 -> listOf("-linux-x86_64.AppImage", "-linux-amd64.deb")
+            PackagePlatform.ARCH_X64 -> listOf("-x86_64.pkg.tar.zst")
+            PackagePlatform.UNSUPPORTED -> emptyList()
         }
+
         val assets = release["assets"]?.jsonArray?.mapNotNull { it as? JsonObject }.orEmpty()
         for (suffix in suffixes) {
-            val hit = assets.firstOrNull { asset ->
-                asset["name"]?.jsonPrimitive?.contentOrNull?.endsWith(suffix, ignoreCase = true) == true &&
-                    asset["state"]?.jsonPrimitive?.contentOrNull == "uploaded"
+            val asset = assets.firstOrNull { candidate ->
+                val name = candidate["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                val expectedPackage = platform != PackagePlatform.ARCH_X64 ||
+                    name.startsWith("bitchord-desktop-revived-bin-", ignoreCase = true)
+                expectedPackage && name.endsWith(suffix, ignoreCase = true) &&
+                    candidate["state"]?.jsonPrimitive?.contentOrNull == "uploaded"
             }
-            hit?.get("browser_download_url")?.jsonPrimitive?.contentOrNull?.let { return it }
+            asset?.get("browser_download_url")?.jsonPrimitive?.contentOrNull?.let { return it }
         }
         return null
     }
 
-    private class Parsed(val parts: List<Int>, val preRelease: Boolean)
+    private data class ParsedVersion(val parts: List<Int>, val preRelease: Boolean)
 
-    private fun parse(raw: String): Parsed {
-        val dash = raw.indexOf('-')
-        val base = if (dash >= 0) raw.substring(0, dash) else raw
-        return Parsed(base.split('.').map { it.toIntOrNull() ?: 0 }, dash >= 0)
+    private fun parseVersion(raw: String): ParsedVersion? {
+        val base = raw.substringBefore('-')
+        val components = base.split('.')
+        if (components.isEmpty() || components.any { it.isEmpty() || it.any { ch -> !ch.isDigit() } }) {
+            return null
+        }
+        val parts = components.map { it.toIntOrNull() ?: return null }
+        return ParsedVersion(parts, '-' in raw)
     }
 
-    /** Numeric comparison, with a `-betaN` build counted as older than the plain release it leads up to. */
+    /** Compare numeric components, treating a test/beta as older than its stable release. */
     internal fun isNewer(latest: String, current: String): Boolean {
-        val l = parse(latest)
-        val c = parse(current)
-        for (i in 0 until maxOf(l.parts.size, c.parts.size)) {
-            val a = l.parts.getOrElse(i) { 0 }
-            val b = c.parts.getOrElse(i) { 0 }
+        val left = parseVersion(latest) ?: return false
+        val right = parseVersion(current) ?: return false
+        for (i in 0 until maxOf(left.parts.size, right.parts.size)) {
+            val a = left.parts.getOrElse(i) { 0 }
+            val b = right.parts.getOrElse(i) { 0 }
             if (a != b) return a > b
         }
-        return c.preRelease && !l.preRelease
+        return right.preRelease && !left.preRelease
     }
 }

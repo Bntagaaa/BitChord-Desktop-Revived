@@ -2,6 +2,7 @@ package com.music.bitchord.desktop
 
 import com.music.bitchord.data.canvas.SpotifyCanvasQuery
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonNull
@@ -10,6 +11,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.URLEncoder
@@ -30,6 +32,10 @@ internal object DesktopSpotifyCanvas {
     private const val SEARCH_URL = "https://api.spotify.com/v1/search"
     private const val ALBUM_TRACKS_URL = "https://api.spotify.com/v1/albums"
     private const val CANVAS_URL = "https://spclient.wg.spotify.com/canvaz-cache/v0/canvases"
+    // Same Pathfinder track-search operation used by the upstream BitChord v1.8.1 release.
+    private const val PATHFINDER_SEARCH_URL = "https://api-partner.spotify.com/pathfinder/v1/query"
+    private const val PATHFINDER_SEARCH_HASH =
+        "bc1ca2fcd0ba1013a0fc88e6cc4f190af501851e3dafd3e1ef85840297694428"
 
     /** spclient gates this path to Spotify's own apps by user agent; the web player's is turned
      * away, so this wears a mobile client's instead. */
@@ -48,7 +54,12 @@ internal object DesktopSpotifyCanvas {
     suspend fun search(title: String, artist: String, album: String?): DesktopCanvasArtwork? {
         val tokens = DesktopSpotifyLibraryAuth.tokens() ?: return null
         val token = tokens.bearer
-        val hit = searchTrack(title, artist, album, token) ?: return null
+        // Match upstream BitChord's working provider: Spotify's own Pathfinder search is
+        // more reliable with this session than /v1/search, which often returns 429 or no
+        // results even for tracks that visibly have a Canvas in Spotify Web Player.
+        val hit = searchViaPathfinder(title, artist, album, token)
+            ?: searchTrack(title, artist, album, token)
+            ?: return null
         val canvasUrl = fetchCanvasUrl(hit.uri, token) ?: return null
         return DesktopCanvasArtwork(
             url = canvasUrl,
@@ -90,26 +101,98 @@ internal object DesktopSpotifyCanvas {
         return null
     }
 
-    private fun searchTrack(title: String, artist: String, album: String?, token: String): TrackHit? {
-        val query = listOfNotNull(title, artist, album).joinToString(" ")
-        val items = get(url(SEARCH_URL, listOf("q" to query, "type" to "track", "limit" to "10")), token)
-            ?.get("tracks")?.jsonObject?.get("items")?.jsonArray
-            ?: return null
-        for (item in items) {
-            val track = item as? JsonObject ?: continue
-            val trackTitle = track.text("name") ?: continue
-            val artists = track["artists"]?.jsonArray
-                ?.mapNotNull { it.jsonObject.text("name") }
-                .orEmpty()
-            if (!canvasMatches(trackTitle, artists, title, artist)) continue
-            val uri = track.text("uri") ?: continue
-            return TrackHit(
-                uri = uri,
-                title = trackTitle,
-                artist = artists.joinToString(", ").ifBlank { artist },
-                album = track["album"]?.jsonObject?.text("name"),
-            )
+    /**
+     * The upstream BitChord v1.8.1 searchTracks persisted query. Spotify Canvas lookup
+     * needs a track URI; using the Web Player's own Pathfinder search is more reliable
+     * than the public REST search with a browser-session token.
+     */
+    private fun searchViaPathfinder(title: String, artist: String, album: String?, token: String): TrackHit? {
+        val clientToken = DesktopSpotifyLibraryAuth.canvasClientToken() ?: return null
+        val searchTerm = listOfNotNull(title, artist, album).joinToString(" ")
+        val variables = buildJsonObject {
+            put("searchTerm", searchTerm)
+            put("offset", 0)
+            put("limit", 10)
+            put("numberOfTopResults", 5)
+            put("includeAudiobooks", false)
+            put("includePreReleases", false)
+        }.toString()
+        val extensions = buildJsonObject {
+            putJsonObject("persistedQuery") {
+                put("version", 1)
+                put("sha256Hash", PATHFINDER_SEARCH_HASH)
+            }
+        }.toString()
+        val requestUrl = url(
+            PATHFINDER_SEARCH_URL,
+            listOf(
+                "operationName" to "searchTracks",
+                "variables" to variables,
+                "extensions" to extensions,
+            ),
+        )
+        val body = canvasGet(
+            requestUrl,
+            mapOf(
+                "Authorization" to "Bearer $token",
+                "Client-Token" to clientToken,
+                "App-platform" to "WebPlayer",
+                "Accept" to "application/json",
+                "User-Agent" to CANVAS_UA,
+            ),
+        ) ?: run {
+            DesktopTrackLog.log("canvas: Spotify Pathfinder track search returned no response")
+            return null
         }
+        val firstItem = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
+            ?.get("data")?.jsonObject
+            ?.get("searchV2")?.jsonObject
+            ?.get("tracksV2")?.jsonObject
+            ?.get("items")?.jsonArray
+            ?.firstOrNull()?.jsonObject
+            ?.get("item")?.jsonObject
+            ?.get("data")?.jsonObject
+        if (firstItem == null) {
+            DesktopTrackLog.log("canvas: Spotify Pathfinder search returned no track for $title")
+            return null
+        }
+        val uri = firstItem.text("uri")
+            ?: firstItem.text("id")?.let { "spotify:track:$it" }
+            ?: return null
+        DesktopTrackLog.log("canvas: Spotify Pathfinder matched $title — $artist")
+        // As upstream does, trust Spotify's own ranked result for this combined query;
+        // the GraphQL hit shape is not stable enough to safely reparse artist metadata.
+        return TrackHit(uri, title, artist, album)
+    }
+
+    private fun searchTrack(title: String, artist: String, album: String?, token: String): TrackHit? {
+        // YouTube Music sometimes uses a release title that Spotify indexes differently.
+        // First try the more specific query, then retry by track + artist without album.
+        val queries = listOfNotNull(
+            album?.takeIf { it.isNotBlank() }?.let { "$title $artist $it" },
+            "$title $artist",
+        ).distinct()
+        for (query in queries) {
+            val items = get(url(SEARCH_URL, listOf("q" to query, "type" to "track", "limit" to "20")), token)
+                ?.get("tracks")?.jsonObject?.get("items")?.jsonArray
+                ?: continue
+            for (item in items) {
+                val track = item as? JsonObject ?: continue
+                val trackTitle = track.text("name") ?: continue
+                val artists = track["artists"]?.jsonArray
+                    ?.mapNotNull { it.jsonObject.text("name") }
+                    .orEmpty()
+                if (!canvasMatches(trackTitle, artists, title, artist)) continue
+                val uri = track.text("uri") ?: continue
+                return TrackHit(
+                    uri = uri,
+                    title = trackTitle,
+                    artist = artists.joinToString(", ").ifBlank { artist },
+                    album = track["album"]?.jsonObject?.text("name"),
+                )
+            }
+        }
+        DesktopTrackLog.log("canvas: no exact Spotify track match for $title — $artist")
         return null
     }
 
@@ -237,7 +320,7 @@ internal object DesktopSpotifyCanvas {
      * a 429 that reads exactly like rate limiting. Omitted rather than fatal when minting fails. */
     private fun authHeaders(token: String): Map<String, String> = buildMap {
         put("Authorization", "Bearer $token")
-        DesktopSpotifyLibraryAuth.cachedClientToken()?.let { put("Client-Token", it) }
+        DesktopSpotifyLibraryAuth.canvasClientToken()?.let { put("Client-Token", it) }
     }
 
     private fun get(url: String, token: String): JsonObject? =
