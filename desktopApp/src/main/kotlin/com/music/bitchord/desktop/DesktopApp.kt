@@ -3124,10 +3124,14 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
      * Artist navigation from the Details side panel continues to call openArtist
      * directly, so that panel stays visible over the destination artist page.
      */
-    fun openArtistFromPlayer(browseId: String, name: String) {
+    fun dismissExpandedPlayerForNavigation() {
         DesktopWindowMode.exit()
         overlays.nowPlaying = false
         playerMenuOpen = false
+    }
+
+    fun openArtistFromPlayer(browseId: String, name: String) {
+        dismissExpandedPlayerForNavigation()
         openArtist(browseId, name)
     }
 
@@ -3911,14 +3915,16 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             // exactly, so a fragment like "2115" opens nothing
                             // rather than White 2115.
                             onOpenArtist = { id, name ->
-                                // Dismiss the expanded player even when the desktop window
-                                // is not fullscreen. Keep the separate Details panel unchanged.
+                                // Close immediately on a tap, even if this credit needs a
+                                // network lookup. The full-window sheet is not OS fullscreen.
+                                // The separate Now Playing Details panel remains unchanged.
+                                dismissExpandedPlayerForNavigation()
                                 if (id != null) {
-                                    openArtistFromPlayer(id, name)
+                                    openArtist(id, name)
                                 } else {
                                     scope.launch {
                                         YtMusicRepository.findArtistPageId(name).getOrNull()
-                                            ?.let { found -> openArtistFromPlayer(found, name) }
+                                            ?.let { found -> openArtist(found, name) }
                                     }
                                 }
                             },
