@@ -73,6 +73,49 @@ class DesktopAppleArtistArtTest {
     }
 
     @Test
+    fun squareMotionOutsideSelectedHeroIsRecoveredFromPr70Fallback() {
+        val art = assertNotNull(parse("""
+            {"header":{"artistLogo":null,
+                 "artwork":{"dictionary":{"url":"$image","width":2000,"height":2000}}},
+             "otherMetadata":{"videoArtwork":{"dictionary":{"motionArtistSquare1x1":{
+                 "video":"https://mvod.itunes.apple.com/artist/square.m3u8"}}}}}
+        """))
+        assertEquals("https://mvod.itunes.apple.com/artist/square.m3u8", art.squareVideoUrl)
+        assertNull(art.wideVideoUrl)
+    }
+
+    @Test
+    fun fullscreenMotionNestedOutsideHeroBeatsWideFallback() {
+        val art = assertNotNull(parse("""
+            {"header":{"artistLogo":null,
+                 "artwork":{"dictionary":{"url":"$image","width":2000,"height":2000}}},
+             "nested":{"wideVideoArtwork":{"dictionary":{
+                "motionArtistWide16x9":{"video":"https://mvod.itunes.apple.com/wide.m3u8"},
+                "motionArtistFullscreen16x9":{"video":"https://mvod.itunes.apple.com/fullscreen.m3u8",
+                    "previewFrame":{"url":"$image","width":1920,"height":1080}}
+             }}}}
+        """))
+        assertEquals("https://mvod.itunes.apple.com/fullscreen.m3u8", art.wideVideoUrl)
+        assertEquals(image.replace("{w}", "1600").replace("{h}", "900").replace("{c}", "bb").replace("{f}", "jpg"), art.heroUrl)
+    }
+
+    @Test
+    fun serializedDataScriptWithReorderedSingleQuotedAttributesIsFound() {
+        val payload = """
+            {"artistLogo":null,"artwork":{"dictionary":{
+                "url":"$image","width":1600,"height":1600}},
+             "videoArtwork":{"dictionary":{"motionArtistSquare1x1":{
+                "video":"https://mvod.itunes.apple.com/artist/square.m3u8"}}}}
+        """
+        val method = DesktopAppleArtistArtRepository::class.java
+            .getDeclaredMethod("parse", String::class.java, String::class.java)
+        method.isAccessible = true
+        val html = "<script type='application/json' id='serialized-server-data'>$payload</script>"
+        val art = assertNotNull(method.invoke(DesktopAppleArtistArtRepository, html, pageUrl) as DesktopAppleArtistArt?)
+        assertEquals("https://mvod.itunes.apple.com/artist/square.m3u8", art.squareVideoUrl)
+    }
+
+    @Test
     fun channelSuffixesAreRemovedWithoutDamagingUnicodeNames() {
         assertEquals("Ariana Grande", canonicalAppleArtistName("Ariana Grande - Topic"))
         assertEquals("ArianaGrande", canonicalAppleArtistName("ArianaGrandeVEVO"))
