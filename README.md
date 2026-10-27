@@ -22,7 +22,7 @@
 
 
 
-## Highlights
+## ✨ Highlights
 
 - **Visual Astra interface** - refined surfaces, configurable blur, a Mica-inspired sidebar, and light/dark themes.
 - **Immersive visuals** - video Canvas artwork where available, plus Apple Music-inspired artist artwork.
@@ -31,12 +31,12 @@
 - **Audio and integrations** - equalizer, crossfade, Automix (beta), Discord Rich Presence, and scrobbling.
 - **Desktop-first shortcuts** - open Quick Search with `Ctrl+K` and the shortcut guide with `Ctrl+/`.
 
-## Download
+## ⬇️ Download
 
 Get available Windows and Linux builds from [GitHub Releases](https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases).
 
 
-## Build from source
+## ⚙️ Build from source
 
 **Requirements:** Java 21 and Git.
 
@@ -52,7 +52,7 @@ Linux:
 ./gradlew :desktopApp:run
 ```
 
-## Credits and license
+## 📜 Credits and license
 
 BitChord was originally created by [@kushagrasinghx](https://github.com/kushagrasinghx). This is an independent community fork, not an official upstream release. Original attribution and license notices are preserved.
 
