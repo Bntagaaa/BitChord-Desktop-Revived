@@ -129,7 +129,21 @@ jobs:
       - run: chmod +x gradlew
 
       - name: Tests
-        run: ./gradlew testDevDebugUnitTest
+        run: |
+          set +e
+          ./gradlew testDevDebugUnitTest --console=plain 2>&1 | tee /tmp/bitchord-android-tests.log
+          test_status=${PIPESTATUS[0]}
+          if [ "$test_status" -ne 0 ]; then
+            python3 - <<'PYERRORS'
+          import re
+          from pathlib import Path
+          lines = Path('/tmp/bitchord-android-tests.log').read_text(errors='replace').splitlines()
+          errors = [line for line in lines if re.search(r'(^e: |error:|Execution failed for task|^> .*[Ff]ail)', line)]
+          for line in errors[:80]:
+              print('::error::' + line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PYERRORS
+          fi
+          exit "$test_status"
 
       - name: Build the dev APK
         run: ./gradlew assembleDevDebug
