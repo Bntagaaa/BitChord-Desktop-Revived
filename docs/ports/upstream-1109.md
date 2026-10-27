@@ -7,7 +7,7 @@ Working branch: `upstream-1109-port`.
 
 ## Status
 
-**Work in progress. Do not merge yet.** The native instrumental loop-mix renderer is not yet connected to the desktop audio pump. The shared loop planner, regression tests and upstream native sources are present; those alone do not enable loop playback. Existing desktop Automix continues to run its established transitions. No claim of a completed full port is made.
+The desktop port includes the native instrumental loop-mix path. It runs through the existing audio pump and output sink; ordinary Automix/crossfade remains the fallback when a safe loop cannot be planned or prepared. This PR stays Draft for real-device and authenticated validation, which the cloud cannot perform.
 
 ## Integrated changes
 
@@ -19,8 +19,10 @@ Working branch: `upstream-1109-port`.
 | Music video | One shared silent FFmpeg video deck for visible surfaces. Existing audio engine remains authoritative for playing, pause, seeks, buffering and speed. Quality choices come from the extracted stream. Cleanup is owned by cancellation. |
 | Player visual changes | Upstream video layout, fades, two-note instrumental glyph, lyric styles, title overflow, mix popup and artwork tint. Existing desktop hover, Recents list/grid preference, See All routes and centered-lyrics composition local retained. |
 | Motion artwork on Top Picks | Desktop artwork providers implement release and artist motion hooks, falling back to still artwork when absent or disabled. |
-| Mix visualization | Existing desktop transition plan publishes the actual gain curves and timing. Popup requests bounded, streamed three-band waveform extraction; closing cancels it. This is separate from unfinished native loop playback. |
-| Beat model and analysis format | New final0 model asset and shared analysis schema/planner updates. |
+| Mix visualization | Existing desktop transition plan publishes the actual gain curves and timing. Popup requests bounded, streamed three-band waveform extraction; closing cancels it. Native loop playback publishes a repeated virtual waveform on the renderer clock; it does not advance a source waveform through bars that are repeating. |
+| Instrumental loop mix | Shared bar/tempo planner, two native Signalsmith decks inside the existing analysis library, exact-frame takeover and 25 ms handover into the existing live incoming decoder. One audio sink owns output and progress. Pause holds the sink; seek, skip, output changes, mode changes and shutdown cancel/settle ownership. Newly available synced words reject unsafe loop bounds. |
+| Beat model and analysis format | New final0 model, opening/ending beat grids, raw vocal-model windows and 10 fps level curves. Native analysis PCM is explicitly resampled to each model's rate; old analyses remain intact and are re-earned in a `loop-v1` cache namespace. |
+| Tempo range and AutoPlay | Incoming beatmatch supports 0.90–1.25x with gradual return to listener speed. The existing AutoPlay request path retries every 15 seconds while playing at the queue tail, using earlier seeds when a radio is exhausted. |
 | Direct Source Stream | Opt-in setting reuses ranked source resolution and the existing engine, bounded preferred-source wait, YouTube fallback, no later upgrade in that mode, 25-second next-track arming. Inactive in parties or with YouTube disabled. |
 | Source matching | Upstream shared Portuguese-credit normalization and matching changes; addon call/read ceilings increased. |
 | Custom sleep timer | Existing timer accepts menu-entered 5–720 minutes, with input validation and existing preset/end-of-track controls. |
@@ -31,7 +33,7 @@ Working branch: `upstream-1109-port`.
 | Simplified Chinese region | Shared locale mapping uses SG for the YouTube region. |
 | Blur compatibility | Newly touched mesh blur observes the existing master override. Native Windows title-bar material is not replaced. |
 
-Android-only Bluetooth routing, Wear output, Media3 sink integration, system-bar and Android Liquid Glass APIs are not desktop drivers. Platform-neutral/shared visual changes are integrated; existing Android host implementations retain compatible defaults for newly added optional host state. Android build validation remains required.
+Android-only Bluetooth routing, Wear output, Media3 sink integration, system-bar and Android Liquid Glass APIs are not desktop drivers. Platform-neutral/shared visual changes are integrated; existing Android host implementations retain compatible defaults for newly added optional host state. Android compatibility is covered by the PR CI jobs.
 
 ## Validation
 
@@ -45,13 +47,17 @@ python3 /workspace/.cloud-setup/gradle1109.py \
   :desktopApp:createDistributable -Pbitchord.version=test-visua --continue
 ```
 
-The final local compatibility run passed 70 shared, 34 shared UI and 476 desktop tests (580 total), with no failures/skips, plus Linux packaging. CI status is recorded in the PR. Tests were retained: a Replay regression and missing Korean resources were fixed in production data/code, not hidden by altering assertions.
+The final local compatibility run passed 70 shared, 34 shared UI and 481 desktop tests (585 total), with no failures/skips, plus Linux packaging. CI status is recorded in the PR. Tests were retained: a Replay regression and missing Korean resources were fixed in production data/code, not hidden by altering assertions.
 
-New desktop regression coverage exercises timer limits and malformed input, album identity across changed credits, local album separation/unknown albums, video clock extrapolation at different playback speeds and buffering, and native recorded-image lifetime. Shared upstream loop-planner tests run, but do not test desktop loop rendering or device audio.
+New desktop regression coverage exercises timer limits and malformed input, album identity across changed credits, local album separation/unknown albums, video clock extrapolation at different playback speeds and buffering, and native recorded-image lifetime. Desktop native tests additionally cover requested-rate region decoding, cancellation/reopening, raw vocal-model inference, incomplete region rejection, repeated renderer creation/disposal, buffer bounds, finite synthetic output and final incoming track alignment. Tempo tests cover both ends of the 0.90–1.25x range. Shared upstream loop-planner tests also run. These tests do not certify device audio.
 
-## Remaining before a complete port
+## Playback compatibility
 
-- Connect native loop rendering to the desktop's single audio sink, with sample-accurate takeover, handoff, pause/seek/skip cancellation and source ownership; complete native tests. The current PR must remain Draft until this is implemented and reviewed.
+Native loops require stereo, listener speed 1x, skip silence off, measured beat/vocal windows and source durations within 0.5 seconds of the analysed recording. Video-origin tracks and Listen Together parties do not enter this path. A missing model, unsuitable instrumental bars, stale preparation, lyric conflict or preparation failure preserves the existing transition path. This keeps the existing source resolver, queue, EQ, spatial processing, silence skipping and output selection authoritative rather than creating a competing player. The renderer owns decoded regions only; it never seeks the outgoing live decoder during preparation. Publication/cancellation is synchronized, and only the audio thread closes an active renderer.
+
+## Manual validation still required
+
+- Exercise native loop takeover and handoff with real music and output devices on Windows/Linux, including pause, seek before/after midpoint, skip, source upgrades, output changes and shutdown. Synthetic tests cannot establish audible quality, seamlessness or real hardware clock behavior.
 - Verify authenticated Top Picks, station loading/account changes and history deletion against a real account.
 - Exercise video quality changes, seek, pause, source upgrades, long tracks and A/V sync on Linux and Windows; test cancellation while network/native reads are pending.
 - Verify visible player changes, RTL, centered lyrics, artist navigation, motion-artwork lifecycle, all master-blur states and native Mica on target desktops.

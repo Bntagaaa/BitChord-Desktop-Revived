@@ -16,6 +16,7 @@ import com.music.bitchord.playback.smart.echoTailSeconds
 import com.music.bitchord.playback.smart.planTransition
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.delay
@@ -195,6 +196,32 @@ class DesktopPlaybackEngine(
         data object ClearUpcoming : Command
         data object Reconfigure : Command
         data object Flush : Command
+    }
+
+    private class LoopPlayback(
+        val session: com.music.bitchord.playback.loopmix.LoopMixSession,
+        val outgoing: Track,
+        val incoming: Track,
+    ) {
+        val incomingStartUs = incoming.startUs
+        var rendered = 0L
+        var sinkStart = 0L
+        val samples = FloatArray(2048)
+        val view = desktopLoopView(session, outgoing.song, incoming.song)
+    }
+    private val loopBuildLock = Any()
+    private val pendingLoop = java.util.concurrent.atomic.AtomicReference<LoopPlayback?>(null)
+    @Volatile private var loopRuntime: LoopPlayback? = null
+    private var loopBuildJob: Job? = null
+    private var loopAttemptedPair: Pair<Track, Track>? = null
+    private val loopLyrics = java.util.concurrent.ConcurrentHashMap<String, List<com.music.bitchord.playback.smart.LoopMix.Span>>()
+    fun setLoopLyrics(id: String, lines: List<com.music.bitchord.data.lyrics.LyricLine>?) {
+        if (lines == null) loopLyrics.remove(id) else {
+            loopLyrics[id] = com.music.bitchord.playback.smart.LoopMix.sungSpans(lines.map {
+                com.music.bitchord.playback.smart.LoopMix.Line(it.timeMs, it.sungUntilMs, it.text.isBlank())
+            })
+            if (loopLyrics.size > 4) loopLyrics.keys.firstOrNull { it != id }?.let(loopLyrics::remove)
+        }
     }
 
     private val thread = Thread(::pump, "BitChord-Audio").apply {
@@ -637,7 +664,7 @@ class DesktopPlaybackEngine(
                 return@launch
             }
             // Not heard yet: the incoming deck itself is replaced, with nothing to interrupt.
-            if (upcoming?.song?.videoId == song.videoId && fadeRemaining <= 0 && !displaySwitched) {
+            if (upcoming?.song?.videoId == song.videoId && fadeRemaining <= 0 && loopRuntime == null && !displaySwitched) {
                 openTrack(song, better, startAtMs = 0).fold(
                     onSuccess = { commands += Command.ReplaceUpcoming(it) },
                     onFailure = { settleIncomingSearch(song) },
@@ -663,7 +690,7 @@ class DesktopPlaybackEngine(
         scope.launch {
             repeat(BLEND_WAIT_POLLS) {
                 val playing = _state.value.song?.videoId == song.videoId
-                if (playing && !displaySwitched && fadeRemaining <= 0) {
+                if (playing && !displaySwitched && fadeRemaining <= 0 && loopRuntime == null) {
                     // Handed over: from here the search is the playing track's, and ends with it.
                     searchingBetterFor = song.videoId
                     if (incomingSearchingFor == song.videoId) incomingSearchingFor = null
@@ -682,6 +709,7 @@ class DesktopPlaybackEngine(
     }
 
     fun release() {
+        loopBuildJob?.cancel()
         waveformJob?.cancel()
         DesktopPlayerHost.mixViewOpen = {}
         analyzer.release()
@@ -794,9 +822,10 @@ class DesktopPlaybackEngine(
     private var waveformJob: kotlinx.coroutines.Job? = null
 
     init {
-        DesktopPlayerHost.mixViewOpen = { open ->
+        DesktopPlayerHost.mixViewOpen = mixViewOpen@ { open ->
             waveformJob?.cancel()
             if (open) {
+                loopRuntime?.let { DesktopPlayerSettings.smartMixView.value = it.view; return@mixViewOpen }
                 val view = DesktopPlayerSettings.smartMixView.value
                 val outgoing = current?.stream
                 val incoming = upcoming?.stream
@@ -813,13 +842,21 @@ class DesktopPlaybackEngine(
 
 
     private fun pump() {
-        while (running.get()) {
-            runCatching { step() }.onFailure { failure ->
-                if (failure is InterruptedException) return
-                DesktopTrackLog.log("audio thread recovered from: ${failure.message}")
+        try {
+            while (running.get()) {
+                try {
+                    step()
+                } catch (_: InterruptedException) {
+                    break
+                } catch (failure: Exception) {
+                    DesktopTrackLog.log("audio thread recovered from: ${failure.message}")
+                    // A renderer is stateful: after an output failure its block cannot be replayed.
+                    if (loopRuntime != null) runCatching { abortLoop(_state.value.positionMs) }
+                }
             }
+        } finally {
+            closeEverything()
         }
-        closeEverything()
     }
 
     private fun step() {
@@ -827,12 +864,22 @@ class DesktopPlaybackEngine(
         val track = current
         if (track == null || paused) {
             if (paused) sink.pause()
+            loopRuntime?.let(::loopPosition)
             if (paused && fadeRemaining > 0) publishBlend(playing = false)
             Thread.sleep(20)
             return
         }
         sink.resume()
 
+        loopRuntime?.let { runtime ->
+            if (!automixEnabled || DesktopListenTogether.state.value.inParty || playbackSpeed != 1f || skipSilenceEnabled || !loopWordsClear(runtime)) {
+                val position = _state.value.positionMs
+                abortLoop(position)
+                return
+            }
+            renderLoop(runtime)
+            return
+        }
         val block = readCurrent(track)
         val count = currentReadCount
         if (block == null) {
@@ -875,6 +922,25 @@ class DesktopPlaybackEngine(
             return
         }
         if (count == 0) return
+        val ready = acceptLoop(track)
+        if (ready != null) {
+            val startUs = playhead.peek(framesWritten)
+            val takeover = (ready.session.plan.out.loopStart * 1_000_000).toLong()
+            val prefixFrames = (((takeover - startUs) * sink.format.sampleRate) / 1_000_000).coerceAtLeast(0L)
+            if (prefixFrames <= count / 2) {
+                val prefix = prefixFrames.toInt() * 2
+                if (startLoop(ready)) {
+                    if (prefix > 0) {
+                        widen(spatial, track, block, prefix)
+                        equalise(equalizer, block, prefix)
+                        play(track, block, prefix)
+                    }
+                    ready.sinkStart = framesWritten
+                    renderLoop(ready)
+                    return
+                }
+            } else if (!pendingLoop.compareAndSet(null, ready)) ready.session.close()
+        }
 
         val (blended, blendedCount) = blend(track, block, count)
         val quiet = silence?.also { it.enabled = skipSilenceEnabled }
@@ -923,7 +989,7 @@ class DesktopPlaybackEngine(
 
     /** The beatmatch stretch [track] is actually rendered at — [DesktopTempoBuffer]'s clamp included. */
     private fun deckRate(track: Track): Double =
-        if (track.tempo != null && !track.tempoDrained) track.tempoRate.coerceIn(1.0, 1.1) else 1.0
+        if (track.tempo != null && !track.tempoDrained) track.tempoRate.coerceIn(com.music.bitchord.playback.smart.MIN_INCOMING_RATE, com.music.bitchord.playback.smart.MAX_INCOMING_RATE) else 1.0
 
     /** Source time each output frame of [track] covers: the listener's speed times the deck's. */
     private fun usPerFrame(track: Track): Double =
@@ -1034,7 +1100,7 @@ class DesktopPlaybackEngine(
         val block = tempo.take(DEFAULT_TEMPO_OUTPUT_SAMPLES)
         currentReadCount = tempo.outputCount
         advanceTempoEase(track, currentReadCount / sink.format.channels.coerceAtLeast(1))
-        if (track.tempoRate <= 1.0 && !track.tempoDrained) {
+        if (kotlin.math.abs(track.tempoRate - 1.0) < .0001 && !track.tempoDrained) {
             // Nothing more is pushed from here; what the stretcher holds is queued unstretched and
             // the decoder takes over once it has played.
             tempo.finish()
@@ -1201,11 +1267,12 @@ class DesktopPlaybackEngine(
     private fun advanceTempoEase(track: Track, outputFrames: Int) {
         if (track.tempoEaseStep <= 0.0 || outputFrames <= 0) return
         track.tempoOutputFrames += outputFrames
-        while (track.tempoOutputFrames >= track.tempoEaseNextFrame && track.tempoRate > 1.0) {
-            track.tempoRate = (track.tempoRate - track.tempoEaseStep).coerceAtLeast(1.0)
+        while (track.tempoOutputFrames >= track.tempoEaseNextFrame && kotlin.math.abs(track.tempoRate - 1.0) > .0001) {
+            track.tempoRate = if (track.tempoRate > 1.0) (track.tempoRate - track.tempoEaseStep).coerceAtLeast(1.0)
+                else (track.tempoRate + track.tempoEaseStep).coerceAtMost(1.0)
             track.tempoEaseNextFrame += track.tempoEaseEveryFrames
         }
-        if (track.tempoRate <= 1.0001) track.tempoRate = 1.0
+        if (kotlin.math.abs(track.tempoRate - 1.0) < .0001) track.tempoRate = 1.0
     }
 
     /** Widens one track's samples, unless the audio is Dolby Atmos. */
@@ -1246,6 +1313,7 @@ class DesktopPlaybackEngine(
 
     private fun promoteUpcoming() {
         val incoming = upcoming ?: return
+        loopAttemptedPair = null
         val plan = activePlan
         activePlan = null
         transitionEcho = null
@@ -1253,9 +1321,9 @@ class DesktopPlaybackEngine(
         incomingFilter.open()
         current?.decoder?.close()
         current = incoming
-        if (incoming.tempo != null && incoming.tempoRate > 1.0) {
-            val steps = ceil((incoming.tempoRate - 1.0) / TEMPO_STEP_PER_BEAT).toInt().coerceAtLeast(1)
-            incoming.tempoEaseStep = (incoming.tempoRate - 1.0) / steps
+        if (incoming.tempo != null && kotlin.math.abs(incoming.tempoRate - 1.0) > .0001) {
+            val steps = ceil(kotlin.math.abs(incoming.tempoRate - 1.0) / TEMPO_STEP_PER_BEAT).toInt().coerceAtLeast(1)
+            incoming.tempoEaseStep = kotlin.math.abs(incoming.tempoRate - 1.0) / steps
             incoming.tempoEaseEveryFrames = (
                 (plan?.beatSeconds ?: 0.0).takeIf { it > 0.0 } ?: EASE_FALLBACK_SECONDS
                 ).times(sink.format.sampleRate).toLong().coerceAtLeast(1L)
@@ -1389,7 +1457,19 @@ class DesktopPlaybackEngine(
 
     private fun drainCommands() {
         while (true) {
-            when (val command = commands.poll() ?: return) {
+            val command = commands.poll() ?: return
+            val wasLoop = loopRuntime != null
+            val hadSwitched = displaySwitched
+            if (command is Command.Start || command is Command.SeekTo || command is Command.Reconfigure || command == Command.Flush || command == Command.ClearUpcoming) {
+                val settle = loopRuntime != null && (command is Command.Reconfigure || command == Command.ClearUpcoming)
+                val position = _state.value.positionMs
+                discardLoop()
+                if (settle) {
+                    performSeek(position)
+                    if (!hadSwitched) endBlend()
+                }
+            }
+            when (command) {
                 is Command.Start -> startTrack(command.track, command.playWhenReady)
                 is Command.ReplaceCurrent -> replaceCurrent(command.track, command.playWhenReady)
                 is Command.RecoverCurrent -> {
@@ -1424,7 +1504,7 @@ class DesktopPlaybackEngine(
                 }
                 is Command.ReplaceUpcoming -> {
                     val track = command.track
-                    if (upcoming?.song?.videoId == track.song.videoId && fadeRemaining <= 0 && !displaySwitched) {
+                    if (upcoming?.song?.videoId == track.song.videoId && fadeRemaining <= 0 && loopRuntime == null && !displaySwitched) {
                         DesktopTrackLog.log(
                             "incoming '${track.song.title}' upgraded to " +
                                 "${track.stream.format.summary.ifBlank { "another rendition" }} before its transition",
@@ -1438,7 +1518,10 @@ class DesktopPlaybackEngine(
                         playingUpgrade(track.song, track.stream)
                     }
                 }
-                is Command.SeekTo -> performSeek(command.millis)
+                is Command.SeekTo -> {
+                    performSeek(command.millis)
+                    if (wasLoop && !hadSwitched) endBlend()
+                }
                 Command.Reconfigure -> reconfigureSink()
                 Command.ClearUpcoming -> {
                     upcoming?.decoder?.close()
@@ -1471,7 +1554,7 @@ class DesktopPlaybackEngine(
     private fun replaceCurrent(track: Track, playWhenReady: Boolean) {
         // An upgrade that arrives after the handoff has begun is no longer worth interrupting the
         // audible transition. Keep the running pair intact and retire the unused decoder.
-        if (fadeRemaining > 0 || displaySwitched) {
+        if (fadeRemaining > 0 || loopRuntime != null || displaySwitched) {
             track.decoder.close()
             return
         }
@@ -1696,6 +1779,7 @@ class DesktopPlaybackEngine(
      * does not light the Automix animation unless analysis changed the style, cue or tempo.
      */
     private fun isSmartMixInProgress(): Boolean {
+        if (loopRuntime != null) return true
         val plan = activePlan ?: return false
         return automixEnabled && fadeRemaining > 0 && (
             plan.transitionStyle == TransitionStyle.DJ_BLEND ||
@@ -1729,7 +1813,7 @@ class DesktopPlaybackEngine(
             armAddonUpcoming(held, plan, positionMs, duration)
             return
         }
-        if (fadeRemaining > 0) return
+        if (fadeRemaining > 0 || loopRuntime != null) return
         val duration = (track.decoder.durationUs ?: return) / 1_000
         if (duration <= 0) return
 
@@ -1761,12 +1845,12 @@ class DesktopPlaybackEngine(
         fadeRemaining = transitionTotal
         incomingSourceFrames = 0.0
         activePlan = plan
-        incoming.tempo = if (plan.incomingPlaybackRate > 1.0001) {
+        incoming.tempo = if (kotlin.math.abs(plan.incomingPlaybackRate - 1.0) > .0001) {
             DesktopTempoBuffer(sink.format.channels, sink.format.sampleRate).also {
                 it.speed = plan.incomingPlaybackRate.toFloat()
             }
         } else null
-        incoming.tempoRate = plan.incomingPlaybackRate.coerceAtLeast(1.0)
+        incoming.tempoRate = plan.incomingPlaybackRate.coerceIn(com.music.bitchord.playback.smart.MIN_INCOMING_RATE, com.music.bitchord.playback.smart.MAX_INCOMING_RATE)
         transitionEcho = if (plan.echoSeconds > 0.0) {
             DesktopTransitionEcho(sink.format.sampleRate, sink.format.channels).also { it.configure(plan.echoSeconds) }
         } else null
@@ -1775,7 +1859,184 @@ class DesktopPlaybackEngine(
     }
 
     /** The marker on the scrubber, showing where the mix will happen before it happens. */
+    private fun prepareLoop(track: Track, positionMs: Long, duration: Long) {
+        val incoming = upcoming ?: return
+        if (!automixEnabled || DesktopListenTogether.state.value.inParty || playbackSpeed != 1f ||
+            skipSilenceEnabled || fadeRemaining > 0 || loopRuntime != null || sink.format.channels != 2) return
+        val pair = track to incoming
+        if (loopAttemptedPair == pair) return
+        val out = analyzer.analysisFor(track.song.videoId)
+        val inn = analyzer.analysisFor(incoming.song.videoId)
+        if (out.headBeats == null || out.tailBeats == null || inn.headBeats == null) return
+        loopAttemptedPair = pair
+        val sampleRate = sink.format.sampleRate
+        val incomingDuration = (incoming.decoder.durationUs ?: 0L) / 1_000_000.0
+        // A differently cut source cannot safely inherit another recording's loop timestamps.
+        if (kotlin.math.abs(out.duration - duration / 1000.0) > .5 || kotlin.math.abs(inn.duration - incomingDuration) > .5) return
+        val plan = com.music.bitchord.playback.smart.LoopMix.plan(
+            out, duration / 1000.0, inn, incomingDuration, positionMs / 1000.0 + 8.0,
+            sungOut = loopLyrics[track.song.videoId], sungIn = loopLyrics[incoming.song.videoId],
+            outVideo = track.song.isVideoOrigin || track.song.isVideo,
+            inVideo = incoming.song.isVideoOrigin || incoming.song.isVideo,
+        ) ?: return
+        loopBuildJob?.cancel()
+        loopBuildJob = scope.launch {
+            var prepared: com.music.bitchord.playback.loopmix.LoopMixSession? = null
+            try {
+                val context = kotlinx.coroutines.currentCoroutineContext()
+                prepared = com.music.bitchord.playback.loopmix.LoopMixSession.build(
+                    plan, track.song.videoId, incoming.song.videoId, sampleRate, 1f,
+                ) { side, from, to ->
+                    desktopLoopRegion(if (side == com.music.bitchord.playback.smart.LoopMix.Side.OUT) track.stream else incoming.stream,
+                        from, to, sampleRate) { !context.isActive }
+                } ?: return@launch
+                val warmup = FloatArray(2048)
+                var frame = prepared.renderer.firstFrame()
+                while (frame < 0) {
+                    if (!context.isActive) throw kotlinx.coroutines.CancellationException()
+                    val count = minOf(1024L, -frame).toInt()
+                    prepared.renderer.render(frame, warmup, 0, count)
+                    frame += count
+                }
+                if (!context.isActive) throw kotlinx.coroutines.CancellationException()
+                val ready = LoopPlayback(prepared, track, incoming)
+                val required = ((prepared.clock.elementTrackTime - prepared.handoverRegion.start) * sampleRate).toInt()
+                if (required !in 1 until prepared.handoverRegion.left.size) return@launch
+                synchronized(loopBuildLock) {
+                    if (context.isActive && pendingLoop.compareAndSet(null, ready)) prepared = null
+                } // ownership passes to the audio thread only while this builder is still current
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (error: Exception) { DesktopTrackLog.log("loop preparation failed: ${error.javaClass.simpleName}") }
+            finally { prepared?.close() }
+        }
+    }
+
+    /** Called on the audio thread only. Builders and decoders never own an active renderer. */
+    private fun discardLoop() {
+        synchronized(loopBuildLock) {
+            loopBuildJob?.cancel()
+            pendingLoop.getAndSet(null)?.session?.close()
+        }
+        loopRuntime?.let { runtime ->
+            runtime.session.close()
+            if (!displaySwitched && upcoming === runtime.incoming) {
+                // Preparation moved the live incoming decoder to the final handover. An aborted
+                // mix must leave the ordinary gapless/crossfade path at its original cue.
+                runtime.incoming.startUs = runtime.incomingStartUs
+                runtime.incoming.decoder.seek(runtime.incomingStartUs)
+                runtime.incoming.dropTempo()
+            }
+        }
+        loopRuntime = null
+        loopAttemptedPair = null
+        DesktopPlayerSettings.automixDetail.value = null
+    }
+
+    private fun abortLoop(positionMs: Long) {
+        val hadSwitched = displaySwitched
+        discardLoop()
+        performSeek(positionMs)
+        if (!hadSwitched) endBlend()
+    }
+
+    private fun loopWordsClear(ready: LoopPlayback): Boolean {
+        fun clear(id: String, pick: com.music.bitchord.playback.smart.LoopMix.Pick): Boolean =
+            loopLyrics[id].orEmpty().none { it.start < pick.loopEnd + .3 && it.certainUntil > pick.loopStart - .3 }
+        return clear(ready.outgoing.song.videoId, ready.session.plan.out) && clear(ready.incoming.song.videoId, ready.session.plan.inn)
+    }
+
+    private fun acceptLoop(track: Track): LoopPlayback? {
+        val ready = pendingLoop.getAndSet(null) ?: return null
+        if (ready.outgoing !== track || ready.incoming !== upcoming || fadeRemaining > 0 ||
+            !automixEnabled || playbackSpeed != 1f || skipSilenceEnabled || DesktopListenTogether.state.value.inParty ||
+            sink.format.sampleRate != ready.session.sampleRate || sink.format.channels != 2 || !loopWordsClear(ready) ||
+            playhead.peek(framesWritten) > (ready.session.plan.out.loopStart * 1_000_000).toLong()) {
+            ready.session.close()
+            return null
+        }
+        return ready
+    }
+
+    private fun startLoop(ready: LoopPlayback): Boolean {
+        val incoming = ready.incoming
+        val cueUs = (ready.session.clock.elementTrackTime * 1_000_000).toLong()
+        if (!incoming.decoder.seek(cueUs)) { ready.session.close(); return false }
+        incoming.dropTempo()
+        incoming.startUs = cueUs
+        ready.sinkStart = framesWritten
+        incomingSourceFrames = 0.0
+        waveformJob?.cancel()
+        loopRuntime = ready
+        DesktopPlayerSettings.smartMixView.value = ready.view
+        DesktopPlayerSettings.automixDetail.value = "Instrumental loop mix · ${ready.session.plan.out.bpm.toInt()} → ${ready.session.plan.targetBpm.toInt()} BPM"
+        return true
+    }
+
+    private fun loopPosition(runtime: LoopPlayback) {
+        val clock = runtime.session.clock
+        if (sink.framesPlayed() < runtime.sinkStart) {
+            val position = playhead.at(sink.framesPlayed()) / 1000
+            _state.update { it.copy(positionMs = position, positionSampledAtNanos = System.nanoTime(), mixing = false) }
+            return
+        }
+        val seconds = ((sink.framesPlayed() - runtime.sinkStart).coerceAtLeast(0L)).toDouble() / runtime.session.sampleRate
+        val incoming = seconds >= clock.handoffAt
+        if (incoming && !displaySwitched) switchDisplay(runtime.incoming)
+        val position = com.music.bitchord.playback.smart.LoopMix.positionAt(clock,
+            if (incoming) com.music.bitchord.playback.smart.LoopMix.Side.IN else com.music.bitchord.playback.smart.LoopMix.Side.OUT, seconds)
+            ?: if (incoming) clock.elementTrackTime else runtime.session.plan.out.loopStart
+        _state.update {
+            val millis = (position * 1000).toLong()
+            it.copy(positionMs = millis, positionSampledAtNanos = System.nanoTime(),
+                seeks = it.seeks + if (millis + 200 < it.positionMs) 1 else 0,
+                isPlaying = !paused, mixing = true)
+        }
+        DesktopPlayerSettings.smartMixProgress.value = (seconds / clock.elementAt).toFloat().coerceIn(0f, 1f)
+    }
+
+    private fun renderLoop(runtime: LoopPlayback) {
+        val session = runtime.session
+        val clock = session.clock
+        val sampleRate = session.sampleRate
+        val end = (clock.elementAt * sampleRate).toLong()
+        val handover = ((clock.elementAt - com.music.bitchord.playback.smart.LoopMix.HANDOVER_SEC) * sampleRate).toLong()
+        var frames = minOf(1024L, end - runtime.rendered).toInt()
+        if (runtime.rendered < handover && runtime.rendered + frames > handover) frames = (handover - runtime.rendered).toInt()
+        if (frames <= 0) return
+        val output = runtime.samples
+        session.renderer.render(runtime.rendered, output, 0, frames)
+        if (runtime.rendered >= handover) {
+            val region = session.handoverRegion
+            for (i in 0 until frames) {
+                val time = (runtime.rendered + i).toDouble() / sampleRate
+                val at = ((clock.elementTrackTime - (clock.elementAt - time) - region.start) * sampleRate).toInt()
+                if (at in region.left.indices) {
+                    val into = ((runtime.rendered + i - handover).toDouble() / (end - handover).coerceAtLeast(1)).toFloat().coerceIn(0f, 1f)
+                    output[i * 2] = output[i * 2] * (1 - into) + region.left[at] * into
+                    output[i * 2 + 1] = output[i * 2 + 1] * (1 - into) + region.right[at] * into
+                }
+            }
+        }
+        widen(spatial, runtime.outgoing, output, frames * 2)
+        equalise(equalizer, output, frames * 2)
+        play(runtime.outgoing, output, frames * 2)
+        runtime.rendered += frames
+        loopPosition(runtime)
+        if (runtime.rendered >= end) {
+            // The final native samples crossfade into unprocessed source PCM. The live decoder
+            // has been seeking/buffering that exact handover point since this mix started.
+            loopRuntime = null
+            session.close()
+            val outgoingEq = equalizer
+            equalizer = equalizerIncoming
+            equalizerIncoming = outgoingEq
+            promoteUpcoming()
+            DesktopPlayerSettings.automixDetail.value = null
+        }
+    }
+
     private fun publishTransitionWindow(track: Track, plan: TransitionPlan, duration: Long) {
+        if (!plan.blocked) prepareLoop(track, _state.value.positionMs, duration)
         val next = upcoming?.song ?: nextSong
         if (next != null && !plan.blocked && plan.fadeSeconds > 0) {
             val key = "${track.song.videoId}/${next.videoId}/${plan.transitionStart}/${plan.transitionEnd}"
@@ -1871,6 +2132,7 @@ class DesktopPlaybackEngine(
     }
 
     private fun closeEverything() {
+        discardLoop()
         current?.decoder?.close()
         upcoming?.decoder?.close()
         current = null

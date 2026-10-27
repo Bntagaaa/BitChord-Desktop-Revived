@@ -11,6 +11,25 @@ class DesktopTempoBufferTest {
     private val rate = 44_100
 
     @Test
+    fun `new beatmatch range can slow by ten percent and speed by twenty five`() {
+        val source = tone(seconds = 3.0)
+        for (speed in listOf(.9f, 1.25f)) {
+            val tempo = DesktopTempoBuffer(channels, rate).apply { this.speed = speed }
+            var offset = 0
+            while (offset < source.size) {
+                val count = minOf(4096, source.size - offset)
+                tempo.push(source.copyOfRange(offset, offset + count), count)
+                offset += count
+            }
+            var rendered = 0
+            while (tempo.available > 0) { tempo.take(4096); rendered += tempo.outputCount }
+            assertTrue(rendered > 0)
+            val ratio = source.size.toDouble() / rendered
+            assertTrue(kotlin.math.abs(ratio - speed) < .06, "Requested $speed, rendered $ratio")
+        }
+    }
+
+    @Test
     fun `ten percent beatmatch produces less wall time without dropping queued output`() {
         val tempo = DesktopTempoBuffer(channels, rate).apply { speed = 1.1f }
         val source = tone(seconds = 2.0)

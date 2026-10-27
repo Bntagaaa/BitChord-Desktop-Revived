@@ -238,6 +238,8 @@ val buildAnalysisNative by tasks.registering {
     val crossing = crossBuildingForWindows
     val toolchain = project.file("native/mingw-w64.cmake")
     inputs.dir(rootProject.file("native/analyzer"))
+    inputs.dir(rootProject.file("native/loopmix"))
+    inputs.dir(rootProject.file("native/third_party"))
     inputs.dir(rootProject.file("app/src/main/cpp/jni"))
     inputs.dir(project.file("native"))
     inputs.property("target", targetOs)

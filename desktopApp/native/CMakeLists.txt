@@ -33,6 +33,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_library(bitchord_analysis SHARED
+    ${REPO_ROOT}/native/loopmix/loop_mix_renderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/loopmix_jni.cpp
     ${REPO_ROOT}/native/analyzer/audio_analysis.cpp
     ${REPO_ROOT}/native/analyzer/tempo_analysis.cpp
     ${REPO_ROOT}/native/analyzer/resampler.cpp
@@ -45,6 +47,7 @@ add_library(bitchord_analysis SHARED
 
 target_include_directories(bitchord_analysis PRIVATE
     ${REPO_ROOT}/native
+    ${REPO_ROOT}/native/third_party
     ${REPO_ROOT}/app/src/main/cpp
 )
 

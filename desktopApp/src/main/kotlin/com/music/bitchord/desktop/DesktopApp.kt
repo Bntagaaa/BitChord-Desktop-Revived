@@ -1465,7 +1465,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             }
         }
 
-    fun loadAutoplaySongs(playFirst: Boolean = false) {
+    fun loadAutoplaySongs(playFirst: Boolean = false, seedOverride: Song? = null) {
         val current = selectedSong ?: return
         val party = DesktopListenTogether.state.value
         if (!DesktopAutoplay.enabled(party, autoplay) ||
@@ -1473,7 +1473,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             (party.inParty && DesktopAutoplay.supplierId(party) != party.you?.memberId)
         ) return
 
-        if (dontRepeatSuggestions) sessionSongHistory += current
+        if (dontRepeatSuggestions && sessionSongHistory.none { it.videoId == current.videoId }) sessionSongHistory += current
 
         // In a party the server's queue is the one being topped up, and this computer's copy of it
         // lags by however long reconcile is held off. Counted from the copy, a batch that had
@@ -1503,7 +1503,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                     } else {
                         liveQueue.songs + partyQueue
                     },
-                    seedSong = current,
+                    seedSong = seedOverride ?: current,
                     limit = remaining,
                 ).getOrElse { failure ->
                     DesktopTrackLog.log("autoplay: could not build a station: ${failure.message}")
@@ -1945,6 +1945,25 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     LaunchedEffect(selectedSong?.videoId, autoplay, repeatMode) {
         loadAutoplaySongs()
     }
+    // Retry only while genuinely playing with no following track and no request already running.
+    LaunchedEffect(selectedSong?.videoId, autoplay, repeatMode, activeAccountId, activeProfileId) {
+        var retry = 0
+        while (currentCoroutineContext().isActive) {
+            delay(15_000)
+            val current = selectedSong ?: continue
+            val snapshot = playbackEngine.state.value
+            val party = DesktopListenTogether.state.value
+            if (!snapshot.isPlaying || snapshot.isLoading || snapshot.awaitingAudio) continue
+            if (!DesktopAutoplay.queueNeedsRefresh(
+                    DesktopAutoplay.enabled(party, autoplay), repeatMode == DesktopRepeatMode.ALL,
+                    liveQueue.index, liveQueue.songs.size, autoplayJob?.isActive == true)) continue
+            val earlier = (history + liveQueue.songs.take(liveQueue.index.coerceAtLeast(0)))
+                .asReversed().distinctBy(Song::videoId).filter { it.videoId != current.videoId }
+            val seed = earlier.getOrNull(if (earlier.isEmpty()) 0 else retry++ % earlier.size)
+            autoplaySeed = null
+            loadAutoplaySongs(seedOverride = seed)
+        }
+    }
     val partyAutoplaySupplier = DesktopAutoplay.supplierId(partyState)
     LaunchedEffect(
         partyState.code,
@@ -2058,7 +2077,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         }
         lyricsLoading = true
         DesktopLyricsClient.lookup(current, length, only = lyricsOnly).fold(
-            onSuccess = { lyrics = it },
+            onSuccess = { lyrics = it; playbackEngine.setLoopLyrics(current.videoId, it.lines) },
             onFailure = { lyricsError = it.message ?: "Lyrics unavailable" },
         )
         lyricsLoading = false

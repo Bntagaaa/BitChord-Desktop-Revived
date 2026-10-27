@@ -8,6 +8,11 @@ import com.music.bitchord.playback.smart.BeatTracker
 import com.music.bitchord.playback.smart.MelSpectrogram
 import com.music.bitchord.playback.smart.TrackAnalysis
 import com.music.bitchord.playback.smart.TrackFeatures
+import com.music.bitchord.playback.smart.BeatSide
+import com.music.bitchord.playback.smart.CurveWindow
+import com.music.bitchord.playback.smart.VocalTracker
+import com.music.bitchord.playback.smart.VocalSpectrogram
+import com.music.bitchord.playback.smart.levelFromRms
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -44,7 +49,7 @@ internal class DesktopTrackAnalyzer(
     }
 
     /** Analyses kept between runs, so a track measured yesterday is not measured again today. */
-    private val store = AnalysisStore { DesktopAnalysisRuntime.analysisHome() }
+    private val store = AnalysisStore { DesktopAnalysisRuntime.analysisHome().resolve("loop-v1").also { it.mkdirs() } }
 
     private val results = ConcurrentHashMap<String, TrackAnalysis>()
     private val running = ConcurrentHashMap.newKeySet<String>()
@@ -57,6 +62,14 @@ internal class DesktopTrackAnalyzer(
 
     /** Said once, not once a tick. */
     private val warnedNoAnalyser = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private val vocals by lazy {
+        VocalTracker({ DesktopAnalysisRuntime.modelPath(VocalTracker.MODEL_ASSET) }, { performance().inferenceThreads })
+    }
+    private var vocalsUsed = false
+    private var beatsUsed = false
+    private val released = java.util.concurrent.atomic.AtomicBoolean(false)
+    private fun cancelled() = released.get() || Thread.currentThread().isInterrupted || stopped()
 
     private val beats by lazy {
         BeatTracker(
@@ -103,7 +116,7 @@ internal class DesktopTrackAnalyzer(
         val trackId = song.videoId
         if (trackId.isBlank()) return
         if (durationSeconds <= 0) return
-        if (stopped()) return
+        if (cancelled()) return
         if (!DesktopAnalysisRuntime.available) {
             if (warnedNoAnalyser.compareAndSet(false, true)) {
                 DesktopTrackLog.log("automix: this build has no analyser, so nothing will be measured")
@@ -123,7 +136,7 @@ internal class DesktopTrackAnalyzer(
 
         worker.execute {
             run {
-                if (stopped()) {
+                if (cancelled()) {
                     running.remove(trackId)
                     return@execute
                 }
@@ -137,7 +150,7 @@ internal class DesktopTrackAnalyzer(
                 }
                     .onFailure { DesktopTrackLog.log("analysis of '${song.title}' failed: ${it.message}") }
                     .getOrNull()
-                if (analysis == null && stopped()) {
+                if (analysis == null && cancelled()) {
                     // Called off, not failed: it is free to be measured once the party ends.
                     running.remove(trackId)
                     return@execute
@@ -146,6 +159,7 @@ internal class DesktopTrackAnalyzer(
                     failed += trackId
                     failedAt[trackId] = System.currentTimeMillis()
                 }
+                if (analysis != null && cancelled()) { running.remove(trackId); return@execute }
                 if (analysis != null) {
                     failedAt.remove(trackId)
                     store.save(trackId, analysis)
@@ -187,12 +201,51 @@ internal class DesktopTrackAnalyzer(
             ?.let { TrackFeatures.analyze(it, durationSeconds) }
             ?: return null
 
-        if (stopped()) return null
+        if (cancelled()) return null
         // The model runs at its own rate, so it gets its own decode rather than a resample of the
         // analyser's.
+        beatsUsed = true
         val grid = decode(stream, MelSpectrogram.sampleRate)?.let { beats.track(it) }
 
+        val vocalWindows = ArrayList<CurveWindow>()
+        val levelWindows = ArrayList<CurveWindow>()
+        val starts = listOf(0.0, 20.0, durationSeconds - 60, durationSeconds - 40, durationSeconds - 20)
+            .map { it.coerceAtLeast(0.0) }.distinct().sorted()
+        for (start in starts) {
+            if (cancelled()) return null
+            val end = minOf(durationSeconds, start + 20.0)
+            if (end <= start) continue
+            val region = desktopLoopRegion(stream, start, end, 44100, ::cancelled) ?: continue
+            vocalsUsed = true
+            vocals.track(region.left, region.right, 44100.0)?.let {
+                vocalWindows += CurveWindow(start, VocalSpectrogram.frameRate, it)
+            }
+            val hop = 4410
+            val values = FloatArray((region.left.size + hop - 1) / hop) { index ->
+                val from = index * hop
+                val until = minOf(from + hop, region.left.size)
+                var squared = 0.0
+                for (i in from until until) {
+                    val mono = (region.left[i] + region.right[i]) * .5
+                    squared += mono * mono
+                }
+                levelFromRms(kotlin.math.sqrt(squared / (until - from).coerceAtLeast(1))).toFloat()
+            }
+            levelWindows += CurveWindow(start, 10.0, values)
+        }
+        fun side(from: Double, until: Double): BeatSide? {
+            val found = grid ?: return null
+            val points = found.beats.filter { it >= from && it <= until }
+            if (points.size < 8) return null
+            val intervals = points.zipWithNext { a, b -> b - a }.filter { it > .1 }.sorted()
+            if (intervals.isEmpty()) return null
+            val bpm = 60.0 / intervals[intervals.size / 2]
+            return BeatSide(points, found.downbeats.filter { it >= from && it <= until }, bpm, found.beatConfidence)
+        }
         return TrackAnalysis(
+            headBeats = side(0.0, minOf(45.0, durationSeconds)),
+            tailBeats = side((durationSeconds - 65).coerceAtLeast(0.0), durationSeconds),
+            vocalWindows = vocalWindows, levelWindows = levelWindows,
             status = TrackAnalysis.STATUS_READY,
             trackId = trackId,
             duration = durationSeconds,
@@ -240,7 +293,7 @@ internal class DesktopTrackAnalyzer(
             val out = ArrayList<FloatArray>()
             var total = 0
             while (true) {
-                if (stopped()) return null
+                if (cancelled()) return null
                 val block = decoder.readSamples() ?: break
                 val count = decoder.sampleCount
                 if (count <= 0) continue
@@ -255,14 +308,24 @@ internal class DesktopTrackAnalyzer(
                 block.copyInto(samples, at)
                 at += block.size
             }
-            samples
+            if (decoder.outputFormat.sampleRate == rate.toInt()) samples else {
+                MelSpectrogram.resample(samples, decoder.outputFormat.sampleRate.toDouble(), rate)
+            }
         } finally {
             decoder.close()
         }
     }
 
     fun release() {
+        released.set(true)
         worker.shutdownNow()
+        // Inference/native reads may finish after an interrupt. Close only after their owner exits.
+        Thread({
+            if (worker.awaitTermination(60, java.util.concurrent.TimeUnit.SECONDS)) {
+                if (vocalsUsed) vocals.release()
+                if (beatsUsed) beats.release()
+            }
+        }, "BitChord-Analysis-Cleanup").apply { isDaemon = true; start() }
         results.clear()
         running.clear()
         failed.clear()
