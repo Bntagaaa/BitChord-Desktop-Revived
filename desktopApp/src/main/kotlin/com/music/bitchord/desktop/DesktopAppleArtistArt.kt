@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
+import org.jsoup.Jsoup
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.text.Normalizer
@@ -127,12 +128,27 @@ internal object DesktopAppleArtistArtRepository {
     }
 
     private fun parse(html: String, pageUrl: String): DesktopAppleArtistArt? {
+        // Keep the fast extraction path for ordinary Apple pages. PR #70's Jsoup
+        // fallback accepts reordered attributes, single quotes and alternate markup.
         val marker = html.indexOf("id=\"serialized-server-data\"")
-        if (marker < 0) return null
-        val start = html.indexOf('>', marker) + 1
-        val end = html.indexOf("</script>", start)
-        if (start <= 0 || end < 0) return null
-        val header = findHeader(json.parseToJsonElement(html.substring(start, end))) ?: return null
+        val start = if (marker >= 0) html.indexOf('>', marker) + 1 else -1
+        val end = if (start > 0) html.indexOf("</script>", start) else -1
+        val embedded = if (start > 0 && end > start) html.substring(start, end) else null
+        val serialized = embedded?.takeIf(String::isNotBlank)
+            ?: Jsoup.parse(html).selectFirst("script#serialized-server-data")?.let {
+                it.data().ifBlank { it.html() }.takeIf(String::isNotBlank)
+            }
+        if (serialized == null) {
+            DesktopTrackLog.log("Apple artist: serialized metadata script not found")
+            return null
+        }
+        val root = runCatching { json.parseToJsonElement(serialized) }
+            .onFailure { DesktopTrackLog.log("Apple artist: malformed serialized metadata") }
+            .getOrNull() ?: return null
+        val header = findHeader(root) ?: run {
+            DesktopTrackLog.log("Apple artist: artist header missing from metadata")
+            return null
+        }
 
         val expectedId = pageUrl.substringBefore('?').substringAfterLast('/')
         val headerId = header.obj("contentDescriptor")?.obj("identifiers")?.text("storeAdamID")
@@ -141,12 +157,28 @@ internal object DesktopAppleArtistArtRepository {
         val wideStill = header.dict("wideArtwork")
         val portrait = header.dict("circleArtwork") ?: header.dict("artwork")
         val still = wideStill ?: portrait ?: header.dict("colorBackdropArtwork")
+        // The main Apple hero may omit motion despite the same artist's data elsewhere
+        // in serialized-server-data. Restore PR #70's recursive fallback, extended to
+        // fullscreen/wide 16:9 so the desktop doesn't regress to a square crop.
         val wideClip = header.dict("wideVideoArtwork")?.let {
-            it.obj("motionArtistFullscreen16x9") ?: it.obj("motionArtistWide16x9")
-        }
+            it.obj("motionArtistFullscreen16x9")?.takeIf { clip -> clip.motionUrl() != null }
+                ?: it.obj("motionArtistWide16x9")?.takeIf { clip -> clip.motionUrl() != null }
+        } ?: findMotionArtist(root, "motionArtistFullscreen16x9")
+            ?: findMotionArtist(root, "motionArtistWide16x9")
         val squareClip = header.dict("videoArtwork")?.obj("motionArtistSquare1x1")
-        val wideVideo = wideClip?.text("video")?.takeIf { it.startsWith("http") }
-        val squareVideo = squareClip?.text("video")?.takeIf { it.startsWith("http") }
+            ?.takeIf { it.motionUrl() != null }
+            ?: findMotionArtist(root, "motionArtistSquare1x1")
+        val wideVideo = wideClip?.motionUrl()
+        val squareVideo = squareClip?.motionUrl()
+        DesktopTrackLog.log(
+            "Apple artist: motion metadata " +
+                when {
+                    wideVideo != null && squareVideo != null -> "wide + square"
+                    wideVideo != null -> "wide"
+                    squareVideo != null -> "square"
+                    else -> "not provided"
+                },
+        )
 
         // A wide header wants the wide clip's own still when there is one; it matches the loop.
         val heroSource = wideClip?.obj("previewFrame")?.takeIf { wideVideo != null }
@@ -191,6 +223,23 @@ internal object DesktopAppleArtistArtRepository {
         }
         return null
     }
+
+    /**
+     * PR #70's fallback: artist motion can be nested outside the selected hero header.
+     * Search for a motion-specific key with a usable HTTP(S) stream, ignoring still-only
+     * metadata. This also covers an artist header without a videoArtwork dictionary.
+     */
+    private fun findMotionArtist(node: JsonElement, key: String): JsonObject? = when (node) {
+        is JsonObject -> {
+            (node[key] as? JsonObject)?.takeIf { it.motionUrl() != null }
+                ?: node.values.firstNotNullOfOrNull { child -> findMotionArtist(child, key) }
+        }
+        is JsonArray -> node.firstNotNullOfOrNull { child -> findMotionArtist(child, key) }
+        else -> null
+    }
+
+    private fun JsonObject.motionUrl(): String? =
+        text("video")?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
 
     private fun JsonObject.obj(key: String): JsonObject? = this[key] as? JsonObject
 
