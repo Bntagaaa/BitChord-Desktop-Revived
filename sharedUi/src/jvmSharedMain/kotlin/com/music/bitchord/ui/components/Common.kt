@@ -1004,3 +1004,6 @@ fun PillTextField(
         )
     }
 }
+
+/** Public list accent retained for Android and desktop callers. */
+val PlayingAccent = Color(0xFFFB4A62)

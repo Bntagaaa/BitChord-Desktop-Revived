@@ -214,8 +214,8 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     override val meteredConnection = MutableStateFlow<Boolean?>(false)
     override val preferUsbDac = MutableStateFlow(false)
     override val prioritizeSpotifyCanvas = MutableStateFlow(false)
-    override val reduceAnimation = MutableStateFlow(false)
-    override val reduceDynamicBlur = MutableStateFlow(false)
+    override val reduceAnimation = DesktopAppearanceSettings.reduceAnimation
+    override val reduceDynamicBlur = DesktopAppearanceSettings.reduceDynamicBlur
     override val showNerdStats = MutableStateFlow(false)
     override val smartAnalysis = MutableStateFlow(SmartAnalysis())
     override val smartFadeEnabled = MutableStateFlow(false)

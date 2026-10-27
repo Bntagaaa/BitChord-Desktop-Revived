@@ -2,7 +2,7 @@
 
 Upstream: https://github.com/kushagrasinghx/BitChord/pull/1109
 Pinned head: `1769e349f1bd9fd8786f28d19e4c2a7cf8b27fa2` (the PR is open and can change).
-Desktop base: `1.8.3-Perfboost-16085863910554356210`, `cfd782a8`.
+Desktop base: `1.8.3-Perfboost-16085863910554356210`, initially `cfd782a8`, rebased onto `9552d4a4` to retain the newly added raster window icon.
 Working branch: `upstream-1109-port`.
 
 ## Status
@@ -45,7 +45,7 @@ python3 /workspace/.cloud-setup/gradle1109.py \
   :desktopApp:createDistributable -Pbitchord.version=test-visua --continue
 ```
 
-The completed verification before final motion/lifecycle refinements passed 70 shared, 34 shared UI and 475 desktop tests (579 total), with no failures/skips, plus Linux packaging. Final validation and CI are recorded in the PR. Tests were retained: a Replay regression and missing Korean resources were fixed in production data/code, not hidden by altering assertions.
+The final local compatibility run passed 70 shared, 34 shared UI and 476 desktop tests (580 total), with no failures/skips, plus Linux packaging. CI status is recorded in the PR. Tests were retained: a Replay regression and missing Korean resources were fixed in production data/code, not hidden by altering assertions.
 
 New desktop regression coverage exercises timer limits and malformed input, album identity across changed credits, local album separation/unknown albums, video clock extrapolation at different playback speeds and buffering, and native recorded-image lifetime. Shared upstream loop-planner tests run, but do not test desktop loop rendering or device audio.
 
@@ -56,3 +56,5 @@ New desktop regression coverage exercises timer limits and malformed input, albu
 - Exercise video quality changes, seek, pause, source upgrades, long tracks and A/V sync on Linux and Windows; test cancellation while network/native reads are pending.
 - Verify visible player changes, RTL, centered lyrics, artist navigation, motion-artwork lifecycle, all master-blur states and native Mica on target desktops.
 - Check real playback, gapless, crossfade, Automix, EQ and parties. The cloud has Xvfb/software rendering, no real audio device or account; headless tests cannot certify these behaviors.
+
+An isolated packaged Xvfb smoke run rendered the welcome screen, accepted Skip, opened Settings, found the Direct source stream toggle through search, scanned a generated local WAV, and opened its song menu and custom timer dialog. It does not establish real device playback or video synchronization. Android CI exposed a removed public PlayingAccent constant; its original API/value has been restored. The shared player now observes the existing desktop master blur/animation flows directly, with regression coverage.

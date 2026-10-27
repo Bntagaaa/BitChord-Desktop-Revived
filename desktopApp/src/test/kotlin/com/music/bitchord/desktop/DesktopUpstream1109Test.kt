@@ -5,6 +5,11 @@ import com.music.bitchord.data.settings.*
 import kotlin.test.*
 
 class DesktopUpstream1109Test {
+    @Test fun sharedPlayerObservesTheExistingDesktopMasterOverrides() {
+        assertSame(DesktopAppearanceSettings.reduceDynamicBlur, DesktopPlayerSettings.reduceDynamicBlur)
+        assertSame(DesktopAppearanceSettings.reduceAnimation, DesktopPlayerSettings.reduceAnimation)
+    }
+
     @Test fun customTimerLimitsAndInvalidInput() {
         assertEquals(5, DesktopSleepTimer.customMinutes(" 5 "))
         assertEquals(720, DesktopSleepTimer.customMinutes("720"))
