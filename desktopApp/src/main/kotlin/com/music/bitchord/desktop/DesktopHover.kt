@@ -124,3 +124,56 @@ internal fun Modifier.desktopNoHoverClickable(
             onClick = onClick,
         )
 }
+
+/**
+ * A list row's acknowledgement of the pointer: a faint rounded wash behind the whole row.
+ *
+ * The sidebar rows answered the pointer only once selected, so pointing at an unselected one did
+ * nothing until it was clicked. Apple Music lights a row the moment the cursor enters it; this is
+ * that wash, kept lighter than the selected pill so hovering never reads as chosen. It draws its own
+ * rounded rect rather than relying on the caller's clip, so it can sit anywhere in the chain.
+ */
+@Composable
+internal fun Modifier.desktopHoverFill(
+    corner: androidx.compose.ui.unit.Dp = ROW_HOVER_CORNER,
+    alpha: Float = ROW_HOVER_ALPHA,
+): Modifier = composed {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val wash by animateFloatAsState(
+        targetValue = if (hovered) 1f else 0f,
+        animationSpec = tween(WASH_MS),
+        label = "hoverFill",
+    )
+    this
+        .hoverable(interaction)
+        .drawBehind {
+            if (wash <= 0.01f) return@drawBehind
+            val radius = corner.toPx()
+            drawRoundRect(
+                color = androidx.compose.ui.graphics.Color.White.copy(alpha = alpha * wash),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius),
+            )
+        }
+}
+
+private val ROW_HOVER_CORNER = 7.dp
+private const val ROW_HOVER_ALPHA = 0.07f
+
+/**
+ * A click that reaches the whole tile but lights none of it.
+ *
+ * The words under a cover start the same thing the cover does, so they take the click. Left to the
+ * plain [clickable], though, the pointer crossing them painted a wash over the whole box — a
+ * rectangle of text answering as though it were the picture. The tiles put their highlight on the
+ * artwork with [desktopHoverFill]; this keeps the click without a second one.
+ */
+@Composable
+internal fun Modifier.desktopQuietClick(enabled: Boolean = true, onClick: () -> Unit): Modifier = composed {
+    clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = null,
+        enabled = enabled,
+        onClick = onClick,
+    )
+}
