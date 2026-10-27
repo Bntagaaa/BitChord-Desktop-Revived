@@ -6353,6 +6353,20 @@ private fun DesktopArtistPage(
     onToggleSubscription: ((SubscriptionState) -> Unit)?,
     contentPadding: PaddingValues,
 ) {
+    // Resolve motion as soon as navigation begins, without waiting for the artist page request.
+    val artistName = (state as? UiState.Success)?.data?.name?.takeIf(String::isNotBlank) ?: fallbackName
+    var appleArt by remember(artistName) {
+        mutableStateOf(DesktopAppleArtistArtRepository.cached(artistName))
+    }
+    LaunchedEffect(artistName) {
+        // Keep the still image underneath while retrying short Apple requests. Stop as soon as motion is found.
+        while (isActive && appleArt?.hasMotion != true) {
+            val latest = DesktopAppleArtistArtRepository.artFor(artistName, forceRefresh = true)
+            if (latest != null) appleArt = latest
+            if (appleArt?.hasMotion == true) break
+            delay(15_000L)
+        }
+    }
     DesktopPageScaffold(contentPadding) {
         when (state) {
             UiState.Loading -> Box(Modifier.fillMaxSize()) {
@@ -6363,13 +6377,7 @@ private fun DesktopArtistPage(
             }
             is UiState.Success -> {
                 val artist = state.data
-                val name = artist.name?.takeIf(String::isNotBlank) ?: fallbackName
-                var appleArt by remember(name) {
-                    mutableStateOf(DesktopAppleArtistArtRepository.cached(name))
-                }
-                LaunchedEffect(name) {
-                    appleArt = DesktopAppleArtistArtRepository.artFor(name) ?: appleArt
-                }
+                val name = artistName
 
                 val palette = rememberDesktopArtworkPalette(appleArt?.heroUrl ?: artist.thumbnailUrl)
                 val artistBackground = appleArt?.backgroundColor?.let { Color(it) } ?: Color(
@@ -6554,6 +6562,18 @@ private fun DesktopArtistBanner(
             fallbackPx = HEADER_ART_PX,
             modifier = Modifier.matchParentSize(),
         )
+
+        // Apple artist motion sits over the still image and never tints the playing track's backdrop.
+        val motionUrl = appleArt?.wideVideoUrl ?: appleArt?.squareVideoUrl
+        if (motionUrl != null) {
+            DesktopCanvasView(
+                url = motionUrl,
+                modifier = Modifier.matchParentSize(),
+                fallbackUrl = appleArt?.squareVideoUrl?.takeIf { it != motionUrl },
+                maxEdge = 960,
+                publishBackdrop = false,
+            )
+        }
 
         Box(
             Modifier.matchParentSize().background(
