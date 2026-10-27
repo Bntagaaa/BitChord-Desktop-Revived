@@ -96,7 +96,6 @@ import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.ArtworkHover
 import com.music.bitchord.ui.components.ArtworkHoverMode
 import com.music.bitchord.ui.components.RowMoreButton
-import com.music.bitchord.ui.components.PlayingAccent
 import com.music.bitchord.ui.components.ROW_DIVIDER_INSET
 import com.music.bitchord.ui.components.SearchField
 import com.music.bitchord.ui.components.SongRow
@@ -482,7 +481,6 @@ fun SearchScreen(
                                     isCurrent = row.song.isSameTrackAs(currentSong),
                                     isPlaying = isPlaying && row.song.isSameTrackAs(currentSong),
                                     searchPlayingStyle = true,
-                                    activeTint = PlayingAccent,
                                 )
                                 is SearchResult.Browse -> BrowseRow(
                                     item = row.item,
@@ -562,7 +560,6 @@ private fun LazyListScope.librarySearchResults(
                     isCurrent = song.isSameTrackAs(currentSong),
                     isPlaying = isPlaying && song.isSameTrackAs(currentSong),
                     searchPlayingStyle = true,
-                    activeTint = PlayingAccent,
                 )
                 if (index < tracks.lastIndex) {
                     HorizontalDivider(
@@ -859,7 +856,7 @@ private fun TypeaheadSongRow(
             Text(
                 text = song.title,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (isCurrent) PlayingAccent else MaterialTheme.colorScheme.onBackground,
+                color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
