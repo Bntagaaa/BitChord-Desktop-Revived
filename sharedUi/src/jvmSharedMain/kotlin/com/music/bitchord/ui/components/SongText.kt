@@ -2,6 +2,8 @@ package com.music.bitchord.ui.components
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -18,7 +20,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.ui.graphics.fadingEdges
 
 fun Modifier.thumbnailBorder(shape: Shape): Modifier = composed {
     this.border(
@@ -35,8 +39,22 @@ fun ExplicitSongTitle(
     style: TextStyle,
     color: Color,
     modifier: Modifier = Modifier,
+    badgeColor: Color = color,
+    fadeOverflow: Boolean = false,
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (fadeOverflow) {
+            FadingLine(text = song.title, style = style, color = color, modifier = Modifier.weight(1f, fill = false))
+        } else {
+            Text(
+                text = song.title,
+                style = style,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
         if (song.isExplicit == true) {
             Text(
                 text = "E",
@@ -47,14 +65,7 @@ fun ExplicitSongTitle(
                     .padding(horizontal = 3.dp),
             )
             Spacer(Modifier.width(6.dp))
+            ExplicitBadge(badgeColor)
         }
-        Text(
-            text = song.title,
-            style = style,
-            color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
     }
 }

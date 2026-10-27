@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.components
 
+import androidx.compose.ui.layout.ContentScale
 import com.music.bitchord.ui.LocalPullToRefreshEnabled
 import com.music.bitchord.ui.AppUiHost
 import com.music.bitchord.ui.AppUi
@@ -203,6 +204,14 @@ val FLOATING_BAR_MAX_WIDTH = 440.dp
  * showing: enough to say the row scrolls without a card being half a card.
  */
 val SHELF_CARD_WIDTH = 150.dp
+
+/**
+ * A track's thumbnail box at [height]: square for a song, 16:9 at the same
+ * height for a music video — its picture's own shape, as YouTube Music lists
+ * one, rather than a still cropped into a square.
+ */
+fun Modifier.trackArtSize(height: Dp, isVideo: Boolean): Modifier =
+    if (isVideo) size(width = height * (16f / 9f), height = height) else size(height)
 
 /** Share of the row a lead-shelf card takes, so the next one peeks in past it. */
 private const val HERO_CARD_FRACTION = 0.70f
@@ -532,7 +541,7 @@ private fun SongRowContent(
     selected: Boolean = false,
 ) {
     val titleColor by animateColorAsState(
-        targetValue = if (isCurrent) activeTint else MaterialTheme.colorScheme.onBackground,
+        targetValue = if (isCurrent && !searchPlayingStyle) activeTint else MaterialTheme.colorScheme.onBackground,
         label = "song row title",
     )
     val rowHoverInteraction = remember { MutableInteractionSource() }
@@ -638,7 +647,7 @@ private fun SongRowContent(
                 modifier = Modifier.size(20.dp),
             )
         }
-        if (isCurrent && trackNumber == null && !(searchPlayingStyle && isPlaying)) {
+        if (isCurrent && trackNumber == null && !searchPlayingStyle) {
             Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
@@ -715,8 +724,6 @@ fun Modifier.hangIntoGutter(outset: Dp): Modifier = layout { measurable, constra
     layout(width, placeable.height) { placeable.place(0, 0) }
 }
 
-/** The accent a current song's title takes in lists that mark it with [SearchPlayingBars]. */
-val PlayingAccent = Color(0xFFFB4A62)
 
 @Composable
 fun SearchPlayingBars(modifier: Modifier = Modifier) {
@@ -824,7 +831,16 @@ fun PullToRefresh(
 
 /** Slim dismissible-looking prompt shown atop Home while signed out. */
 @Composable
-fun SignInBanner(onSignIn: () -> Unit, modifier: Modifier = Modifier) {
+fun SignInBanner(
+    onSignIn: () -> Unit,
+    modifier: Modifier = Modifier,
+    /**
+     * Whether the mesh may move. Off, it finishes the fade it is in and rests:
+     * a blurred layer re-drawn every frame is not something to leave running
+     * under a scroll, or under the player where nobody sees it.
+     */
+    motion: Boolean = true,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
