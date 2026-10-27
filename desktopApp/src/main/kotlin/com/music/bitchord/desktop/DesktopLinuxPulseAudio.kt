@@ -42,6 +42,11 @@ internal object DesktopLinuxPulseAudio {
             command("get-default-sink")?.trim()?.takeIf { it.isNotEmpty() }
         } else null
         if (destination == null) return
+        val sinkIndex = command("list", "short", "sinks")
+            ?.lineSequence()
+            ?.map { it.split('\t') }
+            ?.firstOrNull { it.size > 1 && it[1] == destination }
+            ?.firstOrNull()
         val inputs = command("list", "sink-inputs") ?: return
         val sections = Regex("(?m)^Sink Input #").split(inputs).drop(1)
         sections.forEach { section ->
@@ -49,7 +54,11 @@ internal object DesktopLinuxPulseAudio {
             if (inputId.isEmpty()) return@forEach
             val pid = Regex("application\\.process\\.id\\s*=\\s*\\\"(\\d+)\\\"")
                 .find(section)?.groupValues?.get(1)
-            if (pid == processId) command("move-sink-input", inputId, destination)
+            val currentSink = Regex("(?m)^\\s*Sink: (\\d+)")
+                .find(section)?.groupValues?.get(1)
+            if (pid == processId && (sinkIndex == null || currentSink != sinkIndex)) {
+                command("move-sink-input", inputId, destination)
+            }
         }
     }
 
