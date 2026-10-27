@@ -2142,8 +2142,11 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     }
     // The account's own history on YouTube Music, which is what the home feed is built out of.
     DisposableEffect(playback.song?.videoId) {
+        val leavingId = playback.song?.videoId
         val previous = playbackEngine.state.value.positionMs / 1_000
-        onDispose { DesktopPlaybackTracker.onTrackChanged(previous) }
+        // A version swap changes the video id but keeps one listen alive.
+        // The tracker ignores cleanup for the old id after onVersionSwapped().
+        onDispose { DesktopPlaybackTracker.onTrackChanged(previous, leavingId) }
     }
     LaunchedEffect(playback.song?.videoId, playback.isPlaying) {
         val songId = playback.song?.videoId ?: return@LaunchedEffect
