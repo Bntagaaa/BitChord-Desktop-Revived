@@ -6253,20 +6253,24 @@ private fun DesktopArtistPage(
     onToggleSubscription: ((SubscriptionState) -> Unit)?,
     contentPadding: PaddingValues,
 ) {
-    // Start Apple artist-art lookup as soon as navigation begins, in parallel with
-    // the YouTube Music page request, so HLS playback can start sooner.
+    // Begin loading motion metadata in parallel with the YouTube Music artist page.
+    // Keep the still image visible while retrying, and stop as soon as a playable URL arrives.
     val artistName = (state as? UiState.Success)?.data?.name?.takeIf(String::isNotBlank) ?: fallbackName
     var appleArt by remember(artistName) {
         mutableStateOf(DesktopAppleArtistArtRepository.cached(artistName))
     }
     LaunchedEffect(artistName) {
-        // Keep the still artist image visible while searching. Retry in the background every
-        // 15 seconds until Apple provides a motion URL; stop polling as soon as we have one.
-        while (isActive && appleArt?.videoUrl == null) {
-            val latest = DesktopAppleArtistArtRepository.artFor(artistName)
+        var attempts = 0
+        while (isActive && appleArt?.hasMotion != true) {
+            val latest = DesktopAppleArtistArtRepository.artFor(
+                artistName, forceRefresh = attempts > 0,
+            )
             if (latest != null) appleArt = latest
-            if (appleArt?.videoUrl != null) break
-            delay(15_000L)
+            if (appleArt?.hasMotion == true) break
+            // A couple of quick retries for transient Apple responses, then a low-rate
+            // page-lifetime retry; navigation cancels the coroutine automatically.
+            delay(if (attempts < 2) 4_000L else 15_000L)
+            attempts++
         }
     }
     DesktopPageScaffold(contentPadding) {
@@ -6464,12 +6468,18 @@ private fun DesktopArtistBanner(
             fallbackPx = HEADER_ART_PX,
             modifier = Modifier.matchParentSize(),
         )
-        // Play Apple's artist HLS clip automatically, with the still photo underneath
-        // until the first decoded frame is available.
-        appleArt?.videoUrl?.let { url ->
-            DesktopCanvasView(url = url, modifier = Modifier.matchParentSize())
+        // Render Apple's wide 16:9 motion first, falling back to the square rendition.
+        // The still artwork remains underneath until FFmpeg decodes its first frame.
+        val motionUrl = appleArt?.wideVideoUrl ?: appleArt?.squareVideoUrl
+        if (motionUrl != null) {
+            DesktopCanvasView(
+                url = motionUrl,
+                modifier = Modifier.matchParentSize(),
+                fallbackUrl = appleArt?.squareVideoUrl?.takeIf { it != motionUrl },
+                maxEdge = 960,
+                publishBackdrop = false,
+            )
         }
-
 
         Box(
             Modifier.matchParentSize().background(

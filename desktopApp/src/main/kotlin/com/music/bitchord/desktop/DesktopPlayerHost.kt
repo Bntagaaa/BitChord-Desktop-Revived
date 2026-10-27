@@ -48,15 +48,21 @@ import java.util.Locale
  * as outputs, its party, its translation client. The window keeps the few
  * pieces of live state it owns ([volumeLevel], [pipelineDialog]) up to date.
  */
+/** Spotify clips belong to Now Playing Details, never the shared/fullscreen player. */
+internal fun DesktopCanvasArtwork?.toSharedPlayerCanvas(): CanvasArtwork? =
+    this?.takeUnless { it.source == DesktopCanvasSource.SPOTIFY }?.toShared()
+
 internal object DesktopPlayerHost : PlayerHost {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override val settings: DesktopPlayerSettings = DesktopPlayerSettings
 
-    override fun cachedCanvas(song: Song): CanvasArtwork? = DesktopCanvasClient.cached(song)?.toShared()
+    // Both the main fullscreen path and the cache reject Spotify Canvas.
+    override fun cachedCanvas(song: Song): CanvasArtwork? =
+        DesktopCanvasClient.cached(song).toSharedPlayerCanvas()
 
     override suspend fun canvasFor(song: Song): CanvasArtwork? =
-        withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(song) }?.toShared()
+        withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(song) }.toSharedPlayerCanvas()
 
     @Composable
     override fun CanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) = DesktopCanvasVideo(spec, modifier)
