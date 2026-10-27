@@ -74,13 +74,12 @@ internal fun detectHardwareProfile(): DesktopPerformanceProfile {
  */
 internal fun effectiveDesktopBlur(
     reduceDynamicBlur: Boolean,
-    selected: Boolean,
+    selected: Boolean = true,
     profile: DesktopPerformanceProfile = DesktopPerformanceProfile.FULL,
 ): Boolean {
-    if (reduceDynamicBlur) return false
-    val effectiveProfile = profile.resolved()
-    if (effectiveProfile == DesktopPerformanceProfile.PERFORMANCE) return false
-    return selected
+    // The UI now exposes one global setting: old per-area preferences and graphics profiles
+    // must not silently disable blur after those controls have been removed.
+    return !reduceDynamicBlur
 }
 
 /**
