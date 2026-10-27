@@ -3311,21 +3311,29 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                     return@launch
                 }
 
-                val engineState = playbackEngine.state.value
-                if (engineState.song?.videoId != song.videoId) return@launch
-                val resumeAt = engineState.positionMs.coerceAtLeast(0L)
-                val resumePlaying = engineState.isPlaying
-
-                // Preserve the current queue entry and its Next/Previous neighbours.
-                liveQueue = liveQueue.replaceCurrentVersion(song.videoId, switched)
-                selectedSong = switched
-                saveQueue()
-                // The desktop FFmpeg audio decoder remains the clock; the video surface
-                // is silent and follows that clock, so sound is never played twice.
-                playbackEngine.load(switched, resumePlaying, resumeAt)
+                // Resolve and decode the new version off-thread while the current
+                // audio remains audible. The engine confirms its handoff before
+                // the queue changes; a stale lookup after Next is rejected.
+                val changed = withContext(Dispatchers.IO) {
+                    playbackEngine.switchVersion(song.videoId, switched)
+                }
+                if (!changed) {
+                    if (selectedSong?.videoId == song.videoId) {
+                        DesktopPlayerHost.showMessage("Could not switch version during this transition")
+                    }
+                    return@launch
+                }
+                if (liveQueue.current?.videoId == song.videoId) {
+                    // Preserve the current queue entry and its Next/Previous neighbours.
+                    liveQueue = liveQueue.replaceCurrentVersion(song.videoId, switched)
+                    selectedSong = switched
+                    saveQueue()
+                }
+                // The desktop FFmpeg audio decoder remains the clock; the
+                // video surface is silent and follows the existing audio engine.
                 DesktopTrackLog.log(
                     "music video: ${if (switched.isVideo) "video" else "audio"} version " +
-                        "${song.videoId} -> ${switched.videoId} at ${resumeAt}ms",
+                        "${song.videoId} -> ${switched.videoId}",
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
