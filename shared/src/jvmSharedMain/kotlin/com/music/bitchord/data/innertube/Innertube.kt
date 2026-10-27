@@ -65,6 +65,8 @@ object Innertube {
     @Volatile
     var appLanguage: () -> String? = { null }
 
+    val currentRegion: String get() = com.music.bitchord.data.LocaleTags.ytGl(currentLanguage)
+
     val currentLanguage: String
         get() {
             val raw = appLanguage()?.ifEmpty { null }
@@ -607,6 +609,19 @@ object Innertube {
         put("playlistId", "RDAMVM$videoId")
         put("isAudioOnly", true)
     }
+
+    /**
+     * A watch queue started from a playlist rather than a track: a mix such as
+     * My Supermix, a playlist radio (`RDAMPL…`), or an artist's Mix / Shuffle
+     * button, which also carry their own seed [videoId] and [params].
+     */
+    suspend fun nextPlaylist(playlistId: String, videoId: String? = null, params: String? = null): JsonObject =
+        postMusic("next") {
+            videoId?.let { put("videoId", it) }
+            put("playlistId", playlistId)
+            params?.let { put("params", it) }
+            put("isAudioOnly", true)
+        }
 
     /** Timed caption transcript used as a last-resort lyrics source. */
     suspend fun transcript(videoId: String): JsonObject = postMusic("get_transcript") {

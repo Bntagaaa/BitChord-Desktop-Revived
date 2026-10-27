@@ -31,6 +31,7 @@ internal data class DesktopAppleArtistArt(
     val backgroundColor: Int,
     val textColor: Int,
     val keyColor: Int?,
+    val motionUrl: String? = null,
 )
 
 /**
@@ -139,6 +140,8 @@ internal object DesktopAppleArtistArtRepository {
             backgroundColor = background,
             textColor = textColor,
             keyColor = keyColor,
+            motionUrl = header.objectAt("videoArtwork")?.objectAt("dictionary")
+                ?.objectAt("motionArtistSquare1x1")?.string("video")?.takeIf { it.startsWith("https://") },
         )
     }
 

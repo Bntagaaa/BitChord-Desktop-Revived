@@ -189,8 +189,6 @@
     <string name="sign_in">Anmelden</string>
     <string name="sign_in_youtube_music">Bei YouTube Music anmelden</string>
     <string name="subscriptions">Abos</string>
-    <string name="switch_to_grid_view">Zur Rasteransicht wechseln</string>
-    <string name="switch_to_list_view">Zur Listenansicht wechseln</string>
     <string name="your_replay">Dein Replay</string>
     <string name="your_listening_experience">Dein Hörerlebnis</string>
     <string name="default_replay_holder">BitChord-Hörer</string>
@@ -200,4 +198,7 @@
     <string name="search_library_empty">Durchsuche die Songs in deinem Ordner für lokale Musik.</string>
     <string name="search_library_hint">Songs, Künstler und Alben</string>
     <string name="search_library_no_results">Nichts in der lokalen Musik passt zu „%1$s“.</string>
+
+    <string name="switch_to_grid_view">Zur Rasteransicht wechseln</string>
+    <string name="switch_to_list_view">Zur Listenansicht wechseln</string>
 </resources>

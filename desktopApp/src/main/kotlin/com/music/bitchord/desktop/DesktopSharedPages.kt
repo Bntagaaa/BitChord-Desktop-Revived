@@ -56,6 +56,20 @@ import kotlin.math.roundToInt
 
 /** The shared pages' settings and downloads, from the desktop's preferences. */
 internal object DesktopAppUiHost : AppUiHost {
+    override suspend fun releaseMotion(album: String, artist: String): com.music.bitchord.data.canvas.CanvasArtwork? {
+        if (!DesktopPlayerSettings.animatedCanvas.value) return null
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            DesktopCanvasClient.lookupAlbum(album, artist)?.toShared()
+        }
+    }
+    override suspend fun artistMotion(browseId: String, artistName: String): com.music.bitchord.data.canvas.CanvasArtwork? {
+        if (!DesktopPlayerSettings.animatedCanvas.value) return null
+        val art = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            DesktopAppleArtistArtRepository.artFor(artistName)
+        } ?: return null
+        val url = art.motionUrl ?: return null
+        return com.music.bitchord.data.canvas.CanvasArtwork(url = url, artist = artistName)
+    }
 
     private val persistence = DesktopPersistence()
 

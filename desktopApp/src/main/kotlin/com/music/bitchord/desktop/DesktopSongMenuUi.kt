@@ -91,6 +91,7 @@ internal data class DesktopSongActions(
     val onSleepTimer: (Int?) -> Unit,
     val onSleepAfterTrack: () -> Unit,
     val onShare: (Song) -> Unit,
+    val onRemoveHistory: ((Song) -> Unit)? = null,
 )
 
 /** The "…" beside the player's heart, and the menu it opens. */
@@ -163,6 +164,7 @@ internal fun DesktopSongMenuFor(
         onSleepAfterTrack = { actions.onSleepAfterTrack(); close() },
         onShare = { actions.onShare(song); close() },
         onDismiss = close,
+        onRemoveHistory = actions.onRemoveHistory?.let { remove -> { remove(song); close() } },
     )
 }
 
@@ -194,8 +196,25 @@ internal fun DesktopSongMenu(
     onSleepAfterTrack: () -> Unit,
     onShare: () -> Unit,
     onDismiss: () -> Unit,
+    onRemoveHistory: (() -> Unit)? = null,
 ) {
     var pickingSleepTimer by remember { mutableStateOf(false) }
+    var customTimer by remember { mutableStateOf(false) }
+    var customMinutes by remember { mutableStateOf("30") }
+    if (customTimer) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { customTimer = false },
+        title = { androidx.compose.material3.Text("Custom sleep timer") },
+        text = { androidx.compose.material3.OutlinedTextField(
+            value = customMinutes, onValueChange = { customMinutes = it },
+            label = { androidx.compose.material3.Text("Minutes (5–720)") }, singleLine = true,
+            isError = DesktopSleepTimer.customMinutes(customMinutes) == null,
+        ) },
+        confirmButton = { androidx.compose.material3.TextButton(
+            enabled = DesktopSleepTimer.customMinutes(customMinutes) != null,
+            onClick = { DesktopSleepTimer.customMinutes(customMinutes)?.let { onSleepTimer(it) }; customTimer = false },
+        ) { androidx.compose.material3.Text("Start") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = { customTimer = false }) { androidx.compose.material3.Text("Cancel") } },
+    )
     val liked = likeStatus == LikeStatus.LIKE
     val disliked = likeStatus == LikeStatus.DISLIKE
     // A local file or a finished download has no YouTube identity behind it to rate, queue into a
@@ -213,6 +232,7 @@ internal fun DesktopSongMenu(
                     selected = sleepTimerMinutes == minutes && !sleepAfterTrack,
                 ) { onSleepTimer(minutes) }
             }
+            DesktopMenuRow(Icons.Rounded.Bedtime, "Custom duration…") { customTimer = true }
             DesktopMenuRow(
                 icon = Icons.Rounded.Bedtime,
                 label = DesktopStrings["d_end_of_this_track", "End of this track"],
@@ -226,6 +246,10 @@ internal fun DesktopSongMenu(
             return@DesktopMenuSurface
         }
 
+        onRemoveHistory?.let { remove ->
+            DesktopMenuRow(Icons.Rounded.Bedtime, "Remove from history", onClick = remove)
+            DesktopMenuDivider()
+        }
         // The two are never both offered.
         (onRevertToOriginal ?: onUpgradeQuality)?.let { action ->
             DesktopMenuRow(
@@ -250,7 +274,7 @@ internal fun DesktopSongMenu(
                 onClick = onToggleDislike,
             )
         }
-        if (!isOffline) {
+        run {
             DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, DesktopStrings["add_to_playlist", "Add to playlist"], onClick = onAddToPlaylist)
         }
         if (signedIn || !isOffline) DesktopMenuDivider()

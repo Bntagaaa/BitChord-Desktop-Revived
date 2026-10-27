@@ -316,6 +316,11 @@ import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
 import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
 import com.music.bitchord.data.model.PlaybackSourceType
+import com.music.bitchord.data.TopPicks
+import com.music.bitchord.data.model.TopPick
+import com.music.bitchord.data.model.TopPickKind
+import com.music.bitchord.data.model.TopPickMood
+import com.music.bitchord.ui.screens.MoodGridPage
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.SubscriptionState
 import com.music.bitchord.data.model.UiState
@@ -345,6 +350,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -640,6 +646,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     val searchLoading by searchSession.loading
     val searchRequestGeneration by searchSession.generation
     val searchError by searchSession.error
+    var topPicks by remember { mutableStateOf<List<TopPick>?>(null) }
+    var topPicksLoading by remember { mutableStateOf(false) }
+    var showMoodGrid by remember { mutableStateOf(false) }
+    var stationJob by remember { mutableStateOf<Job?>(null) }
     var homeState by remember { mutableStateOf<UiState<List<HomeShelf>>>(UiState.Loading) }
     // The home feed is paged: `FEmusic_home` answers with a couple of shelves and a token, and
     // everything else arrives by following it.
@@ -2178,6 +2188,27 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
      * Built once so a row on Downloads or Local Music offers what the player's own "…" offers —
      * Android opens the same `SongActionsSheet` from every one of them.
      */
+    fun removeHistorySong(song: Song) {
+        scope.launch {
+            val token = song.feedbackToken
+            if (youtubeSignedIn) {
+                if (token == null) {
+                    DesktopPlayerHost.showMessage("This history item has no removal token")
+                    return@launch
+                }
+                val removed = YtMusicRepository.removeFromHistory(token)
+                if (removed.isFailure) {
+                    DesktopPlayerHost.showMessage("Could not remove from history")
+                    return@launch
+                }
+                YtMusicRepository.invalidateHistoryCache()
+                remoteHistory = remoteHistory.filterNot { it.videoId == song.videoId }
+            }
+            history = history.filterNot { it.videoId == song.videoId }
+            persistence.saveHistory(history)
+        }
+    }
+
     fun songActionsFor(song: Song) = DesktopSongActions(
         signedIn = youtubeSignedIn,
         disliked = song.videoId in dislikedIds,
@@ -2199,6 +2230,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         },
         onSleepAfterTrack = { DesktopSleepTimer.startAfterTrack() },
         onShare = ::shareSong,
+        onRemoveHistory = if (destination == DesktopDestination.HISTORY) ::removeHistorySong else null,
     )
 
     /** The "…" a song row hangs off, built the same way on every page that offers one. */
@@ -2624,7 +2656,38 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
      * supplementary browse feeds, all asked for at once and laid down as each lands. Signed out
      * there is no Recently Played to ask for, which is also how the phone has it.
      */
+    fun openTopPick(pick: TopPick, label: String) {
+        if (pick.kind == TopPickKind.LATEST_RELEASE && pick.browseId != null) {
+            openShelfItem(ShelfItem(pick.title, pick.subtitle, pick.images.firstOrNull(), videoId = null, browseId = pick.browseId), label)
+        } else {
+            stationJob?.cancel()
+            stationJob = scope.launch {
+                TopPicks.queue(pick).fold(
+                    onSuccess = { songs ->
+                        currentCoroutineContext().ensureActive()
+                        if (songs.isNotEmpty()) playSongs(songs, source = DesktopQueueSource(label, PlaybackSourceType.HOME))
+                        else DesktopPlayerHost.showMessage("Could not load this station")
+                    },
+                    onFailure = { DesktopPlayerHost.showMessage("Could not load this station") },
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(activeAccountId, activeProfileId, sessionRevision) {
+        stationJob?.cancel()
+        topPicks = null
+    }
+    LaunchedEffect(activeAccountId, activeProfileId, sessionRevision, homeState) {
+        val shelves = (homeState as? UiState.Success)?.data ?: return@LaunchedEffect
+        topPicksLoading = true
+        try {
+            topPicks = TopPicks.build(shelves, TopPicks.LocalTaste(songs = history))
+        } finally { topPicksLoading = false }
+    }
+
     fun loadHome() {
+        topPicks = null
         if (!youtubeSourceEnabled) {
             homeState = UiState.Error("YouTube Music is disabled")
             return
@@ -3224,6 +3287,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
 
     // What the shared player reads as settings, kept in step with the window's own.
     SideEffect {
+        DesktopPlayerHost.videoClock.value = playback
+        DesktopPlayerHost.videoSpeed = playbackSpeed
         DesktopPlayerSettings.animatedCanvas.value = animatedCanvas
         DesktopPlayerSettings.fullBleedArtwork.value = fullBleedArtwork
         DesktopPlayerSettings.legacyMeshGradient.value = legacyMeshGradient
@@ -4696,7 +4761,23 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             downloadInProgress = downloadInProgress,
                             contentPadding = contentPadding,
                         )
+                        destination == DesktopDestination.LISTEN_NOW && showMoodGrid -> Column(Modifier.fillMaxSize()) {
+                            TextButton(onClick = { showMoodGrid = false }) { Text("Back to Home") }
+                            MoodGridPage(
+                                gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
+                                onClick = { mood, label -> openTopPick(TopPicks.moodStation(mood), label) },
+                                contentPadding = sharedPagePadding,
+                                artworkMotion = !overlays.nowPlaying && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
+                            )
+                        }
                         destination == DesktopDestination.LISTEN_NOW -> HomeScreen(
+                            topPicks = topPicks,
+                            topPicksLoading = topPicksLoading,
+                            listenerName = DesktopAccounts.active()?.name,
+                            onTopPickClick = ::openTopPick,
+                            onMoodClick = { mood, label -> openTopPick(TopPicks.moodStation(mood), label) },
+                            onMoodsShowAll = { showMoodGrid = true },
+                            artworkMotion = !overlays.nowPlaying && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
                             state = homeState,
                             listState = homeListState,
                             onItemClick = { item, shelfTitle -> openShelfItem(item, shelfTitle) },
@@ -7221,6 +7302,8 @@ private fun DesktopSettingsScreen(
                         }
                         onPlaybackSpeedChange(next)
                     }
+                    val directSource by DesktopDirectSource.enabled.collectAsState()
+                    SettingsToggle("Direct source stream", "Start on a higher priority source; YouTube remains the fallback.", directSource, DesktopDirectSource::setEnabled)
                     SettingsRow(
                         Icons.Rounded.Bedtime,
                         "Sleep timer",

@@ -10,6 +10,8 @@ object DesktopSleepTimer {
     val minutes = MutableStateFlow<Int?>(null)
     val afterTrack = MutableStateFlow(false)
 
+    fun customMinutes(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it in 5..720 }
+
     val presets = listOf(15, 30, 45, 60)
 
     fun start(minutes: Int) {

@@ -53,6 +53,19 @@ internal object DesktopPlayerHost : PlayerHost {
 
     override val settings: DesktopPlayerSettings = DesktopPlayerSettings
 
+    var mixViewOpen: (Boolean) -> Unit = {}
+    override fun onMixViewOpen(open: Boolean) = mixViewOpen(open)
+    val videoClock = MutableStateFlow(DesktopPlaybackState())
+    @Volatile var videoSpeed: Float = 1f
+    override val musicVideoSupported = true
+    override val musicVideoAspect = DesktopMusicVideo.aspect
+    override val musicVideoQuality = DesktopMusicVideo.quality
+    override fun setMusicVideoQuality(height: Int?) { DesktopMusicVideo.held.value = height }
+    @Composable
+    override fun MusicVideo(videoId: String, fit: Boolean, onRenderedChanged: (Boolean) -> Unit, modifier: Modifier) {
+        DesktopMusicVideoSurface(videoId, fit, onRenderedChanged, modifier)
+    }
+
     override fun cachedCanvas(song: Song): CanvasArtwork? = DesktopCanvasClient.cached(song)?.toShared()
 
     override suspend fun canvasFor(song: Song): CanvasArtwork? =
@@ -207,6 +220,9 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     override val smartAnalysis = MutableStateFlow(SmartAnalysis())
     override val smartFadeEnabled = MutableStateFlow(false)
     override val smartMixInProgress = MutableStateFlow(false)
+    override val automixDetail = MutableStateFlow<String?>(null)
+    override val smartMixView = MutableStateFlow<com.music.bitchord.data.settings.MixTransitionView?>(null)
+    override val smartMixProgress = MutableStateFlow(0f)
     override val smartMixBlend = MutableStateFlow<MixBlend?>(null)
     override val smartTransitionWindow = MutableStateFlow<TransitionWindow?>(null)
     override val spotifyCanvasAutoHide = MutableStateFlow(true)

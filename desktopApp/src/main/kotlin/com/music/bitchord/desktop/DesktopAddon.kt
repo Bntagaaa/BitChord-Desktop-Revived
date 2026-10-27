@@ -420,7 +420,7 @@ internal class DesktopAddonClient(rawBaseUrl: String) {
          * over ten seconds to mint a lossless URL, and cutting it off there is what left a Hi-Res
          * copy unfound while a 320 kbps one played.
          */
-        const val CALL_TIMEOUT_MS = 20_000L
+        const val CALL_TIMEOUT_MS = 45_000L
         const val MANIFEST_TTL_MS = 10 * 60 * 1000L
         const val SEARCH_TTL_MS = 10 * 60 * 1000L
         const val STREAM_TTL_MS = 5 * 60 * 1000L
@@ -448,7 +448,7 @@ internal class DesktopAddonClient(rawBaseUrl: String) {
 
         /** A ceiling on the whole call: the spec asks addons to answer in seconds, not minutes. */
         private val http = HttpClient(CIO) {
-            install(HttpTimeout) { requestTimeoutMillis = CALL_TIMEOUT_MS }
+            install(HttpTimeout) { requestTimeoutMillis = CALL_TIMEOUT_MS; socketTimeoutMillis = 60_000L }
         }
 
         /** A base URL from whatever the user pasted. */
@@ -888,6 +888,6 @@ internal object DesktopSourceFormats {
     }
 
     private val http = HttpClient(CIO) {
-        install(HttpTimeout) { requestTimeoutMillis = DesktopAddonClient.CALL_TIMEOUT_MS }
+        install(HttpTimeout) { requestTimeoutMillis = DesktopAddonClient.CALL_TIMEOUT_MS; socketTimeoutMillis = 60_000L }
     }
 }

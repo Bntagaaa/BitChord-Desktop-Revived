@@ -201,6 +201,7 @@ internal object DesktopSourceRegistry {
         excludedSourceId: String? = null,
         /** A download: addons that said `allowDownloads: 0` are left out, see [adapters]. */
         forDownload: Boolean = false,
+        addonsOnly: Boolean = false,
     ): Result<DesktopStream> = runCatching {
         val available = playbackAdapters(quality, forDownload)
         val moduleReference = DesktopModuleSource.parseTrack(song.videoId)
@@ -268,6 +269,7 @@ internal object DesktopSourceRegistry {
                 ?.takeIf { playableHere(source, it) }
                 ?.let { return@runCatching it }
         }
+        if (addonsOnly) error("No higher priority source returned this track")
         val youtube = available.firstOrNull {
             it.config.kind == DesktopSourceKind.YOUTUBE && it.config.id != excludedSourceId
         }

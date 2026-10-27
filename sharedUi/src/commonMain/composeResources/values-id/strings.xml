@@ -189,8 +189,6 @@
     <string name="sign_in">Masuk</string>
     <string name="sign_in_youtube_music">Masuk ke YouTube Music</string>
     <string name="subscriptions">Langganan</string>
-    <string name="switch_to_grid_view">Beralih ke tampilan grid</string>
-    <string name="switch_to_list_view">Beralih ke tampilan daftar</string>
     <string name="your_replay">Replay Anda</string>
     <string name="your_listening_experience">Pengalaman mendengarkan Anda</string>
     <string name="default_replay_holder">Pendengar BitChord</string>
@@ -200,4 +198,7 @@
     <string name="search_library_empty">Cari lagu di folder Musik Lokal Anda.</string>
     <string name="search_library_hint">Lagu, Artis, dan Album</string>
     <string name="search_library_no_results">Tidak ada di Musik Lokal yang cocok dengan “%1$s”.</string>
+
+    <string name="switch_to_grid_view">Beralih ke tampilan grid</string>
+    <string name="switch_to_list_view">Beralih ke tampilan daftar</string>
 </resources>

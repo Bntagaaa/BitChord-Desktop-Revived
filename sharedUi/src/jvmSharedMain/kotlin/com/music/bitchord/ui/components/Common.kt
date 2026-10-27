@@ -1,5 +1,17 @@
 package com.music.bitchord.ui.components
 
+import org.jetbrains.compose.resources.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import com.music.bitchord.ui.player.MESH_CYCLE_MILLIS
+import com.music.bitchord.ui.player.MeshGradientBackground
+import com.music.bitchord.ui.player.WelcomeMeshPalettes
+import com.music.bitchord.ui.player.cyclingMeshPalette
+
+import androidx.compose.ui.layout.ContentScale
 import com.music.bitchord.ui.LocalPullToRefreshEnabled
 import com.music.bitchord.ui.AppUiHost
 import com.music.bitchord.ui.AppUi
@@ -203,6 +215,14 @@ val FLOATING_BAR_MAX_WIDTH = 440.dp
  * showing: enough to say the row scrolls without a card being half a card.
  */
 val SHELF_CARD_WIDTH = 150.dp
+
+/**
+ * A track's thumbnail box at [height]: square for a song, 16:9 at the same
+ * height for a music video — its picture's own shape, as YouTube Music lists
+ * one, rather than a still cropped into a square.
+ */
+fun Modifier.trackArtSize(height: Dp, isVideo: Boolean): Modifier =
+    if (isVideo) size(width = height * (16f / 9f), height = height) else size(height)
 
 /** Share of the row a lead-shelf card takes, so the next one peeks in past it. */
 private const val HERO_CARD_FRACTION = 0.70f
@@ -532,7 +552,7 @@ private fun SongRowContent(
     selected: Boolean = false,
 ) {
     val titleColor by animateColorAsState(
-        targetValue = if (isCurrent) activeTint else MaterialTheme.colorScheme.onBackground,
+        targetValue = if (isCurrent && !searchPlayingStyle) activeTint else MaterialTheme.colorScheme.onBackground,
         label = "song row title",
     )
     val rowHoverInteraction = remember { MutableInteractionSource() }
@@ -544,6 +564,7 @@ private fun SongRowContent(
             else -> Color.Transparent
         },
         animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+
         label = "song row background",
     )
     // A Spotify track still being matched to a YouTube Music song, or one that
@@ -598,6 +619,7 @@ private fun SongRowContent(
                     model = com.music.bitchord.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+
                 )
                 if (searchPlayingStyle && isCurrent && isPlaying) {
                     SearchPlayingBars(Modifier.align(Alignment.Center))
@@ -638,7 +660,7 @@ private fun SongRowContent(
                 modifier = Modifier.size(20.dp),
             )
         }
-        if (isCurrent && trackNumber == null && !(searchPlayingStyle && isPlaying)) {
+        if (isCurrent && trackNumber == null && !searchPlayingStyle) {
             Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
@@ -715,8 +737,6 @@ fun Modifier.hangIntoGutter(outset: Dp): Modifier = layout { measurable, constra
     layout(width, placeable.height) { placeable.place(0, 0) }
 }
 
-/** The accent a current song's title takes in lists that mark it with [SearchPlayingBars]. */
-val PlayingAccent = Color(0xFFFB4A62)
 
 @Composable
 fun SearchPlayingBars(modifier: Modifier = Modifier) {
@@ -824,33 +844,71 @@ fun PullToRefresh(
 
 /** Slim dismissible-looking prompt shown atop Home while signed out. */
 @Composable
-fun SignInBanner(onSignIn: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
+fun SignInBanner(
+    onSignIn: () -> Unit,
+    modifier: Modifier = Modifier,
+    /**
+     * Whether the mesh may move. Off, it finishes the fade it is in and rests:
+     * a blurred layer re-drawn every frame is not something to leave running
+     * under a scroll, or under the player where nobody sees it.
+     */
+    motion: Boolean = true,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.98f else 1f, spring(stiffness = 900f), label = "signInScale")
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = PAGE_GUTTER, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onSignIn)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(22.dp))
+            .clickable(interactionSource = interaction, indication = null, onClick = onSignIn),
     ) {
-        Column(Modifier.weight(1f)) {
+        // A card is a few hundred dp the reader is looking straight at, which
+        // is the case the mesh lets keep moving — see its `continuous` note.
+        MeshGradientBackground(
+            palette = cyclingMeshPalette(WelcomeMeshPalettes, running = motion),
+            modifier = Modifier.matchParentSize(),
+            continuous = true,
+            paused = !motion,
+            driftMillis = 6_000,
+            blurRadius = 36.dp,
+            colorFadeMillis = MESH_CYCLE_MILLIS,
+        )
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 18.dp)) {
             Text(
                 text = stringResource(Res.string.sign_in_youtube_music),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.W800,
+                color = Color.White,
             )
-            Text(
-                text = stringResource(Res.string.personalized_recommendations),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Spacer(Modifier.height(16.dp))
+            Row(
+                Modifier
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .padding(start = 16.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(
+                    painter = painterResource(Res.drawable.ic_google_g),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(Res.string.sign_in_with_google),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.W700,
+                    color = Color.Black,
+                )
+            }
         }
-        Spacer(Modifier.width(12.dp))
-        Button(onClick = onSignIn) { Text(stringResource(Res.string.sign_in)) }
     }
 }
 

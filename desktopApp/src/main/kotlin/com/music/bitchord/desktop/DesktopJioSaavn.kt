@@ -205,11 +205,17 @@ internal object DesktopMusicSources {
         qualityOverride: String? = null,
         excludedSourceId: String? = null,
     ): Result<DesktopLiveResolution> =
-        DesktopSourceRegistry.resolveLive(song, qualityOverride, excludedSourceId)
+        if (DesktopDirectSource.active(song)) {
+            val preferred = kotlinx.coroutines.withTimeoutOrNull(15_000L) {
+                DesktopSourceRegistry.resolve(song, qualityOverride, excludedSourceId, addonsOnly = true).getOrNull()
+            }
+            if (preferred != null) Result.success(DesktopLiveResolution(preferred))
+            else DesktopStreamClient.resolve(song).map { DesktopLiveResolution(it) }
+        } else DesktopSourceRegistry.resolveLive(song, qualityOverride, excludedSourceId)
 
     /** A second look, asked from scratch once the first one settled for nothing better. */
     suspend fun upgradeFor(song: Song, playing: DesktopStream?): DesktopStream? =
-        DesktopSourceRegistry.upgradeFor(song, playing)
+        if (DesktopDirectSource.active(song)) null else DesktopSourceRegistry.upgradeFor(song, playing)
 
     /** The quality rung in force. */
     fun ceiling(qualityOverride: String? = null): DesktopAudioQuality =

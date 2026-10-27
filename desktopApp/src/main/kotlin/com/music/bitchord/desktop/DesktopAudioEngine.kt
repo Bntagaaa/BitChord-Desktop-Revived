@@ -682,6 +682,8 @@ class DesktopPlaybackEngine(
     }
 
     fun release() {
+        waveformJob?.cancel()
+        DesktopPlayerHost.mixViewOpen = {}
         analyzer.release()
         running.set(false)
         resolveJob?.cancel()
@@ -788,6 +790,27 @@ class DesktopPlaybackEngine(
 
     /** The plan the running fade was started from, for the filter ride. */
     private var activePlan: TransitionPlan? = null
+    private var mixViewKey: String? = null
+    private var waveformJob: kotlinx.coroutines.Job? = null
+
+    init {
+        DesktopPlayerHost.mixViewOpen = { open ->
+            waveformJob?.cancel()
+            if (open) {
+                val view = DesktopPlayerSettings.smartMixView.value
+                val outgoing = current?.stream
+                val incoming = upcoming?.stream
+                if (view != null && outgoing != null && incoming != null) waveformJob = scope.launch {
+                    val result = try { withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        view.withDecks(desktopMixWaveform(outgoing, view.outgoing), desktopMixWaveform(incoming, view.incoming))
+                    } } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (_: Exception) { return@launch }
+                    if (DesktopPlayerSettings.smartMixView.value === view) DesktopPlayerSettings.smartMixView.value = result
+                }
+            }
+        }
+    }
+
 
     private fun pump() {
         while (running.get()) {
@@ -1289,6 +1312,10 @@ class DesktopPlaybackEngine(
      * carries out a [prepareNext] that arrived while it ran. Called however the blend ended.
      */
     private fun endBlend() {
+        waveformJob?.cancel()
+        DesktopPlayerSettings.smartMixView.value = null
+        DesktopPlayerSettings.smartMixProgress.value = 0f
+        mixViewKey = null
         DesktopPlayerSettings.smartMixBlend.value = null
         var had = false
         var next: Song? = null
@@ -1321,6 +1348,7 @@ class DesktopPlaybackEngine(
      * it has moved further than a tick's jitter.
      */
     private fun publishBlend(playing: Boolean) {
+        DesktopPlayerSettings.smartMixProgress.value = ((transitionTotal - fadeRemaining).toFloat() / fadeTotal.coerceAtLeast(1)).coerceIn(0f, 1f)
         if (!automixEnabled) return
         val track = current ?: return
         val incoming = upcoming ?: return
@@ -1748,6 +1776,32 @@ class DesktopPlaybackEngine(
 
     /** The marker on the scrubber, showing where the mix will happen before it happens. */
     private fun publishTransitionWindow(track: Track, plan: TransitionPlan, duration: Long) {
+        val next = upcoming?.song ?: nextSong
+        if (next != null && !plan.blocked && plan.fadeSeconds > 0) {
+            val key = "${track.song.videoId}/${next.videoId}/${plan.transitionStart}/${plan.transitionEnd}"
+            if (key != mixViewKey) {
+                waveformJob?.cancel()
+                mixViewKey = key
+                fun deck(song: Song, start: Double, end: Double): com.music.bitchord.data.settings.MixDeck {
+                    val analysis = analyzer.analysisFor(song.videoId)
+                    return com.music.bitchord.data.settings.MixDeck(song.title, song.artist, song.thumbnailUrl,
+                        analysis.bpm, analysis.key, (song.durationText.durationSeconds() * 1000).toLong(),
+                        (start - 2).coerceAtLeast(0.0), end + 2)
+                }
+                val count = 129
+                val out = FloatArray(count); val inn = FloatArray(count); val gains = FloatArray(2)
+                repeat(count) { index ->
+                    DesktopTransitionRide.gains(plan, index.toFloat() / (count - 1), gains)
+                    out[index] = gains[0]; inn[index] = gains[1]
+                }
+                DesktopPlayerSettings.smartMixView.value = com.music.bitchord.data.settings.MixTransitionView(
+                    deck(track.song, plan.transitionStart, plan.transitionEnd),
+                    deck(next, plan.incomingCueTime, plan.incomingCueTime + plan.fadeSeconds * plan.incomingPlaybackRate),
+                    plan.transitionStart, plan.transitionEnd, plan.incomingCueTime,
+                    plan.incomingCueTime + plan.fadeSeconds * plan.incomingPlaybackRate,
+                    plan.transitionBeats, FloatArray(plan.transitionBeats.coerceAtLeast(0)) { it.toFloat() / plan.transitionBeats }, out, inn)
+            }
+        }
         val status = analysisStatus(track)
         val markable = !plan.blocked &&
             plan.markerVisible &&
@@ -1782,7 +1836,7 @@ class DesktopPlaybackEngine(
         } else {
             duration - transitionSecondsFor(song) * 1_000L
         }
-        if (startMs - positionMs > ADDON_ARM_LEAD_MS) return
+        if (startMs - positionMs > (if (DesktopDirectSource.active(song)) 25_000L else ADDON_ARM_LEAD_MS)) return
         // Whichever of this thread and a newer [prepareNext] gets there first owns it.
         if (!awaitingArm.compareAndSet(song, null)) return
         DesktopTrackLog.log(

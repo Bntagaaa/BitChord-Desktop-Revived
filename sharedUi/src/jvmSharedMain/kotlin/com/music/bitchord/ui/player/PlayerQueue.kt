@@ -1,5 +1,9 @@
 package com.music.bitchord.ui.player
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
+import com.music.bitchord.ui.components.trackArtSize
+import androidx.compose.ui.layout.ContentScale
 import com.music.bitchord.sharedui.resources.*
 import com.music.bitchord.ui.components.ExplicitSongTitle
 import com.music.bitchord.ui.components.ArtworkHover
@@ -796,6 +800,7 @@ private fun InlineQueueRow(
                 modifier = Modifier.fillMaxSize().background(colors.primary.copy(alpha = 0.08f)),
             )
         }
+
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             ExplicitSongTitle(

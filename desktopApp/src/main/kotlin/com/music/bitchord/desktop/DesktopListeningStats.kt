@@ -171,13 +171,13 @@ object DesktopListeningStats {
             totalPlays = entries.sumOf(DesktopReplayEntry::plays),
             songs = entries.sortedByDescending(DesktopReplayEntry::listenedMs),
             artists = rank(entries) { it.song.artist.ifBlank { "Unknown Artist" } },
-            albums = rank(entries) { it.song.albumName?.takeIf(String::isNotBlank) ?: "Unknown Album" },
+            albums = rankAlbums(entries),
             hourOfDay = hours.toList(),
             busiestDay = busiest?.key,
             busiestDayMs = busiest?.value ?: 0L,
             distinctSongs = entries.size,
             distinctArtists = entries.map { it.song.artist.ifBlank { "Unknown Artist" } }.distinct().size,
-            distinctAlbums = entries.mapNotNull { it.song.albumName?.takeIf(String::isNotBlank) }.distinct().size,
+            distinctAlbums = entries.filter { !it.song.albumName.isNullOrBlank() }.map { albumKey(it.song) }.distinct().size,
             since = buckets.map(Bucket::month).filter { it != LEGACY_MONTH }.minOrNull(),
         )
     }
@@ -186,6 +186,19 @@ object DesktopListeningStats {
     internal fun primaryArtist(credit: String): String =
         credit.split(",", "&", " feat.", " ft.", " x ", " × ")
             .firstOrNull()?.trim()?.takeIf(String::isNotBlank) ?: credit.trim()
+
+    internal fun albumKey(song: Song): String = if (song.albumName.isNullOrBlank() && song.albumId.isNullOrBlank()) "[unknown-album]" else song.albumId?.takeIf(String::isNotBlank)
+        ?: "${song.albumName.orEmpty().trim().lowercase(Locale.ROOT)}\u0000${song.artist.trim().lowercase(Locale.ROOT)}"
+
+    private fun rankAlbums(entries: List<DesktopReplayEntry>): List<DesktopRankedEntry> =
+        entries.groupBy { albumKey(it.song) }.values.map { plays ->
+            val lead = plays.maxByOrNull(DesktopReplayEntry::listenedMs)!!.song
+            DesktopRankedEntry(
+                title = lead.albumName?.takeIf(String::isNotBlank) ?: "Unknown Album",
+                subtitle = lead.artist, artworkUrl = lead.thumbnailUrl, browseId = lead.albumId,
+                ms = plays.sumOf(DesktopReplayEntry::listenedMs), plays = plays.sumOf(DesktopReplayEntry::plays),
+            )
+        }.sortedByDescending(DesktopRankedEntry::ms)
 
     private fun rank(
         entries: List<DesktopReplayEntry>,

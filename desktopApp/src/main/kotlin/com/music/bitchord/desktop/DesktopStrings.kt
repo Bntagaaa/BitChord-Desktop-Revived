@@ -29,6 +29,7 @@ object DesktopStrings {
         DesktopLanguage("id", "Bahasa Indonesia"),
         DesktopLanguage("it", "Italiano"),
         DesktopLanguage("ja", "日本語"),
+        DesktopLanguage("ko", "한국어"),
         DesktopLanguage("pl", "Polski"),
         DesktopLanguage("pt", "Português"),
         DesktopLanguage("ru", "Русский"),
