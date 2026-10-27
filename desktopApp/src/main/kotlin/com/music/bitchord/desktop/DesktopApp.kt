@@ -6353,15 +6353,21 @@ private fun DesktopArtistPage(
     onToggleSubscription: ((SubscriptionState) -> Unit)?,
     contentPadding: PaddingValues,
 ) {
-    // Begin resolving Apple motion artwork as soon as Artist navigation starts,
-    // in parallel with the YouTube Music artist page request. Waiting for Success
-    // added an avoidable second round of network latency before autoplay.
+    // Start Apple artist-art lookup as soon as navigation begins, in parallel with
+    // the YouTube Music page request, so HLS playback can start sooner.
     val artistName = (state as? UiState.Success)?.data?.name?.takeIf(String::isNotBlank) ?: fallbackName
     var appleArt by remember(artistName) {
         mutableStateOf(DesktopAppleArtistArtRepository.cached(artistName))
     }
     LaunchedEffect(artistName) {
-        appleArt = DesktopAppleArtistArtRepository.artFor(artistName) ?: appleArt
+        // Keep the still artist image visible while searching. Retry in the background every
+        // 15 seconds until Apple provides a motion URL; stop polling as soon as we have one.
+        while (isActive && appleArt?.videoUrl == null) {
+            val latest = DesktopAppleArtistArtRepository.artFor(artistName)
+            if (latest != null) appleArt = latest
+            if (appleArt?.videoUrl != null) break
+            delay(15_000L)
+        }
     }
     DesktopPageScaffold(contentPadding) {
         when (state) {
