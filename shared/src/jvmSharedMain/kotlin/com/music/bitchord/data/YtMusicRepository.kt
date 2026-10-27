@@ -47,8 +47,10 @@ object YtMusicRepository {
     // answer makes the eventual player switch use the exact rendition whose
     // bytes were warmed, without repeating a 10–30 second catalogue search.
     private val audioVersionCache = ConcurrentHashMap<String, Song>()
-    // Cache for video version lookups from audio tracks (null means no video found).
-    private val videoVersionCache = ConcurrentHashMap<String, Song?>()
+    // Java ConcurrentHashMap rejects null values. Keep confirmed misses separate
+    // from successful audio-to-video mappings, without caching network failures.
+    private val videoVersionCache = ConcurrentHashMap<String, Song>()
+    private val unavailableVideoVersions = ConcurrentHashMap.newKeySet<String>()
 
     fun cachedAudioVersion(videoId: String): Song? = audioVersionCache[videoId]
     fun cachedVideoVersion(videoId: String): Song? = videoVersionCache[videoId]
@@ -456,10 +458,13 @@ object YtMusicRepository {
     suspend fun resolveVideo(song: Song): Song? {
         if (song.isVideo) return null
         videoVersionCache[song.videoId]?.let { return it }
+        if (song.videoId in unavailableVideoVersions) return null
         val target = TrackMatcher.targetOf(song)
+        var checkedCatalog = false
         for (query in TrackMatcher.queries(target)) {
-            val candidates = search(query, SearchFilter.VIDEOS)
-                .getOrNull()
+            val page = search(query, SearchFilter.VIDEOS).getOrNull()
+            if (page != null) checkedCatalog = true
+            val candidates = page
                 ?.filterIsInstance<SearchResult.Track>()
                 ?.map { it.song }
                 .orEmpty()
@@ -470,7 +475,8 @@ object YtMusicRepository {
             }
         }
         Log.w(TAG, "video switch: no video match for '${song.title}' by '${song.artist}'")
-        videoVersionCache[song.videoId] = null
+        // A failed request is not proof that a song lacks an official video.
+        if (checkedCatalog) unavailableVideoVersions.add(song.videoId)
         return null
     }
 
