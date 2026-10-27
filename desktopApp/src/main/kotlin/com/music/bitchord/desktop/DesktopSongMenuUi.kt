@@ -132,6 +132,8 @@ internal fun DesktopSongMenuFor(
     onRevertToOriginal: (() -> Unit)?,
     onUpgradeQuality: (() -> Unit)?,
     onDismiss: () -> Unit,
+    /** Switch the currently playing track between the audio and video versions. */
+    onSwitchVersion: (() -> Unit)? = null,
 ) {
     val close = onDismiss
     DesktopSongMenu(
@@ -148,6 +150,7 @@ internal fun DesktopSongMenuFor(
         sleepAfterTrack = actions.sleepAfterTrack,
         onRevertToOriginal = onRevertToOriginal?.let { { it(); close() } },
         onUpgradeQuality = onUpgradeQuality?.let { { it(); close() } },
+        onSwitchVersion = onSwitchVersion?.let { { it(); close() } },
         // Rating stays open: the menu says what the rating now is, and closing it is the
         // one way to not see that it worked.
         onToggleLike = onToggleLike,
@@ -197,6 +200,7 @@ internal fun DesktopSongMenu(
     onShare: () -> Unit,
     onDismiss: () -> Unit,
     onRemoveHistory: (() -> Unit)? = null,
+    onSwitchVersion: (() -> Unit)? = null,
 ) {
     var pickingSleepTimer by remember { mutableStateOf(false) }
     var customTimer by remember { mutableStateOf(false) }
@@ -256,6 +260,15 @@ internal fun DesktopSongMenu(
                 icon = if (onRevertToOriginal != null) Icons.AutoMirrored.Rounded.Undo else Icons.Rounded.HighQuality,
                 label = if (onRevertToOriginal != null) "Revert to original" else "Upgrade quality",
                 onClick = action,
+            )
+            DesktopMenuDivider()
+        }
+
+        onSwitchVersion?.let { switch ->
+            DesktopMenuRow(
+                icon = if (song.isVideo) BitChordIcons.MusicNote else Icons.Rounded.HighQuality,
+                label = if (song.isVideo) "Switch to audio" else "Watch music video",
+                onClick = switch,
             )
             DesktopMenuDivider()
         }
