@@ -19,7 +19,17 @@ import org.jetbrains.skia.*
 internal object DesktopMusicVideo {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val users = MutableStateFlow<Map<String, Int>>(emptyMap())
-    val held = MutableStateFlow<Int?>(null)
+    private const val QUALITY_KEY = "music_video_quality"
+    val held = MutableStateFlow<Int?>(
+        DesktopPersistence().int(QUALITY_KEY, 0).takeIf { it in 144..4320 },
+    )
+
+    fun setQuality(height: Int?) {
+        val desired = height?.takeIf { it in 144..4320 }
+        held.value = desired
+        DesktopPersistence().saveInt(QUALITY_KEY, desired ?: 0)
+    }
+
     val quality = MutableStateFlow(MusicVideoQualityUi())
     val aspect = MutableStateFlow(16f / 9f)
     val frame = MutableStateFlow<Pair<String, VideoFrame>?>(null)
