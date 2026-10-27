@@ -283,7 +283,7 @@ fun DesktopCanvasView(
     contentScale: ContentScale = ContentScale.Crop,
     /** Tried once if [url] will not decode — the Apple provider's second rendition of the clip. */
     fallbackUrl: String? = null,
-    maxEdge: Int = DesktopCanvasDecoder.MAX_EDGE,
+    maxEdge: Int = 720,
     /** Off for clips that are not the playing track's, so the player's backdrop is left alone. */
     publishBackdrop: Boolean = true,
 ) {
