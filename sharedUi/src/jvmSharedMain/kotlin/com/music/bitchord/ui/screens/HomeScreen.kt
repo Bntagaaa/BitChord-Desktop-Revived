@@ -80,6 +80,7 @@ import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.TopPick
 import com.music.bitchord.data.model.UiState
 import java.util.Locale
 import com.music.bitchord.data.model.artworkAt
@@ -213,6 +214,11 @@ fun HomeScreen(
     isPlaying: Boolean = false,
     /** Opens a shelf's See All destination when the feed supplies one. */
     onShelfOpen: ((HomeShelf) -> Unit)? = null,
+    topPicks: List<TopPick>? = null,
+    topPicksLoading: Boolean = false,
+    listenerName: String? = null,
+    onTopPickClick: ((TopPick, String) -> Unit)? = null,
+    onTopPickLongPress: ((TopPick) -> Unit)? = null,
 ) {
     val recentsViewType by AppUi.host.homeRecentsViewType.collectAsStateWithLifecycle()
     val compactHeadings = LocalDesktopCompactHeadings.current
@@ -244,6 +250,14 @@ fun HomeScreen(
             if (!signedIn && onSignIn != null) {
                 item {
                     SignInBanner(onSignIn = onSignIn, modifier = Modifier.padding(bottom = 8.dp))
+                }
+            }
+            if (onTopPickClick != null) {
+                when {
+                    !topPicks.isNullOrEmpty() -> item(key = "top-picks") {
+                        TopPicksShelf(topPicks, listenerName, onTopPickClick, onTopPickLongPress)
+                    }
+                    topPicks == null && topPicksLoading -> topPicksSkeleton()
                 }
             }
             when (state) {
