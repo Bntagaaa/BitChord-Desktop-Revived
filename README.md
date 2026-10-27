@@ -28,12 +28,13 @@
 <h2><a id="download"></a>✨ Highlights</h2>
 
 
-- **Visual Astra interface** - refined surfaces, configurable blur, a Mica-inspired sidebar, and light/dark themes.
-- **Immersive visuals** - video Canvas artwork where available, plus Apple Music-inspired artist artwork.
-- **A player that stays out of your way** - fullscreen and floating player, synced lyrics, queue, and native media controls.
-- **Your music, together** - YouTube Music search and playback, Spotify library access/import, local music, and downloads.
-- **Audio and integrations** - equalizer, crossfade, Automix (beta), Discord Rich Presence, and scrobbling.
-- **Desktop-first shortcuts** - open Quick Search with `Ctrl+K` and the shortcut guide with `Ctrl+/`.
+- **Apple Music Experience** - A refined, modern interface featuring elegant frosted surfaces, adaptive blur, a Mica-inspired sidebar, smooth animations, and seamless light/dark themes.
+- **Immersive Music Visuals** - Bring your music to life with Spotify Canvas, Apple Music-inspired animated artist backgrounds, dynamic artwork colors, and beautifully synchronized lyrics.
+- **A More Personal Player** - Enjoy a fullscreen listening experience, a resizable floating player, intuitive playback controls, and seamless queue management.
+- **All Your Music, One Place** - Explore and stream through YouTube Music, access your Spotify library, discover new releases, and enjoy local music and offline downloads.
+- **Powerful Audio Features** - Fine-tune your listening experience with an equalizer, crossfade, experimental Automix, and advanced playback capabilities.
+- **Connected Listening** - Stay connected with Discord Rich Presence, Last.fm and ListenBrainz scrobbling, and integrated music services.
+- **Made for Desktop** - Designed for Windows and Linux with native media controls, customizable interface options, and keyboard shortcuts like `Ctrl+K` for Quick Search and `Ctrl+/` for the shortcut guide.
 </div>
 
 <div align="center">
