@@ -6253,6 +6253,22 @@ private fun DesktopArtistPage(
     onToggleSubscription: ((SubscriptionState) -> Unit)?,
     contentPadding: PaddingValues,
 ) {
+    // Start Apple artist-art lookup as soon as navigation begins, in parallel with
+    // the YouTube Music page request, so HLS playback can start sooner.
+    val artistName = (state as? UiState.Success)?.data?.name?.takeIf(String::isNotBlank) ?: fallbackName
+    var appleArt by remember(artistName) {
+        mutableStateOf(DesktopAppleArtistArtRepository.cached(artistName))
+    }
+    LaunchedEffect(artistName) {
+        // Keep the still artist image visible while searching. Retry in the background every
+        // 15 seconds until Apple provides a motion URL; stop polling as soon as we have one.
+        while (isActive && appleArt?.videoUrl == null) {
+            val latest = DesktopAppleArtistArtRepository.artFor(artistName)
+            if (latest != null) appleArt = latest
+            if (appleArt?.videoUrl != null) break
+            delay(15_000L)
+        }
+    }
     DesktopPageScaffold(contentPadding) {
         when (state) {
             UiState.Loading -> Box(Modifier.fillMaxSize()) {
@@ -6263,13 +6279,7 @@ private fun DesktopArtistPage(
             }
             is UiState.Success -> {
                 val artist = state.data
-                val name = artist.name?.takeIf(String::isNotBlank) ?: fallbackName
-                var appleArt by remember(name) {
-                    mutableStateOf(DesktopAppleArtistArtRepository.cached(name))
-                }
-                LaunchedEffect(name) {
-                    appleArt = DesktopAppleArtistArtRepository.artFor(name) ?: appleArt
-                }
+                val name = artistName
 
                 val palette = rememberDesktopArtworkPalette(appleArt?.heroUrl ?: artist.thumbnailUrl)
                 val artistBackground = appleArt?.backgroundColor?.let { Color(it) } ?: Color(
@@ -6454,6 +6464,12 @@ private fun DesktopArtistBanner(
             fallbackPx = HEADER_ART_PX,
             modifier = Modifier.matchParentSize(),
         )
+        // Play Apple's artist HLS clip automatically, with the still photo underneath
+        // until the first decoded frame is available.
+        appleArt?.videoUrl?.let { url ->
+            DesktopCanvasView(url = url, modifier = Modifier.matchParentSize())
+        }
+
 
         Box(
             Modifier.matchParentSize().background(

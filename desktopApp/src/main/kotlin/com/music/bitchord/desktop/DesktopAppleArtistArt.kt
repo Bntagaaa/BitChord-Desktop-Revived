@@ -28,6 +28,7 @@ internal data class DesktopAppleArtistArt(
     val heroUrl: String,
     val logoUrl: String?,
     val logoAspect: Float,
+    val videoUrl: String?,
     val backgroundColor: Int,
     val textColor: Int,
     val keyColor: Int?,
@@ -44,7 +45,8 @@ internal object DesktopAppleArtistArtRepository {
     private const val CACHE_SIZE = 64
     private const val HERO_WIDTH = 1200
     private const val LOGO_WIDTH = 1000
-    private const val TIMEOUT_MS = 8_000
+    private const val TIMEOUT_MS = 4_000
+    private const val MOTION_RETRY_AFTER_MS = 15_000L
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -53,6 +55,9 @@ internal object DesktopAppleArtistArtRepository {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DesktopAppleArtistArt>): Boolean =
             size > CACHE_SIZE
     }
+    // Still art can be found even when a transient Apple response omits motion metadata.
+    // Retry that case on later visits, but not on every open.
+    private val motionCheckedAt = HashMap<String, Long>()
 
     fun cached(artistName: String): DesktopAppleArtistArt? {
         val key = artistName.normalized()
@@ -62,14 +67,25 @@ internal object DesktopAppleArtistArtRepository {
     suspend fun artFor(artistName: String): DesktopAppleArtistArt? {
         val key = artistName.normalized()
         if (key.isBlank()) return null
-        synchronized(cache) { cache[key]?.let { return it } }
+        val now = System.currentTimeMillis()
+        val existing = synchronized(cache) { cache[key] }
+        if (existing?.videoUrl != null) return existing
+        if (existing != null) {
+            val checkedAt = synchronized(cache) { motionCheckedAt[key] ?: 0L }
+            if (now - checkedAt < MOTION_RETRY_AFTER_MS) return existing
+        }
 
         val result = withContext(Dispatchers.IO) {
-            runCatching { lookup(artistName, key) }.getOrNull()
-        } ?: return null
+            runCatching { lookup(artistName, key) }
+                .onFailure { DesktopTrackLog.log("artist motion: lookup failed for $artistName: ${it.message}") }
+                .getOrNull()
+        } ?: return existing
 
-        synchronized(cache) { cache[key] = result }
-        return result
+        synchronized(cache) {
+            cache[key] = if (result.videoUrl == null && existing?.videoUrl != null) existing else result
+            motionCheckedAt[key] = now
+        }
+        return synchronized(cache) { cache[key] }
     }
 
     private fun lookup(artistName: String, key: String): DesktopAppleArtistArt? {
@@ -128,14 +144,27 @@ internal object DesktopAppleArtistArtRepository {
             null
         }
 
-        val background = parseAppleColor(hero.string("bgColor")) ?: return null
-        val textColor = parseAppleColor(hero.string("textColor1")) ?: 0xFFFFFFFF.toInt()
+        // Apple sometimes nests motion metadata outside the header selected for still art.
+        val motion = header.objectAt("videoArtwork")?.objectAt("dictionary")
+            ?.objectAt("motionArtistSquare1x1") ?: findMotionArtist(root)
+        val videoUrl = motion?.string("video")
+            ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+        DesktopTrackLog.log(
+            "artist motion: $artistName: " +
+                if (videoUrl == null) "no motion URL in Apple metadata" else "motion URL found",
+        )
+        val colors = motion?.objectAt("previewFrame")?.takeIf { videoUrl != null } ?: hero
+        val background = parseAppleColor(colors.string("bgColor"))
+            ?: parseAppleColor(hero.string("bgColor")) ?: return null
+        val textColor = parseAppleColor(colors.string("textColor1"))
+            ?: parseAppleColor(hero.string("textColor1")) ?: 0xFFFFFFFF.toInt()
         val keyColor = parseAppleColor(header.string("keyColor"))
 
         return DesktopAppleArtistArt(
             heroUrl = heroUrl,
             logoUrl = logoUrl,
             logoAspect = if (logoUrl != null) logoWidth.toFloat() / logoHeight else 1f,
+            videoUrl = videoUrl,
             backgroundColor = background,
             textColor = textColor,
             keyColor = keyColor,
@@ -166,6 +195,16 @@ internal object DesktopAppleArtistArtRepository {
             else node.values.firstNotNullOfOrNull(::findArtistHeader)
         }
         is JsonArray -> node.firstNotNullOfOrNull(::findArtistHeader)
+        else -> null
+    }
+
+    private fun findMotionArtist(node: JsonElement): JsonObject? = when (node) {
+        is JsonObject -> {
+            node["motionArtistSquare1x1"].asObject()
+                ?.takeIf { it.string("video").startsWith("http") }
+                ?: node.values.firstNotNullOfOrNull(::findMotionArtist)
+        }
+        is JsonArray -> node.firstNotNullOfOrNull(::findMotionArtist)
         else -> null
     }
 
