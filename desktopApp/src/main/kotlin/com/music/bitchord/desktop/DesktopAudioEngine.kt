@@ -16,6 +16,7 @@ import com.music.bitchord.playback.smart.echoTailSeconds
 import com.music.bitchord.playback.smart.planTransition
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -183,6 +184,12 @@ class DesktopPlaybackEngine(
         class Start(val track: Track, val playWhenReady: Boolean) : Command
         /** Replaces only the playing deck; a quality upgrade must not discard the prepared next deck. */
         class ReplaceCurrent(val track: Track, val playWhenReady: Boolean) : Command
+        /** Handoff between the audio-only and music-video versions of one queue entry. */
+        class SwitchVersion(
+            val expectedId: String,
+            val track: Track,
+            val confirmation: CompletableDeferred<Boolean>,
+        ) : Command
         class RecoverCurrent(
             val failed: Track,
             val replacement: Track,
@@ -231,6 +238,54 @@ class DesktopPlaybackEngine(
     }
 
     // ---- the surface the application uses -------------------------------
+
+    /**
+     * Prepare an alternate video/audio version while the original is still audible.
+     * Unlike [load], this does NOT flush the current song during network lookup.
+     * The audio thread validates the source id one last time and acknowledges
+     * the handoff before the UI replaces the queue entry.
+     */
+    suspend fun switchVersion(expectedId: String, replacement: Song): Boolean {
+        if (!running.get() || _state.value.song?.videoId != expectedId) return false
+        val resolved = DesktopMusicSources.resolveLive(replacement, audioQuality).getOrThrow()
+        val prepared: Track = try {
+            val active = _state.value
+            if (active.song?.videoId != expectedId) return false
+            openTrack(replacement, resolved.stream, active.positionMs.coerceAtLeast(0L))
+                .getOrThrow()
+        } finally {
+            // The version requested by the listener is resolved. Any pending
+            // automatic substitute must not replace this deliberate handoff.
+            resolved.pendingSubstitute?.cancel()
+        }
+
+        val newest = _state.value
+        if (!running.get() || newest.song?.videoId != expectedId) {
+            prepared.decoder.close()
+            return false
+        }
+        // Rebase to the current audio position, not the point at which a slow
+        // stream lookup began. The decoding worker handles this seek off-thread.
+        val newStart = newest.positionMs.coerceAtLeast(0L)
+        if (kotlin.math.abs(newStart - prepared.startUs / 1_000L) > 250L) {
+            if (!prepared.decoder.seek(newStart * 1_000L)) {
+                prepared.decoder.close()
+                return false
+            }
+            prepared.startUs = newStart * 1_000L
+        }
+
+        val confirmation = CompletableDeferred<Boolean>()
+        commands += Command.SwitchVersion(expectedId, prepared, confirmation)
+        try {
+            return confirmation.await()
+        } catch (cancelled: CancellationException) {
+            // The audio thread will close the prepared deck if it has not yet
+            // installed the handoff; an already installed one is unaffected.
+            confirmation.cancel()
+            throw cancelled
+        }
+    }
 
     fun load(song: Song, playWhenReady: Boolean = true, startAtMs: Long = 0L) {
         retryingSongId = null
@@ -1472,6 +1527,26 @@ class DesktopPlaybackEngine(
             when (command) {
                 is Command.Start -> startTrack(command.track, command.playWhenReady)
                 is Command.ReplaceCurrent -> replaceCurrent(command.track, command.playWhenReady)
+                is Command.SwitchVersion -> {
+                    // A stale network request must not replace the next song, or
+                    // interrupt the middle of an Automix crossfade / loop blend.
+                    val eligible = current?.song?.videoId == command.expectedId &&
+                        _state.value.song?.videoId == command.expectedId &&
+                        fadeRemaining <= 0 && loopRuntime == null && !displaySwitched &&
+                        !command.confirmation.isCancelled
+                    if (!eligible) {
+                        command.track.decoder.close()
+                        command.confirmation.complete(false)
+                    } else {
+                        loadGeneration.incrementAndGet()
+                        resolveJob?.cancel()
+                        upgradeJob?.cancel()
+                        recoveryJob?.cancel()
+                        recoveryJob = null
+                        replaceCurrent(command.track, playWhenReady = !paused)
+                        command.confirmation.complete(current === command.track)
+                    }
+                }
                 is Command.RecoverCurrent -> {
                     recoveryJob = null
                     val failed = command.failed
