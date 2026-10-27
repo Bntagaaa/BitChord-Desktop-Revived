@@ -20,9 +20,13 @@
 > [!IMPORTANT]
 > **Independent community project.** This repository continues development of the original PC/desktop app after its discontinuation upstream. It is a fork of [BitChord by @kushagrasinghx](https://github.com/kushagrasinghx/BitChord), but it is **not an official continuation** and is not endorsed, maintained, or supported by the original creator or upstream maintainers. We respect the original work, preserve its attribution and license, and welcome community contributions.
 
+<img width="1920" height="1080" alt="Dekstop" src="https://github.com/user-attachments/assets/fc509b28-a671-4831-9e41-65f5e93c3ae6" />
 
 
-## ✨ Highlights
+<div align="center">
+
+<h2><a id="download"></a>✨ Highlights</h2>
+
 
 - **Visual Astra interface** - refined surfaces, configurable blur, a Mica-inspired sidebar, and light/dark themes.
 - **Immersive visuals** - video Canvas artwork where available, plus Apple Music-inspired artist artwork.
@@ -30,13 +34,26 @@
 - **Your music, together** - YouTube Music search and playback, Spotify library access/import, local music, and downloads.
 - **Audio and integrations** - equalizer, crossfade, Automix (beta), Discord Rich Presence, and scrobbling.
 - **Desktop-first shortcuts** - open Quick Search with `Ctrl+K` and the shortcut guide with `Ctrl+/`.
+</div>
 
-## ⬇️ Download
+<div align="center">
 
-Get available Windows and Linux builds from [GitHub Releases](https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases).
+<h2><a id="download"></a>Download</h2>
+
+<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/main/yeyyeyyyyeyey-Artboard-1.svg" alt="Download for Android" height="55"/></a>
+<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/main/yeyyeyyyyeyey-Artboard-1-copy.svg" alt="Download for Android" height="55"/></a>
+
+**Note:** If you're looking for the Android APK, please download it from the [original BitChord repository](https://github.com/kushagrasinghx/BitChord/releases). This fork is focused on the desktop experience.
 
 
-## ⚙️ Build from source
+</div>
+
+</div>
+<div align="center">
+
+<h2><a id="download"></a>⚙️ Build from source</h2>
+
+</div>
 
 **Requirements:** Java 21 and Git.
 
@@ -52,7 +69,12 @@ Linux:
 ./gradlew :desktopApp:run
 ```
 
-## 📜 Credits and license
+</div>
+<div align="center">
+
+<h2><a id="download"></a>📜 Credits and license</h2>
+
+</div>
 
 BitChord was originally created by [@kushagrasinghx](https://github.com/kushagrasinghx). This is an independent community fork, not an official upstream release. Original attribution and license notices are preserved.
 
