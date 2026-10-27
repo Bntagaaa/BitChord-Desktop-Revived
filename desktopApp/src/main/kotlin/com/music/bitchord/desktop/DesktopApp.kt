@@ -6354,15 +6354,15 @@ private fun DesktopArtistPage(
     contentPadding: PaddingValues,
 ) {
     // Use Continued's artist metadata and caching; keep Revived's UI and behaviour.
-    val artistName = canonicalAppleArtistName(
-        (state as? UiState.Success)?.data?.name?.takeIf(String::isNotBlank) ?: fallbackName
-    )
-    val artistKey = artistName.filter(Char::isLetterOrDigit).lowercase()
+    val artistName = (state as? UiState.Success)?.data?.name?.takeIf(String::isNotBlank) ?: fallbackName
+    // Canonicalize only the metadata lookup. The artist's displayed name stays Revived's.
+    val lookupName = canonicalAppleArtistName(artistName)
+    val artistKey = lookupName.filter(Char::isLetterOrDigit).lowercase()
     var appleArt by remember(artistKey) {
-        mutableStateOf(DesktopAppleArtistArtRepository.cached(artistName))
+        mutableStateOf(DesktopAppleArtistArtRepository.cached(lookupName))
     }
     LaunchedEffect(artistKey) {
-        appleArt = DesktopAppleArtistArtRepository.artFor(artistName)
+        appleArt = DesktopAppleArtistArtRepository.artFor(lookupName)
     }
     DesktopPageScaffold(contentPadding) {
         when (state) {
