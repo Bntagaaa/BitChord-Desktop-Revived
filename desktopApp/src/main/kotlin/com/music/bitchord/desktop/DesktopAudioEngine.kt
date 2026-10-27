@@ -1929,6 +1929,7 @@ class DesktopPlaybackEngine(
         }
         loopRuntime = null
         loopAttemptedPair = null
+        _state.update { it.copy(mixing = false) }
         DesktopPlayerSettings.automixDetail.value = null
     }
 
