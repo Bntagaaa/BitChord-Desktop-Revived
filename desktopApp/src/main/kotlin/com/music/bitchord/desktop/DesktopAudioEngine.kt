@@ -1543,6 +1543,14 @@ class DesktopPlaybackEngine(
                         upgradeJob?.cancel()
                         recoveryJob?.cancel()
                         recoveryJob = null
+                        // It is still the same listen: keep scrobble thresholds and
+                        // YouTube watchtime history across the media-id change.
+                        DesktopPlaybackTracker.onVersionSwapped(
+                            command.expectedId, command.track.song.videoId,
+                        )
+                        DesktopScrobbling.onVersionSwapped(
+                            command.expectedId, command.track.song.videoId,
+                        )
                         replaceCurrent(command.track, playWhenReady = !paused)
                         command.confirmation.complete(current === command.track)
                     }
