@@ -53,6 +53,12 @@ interface PlayerHost {
     val musicVideoSupported: Boolean get() = false
 
     /**
+     * Phones use physical landscape for fullscreen video. Desktop windows are
+     * landscape by default, so only enter video fullscreen when clicked.
+     */
+    val musicVideoFullscreenOnRequest: Boolean get() = false
+
+    /**
      * The playing music video's picture, fitted into these bounds ([fit]) or
      * cropped to fill them. Draws nothing until a frame of [videoId] has
      * landed, reported through [onRenderedChanged], so the caller keeps its
