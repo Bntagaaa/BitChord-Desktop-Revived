@@ -3274,6 +3274,70 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         openArtist(browseId, name)
     }
 
+    // Upstream v1.8.2 already exposes resolveAudio/resolveVideo and the shared
+    // music-video surface. The desktop had no UI action connecting them.
+    var musicVersionSwitching by remember { mutableStateOf(false) }
+
+    fun switchMusicVideo(song: Song) {
+        if (musicVersionSwitching || playbackEngine.state.value.isLoading) return
+        if (DesktopListenTogether.state.value.inParty) {
+            DesktopPlayerHost.showMessage("Version switching is unavailable during Listen Together")
+            return
+        }
+        if (song.localUri != null ||
+            !DesktopSearchClient.isVideoId(song.videoId) ||
+            liveQueue.current?.videoId != song.videoId
+        ) return
+
+        musicVersionSwitching = true
+        scope.launch {
+            try {
+                val alternate = withContext(Dispatchers.IO) {
+                    if (song.isVideo) YtMusicRepository.resolveAudio(song)
+                    else YtMusicRepository.resolveVideo(song)
+                }
+                // A long search must never replace whatever Next or a queue jump has started.
+                if (liveQueue.current?.videoId != song.videoId ||
+                    selectedSong?.videoId != song.videoId ||
+                    DesktopListenTogether.state.value.inParty
+                ) return@launch
+
+                val switched = alternate?.let { song.withMusicVersion(it, toVideo = !song.isVideo) }
+                if (switched == null || !DesktopSearchClient.isVideoId(switched.videoId)) {
+                    DesktopPlayerHost.showMessage(
+                        if (song.isVideo) "No matching audio recording found"
+                        else "No matching music video found",
+                    )
+                    return@launch
+                }
+
+                val engineState = playbackEngine.state.value
+                if (engineState.song?.videoId != song.videoId) return@launch
+                val resumeAt = engineState.positionMs.coerceAtLeast(0L)
+                val resumePlaying = engineState.isPlaying
+
+                // Preserve the current queue entry and its Next/Previous neighbours.
+                liveQueue = liveQueue.replaceCurrentVersion(song.videoId, switched)
+                selectedSong = switched
+                saveQueue()
+                // The desktop FFmpeg audio decoder remains the clock; the video surface
+                // is silent and follows that clock, so sound is never played twice.
+                playbackEngine.load(switched, resumePlaying, resumeAt)
+                DesktopTrackLog.log(
+                    "music video: ${if (switched.isVideo) "video" else "audio"} version " +
+                        "${song.videoId} -> ${switched.videoId} at ${resumeAt}ms",
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                DesktopTrackLog.log("music video switch failed: ${failure.message}")
+                DesktopPlayerHost.showMessage("Could not switch music version")
+            } finally {
+                musicVersionSwitching = false
+            }
+        }
+    }
+
     /** The song menu's verbs for [song], as the player sheet offers them. */
     fun playerSongActions(song: Song) = DesktopSongActions(
         signedIn = youtubeSignedIn,
@@ -3995,7 +4059,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             isLoading = playback.isLoading,
                             position = playerPosition,
                             durationMs = playback.durationMs,
-                            audioVersionSwitching = false,
+                            audioVersionSwitching = musicVersionSwitching,
                             qualityUpgraded = false,
                             queue = liveQueue.songs,
                             queueIndex = liveQueue.index,
@@ -4119,6 +4183,11 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                                         playbackEngine.reloadCurrent(forceSourceRefresh = true)
                                     }.takeIf { DesktopOriginalVersion.isPinned(current.videoId) },
                                     onDismiss = { playerMenuOpen = false },
+                                    onSwitchVersion = { switchMusicVideo(current) }.takeIf {
+                                        current.localUri == null &&
+                                            DesktopSearchClient.isVideoId(current.videoId) &&
+                                            !DesktopListenTogether.state.value.inParty
+                                    },
                                 )
                             }
                         }
