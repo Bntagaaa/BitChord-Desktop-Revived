@@ -67,7 +67,7 @@ internal object DesktopAppUiHost : AppUiHost {
         val art = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             DesktopAppleArtistArtRepository.artFor(artistName)
         } ?: return null
-        val url = art.motionUrl ?: return null
+        val url = art.videoUrl ?: return null
         return com.music.bitchord.data.canvas.CanvasArtwork(url = url, artist = artistName)
     }
 
