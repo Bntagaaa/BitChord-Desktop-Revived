@@ -6353,19 +6353,15 @@ private fun DesktopArtistPage(
     onToggleSubscription: ((SubscriptionState) -> Unit)?,
     contentPadding: PaddingValues,
 ) {
-    // Resolve motion as soon as navigation begins, without waiting for the artist page request.
+    // Begin resolving Apple motion artwork as soon as Artist navigation starts,
+    // in parallel with the YouTube Music artist page request. Waiting for Success
+    // added an avoidable second round of network latency before autoplay.
     val artistName = (state as? UiState.Success)?.data?.name?.takeIf(String::isNotBlank) ?: fallbackName
     var appleArt by remember(artistName) {
         mutableStateOf(DesktopAppleArtistArtRepository.cached(artistName))
     }
     LaunchedEffect(artistName) {
-        // Keep the still image underneath while retrying short Apple requests. Stop as soon as motion is found.
-        while (isActive && appleArt?.hasMotion != true) {
-            val latest = DesktopAppleArtistArtRepository.artFor(artistName, forceRefresh = true)
-            if (latest != null) appleArt = latest
-            if (appleArt?.hasMotion == true) break
-            delay(15_000L)
-        }
+        appleArt = DesktopAppleArtistArtRepository.artFor(artistName) ?: appleArt
     }
     DesktopPageScaffold(contentPadding) {
         when (state) {
@@ -6563,15 +6559,14 @@ private fun DesktopArtistBanner(
             modifier = Modifier.matchParentSize(),
         )
 
-        // Apple artist motion sits over the still image and never tints the playing track's backdrop.
-        val motionUrl = appleArt?.wideVideoUrl ?: appleArt?.squareVideoUrl
-        if (motionUrl != null) {
+        // Apple's motion artist video is only mounted while this artist banner is composed.
+        // The still hero remains underneath until the first HLS frame is decoded.
+        appleArt?.videoUrl?.let { url ->
             DesktopCanvasView(
-                url = motionUrl,
+                url = url,
                 modifier = Modifier.matchParentSize(),
-                fallbackUrl = appleArt?.squareVideoUrl?.takeIf { it != motionUrl },
-                maxEdge = 960,
-                publishBackdrop = false,
+                contentScale = ContentScale.Crop,
+                publishBackdrop = false, // Preserve the playing track's backdrop.
             )
         }
 
