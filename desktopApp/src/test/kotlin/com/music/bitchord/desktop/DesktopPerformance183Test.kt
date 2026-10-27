@@ -89,30 +89,28 @@ class DesktopPerformance183Test {
 
     @Test
     fun testPerformanceProfileBlurBehavior() {
-        // Under PERFORMANCE profile, dynamic blur is disabled even if reduceDynamicBlur is false and selected is true
-        assertFalse(
-            effectiveDesktopBlur(
-                reduceDynamicBlur = false,
-                selected = true,
-                profile = DesktopPerformanceProfile.PERFORMANCE,
-            ),
-        )
-
-        // Under FULL profile, when reduceDynamicBlur is false, user selection is respected
-        assertTrue(
-            effectiveDesktopBlur(
-                reduceDynamicBlur = false,
-                selected = true,
-                profile = DesktopPerformanceProfile.FULL,
-            ),
-        )
-        assertFalse(
-            effectiveDesktopBlur(
-                reduceDynamicBlur = false,
-                selected = false,
-                profile = DesktopPerformanceProfile.FULL,
-            ),
-        )
+        // Settings now exposes only Reduce Blur. Legacy graphics profiles and per-area
+        // selections must not override the one visible user setting.
+        for (profile in DesktopPerformanceProfile.entries) {
+            for (selected in listOf(true, false)) {
+                assertTrue(
+                    "Blur should be enabled with Reduce Blur off (profile=$profile, selected=$selected)",
+                    effectiveDesktopBlur(
+                        reduceDynamicBlur = false,
+                        selected = selected,
+                        profile = profile,
+                    ),
+                )
+                assertFalse(
+                    "Blur must be disabled with Reduce Blur on (profile=$profile, selected=$selected)",
+                    effectiveDesktopBlur(
+                        reduceDynamicBlur = true,
+                        selected = selected,
+                        profile = profile,
+                    ),
+                )
+            }
+        }
     }
 
     @Test
