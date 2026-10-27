@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +39,9 @@ internal fun DesktopAudioOutputDialog(onDismiss: () -> Unit) {
     val selected by DesktopAudioDevices.selected.collectAsState()
     val changes by DesktopAudioDevices.changes.collectAsState()
     val devices = remember(changes) { DesktopAudioDevices.available() }
+    var showAdvanced by remember { mutableStateOf(false) }
+    val advanced = devices.filter(DesktopAudioDevices::isAdvancedDevice)
+    val visible = devices.filter { !DesktopAudioDevices.isAdvancedDevice(it) || showAdvanced || it.id == selected }
     DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 440, dismissOnEscape = true) {
         Column(Modifier.padding(horizontal = panelInset(22.dp), vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
@@ -58,11 +63,24 @@ internal fun DesktopAudioOutputDialog(onDismiss: () -> Unit) {
                 DesktopAudioDevices.select(DesktopAudioDevices.SYSTEM_DEFAULT)
                 onDismiss()
             }
-            devices.forEach { device ->
+            visible.forEach { device ->
                 OutputRow(device.name, device.description, chosen = selected == device.id) {
                     DesktopAudioDevices.select(device.id)
                     onDismiss()
                 }
+            }
+            if (advanced.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (showAdvanced) "Hide advanced audio devices" else "Show advanced audio devices (${advanced.size})",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { showAdvanced = !showAdvanced }
+                        .padding(horizontal = panelInset(12.dp), vertical = 12.dp),
+                    color = DesktopSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }
