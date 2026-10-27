@@ -22,7 +22,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import bitchord.desktopapp.generated.resources.Res
-import bitchord.desktopapp.generated.resources.logo
+import bitchord.desktopapp.generated.resources.app_icon
 import java.awt.Dimension
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -93,7 +93,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         onCloseRequest = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },
         visible = visible,
         title = "BitChord",
-        icon = painterResource(Res.drawable.logo),
+        icon = painterResource(Res.drawable.app_icon),
         state = state,
         // The peer must be opaque and decorated from creation. Windows owns the entire
         // non-client frame: caption, drag, resize, system menu and Snap.
