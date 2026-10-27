@@ -66,10 +66,15 @@ internal object DesktopPlayerHost : PlayerHost {
         DesktopMusicVideoSurface(videoId, fit, onRenderedChanged, modifier)
     }
 
-    override fun cachedCanvas(song: Song): CanvasArtwork? = DesktopCanvasClient.cached(song)?.toShared()
+    override fun cachedCanvas(song: Song): CanvasArtwork? =
+        DesktopCanvasClient.cached(song)
+            ?.takeUnless { it.source == DesktopCanvasSource.SPOTIFY }
+            ?.toShared()
 
     override suspend fun canvasFor(song: Song): CanvasArtwork? =
-        withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(song) }?.toShared()
+        withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(song) }
+            ?.takeUnless { it.source == DesktopCanvasSource.SPOTIFY }
+            ?.toShared()
 
     @Composable
     override fun CanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) = DesktopCanvasVideo(spec, modifier)
