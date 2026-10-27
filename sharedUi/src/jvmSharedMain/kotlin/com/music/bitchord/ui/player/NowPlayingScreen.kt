@@ -832,6 +832,8 @@ fun NowPlayingScreen(
     // is the whole screen. The full-screen buttons turn the phone's screen
     // rather than switching a layout.
     val screenOrientation = rememberScreenOrientation()
+    val videoFullscreenOnRequest = PlayerPlatform.host.musicVideoFullscreenOnRequest
+    var videoFullscreenRequested by remember(song.videoId) { mutableStateOf(false) }
     var canvasAspect by remember(canvas) { mutableFloatStateOf(0f) }
     // Whether the clip actually has a frame on screen right now, and one of
     // them — used to blow the sleeve out to the full-bleed hero treatment and
@@ -1036,6 +1038,11 @@ fun NowPlayingScreen(
     // Controls being visible must not insert an extra navigation level. Back
     // always leaves lyrics in one step, whether it starts over the lyrics list
     // or over the half-player at the bottom.
+    // On desktop, Escape first exits fullscreen video, without closing Now Playing.
+    // Mobile still uses its normal physical-orientation handling.
+    PlayerBackHandler(enabled = videoFullscreenOnRequest && videoFullscreenRequested) {
+        videoFullscreenRequested = false
+    }
     PlayerBackHandler(enabled = lyricsOpen, onBack = closeLyrics)
 
     // Back out of the queue to the player.
@@ -1626,6 +1633,12 @@ fun NowPlayingScreen(
     // queue in turn, and in landscape none of them has anything to do — the
     // sleeve never has to get out of anything's way.
     val landscape = landscapePlayerAvailable(windowWidth, windowHeight)
+    // Desktop is almost always wider than tall. Do not force music videos into
+    // fullscreen just because the window has a landscape aspect ratio.
+    val fullVideo = videoMode && (
+        if (videoFullscreenOnRequest) videoFullscreenRequested else landscape
+    )
+    val landscapeLayout = landscape && !(videoMode && videoFullscreenOnRequest)
     // Tablet-sized players use the full-cover blur in all three states. On a
     // phone only the lyrics and queue replace the main player's seam-aware,
     // reflected mesh; the main player deliberately keeps its existing look.
@@ -1762,7 +1775,7 @@ fun NowPlayingScreen(
         label = "playerTint",
     )
     CompositionLocalProvider(LocalPlayerTint provides playerTint) {
-        if (landscape && videoMode) {
+        if (fullVideo) {
             val versionAligning by PlayerSettings.versionAlignmentInProgress.collectAsStateWithLifecycle()
             val transitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
             Box(modifier = modifier.fillMaxSize().then(dockHost)) {
@@ -1772,7 +1785,10 @@ fun NowPlayingScreen(
                     artRequest = art.request,
                     rendered = videoRendered,
                     onRenderedChanged = { videoRendered = it },
-                    onExitFullscreen = screenOrientation::portrait,
+                    onExitFullscreen = {
+                        if (videoFullscreenOnRequest) videoFullscreenRequested = false
+                        else screenOrientation.portrait()
+                    },
                     onOpenQuality = { showVideoQuality = true },
                     scrubber = {
                         PlayerScrubber(
@@ -1810,7 +1826,7 @@ fun NowPlayingScreen(
                 )
                 playerOverlays()
             }
-        } else if (landscape) {
+        } else if (landscapeLayout) {
             // Paused always wins outright over a scrub in progress — see
             // [ARTWORK_PAUSE_SHRINK_SCALE].
             val landscapeArtScale by animateFloatAsState(
@@ -3327,7 +3343,10 @@ fun NowPlayingScreen(
                                     )
                                     VideoCornerControls(
                                         fullscreen = false,
-                                        onToggleFullscreen = screenOrientation::landscape,
+                                        onToggleFullscreen = {
+                                            if (videoFullscreenOnRequest) videoFullscreenRequested = true
+                                            else screenOrientation.landscape()
+                                        },
                                         onOpenQuality = { showVideoQuality = true },
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
