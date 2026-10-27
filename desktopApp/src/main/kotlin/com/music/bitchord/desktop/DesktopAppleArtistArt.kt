@@ -28,7 +28,6 @@ internal data class DesktopAppleArtistArt(
     val heroUrl: String,
     val logoUrl: String?,
     val logoAspect: Float,
-    /** Apple Music motionArtistSquare1x1 HLS video, when available. */
     val videoUrl: String?,
     val backgroundColor: Int,
     val textColor: Int,
@@ -46,8 +45,8 @@ internal object DesktopAppleArtistArtRepository {
     private const val CACHE_SIZE = 64
     private const val HERO_WIDTH = 1200
     private const val LOGO_WIDTH = 1000
-    private const val TIMEOUT_MS = 8_000
-    private const val MOTION_RETRY_AFTER_MS = 10 * 60 * 1_000L
+    private const val TIMEOUT_MS = 4_000
+    private const val MOTION_RETRY_AFTER_MS = 15_000L
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -56,8 +55,8 @@ internal object DesktopAppleArtistArtRepository {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DesktopAppleArtistArt>): Boolean =
             size > CACHE_SIZE
     }
-    // A still-art hit does not prove Apple supplied motion metadata. Allow revisits to retry,
-    // but avoid hammering Apple's endpoints on every page open.
+    // Still art can be found even when a transient Apple response omits motion metadata.
+    // Retry that case on later visits, but not on every open.
     private val motionCheckedAt = HashMap<String, Long>()
 
     fun cached(artistName: String): DesktopAppleArtistArt? {
@@ -83,7 +82,6 @@ internal object DesktopAppleArtistArtRepository {
         } ?: return existing
 
         synchronized(cache) {
-            // A transient response without motion must not replace a previously discovered clip.
             cache[key] = if (result.videoUrl == null && existing?.videoUrl != null) existing else result
             motionCheckedAt[key] = now
         }
@@ -146,16 +144,14 @@ internal object DesktopAppleArtistArtRepository {
             null
         }
 
-        // Match the upstream BitChord artist header source; this is distinct from Spotify Canvas.
-        // Apple can store videoArtwork outside the selected hero/logo header object.
+        // Apple sometimes nests motion metadata outside the header selected for still art.
         val motion = header.objectAt("videoArtwork")?.objectAt("dictionary")
-            ?.objectAt("motionArtistSquare1x1")
-            ?: findMotionArtist(root)
+            ?.objectAt("motionArtistSquare1x1") ?: findMotionArtist(root)
         val videoUrl = motion?.string("video")
             ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
         DesktopTrackLog.log(
             "artist motion: $artistName: " +
-                if (videoUrl == null) "no motion URL in Apple metadata" else "motion URL found"
+                if (videoUrl == null) "no motion URL in Apple metadata" else "motion URL found",
         )
         val colors = motion?.objectAt("previewFrame")?.takeIf { videoUrl != null } ?: hero
         val background = parseAppleColor(colors.string("bgColor"))
@@ -202,7 +198,6 @@ internal object DesktopAppleArtistArtRepository {
         else -> null
     }
 
-    /** Finds motion video even when Apple nests it outside the selected header object. */
     private fun findMotionArtist(node: JsonElement): JsonObject? = when (node) {
         is JsonObject -> {
             node["motionArtistSquare1x1"].asObject()
