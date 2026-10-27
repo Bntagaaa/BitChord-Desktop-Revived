@@ -283,8 +283,7 @@ fun DesktopCanvasView(
     contentScale: ContentScale = ContentScale.Crop,
     /** Tried once if [url] will not decode — the Apple provider's second rendition of the clip. */
     fallbackUrl: String? = null,
-    maxEdge: Int = 720,
-    /** Off for clips that are not the playing track's, so the player's backdrop is left alone. */
+    maxEdge: Int = 540,
     publishBackdrop: Boolean = true,
 ) {
     var frame by remember(url) { mutableStateOf<ImageBitmap?>(null) }
@@ -298,30 +297,33 @@ fun DesktopCanvasView(
         // and the clip then stopped dead on its last frame for the rest of the song.
         while (isActive) {
             val decoder = DesktopCanvasDecoder(maxEdge)
+            val opened = withContext(Dispatchers.IO) {
+                var last: Result<Unit> = Result.failure(IllegalStateException("the clip could not be fetched"))
+                for (candidate in listOfNotNull(url, fallbackUrl)) {
+                    // A manifest names its segments relative to the host it came from, so saving the
+                    // playlist to disk and opening that leaves FFmpeg with nothing it can resolve.
+                    // Apple's motion artwork is HLS, which is how "could not open the clip" happened.
+                    val source = if (isManifest(candidate)) {
+                        candidate
+                    } else {
+                        DesktopCanvasCache.fileFor(candidate)?.toAbsolutePath()?.toString() ?: continue
+                    }
+                    last = decoder.open(source)
+                    if (last.isSuccess) break
+                }
+                last
+            }
+            if (opened.isFailure) {
+                DesktopTrackLog.log(
+                    "canvas: open failed; retrying in ${retryDelayMs}ms (${opened.exceptionOrNull()?.message})",
+                )
+                withContext(Dispatchers.IO) { decoder.close() }
+                delay(retryDelayMs)
+                retryDelayMs = (retryDelayMs * 2).coerceAtMost(10_000L)
+                continue
+            }
             var shown = 0
             try {
-                val opened = withContext(Dispatchers.IO) {
-                    var last: Result<Unit> = Result.failure(IllegalStateException("the clip could not be fetched"))
-                    for (candidate in listOfNotNull(url, fallbackUrl)) {
-                        val source = if (isManifest(candidate)) {
-                            candidate
-                        } else {
-                            DesktopCanvasCache.fileFor(candidate)?.toAbsolutePath()?.toString() ?: continue
-                        }
-                        last = decoder.open(source)
-                        if (last.isSuccess) break
-                    }
-                    last
-                }
-                if (opened.isFailure) {
-                    DesktopTrackLog.log(
-                        "canvas: open failed; retrying in ${retryDelayMs}ms (${opened.exceptionOrNull()?.message})",
-                    )
-                    withContext(Dispatchers.IO) { decoder.close() }
-                    delay(retryDelayMs)
-                    retryDelayMs = (retryDelayMs * 2).coerceAtMost(10_000L)
-                    continue
-                }
                 val pixels = ByteArray(decoder.width * decoder.height * 4)
                 val info = ImageInfo.makeN32(decoder.width, decoder.height, ColorAlphaType.OPAQUE)
                 while (isActive) {
@@ -351,16 +353,14 @@ fun DesktopCanvasView(
                 retryDelayMs = (retryDelayMs * 2).coerceAtMost(10_000L)
             } else {
                 retryDelayMs = 1_000L
-                // Reopen a fresh HLS demuxer at EOF without spinning at full CPU.
+                // The next pass opens a fresh HLS demuxer. A short pause avoids a tight loop at EOF.
                 delay(250L)
             }
         }
     }
 
     DisposableEffect(url, publishBackdrop) {
-        onDispose {
-            if (publishBackdrop) DesktopCanvasBackdrop.clear(url)
-        }
+        onDispose { if (publishBackdrop) DesktopCanvasBackdrop.clear(url) }
     }
 
     // Nothing at all until the first frame: a placeholder here would flash between the still cover
