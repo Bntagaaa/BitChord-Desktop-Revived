@@ -14,7 +14,6 @@ import com.music.bitchord.ui.player.MusicVideoQualityUi
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.jetbrains.skia.*
-import kotlin.math.abs
 
 /** One silent video deck for all visible surfaces; the existing audio engine owns the clock. */
 internal object DesktopMusicVideo {
@@ -47,20 +46,36 @@ internal object DesktopMusicVideo {
                         quality.value = MusicVideoQualityUi(stream.heights, height, stream.height)
                         val pixels = ByteArray(decoder.width * decoder.height * 4)
                         var lastSeek = -1
-                        var lastPosition = -1L
+                        var lastTargetMs: Long? = null
+                        var reachedEnd = false
                         while (currentCoroutineContext().isActive) {
                             val audio = DesktopPlayerHost.videoClock.value
                             if (audio.song?.videoId != id || audio.awaitingAudio) { delay(30); continue }
                             if (!audio.isPlaying && frame.value != null && lastSeek == audio.seeks) { delay(30); continue }
-                            val target = videoClockPosition(audio, DesktopPlayerHost.videoSpeed)
-                            if (lastSeek != audio.seeks || (lastPosition >= 0 && abs(target - lastPosition) > 1500)) {
-                                decoder.seekTo(target)
+                            val target = videoClockPosition(audio, DesktopPlayerHost.videoSpeed).coerceAtLeast(0L)
+                            val previousTarget = lastTargetMs
+                            // A rewind or seek jumps the *audio* clock. Compare clock samples,
+                            // not video PTS: an FFmpeg seek lands on an earlier keyframe, and
+                            // repeatedly comparing that frame to target would seek forever.
+                            val clockJump = previousTarget != null &&
+                                (target < previousTarget - 750 || target > previousTarget + 2_000)
+                            lastTargetMs = target
+                            if (lastSeek != audio.seeks || clockJump) {
+                                if (!decoder.seekTo(target)) { delay(100); continue }
                                 lastSeek = audio.seeks
+                                reachedEnd = false
                             }
-                            if (!decoder.nextFrame(pixels)) break
-                            lastPosition = decoder.frameTimeMs
-                            if (lastPosition + 80 < target) continue
-                            val wait = ((lastPosition - target) / DesktopPlayerHost.videoSpeed.coerceAtLeast(.1f)).toLong()
+                            // Keep the deck alive at EOF. Repeat-one rewinds the audio clock
+                            // without changing the video id, so collectLatest never restarts it.
+                            if (reachedEnd) { delay(100); continue }
+                            if (!decoder.nextFrame(pixels)) {
+                                reachedEnd = true
+                                delay(100)
+                                continue
+                            }
+                            val frameTime = decoder.frameTimeMs
+                            if (frameTime + 80 < target) continue
+                            val wait = ((frameTime - target) / DesktopPlayerHost.videoSpeed.coerceAtLeast(.1f)).toLong()
                             if (wait > 0) delay(wait.coerceAtMost(1000))
                             frame.value = id to VideoFrame(decoder.width, decoder.height, pixels.copyOf())
                         }
