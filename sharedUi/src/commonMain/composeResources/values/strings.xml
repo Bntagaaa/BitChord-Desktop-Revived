@@ -192,8 +192,6 @@
     <string name="sign_in">Sign in</string>
     <string name="sign_in_youtube_music">Sign in to YouTube Music</string>
     <string name="subscriptions">Subscriptions</string>
-    <string name="switch_to_grid_view">Switch to grid view</string>
-    <string name="switch_to_list_view">Switch to list view</string>
     <string name="your_replay">Your Replay</string>
     <string name="your_listening_experience">Your listening experience</string>
     <string name="default_replay_holder">BitChord listener</string>
