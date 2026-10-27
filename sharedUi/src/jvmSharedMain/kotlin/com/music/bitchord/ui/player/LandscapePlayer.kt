@@ -428,13 +428,15 @@ internal fun LandscapeCredits(
         ) {
             Column {
                 var titleOverflowing by remember { mutableStateOf(false) }
+                val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
                 MarqueeText(
                     text = song.title,
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     onOverflowChange = { titleOverflowing = it },
-                    leading = if (song.isExplicit == true) {
-                        { ExplicitBadge(Color.White) }
+                    // After the title, in the artist line's colour.
+                    trailing = if (song.isExplicit == true) {
+                        { ExplicitBadge(artistColor) }
                     } else {
                         null
                     },
@@ -457,9 +459,9 @@ internal fun LandscapeCredits(
         }
         Spacer(Modifier.width(10.dp))
         // Same gate as the portrait player's: no account to like against for a
-        // guest, and no YouTube identity to rate a local file or a finished
-        // download against either.
-        if (signedIn && song.localUri == null) {
+        // guest — but a local file or a finished download is liked on the
+        // device, which needs none.
+        if (signedIn || song.localUri != null) {
             val liked = likeStatus == LikeStatus.LIKE
             CircleGlyph(
                 icon = if (liked) BitChordIcons.HeartFilled else BitChordIcons.Heart,

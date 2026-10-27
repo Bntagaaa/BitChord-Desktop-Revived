@@ -27,8 +27,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import coil3.compose.LocalPlatformContext
+import com.music.bitchord.ui.graphics.FADE_CURVE_STOPS
 import com.music.bitchord.ui.graphics.forPixelAccess
 import com.music.bitchord.ui.graphics.paletteSwatches
+import com.music.bitchord.ui.graphics.smootherStep
 import com.music.bitchord.ui.graphics.toImageBitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -121,9 +123,10 @@ fun MeshGradientBackground(
     // Read in the draw lambda, not here: an Animatable read during draw
     // invalidates only the drawing, leaving composition out of the loop.
     val phase = remember { Animatable(0f) }
-    LaunchedEffect(trackKey, reduceAnimation, continuous, animated) {
+    LaunchedEffect(trackKey, reduceAnimation, continuous, animated, paused) {
         when {
             !animated || reduceAnimation -> phase.snapTo(0f)
+            paused -> Unit
             // A full turn at a time, restarted rather than looped with an
             // infinite spec: the blobs' speeds are irrational multiples of each
             // other, so the pattern never repeats, and a linear phase keeps the
@@ -183,8 +186,14 @@ fun MeshGradientBackground(
             )
             val radius = size.maxDimension * 0.62f
             drawCircle(
+                // Along smootherstep rather than a straight falloff: a straight one
+                // stops dead at the rim, and that corner showed as a ring where each
+                // blob ended, even through the blur.
                 brush = Brush.radialGradient(
-                    colors = listOf(color.copy(alpha = 0.85f), color.copy(alpha = 0f)),
+                    colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
+                        val t = i / FADE_CURVE_STOPS.toFloat()
+                        t to color.copy(alpha = BLOB_ALPHA * (1f - smootherStep(t)))
+                    },
                     center = center,
                     radius = radius,
                 ),
@@ -204,6 +213,9 @@ fun MeshGradientBackground(
         )
     }
 }
+
+/** A blob's opacity at its centre. */
+private const val BLOB_ALPHA = 0.85f
 
 /**
  * Loads the artwork with Coil (software bitmap, thumbnail-sized) and pulls a
