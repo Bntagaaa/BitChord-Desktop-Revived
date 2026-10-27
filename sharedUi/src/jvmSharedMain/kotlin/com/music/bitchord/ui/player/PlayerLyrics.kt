@@ -107,6 +107,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -2501,11 +2502,20 @@ private fun LyricLine.withoutBracketPunctuation(): LyricLine = copy(
 
 private fun String.stripParens(): String = replace("(", "").replace(")", "").trim()
 
+/** The strip's fixed line box — about what Latin type at 16sp makes of itself. */
+private val STRIP_LINE_HEIGHT = 20.sp
+
+/** How much of a line's own length it spends fading out at the end, clamped to this range. */
+private const val LYRIC_FADE_FRACTION = 0.28f
+private const val LYRIC_FADE_MIN_MS = 160f
+private const val LYRIC_FADE_MAX_MS = 700f
+
 /**
  * The single lyric line above the scrubber.
  *
- * Transitions between lines use [AnimatedContent] with vertical slide and
- * fade, respecting [PlayerSettings.reduceAnimation].
+ * The line fades out as it nears its end, and the next one slides up in its
+ * place — [AnimatedContent] carries the slide, respecting
+ * [PlayerSettings.reduceAnimation].
  */
 @Composable
 private fun CurrentLyricLine(
@@ -2518,6 +2528,16 @@ private fun CurrentLyricLine(
     modifier: Modifier = Modifier,
 ) {
     val isSynced = remember(lines) { lines.any { it.timeMs > 0L } }
+    // One line box whatever the script: left to the font, a Devanagari or
+    // Gurmukhi line is taller than a Latin one and the credits and artwork
+    // above this strip shift up and down as lines change language.
+    val stripStyle = MaterialTheme.typography.titleMedium.copy(
+        lineHeight = STRIP_LINE_HEIGHT,
+        lineHeightStyle = LineHeightStyle(
+            alignment = LineHeightStyle.Alignment.Center,
+            trim = LineHeightStyle.Trim.None,
+        ),
+    )
     if (!isSynced) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -2527,7 +2547,7 @@ private fun CurrentLyricLine(
                 .padding(vertical = 4.dp),
         ) {
             Icon(
-                imageVector = BitChordIcons.MusicNote,
+                imageVector = BitChordIcons.Instrumental,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(16.dp),
@@ -2535,7 +2555,7 @@ private fun CurrentLyricLine(
             Spacer(Modifier.width(6.dp))
             Text(
                 text = stringResource(Res.string.open_lyrics),
-                style = MaterialTheme.typography.titleMedium,
+                style = stripStyle,
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -2593,7 +2613,7 @@ private fun CurrentLyricLine(
     ) {
         if (instrumental) {
             Icon(
-                imageVector = BitChordIcons.MusicNote,
+                imageVector = BitChordIcons.Instrumental,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(16.dp),
@@ -2609,8 +2629,10 @@ private fun CurrentLyricLine(
                         SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> snap() })
                     )
                 } else {
-                    (fadeIn(animationSpec = tween(duration, easing = FastOutSlowInEasing)) +
-                        slideInVertically(animationSpec = tween(duration, easing = FastOutSlowInEasing)) { height -> (height * 0.35f).toInt() })
+                    // The arriving line is not faded in: each line's own dynamic
+                    // fade (see the content below) has already taken the old line
+                    // out, so the new one slides straight up at full strength.
+                    slideInVertically(animationSpec = tween(duration, easing = FastOutSlowInEasing)) { height -> (height * 0.35f).toInt() }
                         .togetherWith(
                             fadeOut(animationSpec = tween(duration, easing = FastOutSlowInEasing)) +
                                 slideOutVertically(animationSpec = tween(duration, easing = FastOutSlowInEasing)) { height -> -(height * 0.35f).toInt() }
@@ -2621,9 +2643,25 @@ private fun CurrentLyricLine(
             },
             label = "currentLyricTransition",
             modifier = Modifier.weight(1f, fill = false),
-        ) { (_, lineItem, lineText) ->
+        ) { (itemIndex, lineItem, lineText) ->
             val itemInstrumental = lineItem == null || lineItem.isGap
             val swept = lineItem?.takeIf { !itemInstrumental && it.isWordSynced }
+            // Each line carries its own fade, read against its own end: the line
+            // leaving the strip is already faded out and stays that way while it
+            // slides off, and the one arriving is at full strength from its
+            // first frame. A single fade on the row would hand the old line the
+            // new line's alpha the instant the index changed.
+            val fading = Modifier.graphicsLayer {
+                if (itemInstrumental) return@graphicsLayer
+                val start = lines.getOrNull(itemIndex)?.timeMs ?: 0L
+                val end = lines.getOrNull(itemIndex + 1)?.timeMs
+                    ?: durationMs.takeIf { it > start }
+                    ?: (start + 4_000L)
+                val fade = ((end - start) * LYRIC_FADE_FRACTION)
+                    .coerceIn(LYRIC_FADE_MIN_MS, LYRIC_FADE_MAX_MS)
+                val remaining = (end - clock.longValue).toFloat()
+                alpha = 0.78f * (remaining / fade).coerceIn(0f, 1f)
+            }
             if (swept != null) {
                 SweptLyricLine(
                     line = swept,
@@ -2633,9 +2671,11 @@ private fun CurrentLyricLine(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     rise = false,
+                    modifier = fading,
                 )
             } else {
                 Text(
+                    modifier = fading,
                     text = lineText,
                     style = MaterialTheme.typography.titleMedium,
                     color = if (itemInstrumental) Color.White.copy(alpha = 0.5f) else Color.White,
