@@ -270,6 +270,12 @@ internal object DesktopCanvasCache {
     }
 }
 
+/** A successful open can still decode zero frames. Prioritise a second rendition on retry. */
+internal fun canvasSourceOrder(primary: String, fallback: String?, preferred: String = primary): List<String> {
+    val candidates = listOfNotNull(primary, fallback).distinct()
+    return if (preferred == fallback && fallback != primary) candidates.reversed() else candidates
+}
+
 /** The motion artwork, drawn as frames rather than played by a native child. */
 @Composable
 fun DesktopCanvasView(
@@ -288,6 +294,7 @@ fun DesktopCanvasView(
     LaunchedEffect(url, fallbackUrl, isPlaying, maxEdge, publishBackdrop) {
         if (!isPlaying) return@LaunchedEffect
         var retryDelayMs = 1_000L
+        var preferredSource = url
         // Round and round until the track ends or the player is closed. A canvas is a few seconds
         // long, so one pass through it is not the feature — and the decoder cannot be relied on to
         // rewind itself: its own seek does not take on an HLS manifest, which is what Apple serves,
@@ -295,17 +302,21 @@ fun DesktopCanvasView(
         while (isActive) {
             val decoder = DesktopCanvasDecoder(maxEdge)
             var shown = 0
+            var openedSource: String? = null
             try {
                 val opened = withContext(Dispatchers.IO) {
                     var last: Result<Unit> = Result.failure(IllegalStateException("the clip could not be fetched"))
-                    for (candidate in listOfNotNull(url, fallbackUrl)) {
+                    for (candidate in canvasSourceOrder(url, fallbackUrl, preferredSource)) {
                         val source = if (isManifest(candidate)) {
                             candidate
                         } else {
                             DesktopCanvasCache.fileFor(candidate)?.toAbsolutePath()?.toString() ?: continue
                         }
                         last = decoder.open(source)
-                        if (last.isSuccess) break
+                        if (last.isSuccess) {
+                            openedSource = candidate
+                            break
+                        }
                     }
                     last
                 }
@@ -341,12 +352,18 @@ fun DesktopCanvasView(
             // Apple HLS can intermittently yield an empty stream. Retry with a cap
             // instead of freezing the still or spinning over network requests.
             if (shown == 0) {
-                DesktopTrackLog.log("canvas: stream produced no frames; retrying in ${retryDelayMs}ms")
+                // An HLS rendition can open successfully and still yield zero decoded
+                // frames (e.g. unsupported codec). On the next pass prefer Apple's
+                // alternate square rendition rather than retrying the broken wide
+                // rendition forever.
+                preferredSource = if (openedSource == url) fallbackUrl ?: url else url
+                DesktopTrackLog.log("canvas: zero decoded frames; retrying alternate rendition in ${retryDelayMs}ms")
                 delay(retryDelayMs)
                 retryDelayMs = (retryDelayMs * 2).coerceAtMost(10_000L)
             } else {
+                preferredSource = openedSource ?: preferredSource
                 retryDelayMs = 1_000L
-                // Reopen an HLS demuxer after EOF so the artist animation keeps looping.
+                // Reopen the rendition that actually decoded frames after HLS EOF.
                 delay(250L)
             }
         }
