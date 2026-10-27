@@ -160,7 +160,8 @@ internal object DesktopAppleArtistArtRepository {
         val start = html.indexOf('>', marker) + 1
         val end = html.indexOf("</script>", start)
         if (start <= 0 || end < 0) return null
-        val header = findHeader(json.parseToJsonElement(html.substring(start, end))) ?: return null
+        val root = json.parseToJsonElement(html.substring(start, end))
+        val header = findHeader(root) ?: return null
 
         val expectedId = pageUrl.substringBefore('?').substringAfterLast('/')
         val headerId = header.obj("contentDescriptor")?.obj("identifiers")?.text("storeAdamID")
