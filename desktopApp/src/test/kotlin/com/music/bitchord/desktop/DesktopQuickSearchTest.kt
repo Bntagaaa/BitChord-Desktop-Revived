@@ -120,8 +120,10 @@ class DesktopQuickSearchTest {
         s.move(1)
         assertEquals("b", s.selected())
         s.move(99)
-        assertEquals("c", s.selected())
+        assertTrue(s.isSearchAllSelected())
         s.move(1)
+        assertTrue(s.isSearchAllSelected())
+        s.move(-1)
         assertEquals("c", s.selected())
     }
 
