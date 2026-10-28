@@ -57,11 +57,18 @@ internal object DesktopMusicVideo {
                                 decoder.seekTo(target)
                                 lastSeek = audio.seeks
                             }
-                            if (!decoder.nextFrame(pixels)) break
+                            if (!decoder.nextFrame(pixels)) {
+                                // Keep the decoder alive for repeat-one or a seek after EOF.
+                                delay(60)
+                                continue
+                            }
                             lastPosition = decoder.frameTimeMs
                             if (lastPosition + 80 < target) continue
                             val wait = ((lastPosition - target) / DesktopPlayerHost.videoSpeed.coerceAtLeast(.1f)).toLong()
                             if (wait > 0) delay(wait.coerceAtMost(1000))
+                            val latest = DesktopPlayerHost.videoClock.value
+                            if (latest.song?.videoId != id || latest.seeks != audio.seeks ||
+                                (audio.isPlaying && !latest.isPlaying) || latest.awaitingAudio) continue
                             frame.value = id to VideoFrame(decoder.width, decoder.height, pixels.copyOf())
                         }
                     } catch (cancelled: CancellationException) { throw cancelled }

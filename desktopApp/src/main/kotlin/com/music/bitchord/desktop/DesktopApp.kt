@@ -3274,8 +3274,50 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         openArtist(browseId, name)
     }
 
+    var mediaVersionJob by remember { mutableStateOf<Job?>(null) }
+    var mediaVersionSwitching by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedSong?.videoId, activeAccountId, activeProfileId) { mediaVersionJob?.cancel() }
+    fun switchMediaVersion() {
+        if (mediaVersionJob?.isActive == true || DesktopListenTogether.state.value.inParty) return
+        val original = liveQueue.current ?: return
+        val slot = liveQueue.index
+        val account = activeAccountId
+        mediaVersionJob = scope.launch {
+            mediaVersionSwitching = true
+            try {
+                val resolved = withContext(Dispatchers.IO) {
+                    if (original.isVideo) YtMusicRepository.resolveAudio(original)
+                    else YtMusicRepository.resolveVideo(original)
+                }
+                if (liveQueue.index != slot || liveQueue.current !== original ||
+                    activeAccountId != account || DesktopListenTogether.state.value.inParty) return@launch
+                if (resolved == null || resolved.videoId == original.videoId) {
+                    DesktopPlayerHost.showMessage("No matching version found")
+                    return@launch
+                }
+                val updated = liveQueue.withMediaVersion(original, resolved) ?: run {
+                    DesktopPlayerHost.showMessage("No matching version found")
+                    return@launch
+                }
+                val replacement = updated.current ?: return@launch
+                val playing = playbackEngine.state.value.isPlaying
+                liveQueue = updated
+                selectedSong = replacement
+                // A music video can have a different intro. Start the chosen version at its own
+                // beginning rather than pretending its timestamps match the catalogue release.
+                history = history.map { if (it.videoId == original.videoId) replacement else it }.distinctBy { it.videoId }
+                saveQueue()
+                persistence.saveHistory(history)
+                playbackEngine.load(replacement, playing)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { DesktopPlayerHost.showMessage("Could not load this version; current playback continues") }
+            finally { mediaVersionSwitching = false }
+        }
+    }
+
     /** The song menu's verbs for [song], as the player sheet offers them. */
     fun playerSongActions(song: Song) = DesktopSongActions(
+        onSwitchMediaVersion = (::switchMediaVersion).takeIf { !mediaVersionSwitching && !DesktopListenTogether.state.value.inParty && song.localUri == null && song.localPath == null },
         signedIn = youtubeSignedIn,
         disliked = song.videoId in dislikedIds,
         downloaded = downloads.any { it.videoId == song.videoId },
@@ -3995,7 +4037,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             isLoading = playback.isLoading,
                             position = playerPosition,
                             durationMs = playback.durationMs,
-                            audioVersionSwitching = false,
+                            audioVersionSwitching = mediaVersionSwitching,
                             qualityUpgraded = false,
                             queue = liveQueue.songs,
                             queueIndex = liveQueue.index,

@@ -51,6 +51,9 @@ interface PlayerHost {
      * audio. False keeps every video surface out of the player altogether.
      */
     val musicVideoSupported: Boolean get() = false
+    /** Desktop window fullscreen; null keeps the phone's sensor/orientation behavior. */
+    val musicVideoFullscreen: StateFlow<Boolean>? get() = null
+    fun setMusicVideoFullscreen(fullscreen: Boolean) {}
 
     /**
      * The playing music video's picture, fitted into these bounds ([fit]) or

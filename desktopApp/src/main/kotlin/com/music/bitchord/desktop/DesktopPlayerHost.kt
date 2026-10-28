@@ -58,6 +58,10 @@ internal object DesktopPlayerHost : PlayerHost {
     val videoClock = MutableStateFlow(DesktopPlaybackState())
     @Volatile var videoSpeed: Float = 1f
     override val musicVideoSupported = true
+    override val musicVideoFullscreen = DesktopWindowMode.fullScreen
+    override fun setMusicVideoFullscreen(fullscreen: Boolean) {
+        if (fullscreen != DesktopWindowMode.fullScreen.value) DesktopWindowMode.toggle()
+    }
     override val musicVideoAspect = DesktopMusicVideo.aspect
     override val musicVideoQuality = DesktopMusicVideo.quality
     override fun setMusicVideoQuality(height: Int?) { DesktopMusicVideo.held.value = height }

@@ -26,6 +26,20 @@ internal data class DesktopQueue(
     /** What is still to come, which is what "Up Next" means. */
     val upcoming: List<Song> get() = if (index >= songs.lastIndex) emptyList() else songs.drop(index + 1)
 
+    /** Replace one rendition in place, retaining the queue entry and its origin. */
+    fun withMediaVersion(expected: Song, replacement: Song): DesktopQueue? {
+        if (current !== expected || replacement.videoId == expected.videoId ||
+            replacement.isVideo == expected.isVideo) return null
+        val item = replacement.copy(
+            isVideoOrigin = true, queueEntryId = expected.queueEntryId,
+            queueTier = expected.queueTier, radioName = expected.radioName,
+            playbackSource = expected.playbackSource,
+            playbackSourceType = expected.playbackSourceType,
+            playbackSourceId = expected.playbackSourceId,
+        )
+        return copy(songs = songs.toMutableList().apply { set(index, item) })
+    }
+
     /**
      * Moves to [target]. Backwards is a plain seek through history; forwards is the phone's queue
      * jump, which keeps everything the listener queued by hand and drops only what was skipped.

@@ -1625,7 +1625,9 @@ fun NowPlayingScreen(
     // gesture exist to let one tall column be the player, the lyrics and the
     // queue in turn, and in landscape none of them has anything to do — the
     // sleeve never has to get out of anything's way.
-    val landscape = landscapePlayerAvailable(windowWidth, windowHeight)
+    val desktopVideoFullscreen = PlayerPlatform.host.musicVideoFullscreen?.collectAsStateWithLifecycle()?.value
+    val landscape = landscapePlayerAvailable(windowWidth, windowHeight) &&
+        !(videoMode && desktopVideoFullscreen == false)
     // Tablet-sized players use the full-cover blur in all three states. On a
     // phone only the lyrics and queue replace the main player's seam-aware,
     // reflected mesh; the main player deliberately keeps its existing look.
@@ -1772,7 +1774,10 @@ fun NowPlayingScreen(
                     artRequest = art.request,
                     rendered = videoRendered,
                     onRenderedChanged = { videoRendered = it },
-                    onExitFullscreen = screenOrientation::portrait,
+                    onExitFullscreen = {
+                        if (desktopVideoFullscreen != null) PlayerPlatform.host.setMusicVideoFullscreen(false)
+                        else screenOrientation.portrait()
+                    },
                     onOpenQuality = { showVideoQuality = true },
                     scrubber = {
                         PlayerScrubber(
@@ -3327,7 +3332,10 @@ fun NowPlayingScreen(
                                     )
                                     VideoCornerControls(
                                         fullscreen = false,
-                                        onToggleFullscreen = screenOrientation::landscape,
+                                        onToggleFullscreen = {
+                                            if (desktopVideoFullscreen != null) PlayerPlatform.host.setMusicVideoFullscreen(true)
+                                            else screenOrientation.landscape()
+                                        },
                                         onOpenQuality = { showVideoQuality = true },
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)

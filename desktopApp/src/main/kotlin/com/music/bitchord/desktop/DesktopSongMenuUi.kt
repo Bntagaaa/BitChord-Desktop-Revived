@@ -92,6 +92,7 @@ internal data class DesktopSongActions(
     val onSleepAfterTrack: () -> Unit,
     val onShare: (Song) -> Unit,
     val onRemoveHistory: ((Song) -> Unit)? = null,
+    val onSwitchMediaVersion: (() -> Unit)? = null,
 )
 
 /** The "…" beside the player's heart, and the menu it opens. */
@@ -163,6 +164,7 @@ internal fun DesktopSongMenuFor(
         onSleepTimer = { actions.onSleepTimer(it); close() },
         onSleepAfterTrack = { actions.onSleepAfterTrack(); close() },
         onShare = { actions.onShare(song); close() },
+        onSwitchMediaVersion = actions.onSwitchMediaVersion?.let { { it(); close() } },
         onDismiss = close,
         onRemoveHistory = actions.onRemoveHistory?.let { remove -> { remove(song); close() } },
     )
@@ -197,6 +199,7 @@ internal fun DesktopSongMenu(
     onShare: () -> Unit,
     onDismiss: () -> Unit,
     onRemoveHistory: (() -> Unit)? = null,
+    onSwitchMediaVersion: (() -> Unit)? = null,
 ) {
     var pickingSleepTimer by remember { mutableStateOf(false) }
     var customTimer by remember { mutableStateOf(false) }
@@ -248,6 +251,11 @@ internal fun DesktopSongMenu(
 
         onRemoveHistory?.let { remove ->
             DesktopMenuRow(Icons.Rounded.Bedtime, "Remove from history", onClick = remove)
+            DesktopMenuDivider()
+        }
+        onSwitchMediaVersion?.let { switch ->
+            DesktopMenuRow(Icons.Rounded.HighQuality,
+                if (song.isVideo) "Switch to audio" else "Watch music video", onClick = switch)
             DesktopMenuDivider()
         }
         // The two are never both offered.
