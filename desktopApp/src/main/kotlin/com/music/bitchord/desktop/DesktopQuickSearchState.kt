@@ -73,7 +73,7 @@ internal class DesktopQuickSearchState<T>(private val keyOf: (T) -> String) {
     fun fail(request: DesktopQuickSearchRequest, message: String): Boolean {
         val old = mutable.value
         if (old.request != request) return false
-        mutable.value = old.copy(items = emptyList(), selectedIndex = -1, loading = false, error = message)
+        mutable.value = old.copy(items = emptyList(), selectedIndex = 0, loading = false, error = message)
         return true
     }
 
