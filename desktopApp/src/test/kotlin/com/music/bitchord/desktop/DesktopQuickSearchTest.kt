@@ -26,6 +26,14 @@ class DesktopQuickSearchTest {
         assertEquals("track:test-id", quickSearchEntryKey(track))
     }
 
+    @Test fun playlistRemainsVisibleWhenFirstFiveResultsAreSongs() {
+        val tracks = (1..7).map { SearchResult.Track(Song("id$it", "Song $it", "Artist", null)) }
+        val playlist = SearchResult.Browse(BrowseItem("pl1", "My Mix", "", null, BrowseType.PLAYLIST))
+        val displayed = quickSearchEntries(tracks + playlist)
+        assertEquals(5, displayed.size)
+        assertEquals(tracks.take(4) + playlist, displayed)
+    }
+
     private fun state() = DesktopQuickSearchState<String> { it }
 
     private fun ready(vararg items: String): DesktopQuickSearchState<String> = state().also {
