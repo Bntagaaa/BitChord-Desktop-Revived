@@ -69,14 +69,13 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 
-/** The compact palette lists playable tracks and real artist targets, never invented artists. */
-internal fun quickSearchEntries(results: List<SearchResult>): List<SearchResult> =
-    results.filter { it !is SearchResult.Browse || it.item.type == BrowseType.ARTIST }
+/** Keep genuine catalogue results, including playlists and albums, in their original relevance order. */
+internal fun quickSearchEntries(results: List<SearchResult>): List<SearchResult> = results
 
 internal fun quickSearchEntryKey(result: SearchResult): String = when (result) {
     is SearchResult.Track -> "track:" + result.song.videoId
     is SearchResult.TopTrack -> "track:" + result.song.videoId
-    is SearchResult.Browse -> "artist:" + result.item.browseId
+    is SearchResult.Browse -> "browse:" + result.item.browseId
 }
 
 /** In-window overlay, not a new native popup/window: keyboard ownership stays at the app root. */
@@ -85,6 +84,7 @@ internal fun DesktopQuickSearch(
     controller: DesktopQuickSearchState<SearchResult>,
     focusRequester: FocusRequester,
     onSelect: (SearchResult) -> Unit,
+    onSearchAll: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     // Only register its z-order; the established Quick Search router owns Escape and all editing.
@@ -121,15 +121,15 @@ internal fun DesktopQuickSearch(
     BoxWithConstraints(Modifier.fillMaxSize().semantics { paneTitle = "Quick Search" }) {
         val topInset = (maxHeight * 0.08f).coerceIn(16.dp, 72.dp)
         val availableHeight = (maxHeight - topInset - 16.dp).coerceAtLeast(0.dp)
-        val listHeight = (availableHeight - 144.dp).coerceIn(0.dp, 560.dp)
+        val listHeight = (availableHeight - 130.dp).coerceIn(0.dp, 300.dp)
         DesktopFlyoutBackdrop(onDismiss = onDismiss, blockScroll = true)
         DesktopFlyoutCard(
             modifier = Modifier.align(Alignment.TopCenter).padding(top = topInset, start = 16.dp, end = 16.dp)
-                .widthIn(max = 650.dp).fillMaxWidth().heightIn(max = availableHeight),
+                .widthIn(max = 490.dp).fillMaxWidth().heightIn(max = availableHeight),
             onBackgroundClick = { focusRequester.requestFocus() },
             frosted = true,
         ) {
-            Column(Modifier.fillMaxWidth().padding(22.dp)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp)) {
                 val searchShape = RoundedCornerShape(7.dp)
                 BasicTextField(
                     value = state.query,
@@ -142,7 +142,7 @@ internal fun DesktopQuickSearch(
                         .background(DesktopSubtleFill)
                         .border(1.dp, DesktopBarEdge, searchShape)
                         .focusRequester(focusRequester)
-                        .semantics { contentDescription = "Quick Search songs" },
+                        .semantics { contentDescription = "Quick Search songs, artists, albums and playlists" },
                     decorationBox = { innerField ->
                         Row(
                             Modifier.fillMaxSize().padding(horizontal = 9.dp),
@@ -162,22 +162,6 @@ internal fun DesktopQuickSearch(
                     },
                 )
                 if (state.query.isNotBlank()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        QuickSearchKeycap("\u2191")
-                        QuickSearchKeycap("\u2193")
-                        Text("Navigate", color = DesktopSecondary, fontSize = 11.sp)
-                        Spacer(Modifier.weight(1f))
-                        QuickSearchKeycap("Enter")
-                        Text("Play & close", color = DesktopSecondary, fontSize = 11.sp)
-                        Spacer(Modifier.width(8.dp))
-                        QuickSearchKeycap("Shift")
-                        QuickSearchKeycap("Enter")
-                        Text("Play & stay", color = DesktopSecondary, fontSize = 11.sp)
-                    }
                     if (state.loading) {
                         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(Modifier.size(18.dp), color = DesktopAccent, strokeWidth = 2.dp)
@@ -196,12 +180,12 @@ internal fun DesktopQuickSearch(
                             }
                         }
                         if (state.items.isEmpty() && state.error == null) {
-                            Text("No tracks or artists found", Modifier.padding(16.dp), color = DesktopSecondary)
+                            Text("No results found", Modifier.padding(horizontal = 9.dp, vertical = 10.dp), color = DesktopSecondary)
                         }
                         if (state.items.isNotEmpty()) Box(Modifier.fillMaxWidth()) {
                             LazyColumn(
                                 state = listState,
-                                modifier = Modifier.fillMaxWidth().heightIn(max = listHeight).desktopTopScrollFade(listState).padding(end = 10.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(max = listHeight).desktopTopScrollFade(listState),
                             ) {
                                 itemsIndexed(state.items, key = { _, item -> quickSearchEntryKey(item) }) { index, item ->
                                     QuickSearchRow(
@@ -212,14 +196,33 @@ internal fun DesktopQuickSearch(
                                     )
                                 }
                             }
-                            Box(Modifier.matchParentSize()) {
-                                VerticalScrollbar(
-                                    adapter = rememberScrollbarAdapter(listState),
-                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp)
-                                        .focusProperties { canFocus = false },
-                                )
-                            }
+                            // At most five rows: no scrollbar or long scrolling palette.
                         }
+                    }
+                    // Always visible, also when media lookup fails. Keyboard selection follows the media rows.
+                    val footerSelected = !state.loading && state.selectedIndex == state.items.size
+                    val footerBackground by animateColorAsState(
+                        targetValue = if (footerSelected) DesktopForeground.copy(alpha = 0.09f) else DesktopSubtleFill,
+                        animationSpec = tween(durationMillis = 170),
+                        label = "quick-search-footer-background",
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
+                            .background(footerBackground)
+                            .semantics { selected = footerSelected; contentDescription = "Search all results for ${state.query.trim()}" }
+                            .focusProperties { canFocus = false }
+                            .onPointerEvent(PointerEventType.Move) { controller.hoverSearchAll() }
+                            .desktopNoHoverClickable(hoverHighlight = false, onClick = { onSearchAll(state.query.trim()) })
+                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(BitChordIcons.Search, contentDescription = null, tint = DesktopSecondary, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(9.dp))
+                        Text("Search \"${state.query.trim()}\"", color = DesktopForeground,
+                            style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f))
+                        Text("↗", color = DesktopSecondary, fontSize = 16.sp)
                     }
                 }
             }
@@ -249,26 +252,30 @@ private fun QuickSearchRow(item: SearchResult, active: Boolean, onHover: () -> U
             // Move, rather than Enter, avoids changing selection merely because keyboard scroll
             // places another row underneath a stationary pointer.
             .onPointerEvent(PointerEventType.Move) { onHover() }
-            .desktopNoHoverClickable(hoverHighlight = false, onClick = onSelect).padding(horizontal = 12.dp, vertical = 8.dp),
+            .desktopNoHoverClickable(hoverHighlight = false, onClick = onSelect).padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopArtwork(
             song?.thumbnailUrl ?: artist?.thumbnailUrl,
-            Modifier.size(40.dp).clip(if (artist != null) CircleShape else RoundedCornerShape(5.dp)),
+            Modifier.size(36.dp).clip(if (artist?.type == BrowseType.ARTIST) CircleShape else RoundedCornerShape(5.dp)),
             px = ROW_ART_PX,
             hoverMode = if (song != null) ArtworkHoverMode.DARKEN_AND_PLAY else ArtworkHoverMode.DARKEN_ONLY,
             hovered = active,
         )
-        Spacer(Modifier.width(13.dp))
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(song?.title ?: artist?.title.orEmpty(), color = DesktopForeground, fontWeight = FontWeight.Medium, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
             Text(song?.artist ?: artist?.subtitle.orEmpty(), color = DesktopSecondary, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
         }
-        Text(if (artist != null) "Artist" else "Track", color = DesktopSecondary, fontSize = 11.sp,
-            modifier = Modifier.padding(start = 10.dp).background(DesktopForeground.copy(alpha = 0.08f), RoundedCornerShape(3.dp))
-                .padding(horizontal = 7.dp, vertical = 4.dp))
+        Text(when (artist?.type) {
+            BrowseType.ARTIST -> "Artist"
+            BrowseType.ALBUM -> "Album"
+            BrowseType.PLAYLIST -> "Playlist"
+            BrowseType.OTHER -> "Other"
+            null -> "Song"
+        }, color = DesktopSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
