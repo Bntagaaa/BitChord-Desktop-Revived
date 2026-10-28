@@ -69,8 +69,20 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 
-/** Keep genuine catalogue results, including playlists and albums, in their original relevance order. */
-internal fun quickSearchEntries(results: List<SearchResult>): List<SearchResult> = results
+/**
+ * Reserve one slot for a playlist when the typeahead supplies one, even if songs dominate
+ * the earliest results. Fill the rest in YouTube Music's original relevance order.
+ */
+internal fun quickSearchEntries(results: List<SearchResult>): List<SearchResult> {
+    val firstPlaylist = results.indexOfFirst {
+        it is SearchResult.Browse && it.item.type == BrowseType.PLAYLIST
+    }
+    val selection = results.take(QUICK_SEARCH_RESULT_LIMIT).toMutableList()
+    if (firstPlaylist >= QUICK_SEARCH_RESULT_LIMIT && selection.isNotEmpty()) {
+        selection[selection.lastIndex] = results[firstPlaylist]
+    }
+    return selection
+}
 
 internal fun quickSearchEntryKey(result: SearchResult): String = when (result) {
     is SearchResult.Track -> "track:" + result.song.videoId
