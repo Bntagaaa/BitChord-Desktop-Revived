@@ -209,7 +209,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
+import com.music.bitchord.ui.components.trackArtSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.draw.drawBehind
@@ -833,6 +835,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     }
     var lyricsOrder by remember { mutableStateOf(persistence.lyricsSourceOrder()) }
     var lyricsOn by remember { mutableStateOf(persistence.lyricsEnabledSources()) }
+    val videoBetaEnabled by DesktopVideoBeta.enabled.collectAsState()
     var fullBleedArtwork by remember { mutableStateOf(persistence.boolean("full_bleed_artwork", false)) }
     var accounts by remember { mutableStateOf(DesktopAccounts.accounts()) }
     var activeAccountId by remember { mutableStateOf(DesktopAccounts.activeAccountId()) }
@@ -2049,6 +2052,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     LaunchedEffect(
         selectedSong?.videoId,
         selectedSong?.isVideo,
+        videoBetaEnabled,
         lyricsLengthMs,
         syncedLyrics,
         prioritizeSyllables,
@@ -2063,7 +2067,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             lyricsLoading = false
             return@LaunchedEffect
         }
-        if (!syncedLyrics || current.isVideo) {
+        if (!syncedLyrics || (current.isVideo && videoBetaEnabled)) {
             lyricsError = "Synced lyrics are switched off"
             lyricsLoading = false
             return@LaunchedEffect
@@ -3277,9 +3281,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
 
     var mediaVersionJob by remember { mutableStateOf<Job?>(null) }
     var mediaVersionSwitching by remember { mutableStateOf(false) }
-    LaunchedEffect(selectedSong?.videoId, activeAccountId, activeProfileId) { mediaVersionJob?.cancel() }
+    LaunchedEffect(selectedSong?.videoId, activeAccountId, activeProfileId, videoBetaEnabled) { mediaVersionJob?.cancel() }
     fun switchMediaVersion() {
-        if (mediaVersionJob?.isActive == true || DesktopListenTogether.state.value.inParty) return
+        if (!videoBetaEnabled || mediaVersionJob?.isActive == true || DesktopListenTogether.state.value.inParty) return
         val original = liveQueue.current ?: return
         val slot = liveQueue.index
         val account = activeAccountId
@@ -3291,8 +3295,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                     else YtMusicRepository.resolveVideo(original)
                 }
                 if (liveQueue.index != slot || liveQueue.current !== original ||
-                    activeAccountId != account || DesktopListenTogether.state.value.inParty) return@launch
-                if (resolved == null || resolved.videoId == original.videoId) {
+                    activeAccountId != account || !DesktopVideoBeta.enabled.value || DesktopListenTogether.state.value.inParty) return@launch
+                if (resolved == null || resolved.isVideo == original.isVideo) {
                     DesktopPlayerHost.showMessage("No matching version found")
                     return@launch
                 }
@@ -3318,7 +3322,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
 
     /** The song menu's verbs for [song], as the player sheet offers them. */
     fun playerSongActions(song: Song) = DesktopSongActions(
-        onSwitchMediaVersion = (::switchMediaVersion).takeIf { !mediaVersionSwitching && !DesktopListenTogether.state.value.inParty && song.localUri == null && song.localPath == null },
+        onSwitchMediaVersion = (::switchMediaVersion).takeIf { videoBetaEnabled && !mediaVersionSwitching && !DesktopListenTogether.state.value.inParty && song.localUri == null && song.localPath == null },
         signedIn = youtubeSignedIn,
         disliked = song.videoId in dislikedIds,
         downloaded = downloads.any { it.videoId == song.videoId },
@@ -4011,7 +4015,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                 },
                 overlay = {
                     DesktopPlayerSheet(
-                        dragToDismiss = selectedSong?.isVideo != true,
+                        dragToDismiss = !videoBetaEnabled || selectedSong?.isVideo != true,
                         visible = overlays.nowPlaying && selectedSong != null,
                         onDismiss = {
                             DesktopWindowMode.exit()
@@ -4137,7 +4141,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                         if (playerMenuOpen) {
                             // Where the player's "…" sits: the right column's credits row, at
                             // the right edge of the centred two-column layout.
-                            val columnEdge = if (current.isVideo && windowWidth >= 900.dp && windowHeight >= 540.dp) {
+                            val columnEdge = if (videoBetaEnabled && current.isVideo && windowWidth >= 900.dp && windowHeight >= 540.dp) {
                                 val sidebarWidth = com.music.bitchord.ui.player.desktopVideoSidebarWidth(windowWidth - 56.dp)
                                 windowWidth / 2 - sidebarWidth - 28.dp - 24.dp - 18.dp
                             } else minOf(windowWidth, 1100.dp) / 2 - 47.dp
@@ -6023,7 +6027,7 @@ private fun DesktopMiniPlayer(
                 if (song == null) {
                     Icon(painterResource(Res.drawable.bitchord_logo_original), "BitChord", tint = DesktopSecondary, modifier = Modifier.size(42.dp))
                 } else {
-                    DesktopArtwork(song.thumbnailUrl, Modifier.size(42.dp).clip(RoundedCornerShape(7.dp)), px = ROW_ART_PX)
+                    DesktopArtwork(song.thumbnailUrl, Modifier.trackArtSize(42.dp, song.isVideo).clip(RoundedCornerShape(7.dp)), px = ROW_ART_PX)
                 }
                 Column(Modifier.weight(1f).padding(start = 8.dp, end = 8.dp)) {
                     Text(song?.title ?: "BitChord", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
@@ -7401,6 +7405,10 @@ private fun DesktopSettingsScreen(
             DesktopSettingsSection.entries.forEach { section ->
             if (section == DesktopSettingsSection.PLAYBACK) item {
                     SettingsGroup(DesktopStrings["playback", "Playback"]) {
+                    val videoBeta by DesktopVideoBeta.enabled.collectAsState()
+                    SettingsToggle("Music video playback (Beta)",
+                        "Experimental video player and audio/video switching. Off uses the classic audio player; video thumbnails stay widescreen.",
+                        videoBeta, DesktopVideoBeta::setEnabled)
                     if (!automix) {
                         if (settingsRowVisible(DesktopStrings["crossfade", "Crossfade"])) {
                         Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
@@ -9028,8 +9036,8 @@ internal fun BoxScope.DesktopShelfArrow(
 }
 
 @Composable
-private fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
-    val width = 158.dp
+internal fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
+    val width = if (item.isVideo) 252.dp else 158.dp
     val shape = RoundedCornerShape(12.dp)
     val artworkHoverInteraction = remember { MutableInteractionSource() }
     val artworkHovered by artworkHoverInteraction.collectIsHoveredAsState()
@@ -9045,7 +9053,8 @@ private fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
     ) {
         Box(
             Modifier
-                .size(width)
+                .width(width).aspectRatio(if (item.isVideo) 16f / 9f else 1f)
+                .testTag("shelf-art-${item.videoId ?: item.browseId}")
                 .clip(shape)
                 .background(DesktopGlass)
                 .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), shape),
@@ -9114,7 +9123,7 @@ private fun DesktopSongRow(
         }
         DesktopArtwork(
             song.thumbnailUrl,
-            Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
+            Modifier.trackArtSize(52.dp, song.isVideo).clip(RoundedCornerShape(8.dp)),
             px = ROW_ART_PX,
             hoverMode = ArtworkHoverMode.DARKEN_AND_PLAY,
             hovered = rowHovered,
@@ -9449,22 +9458,6 @@ private fun SearchResult.key(): String = when (this) {
     is SearchResult.Browse -> "browse:${item.browseId}"
 }
 
-private fun ShelfItem.toSong(): Song {
-    val parts = subtitle.split(" • ", " · ", " | ").filter(String::isNotBlank)
-    // Android's InnertubeParser uses the first non-type/non-tally segment.
-    val artist = parts.firstOrNull {
-        !it.matches(SHELF_DURATION) &&
-            it.lowercase() !in SHELF_TYPE_WORDS &&
-            !it.matches(SHELF_TALLY)
-    } ?: "Unknown Artist"
-    return Song(
-        videoId = videoId.orEmpty(),
-        title = title,
-        artist = artist,
-        thumbnailUrl = thumbnailUrl,
-        durationText = parts.firstOrNull { it.matches(SHELF_DURATION) },
-    )
-}
 
 private fun String.isUnknownArtist(): Boolean =
     trim().equals("unknown", ignoreCase = true) ||
@@ -9472,9 +9465,6 @@ private fun String.isUnknownArtist(): Boolean =
         trim().equals("unknown artist(s)", ignoreCase = true) ||
         isBlank()
 
-private val SHELF_DURATION = Regex("""\d{1,2}:\d{2}(?::\d{2})?""")
-private val SHELF_TALLY = Regex("[0-9,.]+\\s*(?:views?|likes?|songs?)", RegexOption.IGNORE_CASE)
-private val SHELF_TYPE_WORDS = setOf("song", "video", "album", "ep", "single", "playlist", "mix")
 
 private fun formatTime(ms: Long): String {
     val totalSeconds = (ms / 1_000L).coerceAtLeast(0L)

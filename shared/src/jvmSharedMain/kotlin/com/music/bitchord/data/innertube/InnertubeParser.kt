@@ -307,7 +307,7 @@ object InnertubeParser {
 
         val contents = carousel.a("contents").orEmpty()
         val parsed = contents.mapNotNull { item ->
-            parseTwoRowItem(item.o("musicTwoRowItemRenderer"), allowVideos = true)
+            parseTwoRowItem(item.o("musicTwoRowItemRenderer"), allowVideos = true, videoShelf = VIDEO_WORD.containsMatchIn(title))
                 ?: parseResponsiveListItem(item.o("musicResponsiveListItemRenderer"))
 
                     ?.let { song ->
@@ -355,9 +355,9 @@ object InnertubeParser {
         val title = header.o("title").runs()
         val allowVideos = VIDEO_WORD.containsMatchIn(title)
         val items = grid.a("items").orEmpty().mapNotNull { item ->
-            parseTwoRowItem(item.o("musicTwoRowItemRenderer"), allowVideos = true)
+            parseTwoRowItem(item.o("musicTwoRowItemRenderer"), allowVideos = true, videoShelf = VIDEO_WORD.containsMatchIn(title))
                 ?: parseResponsiveListItem(item.o("musicResponsiveListItemRenderer"))
-                    ?.let { song -> ShelfItem(song.title, song.artist, song.thumbnailUrl, song.videoId, null) }
+                    ?.let { song -> ShelfItem(song.title, song.artist, song.thumbnailUrl, song.videoId, null, isVideo = song.isVideo) }
         }
         return if (items.isEmpty()) null else HomeShelf(title.ifBlank { "Browse" }, items)
 
@@ -399,7 +399,7 @@ object InnertubeParser {
                 // Releases and playlists open their pages; the Videos shelf's
                 // cards play, now that the player can show them.
                 val items = carousel.a("contents").orEmpty().mapNotNull {
-                    parseTwoRowItem(it.o("musicTwoRowItemRenderer"))
+                    parseTwoRowItem(it.o("musicTwoRowItemRenderer"), videoShelf = VIDEO_WORD.containsMatchIn(title))
                 }.filter { it.browseId != null || it.isVideo }
                 val moreEndpoint = header.o("title").a("runs")?.firstNotNullOfOrNull {
                     it.o("navigationEndpoint").o("browseEndpoint")
@@ -768,7 +768,7 @@ object InnertubeParser {
             // The row type word is the clean signal when present ("All" tab);
             // otherwise a music-video upload gives itself away with widescreen
             // art where a catalogue track has square album cover art.
-            isVideo = rowType == "video" || thumbnails.isNotSquare(),
+            isVideo = renderer.watchVideoFlag() ?: (rowType == "video" || thumbnails.isNotSquare()),
             isExplicit = renderer.hasExplicitBadge(),
             // Extract the "Remove from history" feedback token from the row's menu, if present.
             feedbackToken = extractFeedbackToken(renderer),
@@ -813,7 +813,7 @@ object InnertubeParser {
             artists = completeArtistCredits(artist.orEmpty(), credits.artists),
             albumId = credits.albumId,
             albumName = credits.albumName,
-            isVideo = rowType == "video" || thumbnails.isNotSquare(),
+            isVideo = renderer.watchVideoFlag() ?: (rowType == "video" || thumbnails.isNotSquare()),
             isExplicit = renderer["subtitleBadges"].hasExplicitBadge(),
         )
     }
@@ -1504,7 +1504,14 @@ object InnertubeParser {
             )
         }
 
-    private fun parseTwoRowItem(renderer: JsonObject?, allowVideos: Boolean = false): ShelfItem? {
+    /** Watch metadata is authoritative even when YouTube supplies a square crop. */
+    private fun JsonObject.watchVideoFlag(): Boolean? = when (findString("musicVideoType")) {
+        "MUSIC_VIDEO_TYPE_OMV", "MUSIC_VIDEO_TYPE_UGC" -> true
+        "MUSIC_VIDEO_TYPE_ATV" -> false
+        else -> null
+    }
+
+    private fun parseTwoRowItem(renderer: JsonObject?, allowVideos: Boolean = false, videoShelf: Boolean = false): ShelfItem? {
         if (renderer == null) return null
         val title = renderer.o("title").runs()
         if (title.isBlank()) return null
@@ -1524,10 +1531,9 @@ object InnertubeParser {
         // playlist or artist; widescreen art on one of those means it's a
         // music-video upload rather than the catalogue track, which the
         // player can now show — same test as parseResponsiveListItem's.
-        val isVideo = resolvedBrowseId == null && videoId != null && (
-            thumbnails.isNotSquare() ||
-                renderer.s("aspectRatio")?.contains("16_9") == true
-            )
+        val isVideo = resolvedBrowseId == null && videoId != null &&
+            (renderer.watchVideoFlag() ?: (videoShelf || thumbnails.isNotSquare() ||
+                renderer.s("aspectRatio")?.contains("16_9") == true))
 
         // An album/playlist billed as a video chart/compilation — "N videos"
         // in the subtitle, or "video" in the card's own title (e.g. "Daily

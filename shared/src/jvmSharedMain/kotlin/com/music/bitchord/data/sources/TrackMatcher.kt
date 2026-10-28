@@ -170,6 +170,10 @@ object TrackMatcher {
             ?.first
     }
 
+    /** Explicit video selection allows intro/outro drift, but still requires the same recording and artist. */
+    fun bestOfficialVideoForAudio(candidates: List<Song>, target: Target): Song? =
+        bestOfficialAudioForVideo(candidates.filter { it.isVideo }, target)
+
     /**
      * Every candidate that really is [target], most confident first.
      *

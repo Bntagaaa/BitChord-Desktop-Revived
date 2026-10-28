@@ -1,8 +1,14 @@
-# Desktop music video completion
+# Desktop music video beta
 
 Based on `upstream-1109-port` at `dc36047d` (including its latest artist page work).
 
-Open Now Playing, choose its `…` menu, then **Watch music video**. The existing YouTube repository finds a matching video; the existing desktop audio engine plays its sound and the silent FFmpeg video surface follows that engine's clock. Video quality controls remain in the shared video player. Fullscreen now uses the existing desktop window placement controller instead of the phone-only orientation API; exiting fullscreen returns to the windowed player. **Switch to audio** finds the catalogue rendition again.
+Enable **Settings → Playback → Music video playback (Beta)** first, then open Now Playing, choose its `…` menu, and select **Watch music video**. The existing YouTube repository finds a matching video; the existing desktop audio engine plays its sound and the silent FFmpeg video surface follows that engine's clock. Video quality controls remain in the shared video player. Fullscreen now uses the existing desktop window placement controller instead of the phone-only orientation API; exiting fullscreen returns to the windowed player. **Switch to audio** finds the catalogue rendition again.
+
+The beta defaults off and is persisted separately from artwork/layout settings. Off keeps the classic audio/cover player and does not resolve or open a picture stream. Disabling it cancels a pending rendition switch and releases the current video decoder without replacing the audio track. Thumbnail dimensions and video metadata remain correct in either mode.
+
+Home and artist playback retain `ShelfItem.isVideo` when converting a card into `Song`. The parser prefers YouTube's OMV/UGC/ATV watch metadata over a square thumbnail crop, and explicit video shelves provide a fallback when watch metadata is absent. Desktop artist cards, shared Home cards, Recents, queue and track-row thumbnails use widescreen video sizing while album/audio art stays square. Mixed shelves use each card's media type rather than treating every item as a video.
+
+Manual rendition matching requires the same title/version and artist but allows the music video's extra intro/outro. A failed lookup stays retryable instead of trying to put null into a ConcurrentHashMap. The queue can also repair an old audio classification when the matched video has the same ID.
 
 Version selection preserves the current queue slot, entry ID, tier, source and neighboring songs. A version change replaces the local history entry rather than adding a second entry. Lookup failures leave playback alone; obsolete lookups are canceled on song/account/profile changes and rejected if the current queue entry changes. Local files and Listen Together parties do not offer the action. Pause/play state is retained.
 
@@ -14,7 +20,7 @@ Regression coverage: queue version round trips, retained source/entry identity a
 
 The user's two-page PDF is a layout reference only. Windows at least 900 dp wide and 540 dp high use a two-column watch view: a large video stage on the left and a queue-only sidebar on the right. The caption is centered above them. Credits, transport, volume and track actions share the strip below the video; the timeline follows the entire strip. On narrower desktop widths that strip uses two rows. The sidebar scales from 300 to 450 dp, with inner padding so drag handles, titles and remove actions stay inside its border.
 
-Lyrics are disabled for desktop music videos: no tab, bottom glyph, restored lyrics pane or lyric strip, and the desktop lyric request is skipped. Audio-only tracks retain their existing lyrics. Unrelated Canvas lookups are also skipped while a music video is playing. Queue thumbnails use the existing 16:9 sizing helper for video and remain square for audio.
+With the beta enabled, lyrics are disabled for desktop music videos: no tab, bottom glyph, restored lyrics pane or lyric strip, and the desktop lyric request is skipped. Audio-only tracks retain their existing lyrics. Unrelated Canvas lookups are also skipped while a music video is playing. Queue thumbnails use the existing 16:9 sizing helper for video and remain square for audio.
 
 The window chrome owns the single fullscreen button. Video surfaces only offer quality selection. In fullscreen the desktop transport sits at the bottom left above the timeline; moving the mouse reveals controls. The video sheet does not use drag-to-dismiss or replay the opening animation on restore. The minimize button and Escape route remain available.
 

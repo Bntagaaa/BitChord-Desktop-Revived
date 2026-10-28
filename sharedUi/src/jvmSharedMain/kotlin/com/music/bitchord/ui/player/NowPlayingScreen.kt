@@ -795,7 +795,8 @@ fun NowPlayingScreen(
     // itself (create/join) when there isn't one.
     val openListenTogetherMembers: () -> Unit = { showListenTogetherMembers = true }
 
-    val desktopVideo = song.isVideo && PlayerPlatform.host.musicVideoFullscreen != null
+    val videoEnabled by PlayerPlatform.host.musicVideoEnabled.collectAsStateWithLifecycle()
+    val desktopVideo = videoEnabled && song.isVideo && PlayerPlatform.host.musicVideoFullscreen != null
     val syncedLyricsSetting by PlayerSettings.syncedLyrics.collectAsStateWithLifecycle()
     val syncedLyricsEnabled = syncedLyricsSetting && !desktopVideo
     val lyricsOffsetMs by PlayerSettings.lyricsOffsetMs.collectAsStateWithLifecycle()
@@ -816,8 +817,8 @@ fun NowPlayingScreen(
     val mixing by PlayerSettings.smartMixInProgress.collectAsStateWithLifecycle()
     // A music video plays its own picture where the sleeve is — see
     // [MusicVideoSurface] — and takes the place of any animated cover.
-    val videoMode = showsMusicVideo(song)
-    val canvas = (if (videoMode) null else rememberCanvasArtwork(song))?.let {
+    val videoMode = videoEnabled && showsMusicVideo(song)
+    val canvas = (if (song.isVideo) null else rememberCanvasArtwork(song))?.let {
         // Apple's 3:4 rendition runs under the whole phone screen, the way its
         // own player shows it; the square one stays the fallback.
         val tall = it.portraitUrl

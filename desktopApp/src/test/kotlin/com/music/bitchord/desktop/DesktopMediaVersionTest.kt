@@ -24,6 +24,15 @@ class DesktopMediaVersionTest {
         assertTrue(assertNotNull(reverted.current).isVideoOrigin)
     }
 
+    @Test fun aPreviouslyMisclassifiedVideoCanBeRepairedWithoutChangingId() {
+        val wrong = Song("video-id", "Video", "Artist", null)
+        val repaired = wrong.copy(isVideo = true, isVideoOrigin = true)
+        val queue = DesktopQueue(listOf(wrong))
+        val changed = assertNotNull(queue.withMediaVersion(wrong, repaired))
+        assertTrue(assertNotNull(changed.current).isVideo)
+        assertEquals("video-id", changed.current?.videoId)
+    }
+
     @Test fun staleOrUnchangedLookupCannotReplaceQueue() {
         val audio = Song("audio", "Song", "Artist", null)
         val video = audio.copy(videoId = "video", isVideo = true)

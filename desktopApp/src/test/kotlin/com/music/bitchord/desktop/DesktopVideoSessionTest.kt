@@ -31,6 +31,27 @@ class DesktopVideoSessionTest {
     private suspend fun await(test: () -> Boolean) = withTimeout(3000) { while (!test()) delay(5) }
     private fun stream(id: String, height: Int) = InnerTubeXResolver.VideoStream(id, "memory:$id", 16, 9, "video/mp4", emptyMap(), listOf(height))
 
+    @Test fun disabledBetaDoesNotOpenVideoAndTogglingOffReleasesOnlyPicture() = runBlocking {
+        val clock = MutableStateFlow(state("video"))
+        val beta = MutableStateFlow(false)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val decoder = Decoder()
+        val attempts = AtomicInteger()
+        val session = DesktopVideoSession(scope, clock, { 1f }, { id, height -> attempts.incrementAndGet(); stream(id, height) },
+            { decoder }, enabled = beta)
+        try {
+            session.attach("video")
+            delay(100)
+            assertEquals(0, attempts.get()); assertEquals(0, decoder.opens.get())
+            beta.value = true
+            await { session.frame.value != null }
+            assertEquals(1, attempts.get()); assertEquals(1, decoder.opens.get())
+            beta.value = false
+            await { session.frame.value == null && decoder.closes.get() == 1 }
+            assertEquals("video", clock.value.song?.videoId)
+        } finally { session.close(); scope.cancel() }
+    }
+
     @Test fun surfacesAndMinimizeRetainTheSameSessionAndFrame() = runBlocking {
         val clock = MutableStateFlow(state("video"))
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

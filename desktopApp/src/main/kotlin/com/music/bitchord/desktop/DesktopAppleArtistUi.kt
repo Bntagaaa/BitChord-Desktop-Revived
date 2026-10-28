@@ -437,7 +437,7 @@ internal fun DesktopAppleShelf(
     showHeading: Boolean = true,
 ) {
     val circles = shelf.items.isNotEmpty() && shelf.items.all { it.browseId?.startsWith("UC") == true }
-    val videos = shelf.title.contains("video", ignoreCase = true)
+    val videos = shelf.items.any { it.isVideo }
     val more = shelf.moreBrowseId
     val heading: @Composable () -> Unit = {
         if (showHeading) DesktopAppleHeading(shelf.title, Modifier.padding(horizontal = DesktopPageGutter, vertical = 12.dp)
@@ -472,10 +472,10 @@ internal fun DesktopAppleShelf(
                 Column(Modifier.width(width)) {
                     DesktopArtwork(
                         item.thumbnailUrl,
-                        Modifier.width(width).aspectRatio(if (videos) 16f / 9f else 1f).clip(shape)
+                        Modifier.width(width).aspectRatio(if (item.isVideo) 16f / 9f else 1f).clip(shape)
                             .desktopHoverFill().clickable { onItemClick(item, shelf.title) }
                             .then(if (onItemMenu == null) Modifier else Modifier.contextClick { onItemMenu(item) }),
-                        px = if (videos) 800 else 400,
+                        px = if (item.isVideo) null else 400,
                     )
                     Text(item.title, fontSize = 13.sp, color = DesktopAppleText, maxLines = 2, overflow = TextOverflow.Ellipsis,
                         textAlign = if (circles) TextAlign.Center else TextAlign.Start,

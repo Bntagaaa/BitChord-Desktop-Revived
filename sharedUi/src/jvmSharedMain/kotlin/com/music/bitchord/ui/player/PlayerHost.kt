@@ -51,6 +51,7 @@ interface PlayerHost {
      * audio. False keeps every video surface out of the player altogether.
      */
     val musicVideoSupported: Boolean get() = false
+    val musicVideoEnabled: StateFlow<Boolean> get() = DefaultMusicVideoEnabled
     /** Desktop window fullscreen; null keeps the phone's sensor/orientation behavior. */
     val musicVideoFullscreen: StateFlow<Boolean>? get() = null
     fun setMusicVideoFullscreen(fullscreen: Boolean) {}
@@ -424,3 +425,5 @@ enum class BluetoothForm { UNKNOWN, BUDS, HEADPHONES, SPEAKER, CAR }
 private val NoAutomixDetail = MutableStateFlow<String?>(null)
 private val NoMixView = MutableStateFlow<MixTransitionView?>(null)
 private val NoMixProgress = MutableStateFlow(0f)
+
+private val DefaultMusicVideoEnabled = MutableStateFlow(true)

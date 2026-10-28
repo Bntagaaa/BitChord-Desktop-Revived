@@ -23,7 +23,9 @@ import kotlin.test.assertEquals
 class DesktopVideoPlayerTest {
     @Test fun realPlayerUsesOneFullscreenControlAndNoLyricsAcrossReopen() = runDesktopComposeUiTest(width = 1440, height = 900) {
         var canvasCalls = 0
+        val beta = MutableStateFlow(true)
         val host = object : PlayerHost by DesktopPlayerHost {
+            override val musicVideoEnabled = beta
             override val settings = object : PlayerSettingsSource by DesktopPlayerSettings {
                 override val reduceAnimation = MutableStateFlow(true)
                 override val reduceDynamicBlur = MutableStateFlow(true)
@@ -85,6 +87,12 @@ class DesktopVideoPlayerTest {
             onNodeWithTag("desktop-video-sidebar").assertDoesNotExist()
             runOnIdle { visible.value = true }
             mainClock.advanceTimeBy(100)
+            onNodeWithTag("desktop-video-sidebar").assertIsDisplayed()
+            runOnIdle { beta.value = false }
+            mainClock.advanceTimeBy(300)
+            onNodeWithTag("desktop-video-sidebar").assertDoesNotExist()
+            runOnIdle { beta.value = true }
+            mainClock.advanceTimeBy(300)
             onNodeWithTag("desktop-video-sidebar").assertIsDisplayed()
             assertEquals(0, canvasCalls, "A music video must not start another Canvas lookup")
         } finally { DesktopWindowMode.exit(); PlayerPlatform.install(DesktopPlayerHost) }

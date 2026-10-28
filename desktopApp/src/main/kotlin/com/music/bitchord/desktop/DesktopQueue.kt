@@ -28,8 +28,7 @@ internal data class DesktopQueue(
 
     /** Replace one rendition in place, retaining the queue entry and its origin. */
     fun withMediaVersion(expected: Song, replacement: Song): DesktopQueue? {
-        if (current !== expected || replacement.videoId == expected.videoId ||
-            replacement.isVideo == expected.isVideo) return null
+        if (current !== expected || replacement.isVideo == expected.isVideo) return null
         val item = replacement.copy(
             isVideoOrigin = true, queueEntryId = expected.queueEntryId,
             queueTier = expected.queueTier, radioName = expected.radioName,

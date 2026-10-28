@@ -36,6 +36,7 @@ internal class DesktopVideoSession(
     private val resolve: suspend (String, Int) -> InnerTubeXResolver.VideoStream?,
     private val decoderFactory: () -> DesktopVideoDecoder,
     private val onError: (Exception) -> Unit = {},
+    enabled: StateFlow<Boolean> = MutableStateFlow(true),
 ) {
     private val users = MutableStateFlow<Map<String, Int>>(emptyMap())
     private val retries = MutableStateFlow(0)
@@ -55,7 +56,7 @@ internal class DesktopVideoSession(
     private val job = scope.launch {
         // Playback identity survives disposal/recreation of a view. Never key this collector on
         // surface count: fullscreen, minimize and restore must not resolve or open the URL again.
-        combine(clock.map { it.song?.takeIf { song -> song.isVideo }?.videoId }.distinctUntilChanged(),
+        combine(clock.combine(enabled) { audio, beta -> audio.song?.takeIf { beta && it.isVideo }?.videoId }.distinctUntilChanged(),
             held, retries) { id, height, retry -> Triple(id, height, retry) }
             .collectLatest { (id, height, _) ->
                 if (frame.value?.first != id) frame.value = null
@@ -136,7 +137,7 @@ internal object DesktopMusicVideo {
                 override fun nextFrame(pixels: ByteArray) = decoder.nextFrame(pixels)
                 override fun close() = decoder.close()
             }
-        }, onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") })
+        }, onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") }, enabled = DesktopVideoBeta.enabled)
     val held get() = session.held
     val quality get() = session.quality
     val aspect get() = session.aspect

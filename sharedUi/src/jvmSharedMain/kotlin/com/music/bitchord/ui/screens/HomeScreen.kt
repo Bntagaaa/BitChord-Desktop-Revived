@@ -59,6 +59,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -409,7 +410,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                     currentSong = currentSong,
                     isPlaying = isPlaying,
                 )
-            } else if (index == 0 && firstIsHero && shelf.layout == ShelfLayout.CARDS) {
+            } else if (index == 0 && firstIsHero && shelf.layout == ShelfLayout.CARDS && shelf.items.none { it.isVideo }) {
                 HeroShelf(
                     shelf = shelf,
                     onItemClick = openItem,
@@ -480,7 +481,11 @@ private fun RecentShelf(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     items(shelf.items) { item ->
-                        HeroCard(
+                        if (item.isVideo) VideoShelfCard(item, onClick = { onItemClick(item) },
+                            onLongPress = onItemLongPress?.let { { it(item) } },
+                            isCurrent = item.matchesCurrentlyPlaying(currentSong),
+                            isPlaying = item.matchesCurrentlyPlaying(currentSong) && isPlaying)
+                        else HeroCard(
                             item = item,
                             onClick = { onItemClick(item) },
                             onLongPress = onItemLongPress?.let { { it(item) } },
@@ -1045,7 +1050,7 @@ internal fun Shelf(
         ) {
             leadingCard?.let { card -> item(key = "leading") { card() } }
             items(shelf.items) { item ->
-                if (shelf.layout == ShelfLayout.VIDEO) {
+                if (item.isVideo) {
                     VideoShelfCard(
                         item = item,
                         onClick = { onItemClick(item) },
@@ -1094,7 +1099,7 @@ fun VideoShelfCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(VIDEO_ASPECT)
+                .aspectRatio(VIDEO_ASPECT).testTag("home-video-art-${item.videoId}")
                 .clip(RoundedCornerShape(12.dp))
                 .thumbnailBorder(RoundedCornerShape(12.dp))
                 .background(placeholderColor),
@@ -1270,7 +1275,7 @@ internal fun ShelfCard(
             "local:downloads" -> {
                 val palette = remember { MeshPalette(listOf(Color(0xFF1E3C72), Color(0xFF2A5298))) }
                 ArtworkHover(
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                    modifier = Modifier.fillMaxWidth().aspectRatio(if (item.isVideo) VIDEO_ASPECT else 1f),
                     shape = RoundedCornerShape(12.dp),
                     mode = ArtworkHoverMode.DARKEN_ONLY,
                     hovered = cardHovered,
@@ -1322,7 +1327,7 @@ internal fun ShelfCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1f)
+                        .aspectRatio(if (item.isVideo) VIDEO_ASPECT else 1f)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 ) {
@@ -1333,7 +1338,7 @@ internal fun ShelfCard(
                         hovered = cardHovered,
                     ) {
                         AsyncImage(
-                            model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
+                            model = if (item.isVideo) item.thumbnailUrl else item.thumbnailUrl.artworkAt(CARD_ART_PX),
                             contentDescription = null,
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),

@@ -60,6 +60,7 @@ internal object DesktopPlayerHost : PlayerHost {
         get() = DesktopMusicVideo.speed
         set(value) { DesktopMusicVideo.speed = value }
     override val musicVideoSupported = true
+    override val musicVideoEnabled = DesktopVideoBeta.enabled
     override val musicVideoFullscreen = DesktopWindowMode.fullScreen
     override fun setMusicVideoFullscreen(fullscreen: Boolean) {
         if (fullscreen != DesktopWindowMode.fullScreen.value) DesktopWindowMode.toggle()
