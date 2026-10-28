@@ -2538,6 +2538,15 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         if (!keepOpen) dismissQuickSearch()
     }
 
+    fun openQuickSearchInFullSearch(term: String) {
+        val requested = term.trim()
+        if (requested.isBlank() || !overlays.quickSearch) return
+        // Close the palette first, then reuse the regular Search session and its existing request.
+        dismissQuickSearch()
+        searchFilter = SearchFilter.ALL
+        runSearch(requested)
+    }
+
     fun selectDestination(next: DesktopDestination) {
         val page = if (next == DesktopDestination.EXPLORE) DesktopDestination.SEARCH else next
         val alreadyOnSearch = destination == DesktopDestination.SEARCH && selectedMoodGenre == null &&
@@ -3687,9 +3696,21 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             when (quickAction) {
                                 DesktopQuickSearchKeyAction.PREVIOUS -> quickSearchState.move(-1)
                                 DesktopQuickSearchKeyAction.NEXT -> quickSearchState.move(1)
-                                DesktopQuickSearchKeyAction.PLAY -> quickSearchState.selected()?.let { selectQuickSearchResult(it, keepOpen = false) }
-                                DesktopQuickSearchKeyAction.PLAY_KEEP_OPEN -> quickSearchState.selected()?.let {
-                                    selectQuickSearchResult(it, keepOpen = true)
+                                DesktopQuickSearchKeyAction.PLAY -> {
+                                    if (quickSearchState.isSearchAllSelected()) {
+                                        openQuickSearchInFullSearch(quickSearchState.state.value.query)
+                                    } else {
+                                        quickSearchState.selected()?.let { selectQuickSearchResult(it, keepOpen = false) }
+                                    }
+                                }
+                                DesktopQuickSearchKeyAction.PLAY_KEEP_OPEN -> {
+                                    // Shift+Enter retains the current song playback behavior; it must not
+                                    // navigate when the Search all footer is selected.
+                                    quickSearchState.selected()?.let {
+                                        if (it is SearchResult.Track || it is SearchResult.TopTrack) {
+                                            selectQuickSearchResult(it, keepOpen = true)
+                                        }
+                                    }
                                 }
                                 DesktopQuickSearchKeyAction.DISMISS -> dismissQuickSearch()
                                 DesktopQuickSearchKeyAction.FOCUS_QUERY -> runCatching { quickSearchFocusRequester.requestFocus() }
@@ -4365,6 +4386,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             controller = quickSearchState,
                             focusRequester = quickSearchFocusRequester,
                             onSelect = { selectQuickSearchResult(it, keepOpen = false) },
+                            onSearchAll = ::openQuickSearchInFullSearch,
                             onDismiss = ::dismissQuickSearch,
                         )
                     }

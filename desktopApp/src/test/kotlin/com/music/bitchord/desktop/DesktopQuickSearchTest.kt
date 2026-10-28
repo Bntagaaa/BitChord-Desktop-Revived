@@ -13,15 +13,25 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DesktopQuickSearchTest {
-    @Test fun quickSearchIncludesArtistRowsButNotAlbumsOrPlaylists() {
+    @Test fun quickSearchIncludesSongsArtistsAlbumsAndPlaylists() {
         val track = SearchResult.Track(Song("test-id", "Song", "Artist", null))
         val artist = SearchResult.Browse(BrowseItem("artist-id", "Artist", "2M listeners", null, BrowseType.ARTIST))
         val album = SearchResult.Browse(BrowseItem("album-id", "Album", "", null, BrowseType.ALBUM))
         val playlist = SearchResult.Browse(BrowseItem("playlist-id", "Mix", "", null, BrowseType.PLAYLIST))
         val results = quickSearchEntries(listOf(track, artist, album, playlist))
-        assertEquals(listOf(track, artist), results)
-        assertEquals("artist:artist-id", quickSearchEntryKey(artist))
+        assertEquals(listOf(track, artist, album, playlist), results)
+        assertEquals("browse:artist-id", quickSearchEntryKey(artist))
+        assertEquals("browse:album-id", quickSearchEntryKey(album))
+        assertEquals("browse:playlist-id", quickSearchEntryKey(playlist))
         assertEquals("track:test-id", quickSearchEntryKey(track))
+    }
+
+    @Test fun playlistRemainsVisibleWhenFirstFiveResultsAreSongs() {
+        val tracks = (1..7).map { SearchResult.Track(Song("id$it", "Song $it", "Artist", null)) }
+        val playlist = SearchResult.Browse(BrowseItem("pl1", "My Mix", "", null, BrowseType.PLAYLIST))
+        val displayed = quickSearchEntries(tracks + playlist)
+        assertEquals(5, displayed.size)
+        assertEquals(tracks.take(4) + playlist, displayed)
     }
 
     private fun state() = DesktopQuickSearchState<String> { it }
@@ -58,9 +68,9 @@ class DesktopQuickSearchTest {
         val s = state()
         s.edit("q")
         s.complete(s.state.value.request!!, listOf("", " ", "a", "a") + (1..20).map { "song$it" })
-        assertEquals(10, s.state.value.items.size)
+        assertEquals(5, s.state.value.items.size)
         assertEquals("a", s.selected())
-        assertEquals(10, s.state.value.items.distinct().size)
+        assertEquals(5, s.state.value.items.distinct().size)
     }
 
     @Test fun editingImmediatelyInvalidatesOldSelection() {
@@ -118,8 +128,10 @@ class DesktopQuickSearchTest {
         s.move(1)
         assertEquals("b", s.selected())
         s.move(99)
-        assertEquals("c", s.selected())
+        assertTrue(s.isSearchAllSelected())
         s.move(1)
+        assertTrue(s.isSearchAllSelected())
+        s.move(-1)
         assertEquals("c", s.selected())
     }
 
@@ -127,8 +139,34 @@ class DesktopQuickSearchTest {
         val s = ready()
         s.move(1)
         s.move(-1)
-        assertEquals(-1, s.state.value.selectedIndex)
+        assertEquals(0, s.state.value.selectedIndex)
+        assertTrue(s.isSearchAllSelected())
         assertNull(s.selected())
+    }
+
+    @Test fun keyboardCanSelectSearchAllFooter() {
+        val s = ready("song", "artist")
+        s.move(2)
+        assertTrue(s.isSearchAllSelected())
+        assertNull(s.selected())
+        s.move(1)
+        assertTrue(s.isSearchAllSelected())
+        s.move(-1)
+        assertEquals("artist", s.selected())
+    }
+
+    @Test fun emptySearchCanStillSelectSearchAll() {
+        val s = ready()
+        assertTrue(s.isSearchAllSelected())
+        assertEquals("query", s.state.value.query)
+    }
+
+    @Test fun hoverOnFooterDoesNotTriggerKeyboardScroll() {
+        val s = ready("song")
+        val before = s.state.value.scrollRevision
+        s.hoverSearchAll()
+        assertTrue(s.isSearchAllSelected())
+        assertEquals(before, s.state.value.scrollRevision)
     }
 
     @Test fun mouseSelectionDoesNotCauseKeyboardScrollFeedback() {
