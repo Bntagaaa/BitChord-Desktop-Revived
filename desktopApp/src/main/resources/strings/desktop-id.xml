@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">Ikon aplikasi</string>
+    <string name="d_app_icon_subtitle">Ubah ikon jendela dan baki sistem langsung. Pilihan tersimpan terpisah dari tema aplikasi.</string>
+    <string name="d_app_icon_dark">Gelap</string>
+    <string name="d_app_icon_light">Terang</string>
+    <string name="d_app_icon_launcher_note">Ikon pintasan dan ikon peluncur yang disematkan mungkin tetap memakai ikon Gelap bawaan.</string>
     <string name="d_a_slim_bar_above_the_toolbar">Bilah tipis di atas bilah alat, berisi tombol jendela itu sendiri. Jika mati, jendela sama sekali tidak punya bilah judul.</string>
     <string name="d_about_artist">Tentang artis</string>
     <string name="d_account">Akun</string>

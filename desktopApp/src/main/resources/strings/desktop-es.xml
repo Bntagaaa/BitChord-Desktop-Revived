@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">Icono de la aplicación</string>
+    <string name="d_app_icon_subtitle">Cambia al instante el icono de la ventana y de la bandeja del sistema. La elección se guarda independientemente del tema.</string>
+    <string name="d_app_icon_dark">Oscuro</string>
+    <string name="d_app_icon_light">Claro</string>
+    <string name="d_app_icon_launcher_note">Los accesos directos instalados y los iconos anclados pueden conservar el icono oscuro predeterminado.</string>
     <string name="d_a_slim_bar_above_the_toolbar">Una barra estrecha sobre la barra de herramientas con los botones de la ventana. Desactivada, la ventana no tiene ninguna barra de título.</string>
     <string name="d_about_artist">Sobre el artista</string>
     <string name="d_account">Cuenta</string>

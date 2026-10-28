@@ -1,5 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
+    <string name="d_app_icon">앱 아이콘</string>
+    <string name="d_app_icon_subtitle">창과 시스템 트레이 아이콘을 즉시 변경합니다. 선택은 테마와 별도로 저장됩니다.</string>
+    <string name="d_app_icon_dark">어둡게</string>
+    <string name="d_app_icon_light">밝게</string>
+    <string name="d_app_icon_launcher_note">설치된 바로가기와 고정된 실행 아이콘에는 기본 어두운 아이콘이 계속 표시될 수 있습니다.</string>
     <string name="d_a_slim_bar_above_the_toolbar">도구 모음 위에 창 버튼이 있는 얇은 막대를 표시합니다. 끄면 제목 표시줄이 숨겨집니다.</string>
     <string name="d_about_artist">아티스트 정보</string>
     <string name="d_account">계정</string>

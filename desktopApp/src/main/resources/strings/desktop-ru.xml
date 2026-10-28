@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">Значок приложения</string>
+    <string name="d_app_icon_subtitle">Мгновенно меняет значок окна и в системном трее. Выбор сохраняется независимо от темы.</string>
+    <string name="d_app_icon_dark">Тёмный</string>
+    <string name="d_app_icon_light">Светлый</string>
+    <string name="d_app_icon_launcher_note">Установленные ярлыки и закреплённые значки могут сохранить стандартный тёмный значок.</string>
     <string name="d_a_slim_bar_above_the_toolbar">Узкая полоса над панелью инструментов с кнопками окна. Если выключено, у окна нет строки заголовка вовсе.</string>
     <string name="d_about_artist">Об исполнителе</string>
     <string name="d_account">Аккаунт</string>

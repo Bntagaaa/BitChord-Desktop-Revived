@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="filter-1" filterUnits="userSpaceOnUse" x="-57.944" y="-61" width="1142.444" height="1142.444" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="16"/><feOffset dx="0" dy="10" result="shadow"/><feFlood flood-color="#2a2540" flood-opacity="0"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="linear-gradient-1" x1="2.056" y1="-1" x2="2.056" y2="1021.444" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fafafa"/>
+      <stop offset="0.5" stop-color="#f0f0f1"/>
+      <stop offset="1" stop-color="#e4e4e6"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="510.722" cy="124.249" r="817.955" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="2.056" y1="6.668" x2="2.056" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.3" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="0.7" stop-color="#000000" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.14"/>
+    </linearGradient>
+  </defs>
+  <title>favicon light.svg</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <g>
+      <g filter="url(#filter-1)">
+        <path d="M283.228 -1 L743.328 -1 C898.615 -1 1024.5 124.885 1024.5 280.172 L1024.5 740.272 C1024.5 895.559 898.615 1021.444 743.328 1021.444 L283.228 1021.444 C127.941 1021.444 2.056 895.559 2.056 740.272 L2.056 280.172 C2.056 124.885 127.941 -1 283.228 -1 Z" fill="url(#linear-gradient-1)"/>
+      </g>
+      <path d="M280.672 1.556 L740.772 1.556 C896.059 1.556 1021.944 127.441 1021.944 282.728 L1021.944 742.828 C1021.944 898.115 896.059 1024 740.772 1024 L280.672 1024 C125.385 1024 -0.5 898.115 -0.5 742.828 L-0.5 282.728 C-0.5 127.441 125.385 1.556 280.672 1.556 Z" fill="url(#radial-gradient-1)"/>
+      <path d="M280.672 6.668 L740.772 6.668 C894.647 6.668 1019.388 131.409 1019.388 285.284 L1019.388 745.384 C1019.388 899.259 894.647 1024 740.772 1024 L280.672 1024 C126.797 1024 2.056 899.259 2.056 745.384 L2.056 285.284 C2.056 131.409 126.797 6.668 280.672 6.668 Z" fill="none" stroke="url(#linear-gradient-2)" stroke-width="2"/>
+    </g>
+    <path d="M179.659 579.688 C191.732 559.262 218.183 552.529 238.543 564.657 L238.564 564.657 C386.679 652.631 631.051 660.72 772.465 617.8 C795.174 610.913 819.188 623.733 826.069 646.441 C832.951 669.16 820.142 693.159 797.418 700.063 C635.083 749.343 365.223 739.821 194.695 638.588 C174.226 626.466 167.531 600.086 179.659 579.688 Z M243.394 434.355 C253.766 417.48 275.826 412.157 292.674 422.529 C416.204 498.474 604.506 520.463 750.619 476.111 C769.567 470.388 789.581 481.067 795.333 499.984 C801.039 518.932 790.355 538.909 771.439 544.671 C604.539 595.312 397.052 570.781 255.192 483.608 C238.345 473.236 233.023 451.181 243.394 434.355 Z M299.644 309.207 C307.875 295.707 325.546 291.426 339.046 299.712 C446.947 365.62 582.779 380.548 742.748 343.998 C758.164 340.487 773.53 350.144 777.041 365.565 C780.57 380.986 770.95 396.351 755.497 399.864 C580.436 439.875 430.274 422.639 309.137 348.608 C295.638 340.322 291.358 322.706 299.644 309.207 Z" fill="#151515" stroke="#151515" stroke-width="14" stroke-miterlimit="10"/>
+  </g>
+</svg>

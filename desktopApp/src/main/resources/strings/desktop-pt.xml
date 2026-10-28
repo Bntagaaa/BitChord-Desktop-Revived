@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">Ícone do aplicativo</string>
+    <string name="d_app_icon_subtitle">Altere imediatamente o ícone da janela e da bandeja do sistema. A escolha é salva independentemente do tema.</string>
+    <string name="d_app_icon_dark">Escuro</string>
+    <string name="d_app_icon_light">Claro</string>
+    <string name="d_app_icon_launcher_note">Os atalhos instalados e os ícones fixados podem manter o ícone escuro padrão.</string>
     <string name="d_a_slim_bar_above_the_toolbar">Uma barra fina acima da barra de ferramentas, com os botões da janela. Desativada, a janela não tem barra de título nenhuma.</string>
     <string name="d_about_artist">Sobre o artista</string>
     <string name="d_account">Conta</string>

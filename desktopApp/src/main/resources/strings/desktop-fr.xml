@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">Icône de l’application</string>
+    <string name="d_app_icon_subtitle">Change immédiatement l’icône de la fenêtre et de la zone de notification. Le choix est enregistré indépendamment du thème.</string>
+    <string name="d_app_icon_dark">Sombre</string>
+    <string name="d_app_icon_light">Clair</string>
+    <string name="d_app_icon_launcher_note">Les raccourcis installés et les icônes épinglées peuvent conserver l’icône sombre par défaut.</string>
     <string name="d_a_slim_bar_above_the_toolbar">Une fine barre au-dessus de la barre d\'outils, avec les boutons de la fenêtre. Désactivée, la fenêtre n'a aucune barre de titre.</string>
     <string name="d_about_artist">À propos de l\'artiste</string>
     <string name="d_account">Compte</string>

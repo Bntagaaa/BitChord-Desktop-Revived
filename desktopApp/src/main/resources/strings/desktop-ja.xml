@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">アプリアイコン</string>
+    <string name="d_app_icon_subtitle">ウィンドウとシステムトレイのアイコンをすぐに変更します。選択はテーマとは別に保存されます。</string>
+    <string name="d_app_icon_dark">ダーク</string>
+    <string name="d_app_icon_light">ライト</string>
+    <string name="d_app_icon_launcher_note">インストール済みのショートカットやピン留めされたアイコンは、既定のダークアイコンのままになる場合があります。</string>
     <string name="d_a_slim_bar_above_the_toolbar">ツールバーの上にある、ウィンドウ操作ボタンを備えた細いバー。 オフにすると、ウィンドウにタイトルバーはまったく表示されません。</string>
     <string name="d_about_artist">アーティストについて</string>
     <string name="d_account">アカウント</string>

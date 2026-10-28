@@ -21,8 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import bitchord.desktopapp.generated.resources.Res
-import bitchord.desktopapp.generated.resources.app_icon
 import java.awt.Dimension
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -78,6 +76,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     // Hoisted so the player can fill the screen and system caption actions stay synchronized.
     val placement by DesktopWindowMode.placement.collectAsState()
     val state = rememberWindowState(width = 1_220.dp, height = 780.dp)
+    val appIcon by DesktopAppIconSettings.selected.collectAsState()
     LaunchedEffect(placement) { state.placement = placement }
     // ...and back, for the times the window is moved between placements by something that is not
     // us; see [DesktopWindowMode.adopt].
@@ -93,7 +92,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         onCloseRequest = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },
         visible = visible,
         title = "BitChord",
-        icon = painterResource(Res.drawable.app_icon),
+        icon = painterResource(appIcon.resource),
         state = state,
         // The peer must be opaque and decorated from creation. Windows owns the entire
         // non-client frame: caption, drag, resize, system menu and Snap.

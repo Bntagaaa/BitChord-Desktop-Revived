@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">ऐप आइकन</string>
+    <string name="d_app_icon_subtitle">विंडो और सिस्टम ट्रे का आइकन तुरंत बदलें। आपकी पसंद थीम से अलग सहेजी जाती है।</string>
+    <string name="d_app_icon_dark">गहरा</string>
+    <string name="d_app_icon_light">हल्का</string>
+    <string name="d_app_icon_launcher_note">इंस्टॉल किए गए शॉर्टकट और पिन किए गए लॉन्चर आइकन डिफ़ॉल्ट गहरा आइकन दिखाते रह सकते हैं।</string>
     <string name="d_a_slim_bar_above_the_toolbar">टूलबार के ऊपर एक पतली पट्टी, जिसमें विंडो के अपने बटन होते हैं। बंद होने पर विंडो में कोई शीर्षक पट्टी नहीं होती।</string>
     <string name="d_about_artist">कलाकार के बारे में</string>
     <string name="d_account">खाता</string>

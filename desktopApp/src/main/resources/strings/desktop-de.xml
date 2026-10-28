@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">App-Symbol</string>
+    <string name="d_app_icon_subtitle">Ändert das Fenster- und Infobereichssymbol sofort. Die Auswahl wird unabhängig vom Design gespeichert.</string>
+    <string name="d_app_icon_dark">Dunkel</string>
+    <string name="d_app_icon_light">Hell</string>
+    <string name="d_app_icon_launcher_note">Installierte Verknüpfungen und angeheftete Startsymbole behalten möglicherweise das dunkle Standardsymbol.</string>
     <string name="d_a_slim_bar_above_the_toolbar">Eine schmale Leiste über der Symbolleiste mit den Schaltflächen des Fensters. Aus hat das Fenster überhaupt keine Titelleiste.</string>
     <string name="d_about_artist">Über den Künstler</string>
     <string name="d_account">Konto</string>

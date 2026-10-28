@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">Uygulama simgesi</string>
+    <string name="d_app_icon_subtitle">Pencere ve sistem tepsisi simgesini anında değiştirin. Seçiminiz temadan bağımsız olarak kaydedilir.</string>
+    <string name="d_app_icon_dark">Koyu</string>
+    <string name="d_app_icon_light">Açık</string>
+    <string name="d_app_icon_launcher_note">Yüklü kısayollar ve sabitlenmiş başlatıcı simgeleri varsayılan Koyu simgeyi koruyabilir.</string>
     <string name="d_a_slim_bar_above_the_toolbar">Araç çubuğunun üstünde, pencerenin kendi düğmelerini taşıyan ince bir şerit. Kapalıyken pencerede hiç başlık çubuğu olmaz.</string>
     <string name="d_about_artist">Sanatçı hakkında</string>
     <string name="d_account">Hesap</string>

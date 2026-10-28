@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">Icona dell’app</string>
+    <string name="d_app_icon_subtitle">Cambia subito l’icona della finestra e dell’area di notifica. La scelta viene salvata indipendentemente dal tema.</string>
+    <string name="d_app_icon_dark">Scura</string>
+    <string name="d_app_icon_light">Chiara</string>
+    <string name="d_app_icon_launcher_note">I collegamenti installati e le icone fissate possono mantenere l’icona scura predefinita.</string>
     <string name="d_a_slim_bar_above_the_toolbar">Una barra sottile sopra la barra degli strumenti, con i pulsanti della finestra. Disattivata, la finestra non ha alcuna barra del titolo.</string>
     <string name="d_about_artist">Informazioni sull\'artista</string>
     <string name="d_account">Account</string>

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">应用图标</string>
+    <string name="d_app_icon_subtitle">立即更改窗口和系统托盘图标。图标选择独立于主题保存。</string>
+    <string name="d_app_icon_dark">深色</string>
+    <string name="d_app_icon_light">浅色</string>
+    <string name="d_app_icon_launcher_note">已安装的快捷方式和固定的启动器图标可能仍使用默认深色图标。</string>
     <string name="d_a_slim_bar_above_the_toolbar">工具栏上方的一条窄栏，带有窗口自己的按钮。 关闭后，窗口将完全没有标题栏。</string>
     <string name="d_about_artist">关于艺人</string>
     <string name="d_account">账户</string>

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">Ikona aplikacji</string>
+    <string name="d_app_icon_subtitle">Zmień od razu ikonę okna i zasobnika systemowego. Wybór jest zapisywany niezależnie od motywu.</string>
+    <string name="d_app_icon_dark">Ciemna</string>
+    <string name="d_app_icon_light">Jasna</string>
+    <string name="d_app_icon_launcher_note">Zainstalowane skróty i przypięte ikony mogą zachować domyślną ciemną ikonę.</string>
     <string name="d_a_slim_bar_above_the_toolbar">Wąski pasek nad paskiem narzędzi z własnymi przyciskami okna. Wyłączony — okno nie ma paska tytułu w ogóle.</string>
     <string name="d_about_artist">O wykonawcy</string>
     <string name="d_account">Konto</string>

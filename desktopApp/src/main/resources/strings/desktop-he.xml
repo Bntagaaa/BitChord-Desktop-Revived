@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="d_app_icon">סמל היישום</string>
+    <string name="d_app_icon_subtitle">שינוי מיידי של סמל החלון ומגש המערכת. הבחירה נשמרת בנפרד מערכת הנושא.</string>
+    <string name="d_app_icon_dark">כהה</string>
+    <string name="d_app_icon_light">בהיר</string>
+    <string name="d_app_icon_launcher_note">קיצורי דרך מותקנים וסמלים מוצמדים עשויים לשמור על הסמל הכהה המוגדר כברירת מחדל.</string>
     <string name="d_a_slim_bar_above_the_toolbar">פס דק מעל סרגל הכלים, עם הלחצנים של החלון עצמו. כשהאפשרות כבויה, לחלון אין שורת כותרת כלל.</string>
     <string name="d_about_artist">על האמן</string>
     <string name="d_account">חשבון</string>

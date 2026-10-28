@@ -2,6 +2,11 @@
 <!-- Copy the desktop has and Android does not: its own window chrome, source editor,
      output-precision controls and the rest. Android-shared copy lives in en.xml. -->
 <resources>
+    <string name="d_app_icon">App icon</string>
+    <string name="d_app_icon_subtitle">Change the window and tray icon instantly. Your choice is saved independently of the theme.</string>
+    <string name="d_app_icon_dark">Dark</string>
+    <string name="d_app_icon_light">Light</string>
+    <string name="d_app_icon_launcher_note">Installed shortcuts and pinned launcher icons may keep the default Dark icon.</string>
     <string name="d_a_slim_bar_above_the_toolbar">A slim bar above the toolbar with the window\'s own buttons. Off, the window has no title bar at all.</string>
     <string name="d_about_artist">About artist</string>
     <string name="d_account">Account</string>
