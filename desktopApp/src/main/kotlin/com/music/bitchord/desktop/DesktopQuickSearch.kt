@@ -91,6 +91,7 @@ internal fun quickSearchEntryKey(result: SearchResult): String = when (result) {
 }
 
 /** In-window overlay, not a new native popup/window: keyboard ownership stays at the app root. */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun DesktopQuickSearch(
     controller: DesktopQuickSearchState<SearchResult>,
