@@ -55,8 +55,10 @@ internal object DesktopPlayerHost : PlayerHost {
 
     var mixViewOpen: (Boolean) -> Unit = {}
     override fun onMixViewOpen(open: Boolean) = mixViewOpen(open)
-    val videoClock = MutableStateFlow(DesktopPlaybackState())
-    @Volatile var videoSpeed: Float = 1f
+    val videoClock get() = DesktopMusicVideo.clock
+    var videoSpeed: Float
+        get() = DesktopMusicVideo.speed
+        set(value) { DesktopMusicVideo.speed = value }
     override val musicVideoSupported = true
     override val musicVideoFullscreen = DesktopWindowMode.fullScreen
     override fun setMusicVideoFullscreen(fullscreen: Boolean) {

@@ -795,7 +795,9 @@ fun NowPlayingScreen(
     // itself (create/join) when there isn't one.
     val openListenTogetherMembers: () -> Unit = { showListenTogetherMembers = true }
 
-    val syncedLyricsEnabled by PlayerSettings.syncedLyrics.collectAsStateWithLifecycle()
+    val desktopVideo = song.isVideo && PlayerPlatform.host.musicVideoFullscreen != null
+    val syncedLyricsSetting by PlayerSettings.syncedLyrics.collectAsStateWithLifecycle()
+    val syncedLyricsEnabled = syncedLyricsSetting && !desktopVideo
     val lyricsOffsetMs by PlayerSettings.lyricsOffsetMs.collectAsStateWithLifecycle()
     // A lambda, not a value: read by the lyric strip and panel in scopes of
     // their own, so a tick recomposes them and not the player around them.
@@ -815,7 +817,7 @@ fun NowPlayingScreen(
     // A music video plays its own picture where the sleeve is — see
     // [MusicVideoSurface] — and takes the place of any animated cover.
     val videoMode = showsMusicVideo(song)
-    val canvas = rememberCanvasArtwork(song)?.takeUnless { videoMode }?.let {
+    val canvas = (if (videoMode) null else rememberCanvasArtwork(song))?.let {
         // Apple's 3:4 rendition runs under the whole phone screen, the way its
         // own player shows it; the square one stays the fallback.
         val tall = it.portraitUrl
@@ -897,7 +899,7 @@ fun NowPlayingScreen(
         mutableStateOf(restoredPlayerScreen == LastPlayerScreen.QUEUE)
     }
     var lyricsOpen by remember {
-        mutableStateOf(restoredPlayerScreen == LastPlayerScreen.LYRICS)
+        mutableStateOf(!desktopVideo && restoredPlayerScreen == LastPlayerScreen.LYRICS)
     }
     val queueSlide = remember { mutableFloatStateOf(0f) }
     // Expensive, song-scoped preparation is deliberately staggered. The small
@@ -925,7 +927,7 @@ fun NowPlayingScreen(
     LaunchedEffect(queueOpen) { if (!queueOpen) queueScrolling = false }
     val panelScrolling = lyricsScrolling || queueScrolling
     var lyricsControlsOpen by remember {
-        mutableStateOf(restoredPlayerScreen == LastPlayerScreen.LYRICS)
+        mutableStateOf(!desktopVideo && restoredPlayerScreen == LastPlayerScreen.LYRICS)
     }
     var queueControlsOpen by remember { mutableStateOf(true) }
     // Shared with Spotify's title placement below. The deck and credits must
@@ -952,7 +954,11 @@ fun NowPlayingScreen(
     // controls from a LaunchedEffect left one composed frame where lyrics were
     // open but the half-player was not, so every trip into lyrics briefly
     // started an exit animation and reversed it on the following frame.
-    val openLyrics: () -> Unit = {
+    LaunchedEffect(desktopVideo) {
+        if (desktopVideo) { lyricsOpen = false; lyricsControlsOpen = false }
+    }
+    val openLyrics: () -> Unit = openLyrics@ {
+        if (desktopVideo) return@openLyrics
         lyricsControlsOpen = true
         lyricsOpen = true
         queueOpen = false
@@ -1521,8 +1527,10 @@ fun NowPlayingScreen(
     // besides the sleeve.
     val playerActions: @Composable () -> Unit = {
         PlayerActionRow(
+            lyricsEnabled = !desktopVideo,
+            queueOpen = if (desktopVideo) true else queueOpen,
+            queueButtonVisible = !desktopVideo,
             lyricsOpen = lyricsOpen,
-            queueOpen = queueOpen,
             shuffleEnabled = shuffleEnabled,
             repeatMode = repeatMode,
             autoplayEnabled = autoplayEnabled,
@@ -1841,22 +1849,18 @@ fun NowPlayingScreen(
                 DesktopMusicVideoLayout(
                     caption = if (hideSongStatus) "" else playbackOriginText(song, playedBy),
                     onOpenCaption = openPlaybackOrigin,
-                    lyricsSelected = lyricsOpen,
-                    onSelectQueue = { closeLyrics(); queueOpen = true },
-                    onSelectLyrics = { queueOpen = false; openLyrics() },
                     video = {
                         if (!videoRendered) VideoLoadingBackdrop(Modifier.fillMaxSize())
                         MusicVideoSurface(song.videoId, Modifier.fillMaxSize(), fit = true,
                             onRenderedChanged = { videoRendered = it })
-                        VideoCornerControls(false,
-                            onToggleFullscreen = { PlayerPlatform.host.setMusicVideoFullscreen(true) },
-                            onOpenQuality = { showVideoQuality = true },
+                        DesktopVideoQualityControl(onClick = { showVideoQuality = true },
                             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
                     },
                     credits = {
                         LandscapeCredits(song, signedIn, likeStatus, showRevertCue, onToggleLike,
-                            onOpenMenu, onOpenAlbum, onOpenArtist)
+                            onOpenMenu, onOpenAlbum, onOpenArtist, showActions = false)
                     },
+                    trackActions = { LandscapeTrackActions(song, signedIn, likeStatus, showRevertCue, onToggleLike, onOpenMenu) },
                     scrubber = {
                         PlayerScrubber(shown = shown, durationMs = durationMs,
                             loading = audioVersionSwitching, mixing = mixing && !scrub.scrubbing,
@@ -1873,12 +1877,10 @@ fun NowPlayingScreen(
                             onValueChange = onVolumeChange, onValueChangeFinished = onVolumeChangeFinished)
                     },
                     panel = {
-                        if (lyricsOpen) {
-                            videoLyricsPane()
-                        } else InlineQueue(queue, queueIndex, autoplayEnabled, controlsLocked,
+                        DesktopVideoQueue(queue, queueIndex, autoplayEnabled, controlsLocked,
                             onJumpTo, onRemoveFromQueue, onMoveInQueue, onClearQueue,
                             onDragActiveChange = onQueueDragActiveChange,
-                            modifier = Modifier.fillMaxSize(), showTitle = false)
+                            modifier = Modifier.fillMaxSize())
                     },
                     panelActions = playerActions,
                 )
@@ -1889,6 +1891,7 @@ fun NowPlayingScreen(
             val transitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
             Box(modifier = modifier.fillMaxSize().then(dockHost)) {
                 FullscreenVideoPlayer(
+                    desktop = desktopVideo,
                     song = song,
                     isPlaying = isPlaying,
                     artRequest = art.request,
@@ -1930,6 +1933,7 @@ fun NowPlayingScreen(
                             onPlayPause = onPlayPause,
                             onNext = onNext,
                             compact = true,
+                            desktop = desktopVideo,
                         )
                     },
                 )
@@ -3383,6 +3387,7 @@ fun NowPlayingScreen(
                                     )
                                     VideoCornerControls(
                                         fullscreen = false,
+                                        showFullscreen = !desktopVideo,
                                         onToggleFullscreen = {
                                             if (desktopVideoFullscreen != null) PlayerPlatform.host.setMusicVideoFullscreen(true)
                                             else screenOrientation.landscape()

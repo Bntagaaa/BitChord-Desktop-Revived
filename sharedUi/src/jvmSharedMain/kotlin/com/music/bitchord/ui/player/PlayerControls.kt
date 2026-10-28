@@ -575,6 +575,8 @@ internal fun VolumeRow(
  */
 @Composable
 internal fun PlayerActionRow(
+    lyricsEnabled: Boolean = true,
+    queueButtonVisible: Boolean = true,
     lyricsOpen: Boolean,
     queueOpen: Boolean,
     shuffleEnabled: Boolean,
@@ -600,7 +602,7 @@ internal fun PlayerActionRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = edgeInset),
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.align(Alignment.CenterStart)) {
+            if (lyricsEnabled) Box(Modifier.align(Alignment.CenterStart)) {
                 BottomGlyph(
                     icon = BitChordIcons.LyricsQuote,
                     contentDescription = stringResource(if (lyricsOpen) Res.string.close_lyrics else Res.string.open_lyrics),
@@ -676,7 +678,7 @@ internal fun PlayerActionRow(
                     )
                 }
             }
-            Box(Modifier.align(Alignment.CenterEnd)) {
+            if (queueButtonVisible) Box(Modifier.align(Alignment.CenterEnd)) {
                 BottomGlyph(
                     icon = BitChordIcons.Queue,
                     contentDescription = stringResource(Res.string.up_next),

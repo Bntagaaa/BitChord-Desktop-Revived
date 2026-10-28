@@ -2048,6 +2048,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     // so looking up against a length of zero would settle on the wrong recording.
     LaunchedEffect(
         selectedSong?.videoId,
+        selectedSong?.isVideo,
         lyricsLengthMs,
         syncedLyrics,
         prioritizeSyllables,
@@ -2062,7 +2063,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             lyricsLoading = false
             return@LaunchedEffect
         }
-        if (!syncedLyrics) {
+        if (!syncedLyrics || current.isVideo) {
             lyricsError = "Synced lyrics are switched off"
             lyricsLoading = false
             return@LaunchedEffect
@@ -2083,9 +2084,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         lyricsLoading = false
     }
 
-    LaunchedEffect(selectedSong?.videoId, animatedCanvas) {
+    LaunchedEffect(selectedSong?.videoId, selectedSong?.isVideo, animatedCanvas) {
         val current = selectedSong
-        if (current == null || !animatedCanvas) {
+        if (current == null || !animatedCanvas || current.isVideo) {
             canvas = null
             return@LaunchedEffect
         }
@@ -2185,7 +2186,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         replaySummary = withContext(Dispatchers.IO) { DesktopListeningStats.summary(replayPeriod) }
     }
     DisposableEffect(playbackEngine) {
-        onDispose { playbackEngine.release() }
+        onDispose { DesktopMusicVideo.stop(); playbackEngine.release() }
     }
 
     /** Opens an artist's page, from a card, a search row or the player's credit. */
@@ -4137,8 +4138,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             // Where the player's "…" sits: the right column's credits row, at
                             // the right edge of the centred two-column layout.
                             val columnEdge = if (current.isVideo && windowWidth >= 900.dp && windowHeight >= 540.dp) {
-                                val sidebarWidth = if (windowWidth - 64.dp >= 1300.dp) 360.dp else 300.dp
-                                windowWidth / 2 - sidebarWidth - 32.dp - 24.dp - 18.dp
+                                val sidebarWidth = com.music.bitchord.ui.player.desktopVideoSidebarWidth(windowWidth - 56.dp)
+                                windowWidth / 2 - sidebarWidth - 28.dp - 24.dp - 18.dp
                             } else minOf(windowWidth, 1100.dp) / 2 - 47.dp
                             Box(
                                 Modifier

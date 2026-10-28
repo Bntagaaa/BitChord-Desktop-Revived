@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +87,7 @@ internal fun FullscreenVideoPlayer(
     scrubber: @Composable () -> Unit,
     transport: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    desktop: Boolean = false,
 ) {
     HideSystemBars(true)
     var controlsShown by remember { mutableStateOf(true) }
@@ -102,6 +104,14 @@ internal fun FullscreenVideoPlayer(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+            .pointerInput(desktop) {
+                if (desktop) awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Move) { controlsShown = true; touches++ }
+                    }
+                }
+            }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -148,7 +158,8 @@ internal fun FullscreenVideoPlayer(
                     .padding(horizontal = 24.dp, vertical = 16.dp),
             ) {
                 Row(
-                    modifier = Modifier.align(Alignment.TopStart).fillMaxWidth(),
+                    modifier = Modifier.align(Alignment.TopStart).fillMaxWidth()
+                        .padding(horizontal = if (desktop) 40.dp else 0.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -168,9 +179,10 @@ internal fun FullscreenVideoPlayer(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    VideoCornerControls(fullscreen = true, onToggleFullscreen = onExitFullscreen, onOpenQuality = onOpenQuality)
+                    if (desktop) DesktopVideoQualityControl(onOpenQuality)
+                    else VideoCornerControls(fullscreen = true, onToggleFullscreen = onExitFullscreen, onOpenQuality = onOpenQuality)
                 }
-                Box(
+                if (!desktop) Box(
                     Modifier
                         .align(Alignment.Center)
                         .widthIn(max = 420.dp),
@@ -183,6 +195,7 @@ internal fun FullscreenVideoPlayer(
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.Bottom,
                 ) {
+                    if (desktop) Box(Modifier.widthIn(max = 260.dp).height(56.dp)) { transport() }
                     scrubber()
                 }
             }
@@ -217,6 +230,7 @@ internal fun VideoCornerControls(
     onToggleFullscreen: () -> Unit,
     onOpenQuality: () -> Unit,
     modifier: Modifier = Modifier,
+    showFullscreen: Boolean = true,
 ) {
     Row(
         modifier = modifier,
@@ -224,7 +238,7 @@ internal fun VideoCornerControls(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         VideoQualityBox(onClick = onOpenQuality)
-        Box(
+        if (showFullscreen) Box(
             modifier = Modifier
                 .size(30.dp)
                 .clip(RoundedCornerShape(8.dp))
@@ -234,13 +248,18 @@ internal fun VideoCornerControls(
         ) {
             Icon(
                 imageVector = if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
-                contentDescription = null,
+                contentDescription = if (fullscreen) "Exit fullscreen" else "Fullscreen",
                 tint = Color.White,
                 modifier = Modifier.size(22.dp),
             )
         }
     }
 }
+
+/** Desktop window chrome owns the only fullscreen toggle. */
+@Composable
+fun DesktopVideoQualityControl(onClick: () -> Unit, modifier: Modifier = Modifier) =
+    VideoCornerControls(false, {}, onClick, modifier, showFullscreen = false)
 
 /** What the quality box and drawer say is playing: the held height, else the one on screen. */
 private fun MusicVideoQualityUi.selected(): Int? =

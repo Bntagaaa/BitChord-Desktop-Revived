@@ -422,6 +422,7 @@ internal fun LandscapeCredits(
     /** Null browse id for anyone but the lead credit — see [NowPlayingScreen]. */
     onOpenArtist: (browseId: String?, name: String) -> Unit,
     modifier: Modifier = Modifier,
+    showActions: Boolean = true,
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Crossfade(
@@ -462,6 +463,14 @@ internal fun LandscapeCredits(
                 )
             }
         }
+        if (showActions) LandscapeTrackActions(song, signedIn, likeStatus, showRevertCue, onToggleLike, onOpenMenu)
+    }
+}
+
+@Composable
+internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: LikeStatus,
+    showRevertCue: Boolean, onToggleLike: () -> Unit, onOpenMenu: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.width(10.dp))
         // Same gate as the portrait player's: no account to like against for a
         // guest — but a local file or a finished download is liked on the

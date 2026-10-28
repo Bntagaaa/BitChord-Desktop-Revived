@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -70,7 +71,8 @@ internal fun DesktopPlayerSheet(
 
         LaunchedEffect(visible) {
             if (visible) {
-                offset.animateTo(0f, tween(SHEET_OPEN_MS, easing = FastOutSlowInEasing))
+                if (dragToDismiss) offset.animateTo(0f, tween(SHEET_OPEN_MS, easing = FastOutSlowInEasing))
+                else offset.snapTo(0f)
             } else {
                 offset.animateTo(heightPx, tween(SHEET_CLOSE_MS, easing = FastOutSlowInEasing))
                 mounted = false
@@ -103,12 +105,12 @@ internal fun DesktopPlayerSheet(
             val fullscreen by DesktopWindowMode.fullScreen.collectAsState()
             Box(Modifier.align(Alignment.TopStart).padding(8.dp)) {
                 DesktopToolbarButton(onClick = onDismiss, size = 32.dp) {
-                    Icon(Icons.Rounded.KeyboardArrowDown, "Minimize player", tint = DesktopForeground, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.KeyboardArrowDown, "Minimize player", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
             Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                 DesktopToolbarButton(onClick = { DesktopWindowMode.toggle() }, size = 32.dp) {
-                    Icon(if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen, "Toggle fullscreen", tint = DesktopForeground, modifier = Modifier.size(20.dp))
+                    Icon(if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen, "Toggle fullscreen", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
             // The handle the landscape player draws at its top edge, made to do

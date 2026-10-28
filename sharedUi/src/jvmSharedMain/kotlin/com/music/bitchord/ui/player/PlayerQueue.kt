@@ -77,6 +77,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -225,6 +226,15 @@ private fun LazyItemScope.queueMotion(): Modifier =
 
 /** The live queue, in the player itself. */
 @Composable
+fun DesktopVideoQueue(
+    queue: List<Song>, currentIndex: Int, autoplayEnabled: Boolean, controlsLocked: Boolean,
+    onJumpTo: (Int) -> Unit, onRemove: (Int) -> Unit, onMove: (Int, Int) -> Unit,
+    onClear: () -> Unit, onDragActiveChange: (Boolean) -> Unit = {}, modifier: Modifier = Modifier,
+) = InlineQueue(queue, currentIndex, autoplayEnabled, controlsLocked, onJumpTo, onRemove,
+    onMove, onClear, onDragActiveChange = onDragActiveChange,
+    modifier = modifier.padding(horizontal = 18.dp), showTitle = false, edgeToEdge = false)
+
+@Composable
 internal fun InlineQueue(
     queue: List<Song>,
     currentIndex: Int,
@@ -247,6 +257,7 @@ internal fun InlineQueue(
     modifier: Modifier = Modifier,
     /** The desktop side panel supplies the shared Lyrics / Queue / Now playing header. */
     showTitle: Boolean = true,
+    edgeToEdge: Boolean = true,
 ) {
     val colors = LocalQueuePanelColors.current
     val listState = rememberLazyListState()
@@ -308,7 +319,7 @@ internal fun InlineQueue(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .bleedHorizontally(PLAYER_GUTTER)
+                .then(if (edgeToEdge) Modifier.bleedHorizontally(PLAYER_GUTTER) else Modifier)
                 .fadingEdges(),
         ) {
             LazyColumn(
@@ -319,7 +330,7 @@ internal fun InlineQueue(
                     // drag on itself and slides the whole player away.
                     .nestedScroll(keepScroll)
                     .then(if (collapsePlayerOnScroll) Modifier.nestedScroll(controlsOnScroll) else Modifier),
-                contentPadding = PaddingValues(horizontal = PLAYER_GUTTER),
+                contentPadding = PaddingValues(horizontal = if (edgeToEdge) PLAYER_GUTTER else 0.dp),
             ) {
                 if (nowPlaying != null) {
                     item(key = "header-now-playing") {
@@ -789,13 +800,14 @@ private fun InlineQueueRow(
             Spacer(Modifier.width(4.dp))
         }
         ArtworkHover(
-            modifier = Modifier.size(44.dp).thumbnailBorder(RoundedCornerShape(6.dp)),
+            modifier = Modifier.trackArtSize(44.dp, song.isVideo).testTag("queue-art-${song.videoId}").thumbnailBorder(RoundedCornerShape(6.dp)),
             shape = RoundedCornerShape(6.dp),
             mode = ArtworkHoverMode.DARKEN_AND_PLAY,
             hovered = rowHovered,
         ) {
             AsyncImage(
                 model = rememberRemoteArtworkUrl(song),
+                contentScale = ContentScale.Crop,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().background(colors.primary.copy(alpha = 0.08f)),
             )

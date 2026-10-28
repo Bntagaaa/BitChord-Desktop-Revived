@@ -1,6 +1,7 @@
 package com.music.bitchord.desktop
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
@@ -16,67 +17,135 @@ import kotlinx.coroutines.flow.*
 import org.jetbrains.skia.*
 import kotlin.math.abs
 
-/** One silent video deck for all visible surfaces; the existing audio engine owns the clock. */
-internal object DesktopMusicVideo {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+/** The view never owns this decoder; only the currently playing video and quality do. */
+internal interface DesktopVideoDecoder {
+    val width: Int
+    val height: Int
+    val frameTimeMs: Long
+    fun open(stream: InnerTubeXResolver.VideoStream)
+    fun seekTo(millis: Long): Boolean
+    fun nextFrame(pixels: ByteArray): Boolean
+    fun close()
+}
+
+/** Injectable session used by both windowed and fullscreen views, including while minimized. */
+internal class DesktopVideoSession(
+    scope: CoroutineScope,
+    val clock: StateFlow<DesktopPlaybackState>,
+    private val speed: () -> Float,
+    private val resolve: suspend (String, Int) -> InnerTubeXResolver.VideoStream?,
+    private val decoderFactory: () -> DesktopVideoDecoder,
+    private val onError: (Exception) -> Unit = {},
+) {
     private val users = MutableStateFlow<Map<String, Int>>(emptyMap())
+    private val retries = MutableStateFlow(0)
     val held = MutableStateFlow<Int?>(null)
     val quality = MutableStateFlow(MusicVideoQualityUi())
     val aspect = MutableStateFlow(16f / 9f)
     val frame = MutableStateFlow<Pair<String, VideoFrame>?>(null)
+    val failed = MutableStateFlow(false)
 
     @Synchronized fun attach(id: String) { users.value = users.value + (id to ((users.value[id] ?: 0) + 1)) }
     @Synchronized fun detach(id: String) {
         val count = (users.value[id] ?: return) - 1
         users.value = if (count > 0) users.value + (id to count) else users.value - id
     }
+    fun retry() { retries.value++ }
 
-    init {
-        scope.launch {
-            combine(users.map { it.keys.lastOrNull() }.distinctUntilChanged(), held) { id, height -> id to height }
-                .collectLatest { (id, height) ->
-                    frame.value = null
-                    quality.value = MusicVideoQualityUi(held = height)
-                    if (id == null) return@collectLatest
-                    val decoder = DesktopCanvasDecoder(maxEdge = 8192, loopAtEnd = false)
-                    try {
-                        val stream = InnerTubeXResolver.extractVideo(id, height ?: 1080)
-                            ?: error("No playable video stream")
-                        decoder.open(stream.url, stream.headers).getOrThrow()
-                        aspect.value = stream.aspect.takeIf { it > 0 } ?: 16f / 9f
-                        quality.value = MusicVideoQualityUi(stream.heights, height, stream.height)
-                        val pixels = ByteArray(decoder.width * decoder.height * 4)
-                        var lastSeek = -1
-                        var lastPosition = -1L
-                        while (currentCoroutineContext().isActive) {
-                            val audio = DesktopPlayerHost.videoClock.value
-                            if (audio.song?.videoId != id || audio.awaitingAudio) { delay(30); continue }
-                            if (!audio.isPlaying && frame.value != null && lastSeek == audio.seeks) { delay(30); continue }
-                            val target = videoClockPosition(audio, DesktopPlayerHost.videoSpeed)
-                            if (lastSeek != audio.seeks || (lastPosition >= 0 && abs(target - lastPosition) > 1500)) {
-                                decoder.seekTo(target)
-                                lastSeek = audio.seeks
-                            }
-                            if (!decoder.nextFrame(pixels)) {
-                                // Keep the decoder alive for repeat-one or a seek after EOF.
-                                delay(60)
-                                continue
-                            }
-                            lastPosition = decoder.frameTimeMs
-                            if (lastPosition + 80 < target) continue
-                            val wait = ((lastPosition - target) / DesktopPlayerHost.videoSpeed.coerceAtLeast(.1f)).toLong()
-                            if (wait > 0) delay(wait.coerceAtMost(1000))
-                            val latest = DesktopPlayerHost.videoClock.value
-                            if (latest.song?.videoId != id || latest.seeks != audio.seeks ||
-                                (audio.isPlaying && !latest.isPlaying) || latest.awaitingAudio) continue
-                            frame.value = id to VideoFrame(decoder.width, decoder.height, pixels.copyOf())
+    private val job = scope.launch {
+        // Playback identity survives disposal/recreation of a view. Never key this collector on
+        // surface count: fullscreen, minimize and restore must not resolve or open the URL again.
+        combine(clock.map { it.song?.takeIf { song -> song.isVideo }?.videoId }.distinctUntilChanged(),
+            held, retries) { id, height, retry -> Triple(id, height, retry) }
+            .collectLatest { (id, height, _) ->
+                if (frame.value?.first != id) frame.value = null
+                failed.value = false
+                quality.value = MusicVideoQualityUi(held = height)
+                if (id == null) { frame.value = null; return@collectLatest }
+                val decoder = decoderFactory()
+                try {
+                    val stream = resolve(id, height ?: 1080) ?: error("No playable video stream")
+                    ensureActive()
+                    decoder.open(stream)
+                    ensureActive()
+                    aspect.value = stream.aspect.takeIf { it > 0 } ?: 16f / 9f
+                    quality.value = MusicVideoQualityUi(stream.heights, height, stream.height)
+                    val pixels = ByteArray(decoder.width * decoder.height * 4)
+                    var lastSeek = -1
+                    var lastPosition = -1L
+                    var producedFrame = false
+                    while (currentCoroutineContext().isActive) {
+                        val audio = clock.value
+                        if (audio.song?.videoId != id || audio.awaitingAudio) { delay(30); continue }
+                        // Decode one frame to warm the session, then retain the decoder and last
+                        // frame while hidden. Restoring only seeks to the live clock if needed.
+                        if (producedFrame && users.value[id] == null) {
+                            users.first { (it[id] ?: 0) > 0 }
+                            continue
                         }
-                    } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (error: Exception) { DesktopPlayerHost.showMessage("Video unavailable; audio continues") }
-                    finally { decoder.close() }
-                }
-        }
+                        if (!audio.isPlaying && producedFrame && lastSeek == audio.seeks) {
+                            clock.first { it.isPlaying || it.seeks != lastSeek }
+                            continue
+                        }
+                        val target = videoClockPosition(audio, speed())
+                        if (lastSeek != audio.seeks || (lastPosition >= 0 && abs(target - lastPosition) > 1500)) {
+                            check(decoder.seekTo(target)) { "Video seek failed" }
+                            lastSeek = audio.seeks
+                        }
+                        if (!decoder.nextFrame(pixels)) {
+                            check(producedFrame) { "Video has no decodable frames" }
+                            delay(60)
+                            continue
+                        }
+                        ensureActive()
+                        lastPosition = decoder.frameTimeMs
+                        if (lastPosition + 80 < target) continue
+                        val wait = ((lastPosition - target) / speed().coerceAtLeast(.1f)).toLong()
+                        if (wait > 0) delay(wait.coerceAtMost(1000))
+                        val latest = clock.value
+                        if (latest.song?.videoId != id || latest.seeks != audio.seeks ||
+                            (audio.isPlaying && !latest.isPlaying) || latest.awaitingAudio) continue
+                        frame.value = id to VideoFrame(decoder.width, decoder.height, pixels.copyOf())
+                        producedFrame = true
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    frame.value = null
+                    failed.value = true
+                    onError(error)
+                } finally { decoder.close() }
+            }
     }
+    fun close() { job.cancel(); frame.value = null }
+}
+
+internal object DesktopMusicVideo {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val clock = MutableStateFlow(DesktopPlaybackState())
+    @Volatile var speed = 1f
+    private val session = DesktopVideoSession(scope, clock, { speed },
+        resolve = InnerTubeXResolver::extractVideo,
+        decoderFactory = {
+            object : DesktopVideoDecoder {
+                private val decoder = DesktopCanvasDecoder(maxEdge = 8192, loopAtEnd = false)
+                override val width get() = decoder.width
+                override val height get() = decoder.height
+                override val frameTimeMs get() = decoder.frameTimeMs
+                override fun open(stream: InnerTubeXResolver.VideoStream) { decoder.open(stream.url, stream.headers).getOrThrow() }
+                override fun seekTo(millis: Long) = decoder.seekTo(millis)
+                override fun nextFrame(pixels: ByteArray) = decoder.nextFrame(pixels)
+                override fun close() = decoder.close()
+            }
+        }, onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") })
+    val held get() = session.held
+    val quality get() = session.quality
+    val aspect get() = session.aspect
+    val frame get() = session.frame
+    val failed get() = session.failed
+    fun attach(id: String) = session.attach(id)
+    fun detach(id: String) = session.detach(id)
+    fun retry() = session.retry()
+    fun stop() { clock.value = DesktopPlaybackState() }
 }
 
 internal fun videoClockPosition(state: DesktopPlaybackState, speed: Float, now: Long = System.nanoTime()): Long {
@@ -97,13 +166,21 @@ internal class VideoFrame(val width: Int, val height: Int, private val pixels: B
 @Composable
 internal fun DesktopMusicVideoSurface(id: String, fit: Boolean, onRendered: (Boolean) -> Unit, modifier: Modifier) {
     val current by DesktopMusicVideo.frame.collectAsState()
+    val failed by DesktopMusicVideo.failed.collectAsState()
     val image = current?.takeIf { it.first == id }?.second
     val report by rememberUpdatedState(onRendered)
     DisposableEffect(id) {
         DesktopMusicVideo.attach(id)
-        onDispose { DesktopMusicVideo.detach(id); report(false) }
+        onDispose { DesktopMusicVideo.detach(id) }
     }
-    LaunchedEffect(image != null) { report(image != null) }
-    image?.let { Image(painter = it, contentDescription = null, modifier = modifier,
-        contentScale = if (fit) ContentScale.Fit else ContentScale.Crop) }
+    LaunchedEffect(id, image != null) { report(image != null) }
+    if (image != null) Image(painter = image, contentDescription = null, modifier = modifier,
+        contentScale = if (fit) ContentScale.Fit else ContentScale.Crop)
+    else if (failed) androidx.compose.foundation.layout.Box(modifier.background(androidx.compose.ui.graphics.Color.Black),
+        contentAlignment = androidx.compose.ui.Alignment.Center) {
+        androidx.compose.foundation.layout.Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+            androidx.compose.material3.Text("Video unavailable", color = androidx.compose.ui.graphics.Color.White)
+            androidx.compose.material3.TextButton(onClick = DesktopMusicVideo::retry) { androidx.compose.material3.Text("Retry video") }
+        }
+    }
 }

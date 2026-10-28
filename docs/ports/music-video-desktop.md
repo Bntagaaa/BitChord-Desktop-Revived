@@ -12,8 +12,20 @@ Regression coverage: queue version round trips, retained source/entry identity a
 
 ## Desktop watch layout
 
-Windows at least 900 dp wide and 540 dp high use a dedicated two-column watch view. The video fills the available left stage, with credits, scrubber, compact desktop transport and volume below it. A 300/360 dp sidebar holds the existing editable queue or the existing synchronized lyrics pane, including its provider/translation/share controls. The background uses BitChord's artwork treatment with a darker veil, rounded video corners and subtle panel borders. Fullscreen remains a separate edge-to-edge mode; smaller windows retain the compact player.
+The user's two-page PDF is a layout reference only. Windows at least 900 dp wide and 540 dp high use a two-column watch view: a large video stage on the left and a queue-only sidebar on the right. The caption is centered above them. Credits, transport, volume and track actions share the strip below the video; the timeline follows the entire strip. On narrower desktop widths that strip uses two rows. The sidebar scales from 300 to 450 dp, with inner padding so drag handles, titles and remove actions stay inside its border.
 
-The video sheet no longer uses drag-to-dismiss. Its minimize button and Escape route remain available. Queue operations, output selection, shuffle, repeat and AutoPlay use their existing callbacks; this is a presentation change with no new playback controller.
+Lyrics are disabled for desktop music videos: no tab, bottom glyph, restored lyrics pane or lyric strip, and the desktop lyric request is skipped. Audio-only tracks retain their existing lyrics. Unrelated Canvas lookups are also skipped while a music video is playing. Queue thumbnails use the existing 16:9 sizing helper for video and remain square for audio.
 
-Compose viewport tests exercise 1440×900 and 960×600: the video stays larger than the sidebar, both remain within bounds without overlap, transport is visible, and queue/lyrics tab selection updates the panel. A structural preview with placeholder video/control slots is exported to `desktopApp/build/reports/desktop-video-layout.png`; it is not a live playback screenshot.
+The window chrome owns the single fullscreen button. Video surfaces only offer quality selection. In fullscreen the desktop transport sits at the bottom left above the timeline; moving the mouse reveals controls. The video sheet does not use drag-to-dismiss or replay the opening animation on restore. The minimize button and Escape route remain available.
+
+## Retained video session
+
+The session is keyed by the playing video ID and requested quality, never by surface count. It resolves and opens ahead of showing the player, retains one decoder and the last frame across fullscreen/minimize/restore, and suspends decoding while hidden or paused. Restore displays that frame immediately and reanchors the existing decoder to the audio clock. A new track, changed quality or stop releases the old decoder on its owning worker. This does not keep decoding invisible video or allocate a second audio player.
+
+An unsuccessful resolution or an initially empty video shows an explicit retry state rather than an endless loading backdrop. Attaching another view does not silently retry a failed network request. The initial fetch, a requested quality change, an explicit retry and reads needed to catch up with audio can still depend on the network; this change does not promise zero network latency.
+
+## Validation
+
+Session regression tests count resolution/open/close operations across repeated view transfers, hidden playback and restore, track changes, quality changes, stop, explicit retry and seeks after EOF. Decode failures close resources and expose a failure state. Compose tests exercise 1440×900 and 960×600, check panel bounds, timeline position, square audio versus 16:9 video thumbnails, absence of lyrics and a single fullscreen toggle. An additional test renders the actual NowPlayingScreen and exercises fullscreen → windowed → minimized → restored without starting a Canvas lookup.
+
+`desktopApp/build/reports/desktop-video-player.png` captures the actual player components with a placeholder video; `desktop-video-layout.png` is the structural viewport test. Neither is a live YouTube playback capture. Live extraction and device A/V synchronization still require network/device validation.
