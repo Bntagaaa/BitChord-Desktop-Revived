@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 internal const val QUICK_SEARCH_DEBOUNCE_MS = 300L
-internal const val QUICK_SEARCH_RESULT_LIMIT = 10
+internal const val QUICK_SEARCH_RESULT_LIMIT = 5
 
 /** A revision, not just a query: closing and reopening must invalidate an old response too. */
 internal data class DesktopQuickSearchRequest(val revision: Long, val query: String)
@@ -62,7 +62,7 @@ internal class DesktopQuickSearchState<T>(private val keyOf: (T) -> String) {
             .distinctBy(keyOf).take(QUICK_SEARCH_RESULT_LIMIT).toList()
         mutable.value = old.copy(
             items = unique,
-            selectedIndex = if (unique.isEmpty()) -1 else 0,
+            selectedIndex = 0, // Empty results select the persistent "Search all" footer.
             loading = false,
             error = null,
             scrollRevision = old.scrollRevision + 1,
@@ -83,8 +83,9 @@ internal class DesktopQuickSearchState<T>(private val keyOf: (T) -> String) {
 
     fun move(delta: Int) {
         val old = mutable.value
-        if (old.loading || old.items.isEmpty()) return
-        val next = (old.selectedIndex + delta).coerceIn(old.items.indices)
+        if (old.loading || old.query.isBlank()) return
+        // The last keyboard target is the fixed "Search all" footer, after the media rows.
+        val next = (old.selectedIndex + delta).coerceIn(0, old.items.size)
         if (next != old.selectedIndex) {
             mutable.value = old.copy(selectedIndex = next, scrollRevision = old.scrollRevision + 1)
         }
@@ -93,6 +94,15 @@ internal class DesktopQuickSearchState<T>(private val keyOf: (T) -> String) {
     fun hover(index: Int) {
         val old = mutable.value
         if (!old.loading && index in old.items.indices) mutable.value = old.copy(selectedIndex = index)
+    }
+
+    fun hoverSearchAll() {
+        val old = mutable.value
+        if (old.query.isNotBlank()) mutable.value = old.copy(selectedIndex = old.items.size)
+    }
+
+    fun isSearchAllSelected(): Boolean = mutable.value.let {
+        !it.loading && it.query.isNotBlank() && it.selectedIndex == it.items.size
     }
 
     fun selected(): T? = mutable.value.let { if (it.loading) null else it.items.getOrNull(it.selectedIndex) }
