@@ -4010,6 +4010,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                 },
                 overlay = {
                     DesktopPlayerSheet(
+                        dragToDismiss = selectedSong?.isVideo != true,
                         visible = overlays.nowPlaying && selectedSong != null,
                         onDismiss = {
                             DesktopWindowMode.exit()
@@ -4135,7 +4136,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                         if (playerMenuOpen) {
                             // Where the player's "…" sits: the right column's credits row, at
                             // the right edge of the centred two-column layout.
-                            val columnEdge = minOf(windowWidth, 1100.dp) / 2 - 47.dp
+                            val columnEdge = if (current.isVideo && windowWidth >= 900.dp && windowHeight >= 540.dp) {
+                                val sidebarWidth = if (windowWidth - 64.dp >= 1300.dp) 360.dp else 300.dp
+                                windowWidth / 2 - sidebarWidth - 32.dp - 24.dp - 18.dp
+                            } else minOf(windowWidth, 1100.dp) / 2 - 47.dp
                             Box(
                                 Modifier
                                     .align(Alignment.Center)

@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 internal fun DesktopPlayerSheet(
     visible: Boolean,
     onDismiss: () -> Unit,
+    dragToDismiss: Boolean = true,
     content: @Composable BoxScope.(windowWidth: Dp, windowHeight: Dp) -> Unit,
 ) {
     // Mounted while it animates out, so the slide down is seen.
@@ -84,6 +85,7 @@ internal fun DesktopPlayerSheet(
                 .fillMaxSize()
                 .graphicsLayer { translationY = offset.value }
                 .draggable(
+                    enabled = dragToDismiss,
                     state = dragState,
                     orientation = Orientation.Vertical,
                     onDragStopped = { velocity ->
@@ -111,7 +113,7 @@ internal fun DesktopPlayerSheet(
             }
             // The handle the landscape player draws at its top edge, made to do
             // on a click what it promises for a drag.
-            Box(
+            if (dragToDismiss) Box(
                 Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth(HANDLE_HIT_WIDTH_FRACTION)

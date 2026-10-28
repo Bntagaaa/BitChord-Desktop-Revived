@@ -468,10 +468,11 @@ internal fun TransportRow(
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     compact: Boolean = false,
+    desktop: Boolean = false,
 ) {
-    val playSize = if (compact) 58.dp else 74.dp
-    val playTouch = if (compact) 76.dp else 92.dp
-    val skipSize = if (compact) 44.dp else PLAYER_SKIP_ICON_SIZE
+    val playSize = if (desktop) 28.dp else if (compact) 58.dp else 74.dp
+    val playTouch = if (desktop) 44.dp else if (compact) 76.dp else 92.dp
+    val skipSize = if (desktop) 24.dp else if (compact) 44.dp else PLAYER_SKIP_ICON_SIZE
     Row(
         modifier = Modifier.fillMaxWidth(),
         // SpaceAround, not SpaceEvenly: the outer margins take half a gap, so
@@ -483,7 +484,7 @@ internal fun TransportRow(
             icon = Res.drawable.ic_player_previous,
             contentDescription = stringResource(Res.string.widget_previous),
             size = skipSize,
-            touchSize = PLAYER_SKIP_TOUCH_SIZE,
+            touchSize = if (desktop) 40.dp else PLAYER_SKIP_TOUCH_SIZE,
             heightScale = PLAYER_SKIP_HEIGHT_SCALE,
             onClick = onPrevious,
             enabled = previousEnabled,
@@ -513,7 +514,7 @@ internal fun TransportRow(
             icon = Res.drawable.ic_player_next,
             contentDescription = stringResource(Res.string.widget_next),
             size = skipSize,
-            touchSize = PLAYER_SKIP_TOUCH_SIZE,
+            touchSize = if (desktop) 40.dp else PLAYER_SKIP_TOUCH_SIZE,
             heightScale = PLAYER_SKIP_HEIGHT_SCALE,
             onClick = onNext,
             enabled = nextEnabled,
