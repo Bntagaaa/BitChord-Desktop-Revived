@@ -358,6 +358,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -2030,6 +2032,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     // opens the player. Run from the player page instead, nothing was fetched until it was opened,
     // and a track half a minute in then showed a skeleton and arrived mid-song.
     var lyrics by remember { mutableStateOf<DesktopLyrics?>(null) }
+    var lyricsTrackId by remember { mutableStateOf<String?>(null) }
     // The provider picked for this track in the player's lyrics drawer, if any.
     var lyricsOnly by remember(selectedSong?.videoId) { mutableStateOf<String?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
@@ -2062,6 +2065,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     ) {
         val current = selectedSong
         lyrics = null
+        lyricsTrackId = current?.videoId
         lyricsError = null
         if (current == null) {
             lyricsLoading = false
@@ -2081,7 +2085,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             return@LaunchedEffect
         }
         lyricsLoading = true
-        DesktopLyricsClient.lookup(current, length, only = lyricsOnly).fold(
+        val result = DesktopLyricsClient.lookup(current, length, only = lyricsOnly)
+        currentCoroutineContext().ensureActive()
+        if (selectedSong?.videoId != current.videoId || lyricsTrackId != current.videoId) return@LaunchedEffect
+        result.fold(
             onSuccess = { lyrics = it; playbackEngine.setLoopLyrics(current.videoId, it.lines) },
             onFailure = { lyricsError = it.message ?: "Lyrics unavailable" },
         )
@@ -3616,10 +3623,35 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         }
     }
 
+    val pipController = remember { DesktopPipController() }
+    val pipCloseFlow = remember { DesktopPipSettings.state.map { it.onClose }.distinctUntilChanged() }
+    val pipCloseEnabled by pipCloseFlow.collectAsState(initial = DesktopPipSettings.state.value.onClose)
+    fun openPip() {
+        if (pipController.show()) {
+            dismissExpandedPlayerForNavigation()
+        } else DesktopPlayerHost.showMessage("Picture in picture is unavailable; playback continues")
+    }
+    DisposableEffect(pipController, trayIconEnabled, closeToTray, pipCloseEnabled) {
+        DesktopWindowVisibility.onClosedToTray = {
+            if (trayIconEnabled && closeToTray && DesktopPipSettings.state.value.onClose) openPip()
+        }
+        onDispose { DesktopWindowVisibility.onClosedToTray = {} }
+    }
+    DisposableEffect(pipController) {
+        DesktopWindowVisibility.onMainShown = pipController::mainShown
+        onDispose { DesktopWindowVisibility.onMainShown = {}; pipController.dispose() }
+    }
+
     MaterialTheme(
         colorScheme = desktopColorScheme(),
         typography = desktopTypography(),
     ) {
+        DesktopPipWindow(pipController,
+            DesktopPipState(selectedSong, playback.isPlaying, playback.isLoading, playback.awaitingAudio,
+                playback.durationMs, liveQueue.hasPrevious, selectedSong != null, partyState.controlsLocked,
+                lyricsTrackId, sharedLyrics, lyricsLoading, lyricsError),
+            playerPosition, ::togglePlayPauseFromUser, ::playPrevious, ::playNext, ::seekPlayer)
+
         CompositionLocalProvider(
             LocalContentColor provides DesktopForeground,
             LocalNowPlaying provides selectedSong,
@@ -3896,6 +3928,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                                 persistence.saveString("volume", it.toString())
                             },
                             onOpenAudioOutput = { overlays.audioOutput = true },
+                            onOpenPip = ::openPip,
                             onOpenLyrics = {
                                 releaseShortcutTextFocus()
                                 overlays.toggleSidePanel(DesktopSidePanel.LYRICS)
@@ -3945,6 +3978,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             persistence.saveString("volume", it.toString())
                         },
                         onOpenAudioOutput = { overlays.audioOutput = true },
+                        onOpenPip = ::openPip,
                         onOpenLyrics = {
                             releaseShortcutTextFocus()
                             overlays.toggleSidePanel(DesktopSidePanel.LYRICS)
@@ -4039,6 +4073,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                 },
                 overlay = {
                     DesktopPlayerSheet(
+                        onOpenPip = ::openPip,
                         dragToDismiss = !videoBetaEnabled || selectedSong?.isVideo != true,
                         visible = overlays.nowPlaying && selectedSong != null,
                         onDismiss = {
@@ -5217,6 +5252,7 @@ private fun DesktopTopBar(
     onVolumeChange: (Float) -> Unit,
     onOpenAudioOutput: () -> Unit,
     onOpenLyrics: () -> Unit,
+    onOpenPip: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenDetails: () -> Unit,
     /** Which panel the column beside the page is showing, lit on its button. */
@@ -5531,6 +5567,7 @@ private fun DesktopTopBar(
                             modifier = Modifier.size(19.dp),
                         )
                     }
+                    DesktopPipLauncher(onOpenPip, enabled = song != null)
                     DesktopToolbarButton(onClick = onOpenQueue, size = 32.dp) {
                         Icon(
                             painterResource(Res.drawable.player_transport_up_next),
@@ -5871,6 +5908,7 @@ private fun DesktopBottomChrome(
     onVolumeChange: (Float) -> Unit,
     onOpenAudioOutput: () -> Unit,
     onOpenLyrics: () -> Unit,
+    onOpenPip: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenDetails: () -> Unit,
 ) {
@@ -5901,6 +5939,7 @@ private fun DesktopBottomChrome(
                 onVolumeChange = onVolumeChange,
                 onOpenAudioOutput = onOpenAudioOutput,
                 onOpenLyrics = onOpenLyrics,
+                onOpenPip = onOpenPip,
                 onOpenQueue = onOpenQueue,
                 onOpenDetails = onOpenDetails,
             )
@@ -5987,6 +6026,7 @@ private fun DesktopMiniPlayer(
     onVolumeChange: (Float) -> Unit,
     onOpenAudioOutput: () -> Unit,
     onOpenLyrics: () -> Unit,
+    onOpenPip: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenDetails: () -> Unit,
 ) {
@@ -6062,6 +6102,7 @@ private fun DesktopMiniPlayer(
                     DesktopToolbarButton(onClick = onOpenLyrics, size = 32.dp) {
                         Icon(painterResource(Res.drawable.player_transport_lyrics), "Lyrics", tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
                     }
+                    DesktopPipLauncher(onOpenPip, enabled = song != null)
                     DesktopToolbarButton(onClick = onOpenQueue, size = 32.dp) {
                         Icon(painterResource(Res.drawable.player_transport_up_next), "Queue", tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
                     }
@@ -7923,6 +7964,12 @@ private fun DesktopSettingsScreen(
                             closeToTray,
                             onCloseToTrayChange,
                         )
+                    }
+                    if (trayIconEnabled && closeToTray) {
+                        val pip by DesktopPipSettings.state.collectAsState()
+                        SettingsToggle("Switch to PiP Mode When Closing App",
+                            "Closing the main window opens the floating player while music continues",
+                            pip.onClose, { value -> DesktopPipSettings.update { it.copy(onClose = value) } })
                     }
                     val hideVolumeBar by DesktopAppearanceSettings.hideVolumeBar.collectAsState()
                     SettingsToggle(

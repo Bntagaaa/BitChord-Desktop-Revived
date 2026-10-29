@@ -25,9 +25,19 @@ internal object DesktopWindowVisibility {
     @Volatile
     var keepRunningWhenClosed: Boolean = false
 
+    /** Registered by the app, removed on disposal; failure preserves normal close-to-tray. */
+    @Volatile var onClosedToTray: () -> Unit = {}
+    @Volatile var onMainShown: () -> Unit = {}
+
+    fun hideForPip() {
+        DesktopWindowMode.exit()
+        _visible.value = false
+    }
+
     /** Brings the window back — from the tray menu, or the icon itself. */
     fun show() {
         _visible.value = true
+        onMainShown()
     }
 
     /**
@@ -36,6 +46,7 @@ internal object DesktopWindowVisibility {
      */
     fun raise() {
         _visible.value = true
+        onMainShown()
         _raiseRequest.value = _raiseRequest.value + 1L
     }
 
@@ -50,6 +61,7 @@ internal object DesktopWindowVisibility {
         DesktopWindowMode.exit()
         _visible.value = false
         DesktopMemoryOptimizer.onWindowHidden()
+        runCatching { onClosedToTray() }.onFailure { DesktopTrackLog.log("PiP activation failed; remaining in tray") }
         DesktopTrackLog.log("window closed to the tray; playback continues")
         return false
     }
