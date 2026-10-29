@@ -25,9 +25,20 @@ internal object DesktopWindowVisibility {
     @Volatile
     var keepRunningWhenClosed: Boolean = false
 
+    /** Only effective while a tray icon and close-to-tray are both enabled. */
+    @Volatile
+    var switchToPiPWhenClosed: Boolean = false
+
     /** Brings the window back — from the tray menu, or the icon itself. */
     fun show() {
+        DesktopPiP.hide()
         _visible.value = true
+    }
+
+    /** PiP remains reachable even when the tray icon is disabled. */
+    fun hideForPiP() {
+        _visible.value = false
+        DesktopMemoryOptimizer.onWindowHidden()
     }
 
     /**
@@ -35,6 +46,7 @@ internal object DesktopWindowVisibility {
      * Main.kt performs the actual AWT focus operation after Compose has made the window visible.
      */
     fun raise() {
+        DesktopPiP.hide()
         _visible.value = true
         _raiseRequest.value = _raiseRequest.value + 1L
     }
@@ -45,6 +57,11 @@ internal object DesktopWindowVisibility {
      */
     fun onCloseRequest(): Boolean {
         if (!keepRunningWhenClosed) return true
+        if (switchToPiPWhenClosed) {
+            DesktopPiP.open()
+            DesktopTrackLog.log("window closed into picture-in-picture; playback continues")
+            return false
+        }
         // A window put away full-screen comes back full-screen with nothing on it, which reads as
         // the app having broken rather than as it having been hidden.
         DesktopWindowMode.exit()
