@@ -201,103 +201,326 @@ internal object DesktopPiPWindowBounds {
 }
 
 /**
- * Two fluid compositions, chosen by available space rather than fixed size modes.
- * The native window can be resized to *any* intermediate width and height.
- * No continuously playing Canvas or expensive blur shader is mounted in this window.
+ * The window is continuously resizable; the lyrics move as space becomes available, but
+ * all artwork and typography sizes interpolate with actual bounds rather than size presets.
+ */
+internal enum class DesktopPiPLyricsMode { HIDDEN, INLINE, BELOW, BESIDE }
+
+internal fun desktopPiPLyricsMode(width: Dp, height: Dp, enabled: Boolean): DesktopPiPLyricsMode = when {
+    !enabled -> DesktopPiPLyricsMode.HIDDEN
+    width < 350.dp || height < 260.dp -> DesktopPiPLyricsMode.INLINE
+    width >= 640.dp && height >= 300.dp -> DesktopPiPLyricsMode.BESIDE
+    else -> DesktopPiPLyricsMode.BELOW
+}
+
+internal data class DesktopPiPLyricPreview(
+    val previous: String?,
+    val current: String,
+    val next: String?,
+    val synced: Boolean,
+)
+
+/**
+ * Match the shared player's active-line rule and honour its signed lyrics offset.
+ * Gaps/introductions are instrumental; missing or unsynced lyrics are not mislabeled as synced.
+ */
+internal fun desktopPiPActiveLyrics(
+    lines: List<LyricLine>,
+    playbackMs: Long,
+    offsetMs: Int,
+): DesktopPiPLyricPreview? {
+    if (lines.isEmpty()) return null
+    val sung = lines.filter { !it.isGap && it.text.isNotBlank() }
+    if (sung.isEmpty()) return DesktopPiPLyricPreview(null, "♪ Instrumental", null, synced = true)
+    if (lines.none { it.timeMs > 0L }) {
+        return DesktopPiPLyricPreview(null, sung.first().text, sung.getOrNull(1)?.text, synced = false)
+    }
+    val position = (playbackMs - offsetMs.toLong()).coerceAtLeast(0L)
+    val index = lines.indexOfLast { it.timeMs <= position }
+    val current = lines.getOrNull(index)
+    val previous = lines.take(index.coerceAtLeast(0)).lastOrNull { !it.isGap }?.text
+    val next = lines.drop((index + 1).coerceAtLeast(0)).firstOrNull { !it.isGap }?.text
+    return DesktopPiPLyricPreview(
+        previous = previous,
+        current = if (current == null || current.isGap) "♪ Instrumental" else current.text,
+        next = next,
+        synced = true,
+    )
+}
+
+internal fun desktopPiPBlurAllowed(reduceBlur: Boolean, hasBackdrop: Boolean): Boolean =
+    !reduceBlur && hasBackdrop
+
+/**
+ * Exactly the fullscreen player's prepared artwork backdrop and album-art mesh are reused here.
+ * No independent Canvas decoder, live video texture, second audio engine or pink accent.
+ * Reduce Blur disables the prepared blur immediately; the existing mesh remains unblurred.
  */
 @Composable
 internal fun DesktopPiPWindow() {
     val snapshot by DesktopPiP.playback.collectAsState()
     val pinned by DesktopPiP.alwaysOnTop.collectAsState()
+    val showLyrics by DesktopPiP.showLyrics.collectAsState()
     val reduceBlur by DesktopAppearanceSettings.reduceDynamicBlur.collectAsState()
-    val palette = DesktopTheme.palette
-    val surface = if (DesktopTheme.isDark) Color(0xFF17181D) else Color(0xFFF8F8FB)
-    val tint = if (DesktopTheme.isDark) Color.White else Color(0xFF181920)
-    val muted = if (DesktopTheme.isDark) Color(0xFFB5B5C3) else Color(0xFF5B5D69)
-    val accent = Color(0xFFFF536F)
+    val lyricsOffset by DesktopPlayerSettings.lyricsOffsetMs.collectAsState()
+    val imageUrl = snapshot.song?.thumbnailUrl
+    // Match the artwork size used by NowPlayingScreen, so Coil can reuse its cached result.
+    val mesh = rememberArtworkMesh(imageUrl, artPx = PLAYER_ART_PX)
+    val preparedBlur = rememberFullArtworkBlurImage(
+        imageUrl = imageUrl,
+        artPx = PLAYER_ART_PX,
+        prepare = !reduceBlur,
+    )
+    val lyricPreview = remember(snapshot.lyrics, snapshot.positionMs, lyricsOffset) {
+        desktopPiPActiveLyrics(snapshot.lyrics, snapshot.positionMs, lyricsOffset)
+    }
+
+    val foreground = Color.White
+    val secondary = Color.White.copy(alpha = 0.67f)
+    val active = Color.White
 
     MaterialTheme(colorScheme = desktopColorScheme(), typography = desktopTypography()) {
-        BoxWithConstraints(
-            Modifier.fillMaxSize().background(surface),
-        ) {
-            val compact = maxHeight < 210.dp || maxWidth < 330.dp
-            val inset = if (compact) 10.dp else 16.dp
-            val artSize = if (compact) {
-                (maxHeight - 54.dp).coerceIn(48.dp, 84.dp)
-            } else {
-                minOf(maxWidth * 0.34f, maxHeight * 0.47f, 156.dp).coerceAtLeast(78.dp)
-            }
-            // Gradient tint instead of an extra live blur renderer. The Reduce Blur master switch
-            // removes it entirely, preserving the same global invariant as the other surfaces.
-            if (!reduceBlur) {
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.linearGradient(
-                            listOf(
-                                accent.copy(alpha = if (DesktopTheme.isDark) 0.16f else 0.10f),
-                                Color(0xFF6960D8).copy(alpha = 0.13f),
-                                Color.Transparent,
-                            ),
-                        ),
-                    ),
+        BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF121212))) {
+            // Both renderers below are the same ones used by the fullscreen player.
+            ArtworkMeshBackdrop(
+                mesh = mesh,
+                blurRadius = if (reduceBlur) 0.dp else 14.dp,
+                flat = false,
+                modifier = Modifier.fillMaxSize(),
+            )
+            if (desktopPiPBlurAllowed(reduceBlur, preparedBlur != null)) {
+                FullArtworkBlurBackdrop(
+                    image = preparedBlur,
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
+            // Fullscreen-style legibility scrim. This is just pigment, not a blur effect.
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.17f),
+                            Color.Black.copy(alpha = 0.38f),
+                            Color.Black.copy(alpha = 0.53f),
+                        ),
+                    ),
+                ),
+            )
+
+            val compact = maxHeight < 210.dp || maxWidth < 320.dp
+            val lyricsMode = desktopPiPLyricsMode(maxWidth, maxHeight, showLyrics)
+            val horizontalPad = if (compact) 9.dp else 14.dp
+            val verticalPad = if (compact) 7.dp else 12.dp
+            val between = if (compact) 3.dp else 7.dp
+            val artHeightCap = when (lyricsMode) {
+                DesktopPiPLyricsMode.BELOW -> maxHeight * 0.31f
+                DesktopPiPLyricsMode.BESIDE -> maxHeight * 0.48f
+                else -> maxHeight * 0.50f
+            }
+            val artworkSize = minOf(
+                maxWidth * if (lyricsMode == DesktopPiPLyricsMode.BESIDE) 0.22f else 0.35f,
+                artHeightCap,
+                if (lyricsMode == DesktopPiPLyricsMode.BESIDE) 168.dp else 148.dp,
+            ).coerceAtLeast(58.dp)
 
             Column(
-                Modifier.fillMaxSize().padding(inset),
-                verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 8.dp),
+                Modifier.fillMaxSize().padding(
+                    start = horizontalPad,
+                    end = horizontalPad,
+                    top = verticalPad,
+                    bottom = verticalPad,
+                ),
+                verticalArrangement = Arrangement.spacedBy(between),
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.PictureInPictureAlt,
-                        "Picture in Picture",
-                        tint = muted,
-                        modifier = Modifier.size(17.dp),
-                    )
-                    Spacer(Modifier.weight(1f))
-                    PiPAction("Always on top", { DesktopPiP.setAlwaysOnTop(!pinned) }, compact = true) {
-                        Icon(
-                            Icons.Rounded.PushPin,
-                            "Always on top",
-                            tint = if (pinned) accent else muted,
-                            modifier = Modifier.size(17.dp),
+                PiPHeader(
+                    pinned = pinned,
+                    showLyrics = showLyrics,
+                    compact = compact,
+                    foreground = foreground,
+                    secondary = secondary,
+                )
+
+                Row(
+                    Modifier.fillMaxWidth().weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 9.dp else 14.dp),
+                ) {
+                    PiPArtwork(snapshot.song, artworkSize)
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 7.dp),
+                    ) {
+                        PiPTrackText(snapshot, foreground, secondary)
+                        if (lyricsMode == DesktopPiPLyricsMode.INLINE) {
+                            PiPInlineLyric(
+                                preview = lyricPreview,
+                                snapshot = snapshot,
+                                secondary = secondary,
+                            )
+                        }
+                        PiPTransport(snapshot, foreground, active, compact = compact)
+                    }
+                    if (lyricsMode == DesktopPiPLyricsMode.BESIDE) {
+                        PiPLyricsPanel(
+                            preview = lyricPreview,
+                            snapshot = snapshot,
+                            modifier = Modifier.weight(0.95f).fillMaxSize(),
                         )
                     }
-                    PiPAction("Return to BitChord", DesktopPiP::restoreMainWindow, compact = true) {
-                        Icon(Icons.Rounded.OpenInFull, "Return to BitChord", tint = muted, modifier = Modifier.size(17.dp))
-                    }
-                    PiPAction("Close PiP", DesktopPiP::close, compact = true) {
-                        Icon(Icons.Rounded.Close, "Close PiP", tint = muted, modifier = Modifier.size(18.dp))
-                    }
                 }
-
-                if (compact) {
-                    Row(
-                        Modifier.fillMaxWidth().weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        PiPArtwork(snapshot.song, artSize)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            PiPTrackText(snapshot, tint, muted)
-                            PiPTransport(snapshot, tint, accent, compact = true)
-                        }
-                    }
-                } else {
-                    Row(
-                        Modifier.fillMaxWidth().weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        PiPArtwork(snapshot.song, artSize)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            PiPTrackText(snapshot, tint, muted)
-                            PiPTransport(snapshot, tint, accent, compact = false)
-                        }
-                    }
+                if (lyricsMode == DesktopPiPLyricsMode.BELOW) {
+                    PiPLyricsPanel(
+                        preview = lyricPreview,
+                        snapshot = snapshot,
+                        modifier = Modifier.fillMaxWidth().weight(0.80f),
+                    )
                 }
+                PiPProgress(snapshot, active, secondary, compact)
+            }
+        }
+    }
+}
 
-                PiPProgress(snapshot, accent, muted, compact)
+@Composable
+private fun PiPHeader(
+    pinned: Boolean,
+    showLyrics: Boolean,
+    compact: Boolean,
+    foreground: Color,
+    secondary: Color,
+) {
+    Row(
+        Modifier.fillMaxWidth().height(if (compact) 27.dp else 31.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Icon(
+            Icons.Rounded.PictureInPictureAlt,
+            "Picture in Picture",
+            tint = secondary,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(if (compact) 1.dp else 5.dp))
+        Text(
+            "NOW PLAYING",
+            maxLines = 1,
+            color = secondary,
+            style = MaterialTheme.typography.labelSmall,
+        )
+        Spacer(Modifier.weight(1f))
+        PiPAction(
+            description = if (showLyrics) "Hide lyrics" else "Show lyrics",
+            onClick = { DesktopPiP.setShowLyrics(!showLyrics) },
+            compact = true,
+            selected = showLyrics,
+        ) {
+            Icon(
+                painterResource(Res.drawable.player_transport_lyrics),
+                if (showLyrics) "Hide lyrics" else "Show lyrics",
+                tint = if (showLyrics) foreground else secondary,
+                modifier = Modifier.size(17.dp),
+            )
+        }
+        PiPAction("Always on top", { DesktopPiP.setAlwaysOnTop(!pinned) }, compact = true, selected = pinned) {
+            Icon(
+                Icons.Rounded.PushPin,
+                "Always on top",
+                tint = if (pinned) foreground else secondary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        PiPAction("Return to BitChord", DesktopPiP::restoreMainWindow, compact = true) {
+            Icon(Icons.Rounded.OpenInFull, "Return to BitChord", tint = secondary, modifier = Modifier.size(16.dp))
+        }
+        PiPAction("Close PiP", DesktopPiP::close, compact = true) {
+            Icon(Icons.Rounded.Close, "Close PiP", tint = secondary, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun PiPInlineLyric(
+    preview: DesktopPiPLyricPreview?,
+    snapshot: DesktopPiPPlayback,
+    secondary: Color,
+) {
+    val lyric = when {
+        !snapshot.syncedLyricsEnabled -> "Synced lyrics disabled"
+        snapshot.lyricsLoading -> "Loading lyrics…"
+        preview == null -> "Lyrics unavailable"
+        else -> preview.current
+    }
+    Text(
+        text = lyric,
+        color = if (preview != null && snapshot.syncedLyricsEnabled) Color.White.copy(alpha = 0.91f) else secondary,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = if (preview?.synced == true) FontWeight.SemiBold else FontWeight.Normal,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun PiPLyricsPanel(
+    preview: DesktopPiPLyricPreview?,
+    snapshot: DesktopPiPPlayback,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(13.dp)
+    BoxWithConstraints(
+        modifier = modifier
+            .clip(shape)
+            .background(Color.Black.copy(alpha = 0.22f))
+            .border(0.6.dp, Color.White.copy(alpha = 0.12f), shape),
+    ) {
+        val showPrevious = maxHeight >= 158.dp
+        val showNext = maxHeight >= 95.dp
+        Column(
+            Modifier.fillMaxSize().padding(
+                horizontal = if (maxWidth < 280.dp) 10.dp else 14.dp,
+                vertical = if (maxHeight < 115.dp) 7.dp else 12.dp,
+            ),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = if (preview?.synced == false) "LYRICS · UNSYNCED" else "LYRICS",
+                color = Color.White.copy(alpha = 0.58f),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(3.dp))
+            if (showPrevious && !preview?.previous.isNullOrBlank()) {
+                Text(
+                    preview!!.previous!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.45f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            val activeLine = when {
+                !snapshot.syncedLyricsEnabled -> "Enable synced lyrics in Settings"
+                snapshot.lyricsLoading -> "Fetching lyrics…"
+                preview == null -> "Lyrics unavailable for this track"
+                else -> preview.current
+            }
+            Text(
+                text = activeLine,
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                style = if (maxHeight >= 180.dp) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                maxLines = if (maxHeight >= 140.dp) 3 else 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (showNext && !preview?.next.isNullOrBlank()) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = preview!!.next!!,
+                    color = Color.White.copy(alpha = 0.54f),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = if (maxHeight >= 165.dp) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
