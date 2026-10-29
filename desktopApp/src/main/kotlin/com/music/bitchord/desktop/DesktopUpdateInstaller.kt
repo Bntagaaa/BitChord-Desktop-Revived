@@ -4,6 +4,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermission
+import java.util.UUID
 
 /** Prepares an external helper before requesting a clean exit. Never edits preferences or caches. */
 internal object DesktopUpdateInstaller {
@@ -29,6 +30,9 @@ internal object DesktopUpdateInstaller {
                 ProcessHandle.current().pid().toString(), file.toString(), verifiedHash).start(); Unit }
         }
         val current = requireNotNull(installation.appImage)
+        val appImageBytes = Files.size(current)
+        val available = Files.getFileStore(current.parent).usableSpace
+        require(available > appImageBytes + Files.size(file) + 32L * 1024 * 1024) { "Not enough free space to stage the AppImage and retain a rollback backup." }
         val staged = Files.createTempFile(current.parent, ".bitchord-update-", ".AppImage")
         try {
             Files.copy(file, staged, StandardCopyOption.REPLACE_EXISTING)
@@ -36,9 +40,10 @@ internal object DesktopUpdateInstaller {
             require(DesktopUpdateDownloader.sha256(staged) == verifiedHash)
             val backup = current.resolveSibling(current.fileName.toString() + ".previous-" + System.currentTimeMillis())
             val helper = helperDirectory.resolve("install.sh")
+            val ready = helperDirectory.resolve("window-ready-" + UUID.randomUUID())
             copyHelper("appimage-update.sh", helper)
             return { ProcessBuilder("/bin/sh", helper.toString(), ProcessHandle.current().pid().toString(),
-                current.toString(), staged.toString(), backup.toString(), verifiedHash)
+                current.toString(), staged.toString(), backup.toString(), verifiedHash, ready.toString())
                 .redirectOutput(helperDirectory.resolve("install.log").toFile()).redirectErrorStream(true).start(); Unit }
         } catch (failure: Throwable) { Files.deleteIfExists(staged); throw failure }
     }
