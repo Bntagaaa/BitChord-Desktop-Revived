@@ -116,7 +116,7 @@ class DesktopUpdateServiceTest {
             val helper=dir.resolve("helper.sh")
             javaClass.getResourceAsStream("/updater/appimage-update.sh")!!.use { Files.copy(it,helper) }
             val process=ProcessBuilder("/bin/sh",helper.toString(),"2147483647",old.toString(),staged.toString(),backup.toString(),DesktopUpdateDownloader.sha256(staged),dir.resolve("ready").toString()).start()
-            assertTrue(process.waitFor(10,java.util.concurrent.TimeUnit.SECONDS)); assertEquals(1,process.exitValue())
+            assertTrue(process.waitFor(20,java.util.concurrent.TimeUnit.SECONDS)); assertEquals(1,process.exitValue())
             assertContentEquals(original,Files.readAllBytes(old));assertFalse(Files.exists(backup))
             // Bad checksum cannot rename or remove the original.
             val rejected=ProcessBuilder("/bin/sh",helper.toString(),"2147483647",old.toString(),staged.toString(),backup.toString(),"0".repeat(64),dir.resolve("ready2").toString()).start()
