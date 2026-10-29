@@ -101,6 +101,25 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         resizable = true,
     ) {
         val composeWindow = window
+        // The AppImage updater must never treat merely spawning the JVM as a healthy restart.
+        // A real, mapped Compose window acknowledges the launch using a unique local marker.
+        LaunchedEffect(composeWindow) {
+            val readyFile = System.getenv("BITCHORD_UPDATE_READY_FILE")?.takeIf { it.isNotBlank() }
+            if (readyFile != null && DesktopPlatform.isLinux) {
+                repeat(100) {
+                    androidx.compose.runtime.withFrameNanos { }
+                    if (composeWindow.isShowing && composeWindow.width > 0 && composeWindow.height > 0) {
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                java.nio.file.Files.writeString(java.nio.file.Path.of(readyFile), "window-ready")
+                            }.onFailure { DesktopTrackLog.log("updater: unable to acknowledge window readiness: ${it.message}") }
+                        }
+                        return@LaunchedEffect
+                    }
+                    delay(100)
+                }
+            }
+        }
         val isDarkTheme = DesktopTheme.isDark
         // System mode follows changes while the app remains open. Native probes run off the UI thread.
         LaunchedEffect(Unit) {
