@@ -5,8 +5,26 @@ import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.DataLine
 import javax.sound.sampled.SourceDataLine
 
+/** The engine boundary; tests use a collecting sink while decoding real audio. */
+internal interface DesktopAudioOutput {
+    val format: DesktopPcmFormat
+    var gain: Float
+    val isOpen: Boolean
+    val deviceName: String?
+    val bufferBytes: Int
+    fun isUsingSelection(id: String): Boolean
+    fun open(requested: DesktopPcmFormat): Result<DesktopPcmFormat>
+    fun write(samples: FloatArray, count: Int): Int
+    fun framesPlayed(): Long
+    fun pause()
+    fun resume()
+    fun flush()
+    fun drain()
+    fun close()
+}
+
 /** The speakers, and the negotiation to reach them. */
-internal class DesktopAudioSink {
+internal class DesktopAudioSink : DesktopAudioOutput {
 
     private var line: SourceDataLine? = null
 
@@ -25,20 +43,20 @@ internal class DesktopAudioSink {
     private var diagnosticBlocks = 0
 
     /** The format the mixer accepted, valid once [open] has succeeded. */
-    var format: DesktopPcmFormat = DesktopPcmFormat(44_100, 2, 2)
+    override var format: DesktopPcmFormat = DesktopPcmFormat(44_100, 2, 2)
         private set
 
     /** Playback gain, applied to the samples rather than to a mixer control. */
     @Volatile
-    var gain: Float = 1f
+    override var gain: Float = 1f
 
-    val isOpen: Boolean get() = windowsOutput || line != null
+    override val isOpen: Boolean get() = windowsOutput || line != null
 
     /** Whether the live line already belongs to the choice currently shown in the player. */
-    fun isUsingSelection(id: String): Boolean = isOpen && openedForSelection == id
+    override fun isUsingSelection(id: String): Boolean = isOpen && openedForSelection == id
 
     /** Opens the best line the mixer will give for [requested]. */
-    fun open(requested: DesktopPcmFormat): Result<DesktopPcmFormat> = runCatching {
+    override fun open(requested: DesktopPcmFormat): Result<DesktopPcmFormat> = runCatching {
         val selectedDevice = DesktopAudioDevices.selected.value
         if (DesktopPlatform.isWindows) {
             val native = DesktopWindowsAudio.open(selectedDevice, requested)
@@ -133,7 +151,7 @@ internal class DesktopAudioSink {
      * The mixer's own name, not `lineInfo`, which describes the line's capabilities — "interface
      * SourceDataLine supporting 36 audio formats" is not a device.
      */
-    val deviceName: String?
+    override val deviceName: String?
         get() = runCatching {
             if (windowsOutput) {
                 DesktopWindowsAudio.deviceName()
@@ -146,11 +164,11 @@ internal class DesktopAudioSink {
     private var openedOn: String? = null
 
     /** How much audio the device is holding, in bytes; 0 before the line is open. */
-    val bufferBytes: Int
+    override val bufferBytes: Int
         get() = if (windowsOutput) windowsBufferBytes else runCatching { line?.bufferSize ?: 0 }.getOrDefault(0)
 
     /** Writes [count] interleaved samples, blocking until the device takes them. */
-    fun write(samples: FloatArray, count: Int): Int {
+    override fun write(samples: FloatArray, count: Int): Int {
         if (windowsOutput) {
             val written = DesktopWindowsAudio.write(samples, count, gain)
             diagnose(samples, count, written)
@@ -213,28 +231,28 @@ internal class DesktopAudioSink {
     }
 
     /** Frames the device has actually rendered — the honest playback position. */
-    fun framesPlayed(): Long =
+    override fun framesPlayed(): Long =
         if (windowsOutput) DesktopWindowsAudio.framesPlayed() else line?.longFramePosition ?: 0L
 
-    fun pause() {
+    override fun pause() {
         if (windowsOutput) DesktopWindowsAudio.pause() else line?.stop()
     }
 
-    fun resume() {
+    override fun resume() {
         if (windowsOutput) DesktopWindowsAudio.resume() else line?.start()
     }
 
     /** Throws away what is queued, so a seek is heard at once. */
-    fun flush() {
+    override fun flush() {
         if (windowsOutput) DesktopWindowsAudio.flush() else line?.flush()
     }
 
     /** Waits for the queue to finish, so the end of a track is not clipped. */
-    fun drain() {
+    override fun drain() {
         if (windowsOutput) DesktopWindowsAudio.drain() else runCatching { line?.drain() }
     }
 
-    fun close() {
+    override fun close() {
         if (windowsOutput) {
             DesktopWindowsAudio.close()
             windowsOutput = false
