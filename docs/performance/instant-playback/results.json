@@ -1,0 +1,209 @@
+{
+  "base_commit": "3fd06fd5ad1bf5e6289c21da3d0a72c0068b44e7",
+  "branch": "feature/instant-playback-optimization",
+  "benchmark": {
+    "metric": "HTTP range open to first decoded PCM; NOT audible TTFAA or engine/output latency",
+    "fixture": "12 seconds 44.1 kHz stereo PCM16 WAV on loopback; 40 ms delay per bounded HTTP response",
+    "trials": 10,
+    "warm_trials": 9,
+    "p95_method": "nearest-rank, ceil(0.95*n)",
+    "comparison": "Baseline before implementation and optimized benchmark-only fresh JVM; trial 0 excluded from warm distribution. The optimized origin declares cache freshness. No live-source or acoustic claim.",
+    "baseline": {
+      "raw": [
+        {
+          "trial": 0,
+          "open_ms": 803.661205,
+          "first_pcm_ms": 808.774662,
+          "origin_requests": 2
+        },
+        {
+          "trial": 1,
+          "open_ms": 126.67167,
+          "first_pcm_ms": 127.501062,
+          "origin_requests": 2
+        },
+        {
+          "trial": 2,
+          "open_ms": 118.2034,
+          "first_pcm_ms": 118.923296,
+          "origin_requests": 2
+        },
+        {
+          "trial": 3,
+          "open_ms": 115.614859,
+          "first_pcm_ms": 116.350819,
+          "origin_requests": 2
+        },
+        {
+          "trial": 4,
+          "open_ms": 118.959301,
+          "first_pcm_ms": 119.690003,
+          "origin_requests": 2
+        },
+        {
+          "trial": 5,
+          "open_ms": 126.892749,
+          "first_pcm_ms": 127.696863,
+          "origin_requests": 2
+        },
+        {
+          "trial": 6,
+          "open_ms": 114.098685,
+          "first_pcm_ms": 114.821546,
+          "origin_requests": 2
+        },
+        {
+          "trial": 7,
+          "open_ms": 113.62489,
+          "first_pcm_ms": 114.381572,
+          "origin_requests": 2
+        },
+        {
+          "trial": 8,
+          "open_ms": 116.610676,
+          "first_pcm_ms": 116.72558,
+          "origin_requests": 2
+        },
+        {
+          "trial": 9,
+          "open_ms": 123.578863,
+          "first_pcm_ms": 123.672133,
+          "origin_requests": 2
+        }
+      ],
+      "warm_median_ms": 118.923296,
+      "warm_p95_ms": 127.696863
+    },
+    "optimized": {
+      "raw": [
+        {
+          "trial": 0,
+          "open_ms": 662.570848,
+          "first_pcm_ms": 668.113066,
+          "origin_requests": 2
+        },
+        {
+          "trial": 1,
+          "open_ms": 31.440444,
+          "first_pcm_ms": 32.183144,
+          "origin_requests": 0
+        },
+        {
+          "trial": 2,
+          "open_ms": 30.353624,
+          "first_pcm_ms": 31.028111,
+          "origin_requests": 0
+        },
+        {
+          "trial": 3,
+          "open_ms": 30.247545,
+          "first_pcm_ms": 31.10655,
+          "origin_requests": 0
+        },
+        {
+          "trial": 4,
+          "open_ms": 27.63498,
+          "first_pcm_ms": 28.318941,
+          "origin_requests": 0
+        },
+        {
+          "trial": 5,
+          "open_ms": 53.284699,
+          "first_pcm_ms": 53.995451,
+          "origin_requests": 0
+        },
+        {
+          "trial": 6,
+          "open_ms": 29.010875,
+          "first_pcm_ms": 29.745042,
+          "origin_requests": 0
+        },
+        {
+          "trial": 7,
+          "open_ms": 28.428877,
+          "first_pcm_ms": 29.133459,
+          "origin_requests": 0
+        },
+        {
+          "trial": 8,
+          "open_ms": 28.279552,
+          "first_pcm_ms": 28.483179,
+          "origin_requests": 0
+        },
+        {
+          "trial": 9,
+          "open_ms": 31.141985,
+          "first_pcm_ms": 31.366693,
+          "origin_requests": 0
+        }
+      ],
+      "warm_median_ms": 31.028111,
+      "warm_p95_ms": 53.995451
+    },
+    "warm_median_reduction_percent": 73.90913971977366,
+    "warm_p95_reduction_percent": 57.71591428992269
+  },
+  "suites": {
+    "desktop": {
+      "tests": 535,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "shared": {
+      "tests": 70,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "sharedUi": {
+      "tests": 34,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "linux_build": {
+    "task": ":desktopApp:createDistributable",
+    "result": "passed",
+    "physical_audio_device": false
+  },
+  "windows_build": {
+    "task": ":desktopApp:windowsPortable -Pbitchord.target=windows",
+    "result": "passed",
+    "runtime_tested": false,
+    "limitation": "Linux cross-build; optional bitchord_analysis.dll absent, so archive does not certify live Automix/SMTC/WASAPI or installer operation."
+  },
+  "unverified": [
+    "Acoustic TTFAA",
+    "Live authenticated YouTube/add-on startup and network recovery",
+    "Physical output switching/Bluetooth",
+    "Windows runtime playback",
+    "Live audible Automix/beatmatch",
+    "Whole-process CPU/RSS baseline comparison",
+    "App restart with changed signed URLs"
+  ],
+  "source_sha256": {
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioCache.kt": "1badcae15d28f37bb190e568cf9d1d40852e8080d52866dde6558f80940919eb",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlaybackWrites.kt": "892d0088f4069f978b69db265ec5ffe15f718f17faed29b49aad030654f5c00a",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopDecodeAhead.kt": "66ba1222210459391e57fe432d41ddf32b698bf5aa377eff403a80835800fe9a",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPersistence.kt": "aec6bcb7b0b2e8a0bea453001687dc03b17d8e1d29e42b7a20c58eba6f2c005a",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopApp.kt": "92e58a1096d04abd58e23d28bc83cfb009d0e4d31dc9898b5c28547adca9d101",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioSink.kt": "417f69ebd2de7b43f161098d1ddb968275f84fa1e6b3fc72ef71eb916637a73d",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopRangeStream.kt": "348a1855c841c71746653de0d165fdd0adddf77c368b574e26294b15c3e673fc",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioEngine.kt": "31d983bf06d6c58edbaf17c75811b8da69f1a6ddcef0d4cc01959fefffe84b4c",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlaybackDiagnostics.kt": "04a118775510fdaf0785271e2f227d8973df883198bee122481c90294ba879e4",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioDecoder.kt": "4a6a1c85a83fe5345e5d2134c18726b28c1957740fa40dece824d6cb0765cffa",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPreferenceChunks.kt": "c5783d8f237aa9eca35350b47d78444f8ebdc837193614087384147f660a95da"
+  },
+  "codec_matrix": [
+    "CODEC_MATRIX PASS tone.wav codec=pcm_s16le rate=48000",
+    "CODEC_MATRIX PASS tone.flac codec=flac rate=48000",
+    "CODEC_MATRIX PASS tone.opus codec=opus rate=48000",
+    "CODEC_MATRIX PASS tone.mp3 codec=mp3float rate=48000",
+    "CODEC_MATRIX PASS tone.m4a codec=aac rate=48000",
+    "CODEC_MATRIX PASS tone.m3u8 codec=aac rate=48000",
+    "CODEC_MATRIX PASS tone.mpd codec=aac rate=48000"
+  ],
+  "implementation_commit": "a1970535"
+}
