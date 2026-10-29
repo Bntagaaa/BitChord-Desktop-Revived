@@ -33,8 +33,8 @@ internal object DesktopArtworkMesh {
         val height = source.height
         if (width < 1 || height < 1) return null
 
-        val pixels = IntArray(width * height)
-        source.readPixels(pixels, 0, 0, width, height)
+        // Read only the rows the existing mesh sampler uses, without a full-size ARGB copy.
+        val pixels = IntArray(width)
 
         // A cell nothing lands in would come out black, so the grid never asks for more cells than
         // the artwork has pixels.
@@ -50,12 +50,13 @@ internal object DesktopArtworkMesh {
 
         var y = 0
         while (y < height) {
+            source.readPixels(pixels, startY = y, width = width, height = 1)
             // Flipped as it is read: row 0 of the grid is the sleeve's bottom.
             val rowBase = ((height - 1 - y) * rows / height) * cols
             var x = 0
             while (x < width) {
                 val cell = rowBase + x * cols / width
-                val pixel = pixels[y * width + x]
+                val pixel = pixels[x]
                 red[cell] += ((pixel shr 16) and 0xFF).toLong()
                 green[cell] += ((pixel shr 8) and 0xFF).toLong()
                 blue[cell] += (pixel and 0xFF).toLong()
@@ -121,11 +122,11 @@ internal object DesktopArtworkMesh {
             bytes[at + 2] = ((argbValue shr 16) and 0xFF).toByte()
             bytes[at + 3] = ((argbValue shr 24) and 0xFF).toByte()
         }
-        val bitmap = Bitmap()
-        bitmap.allocPixels(info)
-        bitmap.installPixels(bytes)
-        bitmap.setImmutable()
-        return org.jetbrains.skia.Image.makeFromBitmap(bitmap).toComposeImageBitmap()
+        return Bitmap().use { bitmap ->
+            check(bitmap.installPixels(info, bytes, size * 4))
+            bitmap.setImmutable()
+            org.jetbrains.skia.Image.makeFromBitmap(bitmap).toComposeImageBitmap()
+        }
     }
 
     private fun smoothstep(t: Float): Float {

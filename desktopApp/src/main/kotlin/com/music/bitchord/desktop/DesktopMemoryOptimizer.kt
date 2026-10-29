@@ -1,15 +1,21 @@
 package com.music.bitchord.desktop
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 
-/** Trims in-memory resources when the window is minimized or hidden in system tray. */
+/** Eviction on a worker: walking the disk cache and requesting GC must not block window events. */
 object DesktopMemoryOptimizer {
-
-    fun onWindowHidden() {
-        DesktopArtworkCache.clear()
-        runCatching { DesktopMediaCache.trim() }
-        System.gc()
-        DesktopTrackLog.log("memory: trimmed image cache and requested heap GC on window hide")
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var trim: Job? = null
+    @Synchronized fun onWindowHidden() {
+        trim?.cancel()
+        trim = scope.launch {
+            delay(1_000)
+            DesktopArtworkCache.trimMemory()
+            DesktopCoilMemory.trim()
+            runCatching { DesktopMediaCache.trim() }
+            System.gc()
+            DesktopTrackLog.log("memory: released idle artwork caches on window hide")
+        }
     }
+    @Synchronized fun onWindowShown() { trim?.cancel(); trim = null }
 }

@@ -29,6 +29,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
+    DesktopCoilMemory.install()
     DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.PROCESS_ENTRY)
     // Read the per-install welcome marker before services initialize or write preferences.
     val welcomeLaunch = DesktopWelcomeOnboarding.inspectStartup()
@@ -84,9 +85,10 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         snapshotFlow { state.placement }.collect(DesktopWindowMode::adopt)
     }
     LaunchedEffect(visible, state.isMinimized) {
+        DesktopRenderVisibility.visible.value = visible && !state.isMinimized
         if (!visible || state.isMinimized) {
             DesktopMemoryOptimizer.onWindowHidden()
-        }
+        } else DesktopMemoryOptimizer.onWindowShown()
     }
     Window(
         onCloseRequest = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },

@@ -1,0 +1,128 @@
+{
+  "scenario": "Fresh forced welcome at 1920x1080 Xvfb; isolated preferences and caches; no account, audio, video, Brave or Meet. Software Skiko fallback occurred. Samples at 20 and 25 seconds. Same 512 MiB heap maximum.",
+  "baseline": [
+    {
+      "label": "base",
+      "run": 1,
+      "samples": [
+        {
+          "seconds": 20.043368562997784,
+          "rss_kib": 476272,
+          "pss_kib": 465387,
+          "cpu_ticks": 1071,
+          "threads": 64
+        },
+        {
+          "seconds": 25.054501805992913,
+          "rss_kib": 476652,
+          "pss_kib": 465767,
+          "cpu_ticks": 1074,
+          "threads": 64
+        }
+      ]
+    },
+    {
+      "label": "base",
+      "run": 2,
+      "samples": [
+        {
+          "seconds": 20.04674964500009,
+          "rss_kib": 506320,
+          "pss_kib": 495435,
+          "cpu_ticks": 1343,
+          "threads": 64
+        },
+        {
+          "seconds": 25.059067242007586,
+          "rss_kib": 506712,
+          "pss_kib": 495827,
+          "cpu_ticks": 1350,
+          "threads": 64
+        }
+      ]
+    },
+    {
+      "label": "base",
+      "run": 3,
+      "samples": [
+        {
+          "seconds": 20.03509488000418,
+          "rss_kib": 478852,
+          "pss_kib": 467964,
+          "cpu_ticks": 1337,
+          "threads": 66
+        },
+        {
+          "seconds": 25.046256683999673,
+          "rss_kib": 478916,
+          "pss_kib": 468028,
+          "cpu_ticks": 1341,
+          "threads": 66
+        }
+      ]
+    }
+  ],
+  "optimized": [
+    {
+      "label": "tuned",
+      "run": 1,
+      "samples": [
+        {
+          "seconds": 20.035913726998842,
+          "rss_kib": 455868,
+          "pss_kib": 444949,
+          "cpu_ticks": 1027,
+          "threads": 60
+        },
+        {
+          "seconds": 25.04746844500187,
+          "rss_kib": 456196,
+          "pss_kib": 445277,
+          "cpu_ticks": 1029,
+          "threads": 60
+        }
+      ]
+    },
+    {
+      "label": "tuned",
+      "run": 2,
+      "samples": [
+        {
+          "seconds": 20.055961058998946,
+          "rss_kib": 460800,
+          "pss_kib": 449879,
+          "cpu_ticks": 1331,
+          "threads": 66
+        },
+        {
+          "seconds": 25.067328763005207,
+          "rss_kib": 460804,
+          "pss_kib": 449883,
+          "cpu_ticks": 1333,
+          "threads": 66
+        }
+      ]
+    },
+    {
+      "label": "tuned",
+      "run": 3,
+      "samples": [
+        {
+          "seconds": 20.04726726199442,
+          "rss_kib": 464988,
+          "pss_kib": 454064,
+          "cpu_ticks": 1317,
+          "threads": 69
+        },
+        {
+          "seconds": 25.058622961994843,
+          "rss_kib": 465000,
+          "pss_kib": 454076,
+          "cpu_ticks": 1319,
+          "threads": 69
+        }
+      ]
+    }
+  ],
+  "limitations": "Directional cold-start smoke measurement, not proof of UI parity with Spotify/YT Music. Other experimental GPU-cache runs are excluded; no GPU cache limit was adopted."
+}

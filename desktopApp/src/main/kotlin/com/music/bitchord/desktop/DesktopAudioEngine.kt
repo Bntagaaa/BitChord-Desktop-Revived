@@ -33,7 +33,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.ceil
@@ -69,7 +68,7 @@ class DesktopPlaybackEngine(
         // dropped rather than run to completion.
         stopped = { DesktopListenTogether.state.value.inParty },
     )
-    private val commands = ConcurrentLinkedQueue<Command>()
+    private val commands = DesktopAudioCommands<Command>()
     private val running = AtomicBoolean(true)
     /** Invalidates a canceled/obsolete load even if native open work ignores coroutine cancellation. */
     private val loadGeneration = AtomicLong(0)
@@ -866,7 +865,7 @@ class DesktopPlaybackEngine(
             if (paused) sink.pause()
             loopRuntime?.let(::loopPosition)
             if (paused && fadeRemaining > 0) publishBlend(playing = false)
-            Thread.sleep(20)
+            commands.awaitCommand()
             return
         }
         sink.resume()

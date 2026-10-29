@@ -77,6 +77,31 @@ class DesktopVideoSessionTest {
         }
     }
 
+    @Test fun minimizedWindowStopsPictureReadsEvenWithAnAttachedViewAndRestoresWithoutReload() = runBlocking {
+        val clock = MutableStateFlow(state("video").copy(isPlaying = true))
+        val visible = MutableStateFlow(true)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val resolves = AtomicInteger()
+        val decoder = Decoder()
+        val session = DesktopVideoSession(scope, clock, { 1f }, { id, height -> resolves.incrementAndGet(); stream(id,height) }, { decoder }, visible = visible)
+        try {
+            session.attach("video")
+            await { session.frame.value != null && decoder.eofReads.get() > 0 }
+            visible.value = false
+            delay(150)
+            val reads = decoder.eofReads.get()
+            val frame = session.frame.value
+            clock.value = clock.value.copy(positionMs = 90_000L, seeks = 2)
+            delay(200)
+            assertEquals(reads, decoder.eofReads.get())
+            assertSame(frame, session.frame.value)
+            assertEquals(1, decoder.opens.get()); assertEquals(0, decoder.closes.get())
+            visible.value = true
+            await { decoder.frameTimeMs == 90_000L && session.frame.value !== frame }
+            assertEquals(1, resolves.get()); assertEquals(1, decoder.opens.get())
+        } finally { session.close(); scope.cancel() }
+    }
+
     @Test fun onlyTrackQualityAndStopReplaceOrCloseTheDecoder() = runBlocking {
         val clock = MutableStateFlow(state("a"))
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

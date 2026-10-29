@@ -357,6 +357,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -455,7 +456,7 @@ private const val STATS_MAX_DELTA_MS = 15_000L
 private const val SCROBBLE_THRESHOLD_MS = 180_000L
 
 /** Used for tracking restart of the current song when previous button is pressed. */
-private const val BACK_RESTARTS_AFTER_MS = 10_000L
+private const val BACK_RESTARTS_AFTER_MS = DESKTOP_BACK_RESTARTS_AFTER_MS
 
 /** How long the supplier waits for the server to echo an AutoPlay queue addition. */
 private const val PARTY_AUTOPLAY_ECHO_TIMEOUT_MS = 5_000L
@@ -2009,7 +2010,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             }
         }
     }
-    val playback by playbackEngine.state.collectAsState()
+    val playback by remember(playbackEngine) {
+        playbackEngine.state.distinctUntilChanged(::samePlaybackUiState)
+    }.collectAsState(initial = playbackEngine.state.value)
 
     // The shared player reads the playhead off this one object, and only where it
     // draws it — see PlaybackPosition — so a tick never recomposes the player.
@@ -2018,6 +2021,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         playbackEngine.state.collect {
             // The audio thread's own timestamp, not this collector's: it runs on the UI thread and
             // gets to a reading as late as the UI is busy.
+            DesktopPlayerHost.videoClock.value = it
             playerPosition.report(it.positionMs, it.positionSampledAtNanos)
             playerPosition.seeks = it.seeks
             playerPosition.advancing = !it.awaitingAudio
@@ -3365,7 +3369,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
 
     // What the shared player reads as settings, kept in step with the window's own.
     SideEffect {
-        DesktopPlayerHost.videoClock.value = playback
         DesktopPlayerHost.videoSpeed = playbackSpeed
         DesktopPlayerSettings.animatedCanvas.value = animatedCanvas
         DesktopPlayerSettings.fullBleedArtwork.value = fullBleedArtwork
@@ -3809,9 +3812,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             DesktopShortcut.PREVIOUS -> playPrevious()
                             DesktopShortcut.NEXT -> playNext()
                             DesktopShortcut.SEEK_BACKWARD ->
-                                if (selectedSong != null) seekPlayer(playback.positionMs - 5_000L)
+                                if (selectedSong != null) seekPlayer(playbackEngine.state.value.positionMs - 5_000L)
                             DesktopShortcut.SEEK_FORWARD ->
-                                if (selectedSong != null) seekPlayer(playback.positionMs + 5_000L)
+                                if (selectedSong != null) seekPlayer(playbackEngine.state.value.positionMs + 5_000L)
                             DesktopShortcut.VOLUME_UP -> {
                                 volume = (volume + 0.05f).coerceIn(0f, 1f)
                                 persistence.saveString("volume", volume.toString())
@@ -3875,7 +3878,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             isPlaying = playback.isPlaying,
                             isLoading = playback.isLoading,
                             previousEnabled = liveQueue.hasPrevious || playback.positionMs > BACK_RESTARTS_AFTER_MS,
-                            progress = if (playback.durationMs > 0L) playback.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
+                            progress = { if (playback.durationMs > 0L) playerPosition.positionMs.toFloat() / playback.durationMs.toFloat() else 0f },
                             volume = playback.volume,
                             shuffle = shuffle,
                             repeatMode = repeatMode,
@@ -3922,7 +3925,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                         isPlaying = playback.isPlaying,
                         isLoading = playback.isLoading,
                         previousEnabled = liveQueue.hasPrevious || playback.positionMs > BACK_RESTARTS_AFTER_MS,
-                        progress = if (playback.durationMs > 0L) playback.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
+                        progress = { if (playback.durationMs > 0L) playerPosition.positionMs.toFloat() / playback.durationMs.toFloat() else 0f },
                         volume = playback.volume,
                         shuffle = shuffle,
                         repeatMode = repeatMode,
@@ -5204,7 +5207,7 @@ private fun DesktopTopBar(
     isPlaying: Boolean,
     isLoading: Boolean,
     previousEnabled: Boolean,
-    progress: Float,
+    progress: () -> Float,
     volume: Float,
     shuffle: Boolean,
     repeatMode: DesktopRepeatMode,
@@ -5377,7 +5380,7 @@ private fun DesktopTopBar(
                                             .fillMaxWidth()
                                             .height(2.dp)
                                             .drawBehind {
-                                                val base = currentProgress.coerceIn(0f, 1f)
+                                                val base = currentProgress().coerceIn(0f, 1f)
                                                 val fraction = base + (1f - base) * mixPulse.cover
                                                 drawRect(
                                                     color = DesktopForeground.copy(alpha = mixPulse.alpha(0.48f)),
@@ -5480,7 +5483,7 @@ private fun DesktopTopBar(
                                         .fillMaxWidth()
                                         .height(2.dp)
                                         .drawBehind {
-                                            val base = currentProgress.coerceIn(0f, 1f)
+                                            val base = currentProgress().coerceIn(0f, 1f)
                                             val fraction = base + (1f - base) * mixPulse.cover
                                             drawRect(
                                                 color = DesktopForeground.copy(alpha = mixPulse.alpha(0.48f)),
@@ -5856,7 +5859,7 @@ private fun DesktopBottomChrome(
     isPlaying: Boolean,
     isLoading: Boolean,
     previousEnabled: Boolean,
-    progress: Float,
+    progress: () -> Float,
     volume: Float,
     shuffle: Boolean,
     repeatMode: DesktopRepeatMode,
@@ -5973,7 +5976,7 @@ private fun DesktopMiniPlayer(
     isPlaying: Boolean,
     isLoading: Boolean,
     previousEnabled: Boolean,
-    progress: Float,
+    progress: () -> Float,
     volume: Float,
     shuffle: Boolean,
     repeatMode: DesktopRepeatMode,
@@ -6092,7 +6095,7 @@ private fun DesktopMiniPlayer(
                         )
                         drawRect(
                             color = DesktopAccent.copy(alpha = 0.92f),
-                            size = Size(size.width * progress.coerceIn(0f, 1f), size.height),
+                            size = Size(size.width * progress().coerceIn(0f, 1f), size.height),
                         )
                     },
             )

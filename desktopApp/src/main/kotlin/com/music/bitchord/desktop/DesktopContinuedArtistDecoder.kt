@@ -27,6 +27,7 @@ import org.bytedeco.ffmpeg.global.avformat.avformat_open_input
 import org.bytedeco.ffmpeg.global.avutil.AVMEDIA_TYPE_VIDEO
 import org.bytedeco.ffmpeg.global.avutil.AV_PIX_FMT_BGRA
 import org.bytedeco.ffmpeg.global.avutil.av_dict_set
+import org.bytedeco.ffmpeg.global.avutil.av_dict_free
 import org.bytedeco.ffmpeg.global.avutil.av_frame_alloc
 import org.bytedeco.ffmpeg.global.avutil.av_frame_free
 import org.bytedeco.ffmpeg.global.avutil.av_image_fill_arrays
@@ -69,7 +70,13 @@ internal class DesktopContinuedArtistDecoder(private val maxEdge: Int = MAX_EDGE
         private set
 
     fun open(url: String, headers: Map<String, String> = emptyMap()): Result<Unit> = runCatching {
+        close()
         DesktopAudioDecoder.ensureNetworkReady()
+        val source = if (url.substringBefore('?').endsWith(".m3u8", ignoreCase = true)) {
+            val key = "$maxEdge|$url"
+            synchronized(variants) { variants[key] } ?: canvasGet(url, headers)
+                ?.let { selectContinuedArtistVariant(url, it, maxEdge) }?.also { synchronized(variants) { variants[key] = it } } ?: url
+        } else url
         val options = AVDictionary(null)
         if (headers.isNotEmpty()) {
             av_dict_set(
@@ -81,13 +88,8 @@ internal class DesktopContinuedArtistDecoder(private val maxEdge: Int = MAX_EDGE
         }
         av_dict_set(options, "rw_timeout", "15000000", 0)
 
-        val source = if (url.substringBefore('?').endsWith(".m3u8", ignoreCase = true)) {
-            val key = "$maxEdge|$url"
-            synchronized(variants) { variants[key] } ?: canvasGet(url, headers)
-                ?.let { selectContinuedArtistVariant(url, it, maxEdge) }?.also { synchronized(variants) { variants[key] = it } } ?: url
-        } else url
         val opened = AVFormatContext(null)
-        check(avformat_open_input(opened, source, null, options) >= 0) { "could not open the clip" }
+        check(try { avformat_open_input(opened, source, null, options) } finally { av_dict_free(options) } >= 0) { "could not open the clip" }
         format = opened
         check(avformat_find_stream_info(opened, null as AVDictionary?) >= 0) { "no stream info" }
         streamIndex = av_find_best_stream(
@@ -114,9 +116,9 @@ internal class DesktopContinuedArtistDecoder(private val maxEdge: Int = MAX_EDGE
         val parameters = stream.codecpar()
         val decoder = avcodec_find_decoder(parameters.codec_id()) ?: error("no decoder for this clip")
         val context = avcodec_alloc_context3(decoder)
+        codec = context
         check(avcodec_parameters_to_context(context, parameters) >= 0) { "bad codec parameters" }
         check(avcodec_open2(context, decoder, null as AVDictionary?) >= 0) { "decoder refused to open" }
-        codec = context
 
         sourceWidth = context.width()
         sourceHeight = context.height()
@@ -208,6 +210,7 @@ internal class DesktopContinuedArtistDecoder(private val maxEdge: Int = MAX_EDGE
         format?.let { avformat_close_input(it) }
         buffer?.deallocate()
         strides?.deallocate()
+        planes?.deallocate()
         frame = null
         packet = null
         scaler = null
@@ -221,6 +224,8 @@ internal class DesktopContinuedArtistDecoder(private val maxEdge: Int = MAX_EDGE
         streamIndex = -1
         sourceWidth = 0
         sourceHeight = 0
+        width = 0
+        height = 0
     }
 
     internal companion object {

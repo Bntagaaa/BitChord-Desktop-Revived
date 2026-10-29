@@ -33,14 +33,19 @@ fun rememberDesktopArtworkPalette(
 
 internal fun DesktopArtworkPalette.Companion.fromBitmap(bitmap: ImageBitmap?): DesktopArtworkPalette {
     if (bitmap == null || bitmap.width == 0 || bitmap.height == 0) return DesktopArtworkPalette.Default
-    val pixels = IntArray(bitmap.width * bitmap.height)
-    bitmap.readPixels(pixels)
+    // Preserve the exact original every-16th-pixel average, with a small scratch stripe.
+    val stripeRows = minOf(32, bitmap.height)
+    val pixels = IntArray(bitmap.width * stripeRows)
     var red = 0L
     var green = 0L
     var blue = 0L
     var count = 0L
-    pixels.forEachIndexed { index, pixel ->
-        if (index % 16 == 0) {
+    for (y in 0 until bitmap.height step stripeRows) {
+        val rows = minOf(stripeRows, bitmap.height - y)
+        bitmap.readPixels(pixels, startY = y, width = bitmap.width, height = rows)
+        val first = (16 - (y.toLong() * bitmap.width % 16)).toInt() % 16
+        for (index in first until bitmap.width * rows step 16) {
+            val pixel = pixels[index]
             red += pixel shr 16 and 0xFF
             green += pixel shr 8 and 0xFF
             blue += pixel and 0xFF

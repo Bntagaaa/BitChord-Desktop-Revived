@@ -3,6 +3,13 @@ import java.util.zip.ZipFile
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+// Share the same bounds across packaged and JVM-only portable launchers.
+val desktopMemoryJvmArgs = listOf(
+    "-Xms32m", "-Xmx512m", "-XX:+UseG1GC",
+    "-XX:MinHeapFreeRatio=20", "-XX:MaxHeapFreeRatio=40",
+    "-XX:G1PeriodicGCInterval=20000", "-XX:G1PeriodicGCSystemLoadThreshold=0",
+)
+
 /** What the launcher and settings footer display when no build version is supplied. */
 val defaultAppVersion = "1.8-beta1"
 
@@ -437,7 +444,7 @@ val windowsPortableAssemble by tasks.registering {
                 appendLine("set \"HERE=%~dp0\"")
                 appendLine("set \"RUNNER=java\"")
                 appendLine("if defined JAVA_HOME set \"RUNNER=%JAVA_HOME%\\bin\\java\"")
-                append("\"%RUNNER%\" -Dbitchord.version=$version")
+                append("\"%RUNNER%\" ${desktopMemoryJvmArgs.joinToString(" ")} -Dbitchord.version=$version")
                 if (moduleIndex.isNotBlank()) append(" -Dbitchord.module.index=$moduleIndex")
                 if (lastfmKey.isNotBlank() && lastfmSharedSecret.isNotBlank()) {
                     append(" -Dbitchord.lastfm.key=$lastfmKey -Dbitchord.lastfm.secret=$lastfmSharedSecret")
@@ -501,8 +508,7 @@ val composeMainClass = "com.music.bitchord.desktop.MainKt"
 compose.desktop {
     application {
         mainClass = composeMainClass
-        jvmArgs("-Xmx512m")
-        jvmArgs("-XX:+UseG1GC", "-XX:G1PeriodicGCInterval=20000", "-XX:G1PeriodicGCSystemLoadThreshold=0")
+        jvmArgs(*desktopMemoryJvmArgs.toTypedArray())
         jvmArgs("-Dbitchord.version=$appVersion")
         if (desktopModuleIndexUrl.isNotBlank()) {
             jvmArgs("-Dbitchord.module.index=$desktopModuleIndexUrl")
@@ -577,4 +583,17 @@ compose.desktop {
         }
     }
 
+}
+
+// Explicit isolated benchmark; not invoked during ordinary tests or packaging.
+tasks.register<JavaExec>("memoryProbe") {
+    group = "verification"
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.music.bitchord.desktop.DesktopMemoryProbe")
+    args(providers.gradleProperty("memory.mode").orElse("canvas-scoped").get(),
+        providers.gradleProperty("memory.frames").orElse("1800").get())
+    providers.gradleProperty("memory.home").orNull?.let { systemProperty("user.home", it) }
+    jvmArgs("-Xmx512m", "-XX:+UseG1GC", "-XX:G1PeriodicGCInterval=20000",
+        "-XX:G1PeriodicGCSystemLoadThreshold=0", "-XX:NativeMemoryTracking=summary")
 }

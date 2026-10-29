@@ -1,0 +1,62 @@
+[
+  {
+    "mode": "canvas-legacy",
+    "run": 1,
+    "metrics": [
+      "mode=canvas-legacy frames=1800 elapsedMs=713 cpuMs=684 allocatedBytes=2101321776 gcCount=17 gcMs=28",
+      "VmHWM:\t  491864 kB",
+      "VmRSS:\t  489880 kB",
+      "heapUsed=43471680 heapCommitted=536870912 retained=2"
+    ]
+  },
+  {
+    "mode": "canvas-legacy",
+    "run": 2,
+    "metrics": [
+      "mode=canvas-legacy frames=1800 elapsedMs=633 cpuMs=599 allocatedBytes=2101458344 gcCount=17 gcMs=28",
+      "VmHWM:\t  495756 kB",
+      "VmRSS:\t  485592 kB",
+      "heapUsed=43381520 heapCommitted=536870912 retained=2"
+    ]
+  },
+  {
+    "mode": "canvas-legacy",
+    "run": 3,
+    "metrics": [
+      "mode=canvas-legacy frames=1800 elapsedMs=637 cpuMs=609 allocatedBytes=2101458712 gcCount=17 gcMs=23",
+      "VmHWM:\t  485928 kB",
+      "VmRSS:\t  485928 kB",
+      "heapUsed=43267624 heapCommitted=536870912 retained=2"
+    ]
+  },
+  {
+    "mode": "canvas-scoped",
+    "run": 1,
+    "metrics": [
+      "mode=canvas-scoped frames=1800 elapsedMs=412 cpuMs=384 allocatedBytes=2100091528 gcCount=17 gcMs=27",
+      "VmHWM:\t  227516 kB",
+      "VmRSS:\t  227516 kB",
+      "heapUsed=117589944 heapCommitted=536870912 retained=2"
+    ]
+  },
+  {
+    "mode": "canvas-scoped",
+    "run": 2,
+    "metrics": [
+      "mode=canvas-scoped frames=1800 elapsedMs=410 cpuMs=385 allocatedBytes=2100091528 gcCount=17 gcMs=25",
+      "VmHWM:\t  228296 kB",
+      "VmRSS:\t  228296 kB",
+      "heapUsed=117702864 heapCommitted=536870912 retained=2"
+    ]
+  },
+  {
+    "mode": "canvas-scoped",
+    "run": 3,
+    "metrics": [
+      "mode=canvas-scoped frames=1800 elapsedMs=405 cpuMs=382 allocatedBytes=2100091528 gcCount=17 gcMs=22",
+      "VmHWM:\t  226236 kB",
+      "VmRSS:\t  226236 kB",
+      "heapUsed=117591992 heapCommitted=536870912 retained=2"
+    ]
+  }
+]

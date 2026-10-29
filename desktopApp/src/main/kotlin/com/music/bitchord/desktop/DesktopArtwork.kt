@@ -21,6 +21,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import java.net.URI
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Cache
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Response
+import java.io.IOException
+import java.nio.file.Path
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * Decoded artwork, kept to a budget.
@@ -41,26 +54,69 @@ internal object DesktopArtworkCache {
     internal val budgetBytes: Long =
         (Runtime.getRuntime().maxMemory() / 6).coerceIn(32L * 1024 * 1024, 128L * 1024 * 1024)
 
-    /** Four bytes a pixel, which is what every format here decodes to. */
-    private val images = DesktopByteBudgetLru<ImageBitmap>(budgetBytes) {
-        it.width.toLong() * it.height.toLong() * 4L
+    // Keep the established decoded budget: shrinking it without measuring churn can cost more.
+    private val loader = DesktopImageLoader<ImageBitmap>(
+        budgetBytes = budgetBytes,
+        sizeOf = { it.width.toLong() * it.height * 4L },
+        fetch = ::fetch,
+        decode = { it.decodeToImageBitmap() },
+    )
+    private val disk = lazy {
+        val base = System.getenv("XDG_CACHE_HOME")?.takeIf(String::isNotBlank)
+            ?: "${System.getProperty("user.home")}/.cache"
+        Cache(Path.of(base, "bitchord", "artwork-http").toFile(), 128L * 1024 * 1024)
+    }
+    // HTTP freshness, validators, atomic journal writes and incremental eviction are handled by
+    // OkHttp. No directory walk on every write, and no permanent caching of expired artwork.
+    private val client by lazy {
+        OkHttpClient.Builder().cache(disk.value)
+            .connectTimeout(10, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS)
+            .callTimeout(30, TimeUnit.SECONDS).build()
     }
 
-    val heldBytes: Long get() = images.heldBytes
+    fun trimMemory() = loader.trimMemory()
 
-    /** Everything held, dropped — what the Storage settings' "Clear image cache" does. */
-    fun clear() = images.clear()
+    fun clear() {
+        loader.trimMemory()
+        runCatching { disk.value.evictAll() }
+    }
+
+    internal val heldBytes get() = loader.heldBytes
 
     suspend fun load(url: String?): ImageBitmap? {
         if (url.isNullOrBlank()) return null
-        images.get(url)?.let { return it }
-        return runCatching {
-            URI(url).toURL().openConnection().apply {
-                connectTimeout = 10_000
-                readTimeout = 10_000
-            }.getInputStream().use { stream -> stream.readBytes().decodeToImageBitmap() }
-        }.getOrNull()?.also { images.put(url, it) }
+        return try { loader.load(url) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { null }
     }
+
+    private suspend fun fetch(url: String): ByteArray {
+        if (URI(url).scheme !in setOf("https", "http")) {
+            return URI(url).toURL().openStream().use { it.readBytes() }
+        }
+        return suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(Request.Builder().url(url).build())
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    continuation.resumeWithException(e)
+                }
+                override fun onResponse(call: Call, response: Response) {
+                    val bytes = try {
+                        response.use {
+                            check(it.isSuccessful) { "Artwork HTTP ${it.code}" }
+                            checkNotNull(it.body).bytes()
+                        }
+                    } catch (e: Exception) {
+                        continuation.resumeWithException(e)
+                        return
+                    }
+                    continuation.resume(bytes)
+                }
+            })
+        }
+    }
+
 }
 
 /** Artwork, fetched at the size the surface drawing it actually needs. */
@@ -76,6 +132,7 @@ fun DesktopArtwork(
 ) {
     val sized = if (px != null) url.artworkAt(px) else url
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = sized) {
+        value = null
         value = withContext(Dispatchers.IO) {
             DesktopArtworkCache.load(sized)
         }

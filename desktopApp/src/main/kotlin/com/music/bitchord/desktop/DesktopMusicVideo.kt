@@ -37,6 +37,7 @@ internal class DesktopVideoSession(
     private val decoderFactory: () -> DesktopVideoDecoder,
     private val onError: (Exception) -> Unit = {},
     enabled: StateFlow<Boolean> = MutableStateFlow(true),
+    private val visible: StateFlow<Boolean> = MutableStateFlow(true),
 ) {
     private val users = MutableStateFlow<Map<String, Int>>(emptyMap())
     private val retries = MutableStateFlow(0)
@@ -80,8 +81,8 @@ internal class DesktopVideoSession(
                         if (audio.song?.videoId != id || audio.awaitingAudio) { delay(30); continue }
                         // Decode one frame to warm the session, then retain the decoder and last
                         // frame while hidden. Restoring only seeks to the live clock if needed.
-                        if (producedFrame && users.value[id] == null) {
-                            users.first { (it[id] ?: 0) > 0 }
+                        if (producedFrame && (users.value[id] == null || !visible.value)) {
+                            users.combine(visible) { attached, shown -> shown && (attached[id] ?: 0) > 0 }.first { it }
                             continue
                         }
                         if (!audio.isPlaying && producedFrame && lastSeek == audio.seeks) {
@@ -137,7 +138,7 @@ internal object DesktopMusicVideo {
                 override fun nextFrame(pixels: ByteArray) = decoder.nextFrame(pixels)
                 override fun close() = decoder.close()
             }
-        }, onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") }, enabled = DesktopVideoBeta.enabled)
+        }, onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") }, enabled = DesktopVideoBeta.enabled, visible = DesktopRenderVisibility.visible)
     val held get() = session.held
     val quality get() = session.quality
     val aspect get() = session.aspect

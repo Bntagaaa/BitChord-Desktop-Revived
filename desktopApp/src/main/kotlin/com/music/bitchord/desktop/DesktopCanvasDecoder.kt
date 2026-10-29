@@ -77,6 +77,7 @@ internal class DesktopCanvasDecoder(
         private set
 
     fun open(url: String, headers: Map<String, String> = emptyMap()): Result<Unit> = runCatching {
+        close()
         DesktopAudioDecoder.ensureNetworkReady()
         val options = AVDictionary(null)
         if (headers.isNotEmpty()) {
@@ -226,6 +227,8 @@ internal class DesktopCanvasDecoder(
         streamIndex = -1
         sourceWidth = 0
         sourceHeight = 0
+        width = 0
+        height = 0
     }
 
     private companion object {
