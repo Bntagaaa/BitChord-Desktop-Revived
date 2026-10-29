@@ -88,7 +88,12 @@ def wait_for(predicate, seconds, description):
     raise AssertionError(description)
 
 def digest(path):
-    with path.open('rb') as stream: return hashlib.file_digest(stream, 'sha256').hexdigest()
+    # Ubuntu 22.04 ships Python 3.10, before hashlib.file_digest was added.
+    checksum = hashlib.sha256()
+    with path.open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            checksum.update(chunk)
+    return checksum.hexdigest()
 
 def ticks(pid):
     return Path(f'/proc/{pid}/stat').read_text().rsplit(') ', 1)[1].split()[19]
