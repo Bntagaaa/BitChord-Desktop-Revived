@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
@@ -54,6 +56,7 @@ import kotlinx.coroutines.launch
 internal fun DesktopPlayerSheet(
     visible: Boolean,
     onDismiss: () -> Unit,
+    onPiP: () -> Unit,
     dragToDismiss: Boolean = true,
     content: @Composable BoxScope.(windowWidth: Dp, windowHeight: Dp) -> Unit,
 ) {
@@ -108,7 +111,10 @@ internal fun DesktopPlayerSheet(
                     Icon(Icons.Rounded.KeyboardArrowDown, "Minimize player", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
-            Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+            Row(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                DesktopToolbarButton(onClick = onPiP, size = 32.dp) {
+                    Icon(Icons.Rounded.PictureInPictureAlt, "Switch to Picture in Picture", tint = Color.White, modifier = Modifier.size(20.dp))
+                }
                 DesktopToolbarButton(onClick = { DesktopWindowMode.toggle() }, size = 32.dp) {
                     Icon(if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen, "Toggle fullscreen", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
