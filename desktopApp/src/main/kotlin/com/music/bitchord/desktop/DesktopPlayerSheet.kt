@@ -56,7 +56,7 @@ import kotlinx.coroutines.launch
 internal fun DesktopPlayerSheet(
     visible: Boolean,
     onDismiss: () -> Unit,
-    onPiP: () -> Unit,
+    onPiP: () -> Unit = {},
     dragToDismiss: Boolean = true,
     content: @Composable BoxScope.(windowWidth: Dp, windowHeight: Dp) -> Unit,
 ) {
