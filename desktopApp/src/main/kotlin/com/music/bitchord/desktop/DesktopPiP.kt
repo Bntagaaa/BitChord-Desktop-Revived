@@ -1,10 +1,6 @@
 package com.music.bitchord.desktop
 
 import androidx.compose.foundation.background
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,7 +41,6 @@ import org.jetbrains.compose.resources.painterResource
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -299,9 +294,9 @@ internal fun DesktopPiPWindow() {
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
                         listOf(
-                            Color.Black.copy(alpha = 0.17f),
-                            Color.Black.copy(alpha = 0.38f),
-                            Color.Black.copy(alpha = 0.53f),
+                            Color.Black.copy(alpha = 0.06f),
+                            Color.Black.copy(alpha = 0.14f),
+                            Color.Black.copy(alpha = 0.24f),
                         ),
                     ),
                 ),
@@ -350,7 +345,7 @@ internal fun DesktopPiPWindow() {
                         Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 7.dp),
                     ) {
-                        PiPTrackText(snapshot, foreground, secondary)
+                        PiPTrackText(snapshot, foreground, secondary, compact)
                         if (lyricsMode == DesktopPiPLyricsMode.INLINE) {
                             PiPInlineLyric(
                                 preview = lyricPreview,
@@ -473,12 +468,14 @@ private fun PiPLyricsPanel(
             .background(Color.Black.copy(alpha = 0.22f))
             .border(0.6.dp, Color.White.copy(alpha = 0.12f), shape),
     ) {
-        val showPrevious = maxHeight >= 158.dp
-        val showNext = maxHeight >= 95.dp
+        val panelHeight = maxHeight
+        val panelWidth = maxWidth
+        val showPrevious = panelHeight >= 158.dp
+        val showNext = panelHeight >= 95.dp
         Column(
             Modifier.fillMaxSize().padding(
-                horizontal = if (maxWidth < 280.dp) 10.dp else 14.dp,
-                vertical = if (maxHeight < 115.dp) 7.dp else 12.dp,
+                horizontal = if (panelWidth < 280.dp) 10.dp else 14.dp,
+                vertical = if (panelHeight < 115.dp) 7.dp else 12.dp,
             ),
             verticalArrangement = Arrangement.Center,
         ) {
@@ -508,8 +505,8 @@ private fun PiPLyricsPanel(
                 text = activeLine,
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
-                style = if (maxHeight >= 180.dp) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-                maxLines = if (maxHeight >= 140.dp) 3 else 2,
+                style = if (panelHeight >= 180.dp) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                maxLines = if (panelHeight >= 140.dp) 3 else 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (showNext && !preview?.next.isNullOrBlank()) {
@@ -518,7 +515,7 @@ private fun PiPLyricsPanel(
                     text = preview!!.next!!,
                     color = Color.White.copy(alpha = 0.54f),
                     style = MaterialTheme.typography.bodySmall,
-                    maxLines = if (maxHeight >= 165.dp) 2 else 1,
+                    maxLines = if (panelHeight >= 165.dp) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -546,21 +543,21 @@ private fun PiPArtwork(song: Song?, size: Dp) {
 }
 
 @Composable
-private fun PiPTrackText(snapshot: DesktopPiPPlayback, foreground: Color, secondary: Color) {
+private fun PiPTrackText(snapshot: DesktopPiPPlayback, foreground: Color, secondary: Color, compact: Boolean) {
     Text(
         snapshot.song?.title ?: "Nothing playing",
         color = foreground,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        style = MaterialTheme.typography.titleMedium,
+        style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
     )
     Text(
         snapshot.song?.artist ?: "Open BitChord to choose a song",
         color = secondary,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        style = MaterialTheme.typography.bodySmall,
+        style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
     )
 }
 
