@@ -24,6 +24,7 @@ import androidx.compose.ui.window.rememberWindowState
 import java.awt.Dimension
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
@@ -77,6 +78,8 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     val placement by DesktopWindowMode.placement.collectAsState()
     val state = rememberWindowState(width = 1_220.dp, height = 780.dp)
     val appIcon by DesktopAppIconSettings.selected.collectAsState()
+    val pipVisible by DesktopPiP.visible.collectAsState()
+    val pipPinned by DesktopPiP.alwaysOnTop.collectAsState()
     LaunchedEffect(placement) { state.placement = placement }
     // ...and back, for the times the window is moved between placements by something that is not
     // us; see [DesktopWindowMode.adopt].
@@ -189,6 +192,46 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
             DesktopFlyoutHost {
                 BitChordDesktopApp(welcomeLaunch)
             }
+        }
+    }
+
+    // A separate native window keeps PiP independently resizable on Windows, X11 and Wayland.
+    // The existing engine and application composition remain alive in the hidden main window.
+    if (pipVisible) {
+        val pipState = rememberWindowState(
+            size = remember { DesktopPiPWindowBounds.initialSize() },
+            position = remember { DesktopPiPWindowBounds.initialPosition() },
+        )
+        LaunchedEffect(pipState) {
+            snapshotFlow { pipState.size }.collectLatest { size ->
+                delay(350)
+                DesktopPiPWindowBounds.saveSize(size)
+            }
+        }
+        LaunchedEffect(pipState) {
+            snapshotFlow { pipState.position }.collectLatest { position ->
+                delay(350)
+                DesktopPiPWindowBounds.savePosition(position)
+            }
+        }
+        Window(
+            onCloseRequest = DesktopPiP::close,
+            title = "BitChord - Picture in Picture",
+            icon = painterResource(appIcon.resource),
+            state = pipState,
+            undecorated = false,
+            transparent = false,
+            resizable = true,
+            alwaysOnTop = pipPinned,
+        ) {
+            DisposableEffect(window) {
+                window.minimumSize = Dimension(
+                    DesktopPiPWindowBounds.minWidth,
+                    DesktopPiPWindowBounds.minHeight,
+                )
+                onDispose { }
+            }
+            DesktopPiPWindow()
         }
     }
 }
