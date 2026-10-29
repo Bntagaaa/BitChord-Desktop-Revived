@@ -66,6 +66,7 @@ class DesktopVideoLayoutTest {
         onNodeWithText("Lyrics").assertDoesNotExist()
         onNodeWithText("Music video").assertIsDisplayed()
         onAllNodesWithContentDescription("Toggle fullscreen").assertCountEquals(1)
+        onAllNodesWithContentDescription("Switch to Picture in Picture").assertCountEquals(1)
         onNodeWithContentDescription("Fullscreen").assertDoesNotExist()
         onNodeWithContentDescription("Exit fullscreen").assertDoesNotExist()
         val audio = onNodeWithTag("queue-art-audio", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
