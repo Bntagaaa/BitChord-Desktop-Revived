@@ -29,6 +29,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
+    DesktopSmoothnessTrace.install()
     DesktopCoilMemory.install()
     DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.PROCESS_ENTRY)
     // Read the per-install welcome marker before services initialize or write preferences.
@@ -86,6 +87,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     }
     LaunchedEffect(visible, state.isMinimized) {
         DesktopRenderVisibility.visible.value = visible && !state.isMinimized
+        DesktopSmoothnessTrace.visibility(visible && !state.isMinimized)
         if (!visible || state.isMinimized) {
             DesktopMemoryOptimizer.onWindowHidden()
         } else DesktopMemoryOptimizer.onWindowShown()
@@ -102,6 +104,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         transparent = false,
         resizable = true,
     ) {
+        DesktopSmoothnessFrameProbe()
         val composeWindow = window
         val isDarkTheme = DesktopTheme.isDark
         // System mode follows changes while the app remains open. Native probes run off the UI thread.
@@ -189,7 +192,11 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         }
         CompositionLocalProvider(LocalDensity provides uiDensity) {
             DesktopFlyoutHost {
-                BitChordDesktopApp(welcomeLaunch)
+                if (DesktopSmoothnessTrace.enabled) {
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.smoothnessTrace()) {
+                        BitChordDesktopApp(welcomeLaunch)
+                    }
+                } else BitChordDesktopApp(welcomeLaunch)
             }
         }
     }

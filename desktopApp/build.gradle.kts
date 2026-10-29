@@ -546,6 +546,9 @@ compose.desktop {
                 "java.instrument",
                 "java.logging",
                 "java.management",
+                // Opt-in smoothness diagnostics and on-device JFR captures.
+                "jdk.management",
+                "jdk.jfr",
                 "java.naming",
                 "java.net.http",
                 "java.prefs",
@@ -596,4 +599,44 @@ tasks.register<JavaExec>("memoryProbe") {
     providers.gradleProperty("memory.home").orNull?.let { systemProperty("user.home", it) }
     jvmArgs("-Xmx512m", "-XX:+UseG1GC", "-XX:G1PeriodicGCInterval=20000",
         "-XX:G1PeriodicGCSystemLoadThreshold=0", "-XX:NativeMemoryTracking=summary")
+}
+
+// Opt-in development measurements, never part of app startup/tests/check automatically.
+tasks.register<JavaExec>("smoothnessBench") {
+    group = "verification"
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.music.bitchord.desktop.DesktopSmoothnessBench")
+    args(providers.gradleProperty("smoothness.workload").orElse("settings").get())
+    providers.gradleProperty("smoothness.home").orNull?.let { systemProperty("user.home", it) }
+    systemProperty("bitchord.smoothness.output", providers.gradleProperty("smoothness.output").get())
+    systemProperty("bitchord.smoothness.syncPreferences",providers.gradleProperty("smoothness.sync").orElse("false").get())
+    providers.gradleProperty("smoothness.jfr").orNull?.let { jvmArgs("-XX:StartFlightRecording=filename=$it,settings=profile,dumponexit=true") }
+    jvmArgs(*desktopMemoryJvmArgs.toTypedArray())
+}
+
+tasks.register<JavaExec>("motionSceneBench") {
+    group = "verification"
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.music.bitchord.desktop.DesktopMotionSceneBench")
+    args(providers.gradleProperty("smoothness.motion").orElse("isolated").get())
+    providers.gradleProperty("smoothness.home").orNull?.let { systemProperty("user.home",it) }
+    systemProperty("bitchord.smoothness.output",providers.gradleProperty("smoothness.output").get())
+    jvmArgs(*desktopMemoryJvmArgs.toTypedArray())
+}
+
+tasks.register<JavaExec>("shellSceneBench") {
+    group = "verification"
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.music.bitchord.desktop.DesktopShellSceneBench")
+    val fixtureHome = providers.gradleProperty("smoothness.home")
+    systemProperty("bitchord.smoothness.fixtureHome", fixtureHome.orElse("").get())
+    systemProperty("java.util.prefs.userRoot", fixtureHome.map { "$it/prefs" }.orElse("").get())
+    doFirst { require(fixtureHome.isPresent) { "shellSceneBench requires -Psmoothness.home=<isolated directory>" } }
+    args(providers.gradleProperty("smoothness.effects").orElse("default").get())
+    providers.gradleProperty("smoothness.home").orNull?.let { systemProperty("user.home",it) }
+    systemProperty("bitchord.smoothness.output",providers.gradleProperty("smoothness.output").get())
+    jvmArgs(*desktopMemoryJvmArgs.toTypedArray())
 }

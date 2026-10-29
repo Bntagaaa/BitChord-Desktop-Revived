@@ -1,0 +1,31 @@
+{
+  "base": "4cf9755104c65ea5615f28ed6ec7d5fe53f5f4a4",
+  "branch": "perf/desktop-smoothness-phase2",
+  "measured_utc_date": "2026-10-29",
+  "source_sha256": {
+    "desktopApp/build.gradle.kts": "a5db1682a670c4b879d6d2f24abaac0691fef9f52b9fe5768b974708155099fd",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopApp.kt": "b7a54fa34dadf55816a6d52630632295df3a0d3c7c41eb31fb08df9b40de763a",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopCanvas.kt": "933f1d51edf1d483c25b68e5d5756aee06914580af1a9faf39991a5554484d54",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopCanvasVideo.kt": "64b9f4ecf5d2347c5ed0f79fd1ac78ff8aefaa0626121ef93966ccdd870c1a68",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopContinuedArtistMotion.kt": "01f0aba6e5c3ca8d6330d5d212167c8499801d097f1929dc3a2d81c5ae0f1045",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLiveFramePainter.kt": "2ff49c6712b6d87f1e7d1c479b04ceb41ac5735af553e7ce1e3fac7cfe24cfee",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopMemoryOptimizer.kt": "76cb0f79ff86dacc6886e4af23e6d7fe0fad4ee17502444bab531fd92ccb17cd",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopMusicVideo.kt": "00a0e36f8573f526aa7f2fe8722e8e60dca7d799dad0aff0379226a9b3298618",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPersistence.kt": "96df9f957496c325a790934636415a87e7868b82367eff3d93ca1e459c5290b8",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPreferenceChunks.kt": "3b376f223b48fd43542c7d1c795a143f60715452a2118235ed8fa9fc387d7870",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPreferenceFlush.kt": "c0ce5c473cff293734e512a5564774b530646eb5014a78aca5df10cbac69a5ff",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPresence.kt": "210304a9ef22fe84ab07285476c25c60dd9abdbce11e26f3fc08c1eab4c511c0",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSmoothnessModifier.kt": "2d5d77fbdaf736dfd5557569c251a2099af2584e023e5c296d8c3646cdb623a0",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSmoothnessTrace.kt": "2b4d966754ba8412f4e21223509811cad6f77e5d4bc2f8aa45d297fde35f1c86",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTypeaheadEffect.kt": "685c75f7aeb84fccf1dcfd39cef32aed91b66d7073a437ac4556314aee40fa4c",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWelcomeOnboarding.kt": "48f9268e8cc68a9f040ca4ce67fdf067b9e3ded5b45e22debccbb80a99adeb21",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/Main.kt": "669bdb28a5777860d359b370b69fdb6980749b048c0f540e486c5976d5c28c58",
+    "desktopApp/src/test/kotlin/com/music/bitchord/desktop/DesktopMotionSceneBench.kt": "9a5f97e89fddf110084c338cd76b292fe4db6730dd68be09fbc075051794924b",
+    "desktopApp/src/test/kotlin/com/music/bitchord/desktop/DesktopRestoreGcTest.kt": "26771bfdd8b06c7f1dc8aebb4db86b6de04caec5c6a3fba8cbbdef038f167233",
+    "desktopApp/src/test/kotlin/com/music/bitchord/desktop/DesktopScrollFadeTest.kt": "5d18f86cb14ac62ed5870654bb4270bcddeb55f4febed31edf8e42ed479291b1",
+    "desktopApp/src/test/kotlin/com/music/bitchord/desktop/DesktopShellSceneBench.kt": "7ba5b1e6c8a2f3e2cd3f93abe39fd94e7f63b77886468dc8c790982a68465a1c",
+    "desktopApp/src/test/kotlin/com/music/bitchord/desktop/DesktopSmoothnessBench.kt": "e3807a74e99b7af93d6a125eac2fca5b6c82ca18a8e47694ac21a2589f26af5e",
+    "desktopApp/src/test/kotlin/com/music/bitchord/desktop/DesktopSmoothnessRegressionTest.kt": "f54e3020837c09a23f65723c4a87d0a38990950944edee38097bc8ebd8141f90",
+    "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/screens/HomeScreen.kt": "691379da62f80ce8e0c69cf528104b9323aae852a66b6f8d073c045e8ef29255"
+  }
+}

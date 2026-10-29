@@ -45,7 +45,7 @@ internal object DesktopWelcomeOnboarding {
 
     internal fun complete(preferences: Preferences, launch: Launch) {
         preferences.putBoolean(launch.markerKey, true)
-        runCatching { preferences.flush() }
+        DesktopPreferenceFlush.request(preferences)
     }
 
     internal fun forceRequested(value: String?): Boolean = when (value?.trim()?.lowercase(Locale.ROOT)) {

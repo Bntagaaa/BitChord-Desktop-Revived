@@ -1,0 +1,17 @@
+variant,metric,runs,median_count,median_p50_ms,median_p95_ms,median_p99_ms,median_over_16_67ms_percent,median_over_8_33ms_percent
+motion-isolated,app/awt_dispatch,3,330.0,0.066991,11.562724,14.136025,1.2121212121212122,9.696969696969697
+motion-isolated,app/draw_cpu_scope,3,1.0,3.387543,3.387543,3.387543,0.0,0.0
+motion-isolated,app/edt_queue_lag,3,25.0,7.889503,17.282704,26.449241,12.5,42.30769230769231
+motion-isolated,app/gc_collection,3,9.0,2.0,3.0,3.0,0.0,0.0
+motion-isolated,motion-isolated/awt_dispatch,3,1776.0,0.035925,11.178052,14.982444,0.28153153153153154,10.135135135135135
+motion-isolated,motion-isolated/compose_frame_callback_interval,3,179.0,15.569551,17.327259,19.118651,7.262569832402235,100.0
+motion-isolated,motion-isolated/edt_queue_lag,3,146.0,4.13423,11.841829,14.808549,0.6802721088435374,22.916666666666664
+motion-isolated,motion-isolated/gc_collection,3,31.0,1.0,2.0,2.0,0.0,0.0
+motion-legacy,app/awt_dispatch,3,330.0,0.069765,12.71104,14.752098,0.911854103343465,9.696969696969697
+motion-legacy,app/draw_cpu_scope,3,1.0,4.01459,4.01459,4.01459,0.0,0.0
+motion-legacy,app/edt_queue_lag,3,25.0,5.629808,13.987062,29.295516,8.0,41.66666666666667
+motion-legacy,app/gc_collection,3,9.0,2.0,3.0,3.0,0.0,0.0
+motion-legacy,motion-legacy/awt_dispatch,3,1775.0,0.037526,10.978282,12.128023,0.056338028169014086,10.140845070422536
+motion-legacy,motion-legacy/compose_frame_callback_interval,3,179.0,15.556992,15.895374,16.287071,1.1173184357541899,100.0
+motion-legacy,motion-legacy/edt_queue_lag,3,144.0,3.534821,10.601728,11.728291,0.0,20.689655172413794
+motion-legacy,motion-legacy/gc_collection,3,1.0,4.0,4.0,4.0,0.0,0.0

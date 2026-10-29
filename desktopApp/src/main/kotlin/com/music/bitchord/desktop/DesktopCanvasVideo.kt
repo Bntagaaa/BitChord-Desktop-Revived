@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -48,8 +49,8 @@ import org.jetbrains.skia.ImageInfo
 @Composable
 internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
     val canvas = spec.canvas
-    var frame by remember(canvas) { mutableStateOf<DesktopCanvasFrame?>(null) }
-    val rendered = frame != null
+    val frames = remember(canvas) { mutableStateOf<DesktopCanvasFrame?>(null) }
+    val rendered by remember(frames) { derivedStateOf { frames.value != null } }
     val windowVisible by DesktopRenderVisibility.visible.collectAsState()
     val running by rememberUpdatedState(spec.isPlaying && !spec.pausedForTransition && windowVisible)
     val reportAspect by rememberUpdatedState(spec.onAspectRatioChanged)
@@ -96,7 +97,7 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
                     if (!decoded) break
                     shown++
                     // Keep only an immutable JVM snapshot of the decoder buffer.
-                    frame = DesktopCanvasFrame(info, pixels)
+                    frames.value = DesktopCanvasFrame(info, pixels)
                     val spent = System.currentTimeMillis() - started
                     delay((decoder.frameIntervalMillis - spent).coerceAtLeast(0L))
                 }
@@ -118,11 +119,11 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
     // clip — another every so often.
     LaunchedEffect(rendered, spec.refreshFrameEveryMs) {
         if (!rendered) return@LaunchedEffect
-        frame?.capture()?.let(reportFrame)
+        frames.value?.capture()?.let(reportFrame)
         val interval = spec.refreshFrameEveryMs ?: return@LaunchedEffect
         while (isActive) {
             delay(interval)
-            frame?.capture()?.let(reportFrame)
+            frames.value?.capture()?.let(reportFrame)
         }
     }
 
@@ -150,7 +151,7 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
             if (bottomFade > 0.001f) compositingStrategy = CompositingStrategy.Offscreen
         },
     ) {
-        val image = frame ?: return@Canvas
+        val image = frames.value ?: return@Canvas
         val clipAspect = image.width.toFloat() / image.height
         val viewAspect = size.width / size.height
         val fit = spec.contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f

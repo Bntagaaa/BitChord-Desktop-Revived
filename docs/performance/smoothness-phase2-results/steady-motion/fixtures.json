@@ -1,0 +1,20 @@
+{
+  "motion-isolated-1": [
+    "motion_legacy=false compositions=0 draws=600 process_cpu_ms=7780.0 heap_delta=-133591184"
+  ],
+  "motion-isolated-2": [
+    "motion_legacy=false compositions=0 draws=600 process_cpu_ms=7930.0 heap_delta=-6451240"
+  ],
+  "motion-isolated-3": [
+    "motion_legacy=false compositions=0 draws=600 process_cpu_ms=7730.0 heap_delta=-187091288"
+  ],
+  "motion-legacy-1": [
+    "motion_legacy=true compositions=600 draws=600 process_cpu_ms=7610.0 heap_delta=-107270552"
+  ],
+  "motion-legacy-2": [
+    "motion_legacy=true compositions=600 draws=600 process_cpu_ms=8340.0 heap_delta=-6368896"
+  ],
+  "motion-legacy-3": [
+    "motion_legacy=true compositions=600 draws=600 process_cpu_ms=8190.0 heap_delta=-67430368"
+  ]
+}

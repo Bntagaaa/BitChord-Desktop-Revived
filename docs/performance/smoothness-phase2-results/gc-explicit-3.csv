@@ -1,0 +1,6 @@
+metric,count,p50_ms,p95_ms,p99_ms,over_16_67ms,over_8_33ms
+app/awt_dispatch,1,0.452904,0.452904,0.452904,0,0
+app/gc_collection,3,2.0,2.0,2.0,0,0
+gc-explicit/awt_dispatch,31,0.048403,0.07338,0.082955,0,0
+gc-explicit/edt_queue_lag,31,0.175971,0.285425,0.298445,0,0
+gc-explicit/gc_collection,1,6.0,6.0,6.0,0,0

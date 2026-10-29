@@ -1,0 +1,51 @@
+{
+  "gc-explicit-1": [
+    "gc_call_ms=5.945184",
+    "gc_explicit=true heap_used=11723456 heap_committed=33554432 VmRSS:\t   83784 kB"
+  ],
+  "gc-explicit-2": [
+    "gc_call_ms=5.294802",
+    "gc_explicit=true heap_used=11676080 heap_committed=33554432 VmRSS:\t   83876 kB"
+  ],
+  "gc-explicit-3": [
+    "gc_call_ms=6.375283",
+    "gc_explicit=true heap_used=11661768 heap_committed=33554432 VmRSS:\t   84104 kB"
+  ],
+  "gc-natural-1": [
+    "gc_call_ms=2.11E-4",
+    "gc_explicit=false heap_used=213883192 heap_committed=216006656 VmRSS:\t  172980 kB"
+  ],
+  "gc-natural-2": [
+    "gc_call_ms=1.9E-4",
+    "gc_explicit=false heap_used=214108056 heap_committed=217055232 VmRSS:\t  172936 kB"
+  ],
+  "gc-natural-3": [
+    "gc_call_ms=2.1E-4",
+    "gc_explicit=false heap_used=214092064 heap_committed=217055232 VmRSS:\t  173144 kB"
+  ],
+  "settings-async-1": [
+    "elapsed_ms=530.719518 edt_cpu_ms=6.626009 edt_allocated=207480"
+  ],
+  "settings-async-2": [
+    "elapsed_ms=531.826078 edt_cpu_ms=7.407598 edt_allocated=207480"
+  ],
+  "settings-async-3": [
+    "elapsed_ms=539.318334 edt_cpu_ms=7.966348 edt_allocated=207480"
+  ],
+  "settings-sync-1": [
+    "elapsed_ms=1583.071777 edt_cpu_ms=1019.518406 edt_allocated=77142440"
+  ],
+  "settings-sync-2": [
+    "elapsed_ms=1574.052192 edt_cpu_ms=993.155925 edt_allocated=77143616"
+  ],
+  "settings-sync-3": [
+    "elapsed_ms=1489.489511 edt_cpu_ms=923.906077 edt_allocated=77142016"
+  ],
+  "shell-baseline-1": [],
+  "shell-baseline-2": [],
+  "shell-baseline-3": [],
+  "shell-phase2-1": [],
+  "shell-phase2-2": [],
+  "shell-phase2-3": [],
+  "shell-phase2-reduced-1": []
+}

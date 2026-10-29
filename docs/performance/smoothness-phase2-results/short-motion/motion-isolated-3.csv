@@ -1,0 +1,9 @@
+metric,count,p50_ms,p95_ms,p99_ms,over_16_67ms,over_8_33ms
+app/awt_dispatch,328,0.066991,11.481821,13.212571,3,32
+app/draw_cpu_scope,1,2.978105,2.978105,2.978105,0,0
+app/edt_queue_lag,24,5.910581,19.881015,26.449241,3,10
+app/gc_collection,9,2.0,3.0,3.0,0,0
+motion-isolated/awt_dispatch,1777,0.043476,11.178052,14.982444,7,180
+motion-isolated/compose_frame_callback_interval,179,15.651345,17.634703,22.347792,18,179
+motion-isolated/edt_queue_lag,146,4.13423,11.841829,14.808549,2,39
+motion-isolated/gc_collection,31,1.0,2.0,2.0,0,0

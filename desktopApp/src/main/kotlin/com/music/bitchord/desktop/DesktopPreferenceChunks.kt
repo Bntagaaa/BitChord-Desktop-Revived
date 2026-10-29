@@ -39,7 +39,7 @@ internal object DesktopPreferenceChunks {
             preferences.remove("$key.$index")
             index++
         }
-        runCatching { preferences.flush() }
+        DesktopPreferenceFlush.request(preferences)
     }
 
     /** Removes both legacy and chunked forms of one logical value. */
@@ -50,7 +50,7 @@ internal object DesktopPreferenceChunks {
             preferences.remove("$key.$index")
             index++
         }
-        runCatching { preferences.flush() }
+        DesktopPreferenceFlush.request(preferences)
     }
 
     /** Drops the characters XML cannot carry, because the backing store is XML. */
