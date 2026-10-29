@@ -1,75 +1,39 @@
 package com.music.bitchord.desktop
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class DesktopUpdateCheckerTest {
-    private val checker = DesktopUpdateChecker
-
-    @Test
-    fun newerVersionsAndPrereleases() {
-        assertTrue(checker.isNewer("1.8.3", "1.8.2"))
-        assertTrue(checker.isNewer("1.8.2", "1.8.2-beta1"))
-        assertFalse(checker.isNewer("1.8.2", "1.8.2"))
-        assertFalse(checker.isNewer("1.8.1", "1.8.2"))
-        assertFalse(checker.isNewer("1.8.3", "test-build"))
-        assertFalse(checker.isNewer("unknown", "1.8.2"))
+    @Test fun stableAndPrereleaseOrdering() {
+        val newer = DesktopUpdateChecker::isNewer
+        for ((a,b) in listOf("1.9.0" to "1.8.99", "1.8.3" to "1.8.3-rc.9", "1.8.3-beta10" to "1.8.3-beta2", "1.8.3-beta.2" to "1.8.3-alpha.9", "1.8.3-rc.1" to "1.8.3-beta.9")) assertTrue(newer(a,b), "$a > $b")
+        for ((a,b) in listOf("1.8.3+build2" to "1.8.3+build1", "1.8.3-beta.1" to "1.8.3", "unknown" to "1.8.3", "1.8.3" to "dev-test", "1.8.3" to "1.8.3", "1.8.2" to "1.8.3")) assertFalse(newer(a,b), "$a must not update $b")
     }
-
-    @Test
-    fun detectCachyOsAndArchLinuxRegardlessOfDesktop() {
-        val linux = "Linux"
-        val cpu = "amd64"
-        assertEquals(
-            DesktopUpdateChecker.PackagePlatform.ARCH_X64,
-            checker.targetPlatform(linux, "NAME=CachyOS\nID=cachyos\nID_LIKE=arch", cpu),
-        )
-        assertEquals(
-            DesktopUpdateChecker.PackagePlatform.ARCH_X64,
-            checker.targetPlatform(linux, "ID=endeavouros\nID_LIKE=\"arch\"", "x86_64"),
-        )
-        assertEquals(
-            DesktopUpdateChecker.PackagePlatform.LINUX_X64,
-            checker.targetPlatform(linux, "ID=ubuntu\nID_LIKE=debian", cpu),
-        )
-        assertEquals(
-            DesktopUpdateChecker.PackagePlatform.UNSUPPORTED,
-            checker.targetPlatform(linux, "ID=cachyos\nID_LIKE=arch", "aarch64"),
-        )
+    @Test fun installationFormatTakesPriorityOverDistro() {
+        fun detect(os: String="Linux", cpu: String="amd64", image: String?=null, portable: Boolean=false, installed: Boolean=false, owner: String="") = UpdateInstallation.classify(os,cpu,image,portable,installed,owner).format
+        assertEquals(UpdateFormat.APPIMAGE, detect(image="/home/me/BitChord.AppImage", owner="pacman"))
+        assertEquals(UpdateFormat.ARCH, detect(owner="pacman"))
+        assertEquals(UpdateFormat.DEB, detect(owner="dpkg-query"))
+        assertEquals(UpdateFormat.RPM, detect(owner="rpm"))
+        assertEquals(UpdateFormat.WINDOWS_PORTABLE, detect("Windows 11", portable=true, installed=true))
+        assertEquals(UpdateFormat.WINDOWS_SETUP, detect("Windows 11", installed=true))
+        assertEquals(UpdateFormat.UNKNOWN, detect("Windows 11"))
+        assertEquals(UpdateFormat.UNKNOWN, detect(cpu="aarch64", image="/tmp/a.AppImage"))
+        assertEquals(UpdateFormat.UNKNOWN, detect())
     }
-
-    @Test
-    fun nativeArchPackagePreferredWithoutDebianFallback() {
-        val withNative = release(
-            "BitChord-1.8.3-linux-x86_64.AppImage",
-            "BitChord-1.8.3-linux-amd64.deb",
-            "bitchord-desktop-revived-bin-1.8.3-1-x86_64.pkg.tar.zst",
-        )
-        assertEquals(
-            "https://example.org/bitchord-desktop-revived-bin-1.8.3-1-x86_64.pkg.tar.zst",
-            checker.installerUrl(withNative, DesktopUpdateChecker.PackagePlatform.ARCH_X64),
-        )
-        assertEquals(
-            "https://example.org/BitChord-1.8.3-linux-x86_64.AppImage",
-            checker.installerUrl(withNative, DesktopUpdateChecker.PackagePlatform.LINUX_X64),
-        )
-        assertNull(
-            checker.installerUrl(
-                release("BitChord-1.8.3-linux-amd64.deb"),
-                DesktopUpdateChecker.PackagePlatform.ARCH_X64,
-            ),
-        )
-        assertNull(
-            checker.installerUrl(withNative, DesktopUpdateChecker.PackagePlatform.UNSUPPORTED),
-        )
+    private fun release(version: String, preview: Boolean=false, draft: Boolean=false, suffix: String="-linux-x86_64.AppImage") = """{"tag_name":"v$version","draft":$draft,"prerelease":$preview,"html_url":"https://github.com/${DesktopUpdateChecker.REPOSITORY}/releases/tag/v$version","assets":[{"name":"BitChord-$version$suffix","size":100,"state":"uploaded","browser_download_url":"https://github.com/${DesktopUpdateChecker.REPOSITORY}/releases/download/v$version/BitChord-$version$suffix"}]}"""
+    @Test fun filtersDraftsChannelsAndSelectsCompatibleAssets() {
+        val body="[${release("1.9.0-beta.2",true)},${release("1.8.4")},${release("9.0.0",draft=true)}]"
+        val installed=UpdateInstallation(UpdateFormat.APPIMAGE)
+        assertEquals("1.8.4", DesktopUpdateChecker.selectRelease(body,DesktopUpdateChecker.Channel.STABLE,installed,"1.8.3")?.version)
+        assertEquals("1.9.0-beta.2", DesktopUpdateChecker.selectRelease(body,DesktopUpdateChecker.Channel.PREVIEW,installed,"1.8.3")?.version)
+        assertNull(DesktopUpdateChecker.selectRelease(body,DesktopUpdateChecker.Channel.STABLE,installed,"1.8.4"))
+        assertNull(DesktopUpdateChecker.selectRelease(body,DesktopUpdateChecker.Channel.STABLE,UpdateInstallation(UpdateFormat.DEB),"1.8.3")?.asset)
+        assertNull(DesktopUpdateChecker.selectRelease(body,DesktopUpdateChecker.Channel.STABLE,UpdateInstallation(UpdateFormat.ARCH),"1.8.3")?.asset)
     }
-
-    private fun release(vararg filenames: String) = Json.parseToJsonElement(
-        """{"assets":[${filenames.joinToString(",") { name -> """{"name":"$name","state":"uploaded","browser_download_url":"https://example.org/$name"}""" }}]}"""
-    ).jsonObject
+    @Test fun rejectsForeignUrlsAndMalformedResponses() {
+        assertFalse(DesktopUpdateChecker.officialAssetUrl("https://github.com/attacker/repo/releases/download/v1/evil.exe"))
+        assertFalse(DesktopUpdateChecker.officialAssetUrl("https://github.com/${DesktopUpdateChecker.REPOSITORY}/releases/download/v1/../evil.exe"))
+        assertFalse(DesktopUpdateChecker.officialAssetUrl("http://github.com/${DesktopUpdateChecker.REPOSITORY}/releases/download/v1/evil.exe"))
+        assertFails { DesktopUpdateChecker.selectRelease("invalid",DesktopUpdateChecker.Channel.STABLE,UpdateInstallation(UpdateFormat.APPIMAGE),"1.0.0") }
+    }
 }

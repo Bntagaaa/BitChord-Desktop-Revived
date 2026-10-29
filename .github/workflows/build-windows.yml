@@ -91,6 +91,7 @@ jobs:
           Copy-Item $msi.FullName "dist/BitChord-$v-windows-x64.msi"
           Copy-Item $exe.FullName "dist/BitChord-$v-windows-x64-setup.exe"
 
+          New-Item -ItemType File -Force desktopApp/build/compose/binaries/main/app/BitChord/.bitchord-portable | Out-Null
           7z a -tzip -mx=5 "dist/BitChord-$v-windows-x64-portable.zip" `
             "desktopApp/build/compose/binaries/main/app/BitChord/*" | Out-Null
 

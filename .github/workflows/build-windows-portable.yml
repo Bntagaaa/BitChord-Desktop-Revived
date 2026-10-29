@@ -63,6 +63,7 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           $version = "${{ inputs.version }}" -replace '[^a-zA-Z0-9._-]', '-'
           $zipPath = Join-Path $env:GITHUB_WORKSPACE "dist/BitChord-$version-windows-x64-portable.zip"
+          New-Item -ItemType File -Force (Join-Path $appDirs[0].FullName ".bitchord-portable") | Out-Null
           Push-Location $appRoot
           try {
             & 7z a -tzip -mx=3 $zipPath $appDirs[0].Name
