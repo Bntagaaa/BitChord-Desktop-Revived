@@ -191,7 +191,7 @@ class DesktopPersistence {
     internal fun saveAudioQuality(value: DesktopAudioQuality) {
         preferences.put(KEY_AUDIO_QUALITY, value.name)
         preferences.putBoolean(KEY_AUDIO_QUALITY_RUNGS, true)
-        runCatching { preferences.flush() }
+        DesktopPreferenceFlush.request(preferences)
     }
 
     fun string(key: String, default: String = ""): String =

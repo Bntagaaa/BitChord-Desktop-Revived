@@ -167,16 +167,18 @@ internal class VideoFrame(val width: Int, val height: Int, private val pixels: B
 
 @Composable
 internal fun DesktopMusicVideoSurface(id: String, fit: Boolean, onRendered: (Boolean) -> Unit, modifier: Modifier) {
-    val current by DesktopMusicVideo.frame.collectAsState()
+    val current = DesktopMusicVideo.frame.collectAsState()
     val failed by DesktopMusicVideo.failed.collectAsState()
-    val image = current?.takeIf { it.first == id }?.second
+    val image = remember(current,id) { derivedStateOf { current.value?.takeIf { it.first == id }?.second } }
+    val rendered by remember(image) { derivedStateOf { image.value != null } }
+    val painter = remember(image) { DesktopLiveFramePainter(image) }
     val report by rememberUpdatedState(onRendered)
     DisposableEffect(id) {
         DesktopMusicVideo.attach(id)
         onDispose { DesktopMusicVideo.detach(id) }
     }
-    LaunchedEffect(id, image != null) { report(image != null) }
-    if (image != null) Image(painter = image, contentDescription = null, modifier = modifier,
+    LaunchedEffect(id, rendered) { report(rendered) }
+    if (rendered) Image(painter = painter, contentDescription = null, modifier = modifier,
         contentScale = if (fit) ContentScale.Fit else ContentScale.Crop)
     else if (failed) androidx.compose.foundation.layout.Box(modifier.background(androidx.compose.ui.graphics.Color.Black),
         contentAlignment = androidx.compose.ui.Alignment.Center) {

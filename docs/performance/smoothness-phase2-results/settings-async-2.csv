@@ -1,0 +1,7 @@
+metric,count,p50_ms,p95_ms,p99_ms,over_16_67ms,over_8_33ms
+app/awt_dispatch,25,0.050947,0.163647,0.51027,0,0
+app/edt_queue_lag,5,0.172866,0.252196,0.252196,0,0
+app/gc_collection,1,4.0,4.0,4.0,0,0
+settings-slider/awt_dispatch,128,0.082905,0.151839,0.181804,0,0
+settings-slider/edt_queue_lag,28,0.090171,0.123932,0.138023,0,0
+settings-slider/settings_write,100,0.053311,0.1126,0.125138,0,0

@@ -32,7 +32,7 @@ internal object DesktopPresence {
         preferences.get(KEY_INSTALL_ID, null)?.let { return it }
         val id = UUID.randomUUID().toString()
         preferences.put(KEY_INSTALL_ID, id)
-        runCatching { preferences.flush() }
+        DesktopPreferenceFlush.request(preferences)
         return id
     }
 }

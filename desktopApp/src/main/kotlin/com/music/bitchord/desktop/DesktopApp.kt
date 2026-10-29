@@ -647,7 +647,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     // False while the query is being set *by* the app.
     var searchTyping by searchSession.typing
     val searchLoading by searchSession.loading
-    val searchRequestGeneration by searchSession.generation
     val searchError by searchSession.error
     var topPicks by remember { mutableStateOf<List<TopPick>?>(null) }
     var topPicksLoading by remember { mutableStateOf(false) }
@@ -1293,6 +1292,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
      * [fallback] is what the card that was clicked already knew.
      */
     fun openCollection(browseId: String, fallback: BrowseItem? = null) {
+        DesktopSmoothnessTrace.navigation()
         openedBrowse = null
         val current = openedCollection
         if (current?.browseId == browseId && !current.loading) {
@@ -2199,6 +2199,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
 
     /** Opens an artist's page, from a card, a search row or the player's credit. */
     fun openArtist(browseId: String, name: String) {
+        DesktopSmoothnessTrace.navigation()
         val target = DesktopArtistTarget(browseId, name)
         if (openedArtist == target && artistState is UiState.Success) return
         openedCollection = null
@@ -2456,40 +2457,20 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         }
     }
 
-    /** The typeahead, one request behind the keystrokes rather than one per. */
-    LaunchedEffect(query, searchTyping, searchRequestGeneration) {
-        if (!searchTyping || query.isBlank()) {
-            searchSuggestions = emptyList()
-            return@LaunchedEffect
-        }
-        val requestedQuery = query
-        val requestedGeneration = searchRequestGeneration
-        delay(SUGGESTION_DEBOUNCE_MS)
-        if (!searchTyping || query != requestedQuery) return@LaunchedEffect
-        val response = DesktopSearchClient.searchSuggestions(requestedQuery)
-        currentCoroutineContext().ensureActive()
-        response
-            .onSuccess { if (searchTyping && query == requestedQuery && searchRequestGeneration == requestedGeneration) searchSuggestions = it }
-            .onFailure { if (searchTyping && query == requestedQuery && searchRequestGeneration == requestedGeneration) searchSuggestions = emptyList() }
-    }
-
-    // Its own pass, on its own delay: a search costs far more than a completion, so it waits for a
-    // longer pause in the typing rather than riding the same one.
-    LaunchedEffect(query, searchTyping, searchRequestGeneration) {
-        if (!searchTyping || query.isBlank()) {
-            searchTypeahead = emptyList()
-            return@LaunchedEffect
-        }
-        val requestedQuery = query
-        val requestedGeneration = searchRequestGeneration
-        delay(TYPEAHEAD_MEDIA_DEBOUNCE_MS)
-        if (!searchTyping || query != requestedQuery) return@LaunchedEffect
-        val response = DesktopSearchClient.searchTypeahead(requestedQuery)
-        currentCoroutineContext().ensureActive()
-        response
-            .onSuccess { if (searchTyping && query == requestedQuery && searchRequestGeneration == requestedGeneration) searchTypeahead = it.take(TYPEAHEAD_MEDIA_LIMIT) }
-            .onFailure { if (searchTyping && query == requestedQuery && searchRequestGeneration == requestedGeneration) searchTypeahead = emptyList() }
-    }
+    val typeaheadVisible = destination == DesktopDestination.SEARCH && openedArtist == null &&
+        openedCollection == null && overlays.settingsPage == null && !overlays.nowPlaying
+    DesktopTypeaheadEffect(
+        query = searchSession.query, typing = searchSession.typing, generation = searchSession.generation,
+        debounceMillis = SUGGESTION_DEBOUNCE_MS, enabled = typeaheadVisible,
+        load = DesktopSearchClient::searchSuggestions,
+        publish = { searchSuggestions = it },
+    )
+    DesktopTypeaheadEffect(
+        query = searchSession.query, typing = searchSession.typing, generation = searchSession.generation,
+        debounceMillis = TYPEAHEAD_MEDIA_DEBOUNCE_MS, enabled = typeaheadVisible,
+        load = DesktopSearchClient::searchTypeahead,
+        publish = { searchTypeahead = it.take(TYPEAHEAD_MEDIA_LIMIT) },
+    )
 
     fun runSearch(term: String) {
         editQuery(term)
@@ -2552,6 +2533,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     }
 
     fun selectDestination(next: DesktopDestination) {
+        DesktopSmoothnessTrace.navigation()
         val page = if (next == DesktopDestination.EXPLORE) DesktopDestination.SEARCH else next
         val alreadyOnSearch = destination == DesktopDestination.SEARCH && selectedMoodGenre == null &&
             openedArtist == null && openedCollection == null && openedBrowse == null && overlays.settingsPage == null

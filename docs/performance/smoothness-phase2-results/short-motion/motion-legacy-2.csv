@@ -1,0 +1,9 @@
+metric,count,p50_ms,p95_ms,p99_ms,over_16_67ms,over_8_33ms
+app/awt_dispatch,331,0.068684,12.71104,15.341025,4,32
+app/draw_cpu_scope,1,4.457508,4.457508,4.457508,0,0
+app/edt_queue_lag,26,5.817795,13.987062,36.521459,2,11
+app/gc_collection,9,3.0,3.0,3.0,0,0
+motion-legacy/awt_dispatch,1775,0.037526,11.360248,12.800086,1,180
+motion-legacy/compose_frame_callback_interval,179,15.476962,15.985645,16.627656,2,179
+motion-legacy/edt_queue_lag,144,3.700956,11.192218,12.146805,0,33
+motion-legacy/gc_collection,1,4.0,4.0,4.0,0,0

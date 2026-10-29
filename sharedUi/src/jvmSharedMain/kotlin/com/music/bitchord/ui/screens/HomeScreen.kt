@@ -61,7 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.graphicsLayer
@@ -140,32 +140,23 @@ fun Modifier.desktopTopScrollFade(state: androidx.compose.foundation.ScrollState
 private fun Modifier.desktopVerticalScrollFadeWhen(
     canScrollBackward: () -> Boolean,
     canScrollForward: () -> Boolean,
-): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-    .drawWithContent {
-        drawContent()
-        // Limit masks in small scrolling panels so the bands can never cover the entire viewport.
+): Modifier = graphicsLayer {
+        compositingStrategy = if (canScrollBackward() || canScrollForward()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+    }.drawWithCache {
         val topPx = minOf(34.dp.toPx(), size.height / 3f).coerceAtLeast(0f)
         val bottomPx = minOf(54.dp.toPx(), size.height / 3f).coerceAtLeast(0f)
-        if (topPx <= 0f || bottomPx <= 0f) return@drawWithContent
-        if (canScrollBackward()) {
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Black),
-                    startY = 0f,
-                    endY = topPx,
-                ),
-                blendMode = BlendMode.DstIn,
-            )
-        }
-        if (canScrollForward()) {
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.Black, Color.Transparent),
-                    startY = size.height - bottomPx,
-                    endY = size.height,
-                ),
-                blendMode = BlendMode.DstIn,
-            )
+        val topMask = Brush.verticalGradient(
+            colors = listOf(Color.Transparent, Color.Black), startY = 0f, endY = topPx,
+        )
+        val bottomMask = Brush.verticalGradient(
+            colors = listOf(Color.Black, Color.Transparent), startY = size.height - bottomPx, endY = size.height,
+        )
+        onDrawWithContent {
+            drawContent()
+            if (topPx > 0f && bottomPx > 0f) {
+                if (canScrollBackward()) drawRect(brush = topMask, blendMode = BlendMode.DstIn)
+                if (canScrollForward()) drawRect(brush = bottomMask, blendMode = BlendMode.DstIn)
+            }
         }
     }
 

@@ -1,0 +1,5 @@
+java=21.0.9
+os=Linux
+reported_refresh_hz=0
+sample_window=last 20000 values per metric
+frame_times=application callbacks, not display presentation

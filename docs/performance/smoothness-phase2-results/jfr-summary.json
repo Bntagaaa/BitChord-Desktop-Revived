@@ -1,0 +1,67 @@
+{
+  "settings-sync": {
+    "edt_execution_samples": 82,
+    "edt_samples_with_preferences_or_xml_stack": 2,
+    "gc_phase_pause_ms": [
+      0.051448,
+      0.062254000000000004,
+      0.066931,
+      0.9135289999999999,
+      0.945747,
+      1.0537400000000001,
+      1.1430150000000001,
+      1.188554,
+      1.201103,
+      1.586645,
+      1.631593,
+      1.801449,
+      2.172239,
+      2.218138,
+      2.320322,
+      2.673936,
+      3.33243,
+      5.954824
+    ],
+    "gc_phase_pause_p50_p95_p99_ms": [
+      1.201103,
+      3.33243,
+      3.33243
+    ],
+    "top_sampled_edt_leaf_methods": [
+      [
+        "java/util/concurrent/locks/AbstractQueuedSynchronizer.signalNext",
+        67
+      ],
+      [
+        "java/util/zip/ZipFile$Source.getEntryPos",
+        3
+      ],
+      [
+        "com/sun/org/apache/xerces/internal/impl/XMLEntityScanner.scanLiteral",
+        2
+      ],
+      [
+        "com/sun/org/apache/xerces/internal/impl/io/UTF8Reader.read",
+        2
+      ],
+      [
+        "com/sun/org/apache/xerces/internal/dom/NamedNodeMapImpl.getNamedItem",
+        1
+      ]
+    ]
+  },
+  "settings-async": {
+    "edt_execution_samples": 0,
+    "edt_samples_with_preferences_or_xml_stack": 0,
+    "gc_phase_pause_ms": [
+      1.777449,
+      1.786947
+    ],
+    "gc_phase_pause_p50_p95_p99_ms": [
+      1.777449,
+      1.777449,
+      1.777449
+    ],
+    "top_sampled_edt_leaf_methods": []
+  }
+}

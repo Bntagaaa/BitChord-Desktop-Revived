@@ -1,0 +1,2 @@
+monotonic_ns,process_cpu_ns,heap_used_bytes,heap_committed_bytes,rss_bytes,edt_allocated_bytes
+108067229315311,1580000000,16714272,35651584,101130240,-1

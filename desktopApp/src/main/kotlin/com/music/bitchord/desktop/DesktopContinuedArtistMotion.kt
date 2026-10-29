@@ -9,6 +9,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.collectAsState
 
 import androidx.compose.foundation.Image
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -40,7 +41,9 @@ fun DesktopContinuedArtistMotionView(
     /** Off for clips that are not the playing track's, so the player's backdrop is left alone. */
     publishBackdrop: Boolean = true,
 ) {
-    var frame by remember(url) { mutableStateOf<DesktopCanvasFrame?>(null) }
+    val frames = remember(url) { mutableStateOf<DesktopCanvasFrame?>(null) }
+    val rendered by remember(frames) { derivedStateOf { frames.value != null } }
+    val painter = remember(frames) { DesktopLiveFramePainter(frames) }
     val windowVisible by DesktopRenderVisibility.visible.collectAsState()
     val running by rememberUpdatedState(isPlaying && windowVisible)
 
@@ -81,7 +84,7 @@ fun DesktopContinuedArtistMotionView(
                     shown++
                     // Keep only an immutable JVM frame; temporary native draw images are closed immediately.
                     val next = DesktopCanvasFrame(info, pixels)
-                    frame = next
+                    frames.value = next
                     // The backdrop reads the first frame and holds it: re-meshing every frame would
                     // be a full resample twenty-five times a second for a wash nobody is watching
                     // closely, and the clip's palette does not change much across it anyway.
@@ -107,9 +110,9 @@ fun DesktopContinuedArtistMotionView(
 
     // Nothing at all until the first frame: a placeholder here would flash between the still cover
     // and the clip on every track change.
-    frame?.let {
+    if (rendered) {
         Image(
-            painter = it,
+            painter = painter,
             contentDescription = null,
             contentScale = contentScale,
             modifier = modifier,
