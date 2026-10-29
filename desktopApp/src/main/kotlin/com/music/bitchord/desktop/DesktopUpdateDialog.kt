@@ -23,7 +23,7 @@ internal fun DesktopUpdateSettings(service: DesktopUpdateService) {
         Text("Current version: ${DesktopUpdateChecker.currentVersion}")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DesktopUpdateChecker.Channel.entries.forEach { option ->
-                FilterChip(selected = channel == option, onClick = { service.setChannel(option) },
+                FilterChip(selected = channel == option, enabled = state.phase != UpdatePhase.INSTALLING, onClick = { service.setChannel(option) },
                     label = { Text(if (option == DesktopUpdateChecker.Channel.STABLE) "Stable" else "Preview") })
             }
         }
@@ -37,11 +37,15 @@ internal fun DesktopUpdateSettings(service: DesktopUpdateService) {
             OutlinedButton(onClick = { service.check() }, enabled = state.phase !in setOf(UpdatePhase.CHECKING, UpdatePhase.DOWNLOADING, UpdatePhase.VERIFYING, UpdatePhase.INSTALLING)) { Text("Check for Updates") }
             if (state.release != null) Button(onClick = { service.dialog.value = true }) { Text("View update") }
         }
+        Row {
+            TextButton(onClick = service::showLogs) { Text("Open updater logs") }
+            TextButton(onClick = { DesktopExternalLinks.open("https://github.com/${DesktopUpdateChecker.REPOSITORY}/releases") }) { Text("Official releases") }
+        }
     }
 }
 
 @Composable
-internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: () -> Unit) {
+internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: suspend () -> Unit) {
     val visible by service.dialog.collectAsState()
     val state by service.state.collectAsState()
     val icon by DesktopAppIconSettings.selected.collectAsState()
@@ -72,7 +76,7 @@ internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: () -> Un
                 state.phase == UpdatePhase.READY -> Button(onClick = {
                     if (service.canAutoInstall) service.install(onExit)
                     else service.showDownload()
-                }) { Text(if (service.canAutoInstall) "Restart to Update" else "Show verified download") }
+                }) { Text(if (service.canAutoInstall) if (service.installation.format == UpdateFormat.WINDOWS_SETUP) "Close and open setup" else "Restart to Update" else "Show verified download") }
                 release.asset == null -> TextButton(onClick = { DesktopExternalLinks.open(release.url) }) { Text("View release") }
                 !busy -> Button(onClick = service::download) { Text(if (state.phase in setOf(UpdatePhase.FAILED, UpdatePhase.CANCELLED)) "Retry download" else "Download update") }
             }

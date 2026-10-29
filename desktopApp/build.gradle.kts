@@ -31,7 +31,9 @@ val targetOs: String = (providers.gradleProperty("bitchord.target").orNull ?: wh
 // Published updates need a monotonically increasing native build number: otherwise all
 // 1.8.x installers have the same MSI version and Windows may treat an update as a repair.
 // Release workflow runs share one counter, including preview → stable transitions.
-val desktopVersionCode = providers.gradleProperty("bitchord.packageBuild").orNull?.toIntOrNull()
+val desktopVersionCode = providers.gradleProperty("bitchord.packageBuild").orNull?.let {
+    requireNotNull(it.toIntOrNull()) { "bitchord.packageBuild must be an integer; refusing a silent installer-version fallback" }
+}
     ?: System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { 1_000 + it }
     ?: 29
 require(desktopVersionCode in 0..65_535) { "Native package build must be between 0 and 65535" }
@@ -48,6 +50,12 @@ val requestedMajorMinor = Regex("""^(\d+)\.(\d+)(?:\.\d+)*$""")
     }
 val defaultMajorMinor = defaultAppVersion.substringBefore('-')
 val nativePackageVersion = "${requestedMajorMinor ?: defaultMajorMinor}.$desktopVersionCode"
+
+tasks.register("updaterPackagingMetadata") {
+    group = "verification"
+    description = "Reports public/native updater versions without exposing launcher credentials."
+    doLast { logger.lifecycle("Updater packaging: public=$appVersion native=$nativePackageVersion target=$targetOs build=$desktopVersionCode") }
+}
 
 if (requestedMajorMinor == null) {
     logger.lifecycle(
@@ -452,6 +460,7 @@ val windowsPortableAssemble by tasks.registering {
                 appendLine("endlocal")
             },
         )
+        File(target, ".bitchord-portable").writeText("")
 
         // What "it builds" is not the same as "it runs", and the difference is exactly what shipped
         // a broken archive.

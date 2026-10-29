@@ -30,6 +30,16 @@ class DesktopUpdateCheckerTest {
         assertNull(DesktopUpdateChecker.selectRelease(body,DesktopUpdateChecker.Channel.STABLE,UpdateInstallation(UpdateFormat.DEB),"1.8.3")?.asset)
         assertNull(DesktopUpdateChecker.selectRelease(body,DesktopUpdateChecker.Channel.STABLE,UpdateInstallation(UpdateFormat.ARCH),"1.8.3")?.asset)
     }
+    @Test fun everyDistributionSelectsOnlyItsOwnReleaseAssetAndPartialReleasesStaySafe() {
+        for (format in listOf(UpdateFormat.APPIMAGE, UpdateFormat.WINDOWS_SETUP, UpdateFormat.WINDOWS_PORTABLE, UpdateFormat.DEB, UpdateFormat.RPM)) {
+            val compatible = release("1.8.5", suffix = format.suffix!!)
+            val incompatibleNewer = release("1.8.6", suffix = if (format == UpdateFormat.APPIMAGE) "-windows-x64-setup.exe" else "-linux-x86_64.AppImage")
+            val selected = DesktopUpdateChecker.selectRelease("[$compatible,$incompatibleNewer]", DesktopUpdateChecker.Channel.STABLE, UpdateInstallation(format), "1.8.4")!!
+            assertEquals("1.8.5", selected.version); assertTrue(selected.asset!!.name.endsWith(format.suffix!!))
+            val wrongTag = compatible.replace("/download/v1.8.5/", "/download/v1.8.3/")
+            assertNull(DesktopUpdateChecker.selectRelease("[$wrongTag]", DesktopUpdateChecker.Channel.STABLE, UpdateInstallation(format), "1.8.4")!!.asset)
+        }
+    }
     @Test fun rejectsForeignUrlsAndMalformedResponses() {
         assertFalse(DesktopUpdateChecker.officialAssetUrl("https://github.com/attacker/repo/releases/download/v1/evil.exe"))
         assertFalse(DesktopUpdateChecker.officialAssetUrl("https://github.com/${DesktopUpdateChecker.REPOSITORY}/releases/download/v1/../evil.exe"))

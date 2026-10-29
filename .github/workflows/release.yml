@@ -74,6 +74,13 @@ jobs:
             dist/BitChord-${{ steps.version.outputs.value }}-linux-x86_64.AppImage \
             "$PWD/appimagetool.AppImage"
 
+      - name: Real AppImage GUI relaunch and recovery
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          xvfb-run -a python3 desktopApp/packaging/tests/appimage-relaunch.py \
+            "dist/BitChord-$BUILD_VERSION-linux-x86_64.AppImage" --output "$RUNNER_TEMP/updater-appimage"
+
       - name: Collect
         run: |
           v=${{ steps.version.outputs.value }}
@@ -81,6 +88,15 @@ jobs:
           cp desktopApp/build/compose/binaries/main/deb/*.deb "dist/BitChord-$v-linux-amd64.deb"
           cp desktopApp/build/compose/binaries/main/rpm/*.rpm "dist/BitChord-$v-linux-x86_64.rpm"
           ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: linux-updater-diagnostics
+          path: |
+            ${{ runner.temp }}/updater-appimage/results.json
+            ${{ runner.temp }}/updater-appimage/**/install.log
+            ${{ runner.temp }}/updater-appimage/**/status
 
       - uses: actions/upload-artifact@v4
         with:
@@ -218,6 +234,12 @@ jobs:
           7z a -tzip -mx=5 "dist/BitChord-$v-windows-x64-portable.zip" `
             "desktopApp/build/compose/binaries/main/app/BitChord/*" | Out-Null
           Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Validate Windows updater helper and actual artifacts
+        shell: pwsh
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.value }}
+        run: ./desktopApp/packaging/tests/windows-updater-checks.ps1 -Artifacts dist -Version $env:BUILD_VERSION
 
       - uses: actions/upload-artifact@v4
         with:

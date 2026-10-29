@@ -2160,11 +2160,19 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     }
     updater?.let { service ->
         DesktopUpdateDialog(service) {
-            saveQueue()
-            persistence.saveHistory(history)
-            DesktopMusicVideo.stop()
-            playbackEngine.shutdown()
-            DesktopWindowsMedia.stop()
+            val ownQueue = if (DesktopListenTogether.state.value.inParty) null else liveQueue.songs.toList() to liveQueue.index
+            val savedHistory = history.toList()
+            desktopUpdateShutdown.finish {
+                ownQueue?.let { (songs, index) ->
+                    persistence.saveQueue(songs)
+                    persistence.saveString("queue_index", index.toString())
+                }
+                persistence.saveHistory(savedHistory)
+                persistence.preferences.flush()
+                DesktopMusicVideo.stop()
+                playbackEngine.shutdown() // Existing bounded 2-second audio-thread join.
+                DesktopWindowsMedia.stop()
+            }
             exitProcess(0)
         }
     }

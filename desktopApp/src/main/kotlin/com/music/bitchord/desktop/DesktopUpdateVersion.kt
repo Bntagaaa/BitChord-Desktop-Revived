@@ -18,10 +18,15 @@ internal data class DesktopUpdateVersion(val numbers: List<Int>, val pre: List<S
     }
     companion object {
         fun parse(raw: String): DesktopUpdateVersion? {
-            val match = Regex("^v?(\\d+(?:\\.\\d+)*)(?:-([0-9A-Za-z.-]+))?(?:\\+[0-9A-Za-z.-]+)?$").matchEntire(raw) ?: return null
+            val match = Regex("^v?((?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:\\.(?:0|[1-9][0-9]*))?)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$").matchEntire(raw) ?: return null
             val nums = match.groupValues[1].split('.').map { it.toIntOrNull() ?: return null }
-            val pre = match.groupValues[2].takeIf(String::isNotEmpty)?.replace(Regex("([A-Za-z]+)([0-9]+)"), "$1.$2")?.split('.').orEmpty()
-            if (pre.any(String::isEmpty)) return null
+            val label = match.groupValues[2]
+            // Only the project's historic alpha1/beta1/rc1 convention is normalized.
+            // General SemVer alphanumeric identifiers (e.g. x10) retain lexical ordering.
+            val historic = Regex("^(alpha|beta|rc)(0|[1-9][0-9]*)$").matchEntire(label)
+            val pre = (historic?.let { "${it.groupValues[1]}.${it.groupValues[2]}" } ?: label)
+                .takeIf(String::isNotEmpty)?.split('.').orEmpty()
+            if (pre.any { it.all(Char::isDigit) && it.length > 1 && it.startsWith('0') }) return null
             return DesktopUpdateVersion(nums, pre)
         }
     }

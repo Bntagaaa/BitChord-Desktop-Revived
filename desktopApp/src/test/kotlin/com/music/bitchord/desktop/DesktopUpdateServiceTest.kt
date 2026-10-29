@@ -19,10 +19,10 @@ class DesktopUpdateServiceTest {
             val ready=downloader.download(release(),dir) { n,_ -> progress=n }
             assertEquals(content.size.toLong(),progress); assertContentEquals(content,Files.readAllBytes(ready))
             assertFailsWith<IllegalArgumentException> { downloader.download(release("0".repeat(64)),dir) {_,_->} }
-            assertFalse(Files.exists(ready))
+            assertTrue(Files.exists(ready)) // A failed retry must preserve a prior verified package.
             assertFailsWith<IllegalArgumentException> { DesktopUpdateDownloader { ByteArrayInputStream(content.copyOf(32)) }.download(release(),dir) {_,_->} }
             assertFailsWith<IllegalStateException> { downloader.download(release(null),dir) {_,_->} }
-            assertEquals(0L,Files.list(dir).use { it.count() })
+            assertEquals(1L,Files.list(dir).use { it.count() })
         } finally { dir.toFile().deleteRecursively() }
     }
     @Test fun rejectsTraversalFilenameWithoutTouchingFiles() = runBlocking {
@@ -72,8 +72,6 @@ class DesktopUpdateServiceTest {
             val service=DesktopUpdateService(UpdateInstallation(UpdateFormat.WINDOWS_PORTABLE),discover={_,_->release()},downloader=DesktopUpdateDownloader { ByteArrayInputStream(content) },scope=scope,directory=dir)
             service.check()
             withTimeout(5000) { service.state.first { it.phase==UpdatePhase.AVAILABLE } }
-            // The checker job can finish just after publishing its state.
-            delay(50)
             service.download(); service.download()
             val ready=withTimeout(5000) { service.state.first { it.phase==UpdatePhase.READY } }
             assertNotNull(ready.file)
@@ -84,44 +82,21 @@ class DesktopUpdateServiceTest {
     }
     @Test fun appImageHelperConfirmsWindowBeforeSuccess() {
         if (!DesktopPlatform.isLinux) return
-        val dir = Files.createTempDirectory("updater relaunch with spaces")
-        try {
-            val old = dir.resolve("original.AppImage")
-            val staged = dir.resolve("new.AppImage")
-            val backup = dir.resolve("original.previous")
-            val ready = dir.resolve("window-ready")
-            Files.writeString(old, "#!/bin/sh\nexit 0\n")
-            Files.writeString(staged, "#!/bin/sh\nprintf ready > \"\$BITCHORD_UPDATE_READY_FILE\"\n")
-            old.toFile().setExecutable(true)
-            staged.toFile().setExecutable(true)
-            val helper = dir.resolve("helper.sh")
-            javaClass.getResourceAsStream("/updater/appimage-update.sh")!!.use { Files.copy(it, helper) }
-            val process = ProcessBuilder("/bin/sh", helper.toString(), "2147483647", old.toString(),
-                staged.toString(), backup.toString(), DesktopUpdateDownloader.sha256(staged), ready.toString()).start()
-            assertTrue(process.waitFor(12, java.util.concurrent.TimeUnit.SECONDS))
-            assertEquals(0, process.exitValue())
-            assertTrue(Files.exists(ready))
-            assertTrue(Files.exists(backup))
-            assertFalse(Files.exists(staged))
-        } finally { dir.toFile().deleteRecursively() }
+        UpdaterHelperFixture().use { fixture ->
+            fixture.candidate(fixture.acknowledge + "\nsleep 20\n")
+            assertEquals(0, fixture.run())
+            assertTrue(Files.exists(fixture.ready))
+            assertTrue(Files.exists(fixture.backup))
+            assertFalse(Files.exists(fixture.staged))
+        }
     }
     @Test fun appImageHelperRestoresOriginalOnRelaunchFailure() {
         if (!DesktopPlatform.isLinux) return
-        val dir=Files.createTempDirectory("updater rollback with spaces")
-        try {
-            val old=dir.resolve("original.AppImage"); val staged=dir.resolve("new.AppImage"); val backup=dir.resolve("old.backup")
-            Files.writeString(old,"#!/bin/sh\nexit 0\n"); old.toFile().setExecutable(true)
-            Files.writeString(staged,"#!/bin/sh\nexit 1\n"); staged.toFile().setExecutable(true)
-            val original=Files.readAllBytes(old)
-            val helper=dir.resolve("helper.sh")
-            javaClass.getResourceAsStream("/updater/appimage-update.sh")!!.use { Files.copy(it,helper) }
-            val process=ProcessBuilder("/bin/sh",helper.toString(),"2147483647",old.toString(),staged.toString(),backup.toString(),DesktopUpdateDownloader.sha256(staged),dir.resolve("ready").toString()).start()
-            assertTrue(process.waitFor(20,java.util.concurrent.TimeUnit.SECONDS)); assertEquals(1,process.exitValue())
-            assertContentEquals(original,Files.readAllBytes(old));assertFalse(Files.exists(backup))
-            // Bad checksum cannot rename or remove the original.
-            val rejected=ProcessBuilder("/bin/sh",helper.toString(),"2147483647",old.toString(),staged.toString(),backup.toString(),"0".repeat(64),dir.resolve("ready2").toString()).start()
-            assertTrue(rejected.waitFor(10,java.util.concurrent.TimeUnit.SECONDS));assertEquals(1,rejected.exitValue())
-            assertContentEquals(original,Files.readAllBytes(old))
-        } finally { dir.toFile().deleteRecursively() }
+        UpdaterHelperFixture().use { fixture ->
+            fixture.candidate("exit 1")
+            assertEquals(1, fixture.run())
+            assertEquals(fixture.original, Files.readString(fixture.current))
+            assertEquals(fixture.original, Files.readString(fixture.backup))
+        }
     }
 }

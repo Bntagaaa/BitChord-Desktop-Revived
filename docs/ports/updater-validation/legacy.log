@@ -1,0 +1,3 @@
+BitChord updater: Installed verified AppImage: $FIXTURE_ROOT/legacy/installation with spaces/BitChord Test.AppImage
+BitChord updater: Started candidate process 192634; waiting for visible-window confirmation.
+BitChord updater: New application acknowledged the window; update successful.

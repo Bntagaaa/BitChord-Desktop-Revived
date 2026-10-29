@@ -104,18 +104,17 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         // The AppImage updater must never treat merely spawning the JVM as a healthy restart.
         // A real, mapped Compose window acknowledges the launch using a unique local marker.
         LaunchedEffect(composeWindow) {
-            val readyFile = System.getenv("BITCHORD_UPDATE_READY_FILE")?.takeIf { it.isNotBlank() }
-            if (readyFile != null && DesktopPlatform.isLinux) {
-                repeat(100) {
+            if (DesktopPlatform.isLinux && System.getenv("BITCHORD_UPDATE_READY_FILE") != null) {
+                DesktopWindowVisibility.raise()
+                state.isMinimized = false
+                // A mapped window plus a second frame callback, rather than JVM process entry.
+                var visibleFrames = 0
+                repeat(900) {
                     androidx.compose.runtime.withFrameNanos { }
-                    if (composeWindow.isShowing && composeWindow.width > 0 && composeWindow.height > 0) {
-                        withContext(Dispatchers.IO) {
-                            runCatching {
-                                java.nio.file.Files.writeString(java.nio.file.Path.of(readyFile), "window-ready")
-                            }.onFailure { DesktopTrackLog.log("updater: unable to acknowledge window readiness: ${it.message}") }
-                        }
-                        return@LaunchedEffect
-                    }
+                    if (composeWindow.isShowing && !state.isMinimized && composeWindow.width > 0 && composeWindow.height > 0) {
+                        visibleFrames++
+                        if (visibleFrames >= 2 && withContext(Dispatchers.IO) { DesktopUpdateReadiness.acknowledge() }) return@LaunchedEffect
+                    } else visibleFrames = 0
                     delay(100)
                 }
             }
