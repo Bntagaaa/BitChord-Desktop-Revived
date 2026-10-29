@@ -2032,6 +2032,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     // opens the player. Run from the player page instead, nothing was fetched until it was opened,
     // and a track half a minute in then showed a skeleton and arrived mid-song.
     var lyrics by remember { mutableStateOf<DesktopLyrics?>(null) }
+    var lyricsTrackId by remember { mutableStateOf<String?>(null) }
     // The provider picked for this track in the player's lyrics drawer, if any.
     var lyricsOnly by remember(selectedSong?.videoId) { mutableStateOf<String?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
@@ -2064,6 +2065,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     ) {
         val current = selectedSong
         lyrics = null
+        lyricsTrackId = null
         lyricsError = null
         if (current == null) {
             lyricsLoading = false
@@ -2084,7 +2086,11 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         }
         lyricsLoading = true
         DesktopLyricsClient.lookup(current, length, only = lyricsOnly).fold(
-            onSuccess = { lyrics = it; playbackEngine.setLoopLyrics(current.videoId, it.lines) },
+            onSuccess = {
+                lyrics = it
+                lyricsTrackId = current.videoId
+                playbackEngine.setLoopLyrics(current.videoId, it.lines)
+            },
             onFailure = { lyricsError = it.message ?: "Lyrics unavailable" },
         )
         lyricsLoading = false
@@ -3427,7 +3433,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     }
 
     // What the player and the lyrics column beside the page both read, worked out once for the two.
-    val sharedLyrics = lyrics?.lines
+    // Never expose a previous track's lines during the new track's asynchronous lookup.
+    val sharedLyrics = lyrics?.lines?.takeIf { lyricsTrackId == selectedSong?.videoId }
     val sharedLyricsSource = remember(lyrics) { lyrics?.source?.let(::lyricsSourceNamed) }
     val sharedLyricsUnavailable = !lyricsLoading && sharedLyrics.isNullOrEmpty()
     val providerStates = remember(lyricsOrder, lyricsOn, sharedLyricsSource, lyricsLoading) {
@@ -3494,6 +3501,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                 durationMs = playback.durationMs,
                 previousEnabled = liveQueue.hasPrevious || playback.positionMs > BACK_RESTARTS_AFTER_MS,
                 nextEnabled = liveQueue.hasNext,
+                lyrics = sharedLyrics.orEmpty(),
+                lyricsLoading = lyricsLoading,
+                syncedLyricsEnabled = syncedLyrics && !(selectedSong?.isVideo == true && videoBetaEnabled),
             ),
             onPlayPause = { if (selectedSong != null) togglePlayPauseFromUser() },
             onPrevious = ::playPrevious,
