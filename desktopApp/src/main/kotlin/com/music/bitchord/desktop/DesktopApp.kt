@@ -145,6 +145,7 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Info
@@ -777,6 +778,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     var downloadQuality by remember { mutableStateOf(persistence.string("download_quality", "LOSSLESS")) }
     var trayIconEnabled by remember { mutableStateOf(persistence.boolean("tray_icon", true)) }
     var closeToTray by remember { mutableStateOf(persistence.boolean("close_to_tray", true)) }
+    var pipWhenClosed by remember { mutableStateOf(persistence.boolean("pip_when_closed", false)) }
     // The three the FFmpeg engine unlocked: none of them could exist while JavaFX owned the decode,
     // because none of them can be done without the samples themselves.
     var spatialAudio by remember { mutableStateOf(persistence.boolean("spatial_audio", false)) }
@@ -2811,11 +2813,15 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         onDispose { tray.stop() }
     }
     // Deliberately not a key on the effect above.
-    DisposableEffect(trayIconEnabled, closeToTray) {
+    DisposableEffect(trayIconEnabled, closeToTray, pipWhenClosed) {
         // The listener's choice, with the tray as its precondition: hiding with no tray to come
         // back from leaves an audible process and no window.
         DesktopWindowVisibility.keepRunningWhenClosed = trayIconEnabled && closeToTray
-        onDispose { DesktopWindowVisibility.keepRunningWhenClosed = false }
+        DesktopWindowVisibility.switchToPiPWhenClosed = trayIconEnabled && closeToTray && pipWhenClosed
+        onDispose {
+            DesktopWindowVisibility.keepRunningWhenClosed = false
+            DesktopWindowVisibility.switchToPiPWhenClosed = false
+        }
     }
     val appIcon by DesktopAppIconSettings.selected.collectAsState()
     LaunchedEffect(tray, trayIconEnabled, appIcon) {
@@ -3477,6 +3483,25 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         partySyncHolder[0]?.onLocalIntent()
     }
 
+    // Publish the current session into the lightweight PiP window. No duplicate audio engine.
+    SideEffect {
+        DesktopPiP.publish(
+            DesktopPiPPlayback(
+                song = selectedSong,
+                isPlaying = playback.isPlaying,
+                isLoading = playback.isLoading,
+                positionMs = playback.positionMs,
+                durationMs = playback.durationMs,
+                previousEnabled = liveQueue.hasPrevious || playback.positionMs > BACK_RESTARTS_AFTER_MS,
+                nextEnabled = liveQueue.hasNext,
+            ),
+            onPlayPause = { if (selectedSong != null) togglePlayPauseFromUser() },
+            onPrevious = ::playPrevious,
+            onNext = ::playNext,
+            onSeek = ::seekPlayer,
+        )
+    }
+
     val shortcutBlockedByModal = showFirstLaunchWelcome ||
         overlays.accounts || overlays.signIn || overlays.playlistDialog ||
         playlistTarget != null || overlays.rename || overlays.delete || overlays.downloadManager ||
@@ -3900,6 +3925,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                                 releaseShortcutTextFocus()
                                 overlays.toggleSidePanel(DesktopSidePanel.LYRICS)
                             },
+                            onOpenPiP = DesktopPiP::open,
                             onOpenQueue = {
                                 releaseShortcutTextFocus()
                                 overlays.toggleSidePanel(DesktopSidePanel.QUEUE)
@@ -3949,6 +3975,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                             releaseShortcutTextFocus()
                             overlays.toggleSidePanel(DesktopSidePanel.LYRICS)
                         },
+                        onOpenPiP = DesktopPiP::open,
                         onOpenQueue = {
                             releaseShortcutTextFocus()
                             overlays.toggleSidePanel(DesktopSidePanel.QUEUE)
@@ -4044,6 +4071,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                         onDismiss = {
                             DesktopWindowMode.exit()
                             overlays.nowPlaying = false
+                        },
+                        onPiP = {
+                            overlays.nowPlaying = false
+                            DesktopPiP.open()
                         },
                     ) { windowWidth, windowHeight ->
                         val current = selectedSong ?: return@DesktopPlayerSheet
@@ -4624,6 +4655,11 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
                                     outputSummary = playbackEngine.outputSummary(),
                                     trayIconEnabled = trayIconEnabled,
                                     closeToTray = closeToTray,
+                                    pipWhenClosed = pipWhenClosed,
+                                    onPiPWhenClosedChange = {
+                                        pipWhenClosed = it
+                                        persistence.saveBoolean("pip_when_closed", it)
+                                    },
                                     onCloseToTrayChange = {
                                         closeToTray = it
                                         persistence.saveBoolean("close_to_tray", it)
@@ -5217,6 +5253,7 @@ private fun DesktopTopBar(
     onVolumeChange: (Float) -> Unit,
     onOpenAudioOutput: () -> Unit,
     onOpenLyrics: () -> Unit,
+    onOpenPiP: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenDetails: () -> Unit,
     /** Which panel the column beside the page is showing, lit on its button. */
@@ -5530,6 +5567,9 @@ private fun DesktopTopBar(
                             tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopForeground else DesktopSecondary,
                             modifier = Modifier.size(19.dp),
                         )
+                    }
+                    DesktopToolbarButton(onClick = onOpenPiP, enabled = song != null, size = 32.dp) {
+                        Icon(Icons.Rounded.PictureInPictureAlt, "Picture in Picture", tint = DesktopSecondary, modifier = Modifier.size(19.dp))
                     }
                     DesktopToolbarButton(onClick = onOpenQueue, size = 32.dp) {
                         Icon(
@@ -5871,6 +5911,7 @@ private fun DesktopBottomChrome(
     onVolumeChange: (Float) -> Unit,
     onOpenAudioOutput: () -> Unit,
     onOpenLyrics: () -> Unit,
+    onOpenPiP: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenDetails: () -> Unit,
 ) {
@@ -5901,6 +5942,7 @@ private fun DesktopBottomChrome(
                 onVolumeChange = onVolumeChange,
                 onOpenAudioOutput = onOpenAudioOutput,
                 onOpenLyrics = onOpenLyrics,
+        onOpenPiP = onOpenPiP,
                 onOpenQueue = onOpenQueue,
                 onOpenDetails = onOpenDetails,
             )
@@ -5987,6 +6029,7 @@ private fun DesktopMiniPlayer(
     onVolumeChange: (Float) -> Unit,
     onOpenAudioOutput: () -> Unit,
     onOpenLyrics: () -> Unit,
+    onOpenPiP: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenDetails: () -> Unit,
 ) {
@@ -6061,6 +6104,12 @@ private fun DesktopMiniPlayer(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(1.dp)) {
                     DesktopToolbarButton(onClick = onOpenLyrics, size = 32.dp) {
                         Icon(painterResource(Res.drawable.player_transport_lyrics), "Lyrics", tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
+                    }
+                    DesktopToolbarButton(onClick = onOpenPiP, enabled = song != null, size = 32.dp) {
+                        Icon(Icons.Rounded.PictureInPictureAlt, "Picture in Picture", tint = DesktopSecondary, modifier = Modifier.size(18.dp))
+                    }
+                    DesktopToolbarButton(onClick = onOpenPiP, enabled = song != null, size = 32.dp) {
+                        Icon(Icons.Rounded.PictureInPictureAlt, "Picture in Picture", tint = DesktopSecondary, modifier = Modifier.size(19.dp))
                     }
                     DesktopToolbarButton(onClick = onOpenQueue, size = 32.dp) {
                         Icon(painterResource(Res.drawable.player_transport_up_next), "Queue", tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
@@ -7362,6 +7411,8 @@ private fun DesktopSettingsScreen(
     onLegacyMeshGradientChange: (Boolean) -> Unit,
     trayIconEnabled: Boolean,
     closeToTray: Boolean,
+    pipWhenClosed: Boolean,
+    onPiPWhenClosedChange: (Boolean) -> Unit,
     onCloseToTrayChange: (Boolean) -> Unit,
     onTrayIconChange: (Boolean) -> Unit,
     spatialAudio: Boolean,
@@ -7923,6 +7974,14 @@ private fun DesktopSettingsScreen(
                             closeToTray,
                             onCloseToTrayChange,
                         )
+                        if (closeToTray) {
+                            SettingsToggle(
+                                "Switch to PiP mode when closing app",
+                                "Closing BitChord opens a small, freely resizable always-on-top player instead of only hiding to tray",
+                                pipWhenClosed,
+                                onPiPWhenClosedChange,
+                            )
+                        }
                     }
                     val hideVolumeBar by DesktopAppearanceSettings.hideVolumeBar.collectAsState()
                     SettingsToggle(
