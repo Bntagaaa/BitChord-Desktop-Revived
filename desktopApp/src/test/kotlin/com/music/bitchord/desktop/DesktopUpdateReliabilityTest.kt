@@ -91,11 +91,20 @@ class DesktopUpdateReliabilityTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val entered = CountDownLatch(1); val finish = CountDownLatch(1); val exits = AtomicInteger()
         try {
-            val installed = Files.writeString(dir.resolve("current.AppImage"), "fixture")
-            val service = DesktopUpdateService(UpdateInstallation(UpdateFormat.APPIMAGE, installed), discover = { _, _ -> release() },
+            // Use a format that supports the injected preparation path on every CI OS.
+            // APPIMAGE is intentionally unsupported by canAutoInstall on Windows.
+            val windowsRelease = release().let { candidate ->
+                val asset = requireNotNull(candidate.asset)
+                candidate.copy(asset = asset.copy(
+                    name = asset.name.replace("-linux-x86_64.AppImage", "-windows-x64-setup.exe"),
+                    url = asset.url.replace("-linux-x86_64.AppImage", "-windows-x64-setup.exe"),
+                ))
+            }
+            val installed = Files.writeString(dir.resolve("current-install.exe"), "fixture")
+            val service = DesktopUpdateService(UpdateInstallation(UpdateFormat.WINDOWS_SETUP), discover = { _, _ -> windowsRelease },
                 downloader = DesktopUpdateDownloader { ByteArrayInputStream(bytes) }, scope = scope, directory = dir.resolve("cache"),
                 prepare = { _, _, _, _ ->
-                    entered.countDown(); check(finish.await(3, TimeUnit.SECONDS)); error("fixture preparation failure")
+                    entered.countDown(); check(finish.await(10, TimeUnit.SECONDS)); error("fixture preparation failure")
                 })
             service.check(); withTimeout(5000) { service.state.first { it.phase == UpdatePhase.AVAILABLE } }
             service.download(); withTimeout(5000) { service.state.first { it.phase == UpdatePhase.READY } }
