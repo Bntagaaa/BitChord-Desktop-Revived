@@ -1,6 +1,10 @@
 package com.music.bitchord.desktop
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +29,19 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import com.music.bitchord.data.lyrics.LyricLine
+import com.music.bitchord.data.model.PLAYER_ART_PX
+import com.music.bitchord.ui.player.ArtworkMeshBackdrop
+import com.music.bitchord.ui.player.FullArtworkBlurBackdrop
+import com.music.bitchord.ui.player.rememberArtworkMesh
+import com.music.bitchord.ui.player.rememberFullArtworkBlurImage
+import bitchord.desktopapp.generated.resources.Res
+import bitchord.desktopapp.generated.resources.player_transport_lyrics
+import org.jetbrains.compose.resources.painterResource
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +79,10 @@ internal data class DesktopPiPPlayback(
     val durationMs: Long = 0L,
     val previousEnabled: Boolean = false,
     val nextEnabled: Boolean = false,
+    /** The existing Now Playing lookup; PiP must never run a second lyrics request. */
+    val lyrics: List<LyricLine> = emptyList(),
+    val lyricsLoading: Boolean = false,
+    val syncedLyricsEnabled: Boolean = true,
 )
 
 /**
@@ -78,6 +99,14 @@ internal object DesktopPiP {
     private val storage = DesktopPersistence()
     private val _alwaysOnTop = MutableStateFlow(storage.boolean("pip_always_on_top", true))
     val alwaysOnTop: StateFlow<Boolean> = _alwaysOnTop
+
+    private val _showLyrics = MutableStateFlow(storage.boolean("pip_show_lyrics", true))
+    val showLyrics: StateFlow<Boolean> = _showLyrics
+
+    fun setShowLyrics(enabled: Boolean) {
+        _showLyrics.value = enabled
+        storage.saveBoolean("pip_show_lyrics", enabled)
+    }
 
     @Volatile private var playPause: () -> Unit = {}
     @Volatile private var previous: () -> Unit = {}
