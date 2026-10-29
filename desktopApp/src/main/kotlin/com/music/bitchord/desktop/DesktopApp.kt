@@ -6108,9 +6108,6 @@ private fun DesktopMiniPlayer(
                     DesktopToolbarButton(onClick = onOpenPiP, enabled = song != null, size = 32.dp) {
                         Icon(Icons.Rounded.PictureInPictureAlt, "Picture in Picture", tint = DesktopSecondary, modifier = Modifier.size(18.dp))
                     }
-                    DesktopToolbarButton(onClick = onOpenPiP, enabled = song != null, size = 32.dp) {
-                        Icon(Icons.Rounded.PictureInPictureAlt, "Picture in Picture", tint = DesktopSecondary, modifier = Modifier.size(19.dp))
-                    }
                     DesktopToolbarButton(onClick = onOpenQueue, size = 32.dp) {
                         Icon(painterResource(Res.drawable.player_transport_up_next), "Queue", tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
                     }
