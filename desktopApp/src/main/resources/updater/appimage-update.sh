@@ -74,7 +74,7 @@ while [ "$count" -lt 75 ]; do
     fi
     if ! kill -0 "$launched" 2>/dev/null; then
         dead_count=$((dead_count + 1))
-        if [ "$dead_count" -ge 15 ]; then
+        if [ "$dead_count" -ge 3 ]; then
             recover 'Updated AppImage exited before confirming its window.'
         fi
     fi
