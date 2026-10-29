@@ -595,38 +595,56 @@ private fun PiPTransport(snapshot: DesktopPiPPlayback, foreground: Color, accent
     }
 }
 
+/**
+ * Use the same lightweight, thin scrubber as the desktop player. Seeking only commits on release;
+ * a drag must not restart the decoder dozens of times every second.
+ */
 @Composable
 private fun PiPProgress(snapshot: DesktopPiPPlayback, accent: Color, secondary: Color, compact: Boolean) {
     val fraction = if (snapshot.durationMs > 0L) {
         (snapshot.positionMs.toFloat() / snapshot.durationMs.toFloat()).coerceIn(0f, 1f)
     } else 0f
-    var scrubbing by remember { mutableStateOf(false) }
-    var dragFraction by remember { mutableFloatStateOf(0f) }
+    var scrubbing by remember(snapshot.song?.videoId) { mutableStateOf(false) }
+    var dragFraction by remember(snapshot.song?.videoId) { mutableFloatStateOf(0f) }
     val progress = if (scrubbing) dragFraction else fraction
 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        if (!compact) Text(
-            timeLabel(snapshot.positionMs),
-            style = MaterialTheme.typography.labelSmall,
-            color = secondary,
-        )
-        Slider(
+        if (!compact) {
+            Text(
+                timeLabel(snapshot.positionMs),
+                style = MaterialTheme.typography.labelSmall,
+                color = secondary,
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        DesktopThinSlider(
             value = progress,
-            onValueChange = { scrubbing = true; dragFraction = it },
+            onValueChange = {
+                if (snapshot.song != null && snapshot.durationMs > 0L) {
+                    scrubbing = true
+                    dragFraction = it
+                }
+            },
             onValueChangeFinished = {
-                if (snapshot.durationMs > 0L) {
+                if (scrubbing && snapshot.song != null && snapshot.durationMs > 0L) {
                     DesktopPiP.seekTo((dragFraction * snapshot.durationMs).toLong())
                 }
                 scrubbing = false
             },
-            enabled = snapshot.song != null && snapshot.durationMs > 0L,
-            modifier = Modifier.weight(1f).height(if (compact) 18.dp else 28.dp),
+            idleHeight = 3.dp,
+            activeHeight = 6.dp,
+            activeColor = accent.copy(alpha = 0.97f),
+            inactiveColor = Color.White.copy(alpha = 0.27f),
+            modifier = Modifier.weight(1f),
         )
-        if (!compact) Text(
-            timeLabel(snapshot.durationMs),
-            style = MaterialTheme.typography.labelSmall,
-            color = secondary,
-        )
+        if (!compact) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                timeLabel(snapshot.durationMs),
+                style = MaterialTheme.typography.labelSmall,
+                color = secondary,
+            )
+        }
     }
 }
 
@@ -635,18 +653,25 @@ private fun timeLabel(ms: Long): String {
     return "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
 }
 
+/** White controls mirror Now Playing's artwork-overlay language, in both OS themes. */
 @Composable
 private fun PiPAction(
     description: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
     compact: Boolean = false,
+    selected: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     Box(
         Modifier
             .size(if (compact) 27.dp else 36.dp)
-            .clip(RoundedCornerShape(9.dp))
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) Color.White.copy(alpha = 0.15f) else Color.Transparent)
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+                role = Role.Button
+            }
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
