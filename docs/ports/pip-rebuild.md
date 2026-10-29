@@ -21,6 +21,8 @@ Implementation responsibilities:
 - DesktopPipSettings: coalesced off-thread persistence of bounds and preferences.
 - DesktopPipGeometry: usable monitor bounds, disconnected-monitor recovery.
 - DesktopPipWindow: native decorated resizable window, focus/pin/disposal handling.
+- DesktopPipHost: application-level sibling of main Window, reading live session state.
+- DesktopLyricsSession: one cancellation-safe lookup collector independent of main-window frames.
 - DesktopPipState: adapt existing playback/lyrics, responsive sizing and line selection.
 - DesktopPipUi: cover-derived background, fluid body, controls and lyrics.
 - DesktopApp/PlayerSheet/WindowVisibility: activation buttons, tray setting, existing commands.
@@ -73,6 +75,33 @@ keyboard focus governing its clock. Timestamped lines, intro, explicit instrumen
 gaps and known vocal ends are supported. Unsynced lyrics scroll without pretending
 to be timed. Loading, missing and disabled lyrics have explicit states. Show/Hide
 Lyrics persists separately from the app's global lyrics enable switch.
+
+## Track-change fix
+
+The original integration called DesktopPipWindow from inside the main Window and
+passed a presentation value computed by that window. Compose pauses that parent
+composition while main is hidden, leaving the visible floating window with the
+previous title/artist/lyrics. The original native lifecycle fixture put the host
+at application level, so it did not exercise this production nesting bug.
+
+The regression was reproduced with the production host inside a real main Window:
+after selecting the second song while main was hidden, PiP still rendered
+`First song`, `First artist`, and `First verse`. Main.kt now hosts PiP as a sibling
+of the primary Window. Its session reads the existing snapshot state directly;
+the shared PlaybackPosition and playback intent callbacks are retained.
+
+The app's single lyrics lookup now follows snapshotFlow/collectLatest instead of
+depending on a track-keyed main-window recomposition. It keeps the duration latch,
+provider settings, video/global disable rules, loading/errors and cancellation
+fence. Provider overrides are associated with the selected song. Old-track words
+are excluded while the new result is loading. Neither engine nor window is
+recreated on a track change, and PiP starts no second lyrics lookup.
+
+The new native regression asserts actual rendered semantic text while main stays
+hidden, including delayed new lyrics, external track changes, PiP Next/Previous,
+one lookup per transition, the same native peer, restore, reopen from a hidden
+main window and close. Separate session tests cover late canceled providers,
+duration stabilization, disabled video lyrics, provider overrides and errors.
 
 ## Rendering and resource bounds
 
@@ -162,8 +191,11 @@ SDK/build was unavailable locally. Final numerical/build results are recorded in
 
 ## Recorded validation
 
-- **633 tests passed:** desktop 529, shared 70, sharedUi 34; zero failures/errors/skips.
+- **637 tests passed:** desktop 533, shared 70, sharedUi 34; zero failures/errors/skips.
   The native-window opt-in was explicitly enabled in the full local Linux run.
+- The hidden-main regression failed before the fix and passes after it. Rendered
+  title/artist/lyrics follow both external changes and PiP Next/Previous without
+  recreating the native window. The three new lookup-session tests also passed.
 - The local HTTP artwork test returns `Cache-Control: no-store` and observes exactly
   **one request** supplying cover plus prepared background, across subsequent resizes.
 - Final Linux `createDistributable` passed. Windows JVM/portable cross-build passed;
