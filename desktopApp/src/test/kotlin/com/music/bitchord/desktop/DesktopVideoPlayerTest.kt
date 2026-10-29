@@ -68,6 +68,7 @@ class DesktopVideoPlayerTest {
             onNodeWithContentDescription("Lyrics").assertDoesNotExist()
             onAllNodesWithContentDescription("Toggle fullscreen").assertCountEquals(1)
             onAllNodesWithContentDescription("Switch to Picture in Picture").assertCountEquals(1)
+            onAllNodesWithContentDescription("Switch to Picture in Picture").assertCountEquals(1)
             onNodeWithContentDescription("Fullscreen").assertDoesNotExist()
             val bitmap = onRoot().captureToImage()
             val pixels = bitmap.toPixelMap()
