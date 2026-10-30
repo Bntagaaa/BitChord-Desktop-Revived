@@ -152,6 +152,9 @@ class DesktopPlaybackEngine internal constructor(
      */
     private val awaitingArm = java.util.concurrent.atomic.AtomicReference<Song?>(null)
     private var retryingSongId: String? = null
+    /** Failed PCM writes are not a playing stream, even if the UI says Play. */
+    private var consecutiveOutputFailures = 0
+    private var outputRecoveryAttempted = false
 
     /** Owned by the audio thread once handed over; never touched from outside. */
     private class Track(
@@ -270,8 +273,10 @@ class DesktopPlaybackEngine internal constructor(
         val prepared = try {
             val snapshot = _state.value
             if (snapshot.song?.videoId != expectedId) return false
-            openTrack(replacement, live.stream, snapshot.positionMs.coerceAtLeast(0L))
-                .getOrElse { return false }
+            openTrack(
+                replacement, live.stream, snapshot.positionMs.coerceAtLeast(0L),
+                verifyFirstAudio = true,
+            ).getOrElse { return false }
         } finally {
             live.pendingSubstitute?.cancel()
         }
@@ -406,6 +411,7 @@ class DesktopPlaybackEngine internal constructor(
         recoveryAttempt: Int = 0,
         prefetch: Boolean = false,
         trace: DesktopPlaybackTrace? = null,
+        verifyFirstAudio: Boolean = false,
     ): Result<Track> {
         var rawDecoder: DesktopAudioDecoder? = null
         var wrappedDecoder: DesktopDecodeAhead? = null
@@ -452,6 +458,22 @@ class DesktopPlaybackEngine internal constructor(
                     )
                     wrappedDecoder = ahead
                     rawDecoder = null
+                    currentCoroutineContext().ensureActive()
+                    // A lossless addon URL (especially DASH/Hi-Res) can parse successfully
+                    // but never decode a PCM frame. Prove the candidate is playable *before*
+                    // replacing the previous decoder; normal YouTube playback remains instant.
+                    val needsProof = verifyFirstAudio || stream.format.isLossless ||
+                        stream.transport != null ||
+                        (stream.sourceId != null && stream.sourceId != "youtube")
+                    if (needsProof && !runInterruptible { ahead.awaitFirstAudio(FIRST_AUDIO_PROBE_MS) }) {
+                        val why = ahead.failureCause?.message
+                            ?: when (ahead.state) {
+                                DesktopDecodeState.EOF -> "stream ended without audio"
+                                DesktopDecodeState.RUNNING -> "stream did not decode audio within the startup limit"
+                                else -> "audio decoder failed"
+                            }
+                        error("Audio source is not playable: $why")
+                    }
                     currentCoroutineContext().ensureActive()
                     Result.success(
                         Track(
@@ -510,7 +532,9 @@ class DesktopPlaybackEngine internal constructor(
                     if (current.streamFormat?.isDolbyAtmos == true) return@launch
                     if (DesktopMusicSources.ceiling(null) != DesktopAudioQuality.LOSSLESS) return@launch
                     val playing = DesktopStream(url = "", format = current.streamFormat ?: DesktopStreamFormat(), sourceId = current.streamSourceId)
-                    if (take(song, DesktopMusicSources.upgradeFor(song, playing))) return@launch
+                    if (take(song, DesktopMusicSources.upgradeFor(
+                        song, playing, excludedSourceId = refusedSources[song.videoId],
+                    ))) return@launch
                 }
                 DesktopTrackLog.log("no better copy of '${song.title}' was found")
             } finally {
@@ -529,6 +553,10 @@ class DesktopPlaybackEngine internal constructor(
         if (better == null) return false
         val current = _state.value
         if (current.song?.videoId != song.videoId) return true
+        if (better.sourceId != null && refusedSources[song.videoId] == better.sourceId) {
+            DesktopTrackLog.log("ignoring previously failed quality source for '${song.title}'")
+            return false
+        }
         if (!DesktopMusicSources.worthSwapping(better.format, current.streamFormat)) {
             DesktopTrackLog.log(
                 "keeping '${song.title}' on what is playing — " +
@@ -548,7 +576,7 @@ class DesktopPlaybackEngine internal constructor(
     private fun swapStream(song: Song, stream: DesktopStream, positionMs: Long) {
         val generation = loadGeneration.get()
         scope.launch {
-            openTrack(song, stream, positionMs).fold(
+            openTrack(song, stream, positionMs, verifyFirstAudio = true).fold(
                 onSuccess = { track ->
                     val latest = _state.value
                     if (latest.song?.videoId != song.videoId) {
@@ -569,9 +597,14 @@ class DesktopPlaybackEngine internal constructor(
                         "could not open the copy of '${song.title}' from " +
                             "${DesktopMusicSources.sourceNameFor(stream)}: ${failure.message}",
                     )
-                    _state.update { it.copy(
-                        error = "Could not switch version: ${failure.message ?: "that copy would not open"}",
-                    ) }
+                    stream.sourceId?.takeUnless { it == "youtube" }?.let {
+                        refusedSources[song.videoId] = it
+                    }
+                    // The original PCM is still playing: report the rejected upgrade as a
+                    // nonfatal source issue rather than putting the player in an error state.
+                    if (_state.value.song?.videoId == song.videoId) {
+                        DesktopPlayerHost.showMessage("Lossless source unavailable; continuing current playback")
+                    }
                 },
             )
         }
@@ -581,14 +614,19 @@ class DesktopPlaybackEngine internal constructor(
     fun reloadCurrent(forceSourceRefresh: Boolean = false) {
         val current = _state.value
         val song = current.song ?: return
-        if (forceSourceRefresh) DesktopAddonSource.clearCompletedTrackCalls()
+        if (forceSourceRefresh) {
+            DesktopAddonSource.clearCompletedTrackCalls()
+            refusedSources.remove(song.videoId)
+        }
         upgradeJob?.cancel()
         DesktopTrackLog.log(
             "re-opening '${song.title}' — pinned to the original: " +
                 "${DesktopOriginalVersion.isPinned(song.videoId)}",
         )
         scope.launch {
-            DesktopMusicSources.resolve(song, audioQuality).fold(
+            DesktopMusicSources.resolve(
+                song, audioQuality, excludedSourceId = refusedSources[song.videoId],
+            ).fold(
                 onSuccess = { stream ->
                     if (_state.value.song?.videoId != song.videoId) return@fold
                     DesktopTrackLog.log("re-opened from ${DesktopMusicSources.sourceNameFor(stream)}")
@@ -637,9 +675,13 @@ class DesktopPlaybackEngine internal constructor(
         _state.update { it.copy(volume = volume) }
     }
 
-    /** Sets the source quality ceiling used the next time a track is resolved. */
+    /** A quality change gives previously refused providers a fresh chance. */
     fun setAudioQuality(quality: String) {
-        audioQuality = quality.uppercase()
+        val next = quality.uppercase()
+        if (audioQuality != next) {
+            audioQuality = next
+            refusedSources.clear()
+        }
     }
 
     fun setCrossfadeSeconds(seconds: Int) {
@@ -1073,10 +1115,43 @@ class DesktopPlaybackEngine internal constructor(
             )
         }
         if (count > 0) track.trace?.mark("pcm")
-        val written = sink.write(samples, count)
+        val written = try {
+            sink.write(samples, count)
+        } catch (failure: Exception) {
+            DesktopTrackLog.log("audio output write failed: ${failure.message}")
+            0
+        }
         if (written > 0) track.trace?.submitted(queuedSourceUs())
-        framesWritten += count / sink.format.channels.coerceAtLeast(1)
-        if (count > 0) {
+        val frameBytes = sink.format.bytesPerSample * sink.format.channels.coerceAtLeast(1)
+        framesWritten += written.coerceAtLeast(0) / frameBytes.coerceAtLeast(1)
+        // Native WASAPI can open a high-rate format but later stop draining its buffer.
+        // Never count unwritten samples as delivered, and never claim a silent device is playing.
+        val requestedBytes = count.toLong() * sink.format.bytesPerSample
+        if (count > 0 && written.toLong() < requestedBytes) {
+            consecutiveOutputFailures++
+            if (consecutiveOutputFailures >= 2) {
+                consecutiveOutputFailures = 0
+                if (!outputRecoveryAttempted) {
+                    outputRecoveryAttempted = true
+                    DesktopTrackLog.log("audio output stalled; retrying at 48000 Hz shared mode")
+                    reconfigureSink(fallbackRateHz = 48_000)
+                } else {
+                    paused = true
+                    sink.pause()
+                    DesktopTrackLog.log("audio output failed after 48000 Hz recovery; stopping silent playback")
+                    _state.update {
+                        it.copy(
+                            isPlaying = false,
+                            awaitingAudio = false,
+                            error = "Audio output stopped accepting samples. Change output device or retry playback.",
+                        )
+                    }
+                }
+            }
+            return
+        }
+        consecutiveOutputFailures = 0
+        if (count > 0 && written > 0) {
             // If a watchdog reopen was in flight but the original worker recovered on its own,
             // keep the healthy stream and make the eventual replacement stale.
             if (track.recoveryRequested && track.decoder.state == DesktopDecodeState.RUNNING) {
@@ -1299,16 +1374,23 @@ class DesktopPlaybackEngine internal constructor(
             else state
         }
 
+        // Do not keep reopening the same lossless source that just failed to
+        // produce PCM. Move to a different configured source (usually YouTube)
+        // while retaining the original position and play/pause intent.
+        val brokenSource = track.stream.sourceId?.takeUnless { it == "youtube" }
+        brokenSource?.let { refusedSources[track.song.videoId] = it }
+        val excludedSource = brokenSource ?: refusedSources[track.song.videoId]
         recoveryJob?.cancel()
         recoveryJob = scope.launch {
             try {
-                DesktopMusicSources.resolveLive(track.song, audioQuality).fold(
+                resolveSource(track.song, audioQuality, excludedSource, true).fold(
                     onSuccess = { live ->
                         openTrack(
                             song = track.song,
                             stream = live.stream,
                             startAtMs = resumeMs,
                             recoveryAttempt = attempt,
+                            verifyFirstAudio = true,
                         ).fold(
                             onSuccess = { replacement ->
                                 commands += Command.RecoverCurrent(track, replacement, live.pendingSubstitute)
@@ -1751,6 +1833,8 @@ class DesktopPlaybackEngine internal constructor(
         current = track
         track.decoder.prepareForPlayback()
         fadeRemaining = 0
+        consecutiveOutputFailures = 0
+        outputRecoveryAttempted = false
 
         val decoded = track.decoder.outputFormat
         // Only renegotiate when the device would actually have to change.
@@ -1788,13 +1872,17 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     /** Reopens the output on the current decoder, keeping the track playing. */
-    private fun reconfigureSink() {
+    private fun reconfigureSink(fallbackRateHz: Int? = null) {
         val track = current ?: return
         val decoded = track.decoder.outputFormat
         // Where the next block written carries on from: what was queued on the old line is dropped
         // with it, and the decoder is already past it.
         val positionUs = playhead.peek(framesWritten)
-        sink.open(decoded.copy(bytesPerSample = precisionBytes(), isFloat = preferFloat))
+        sink.open(decoded.copy(
+            sampleRate = fallbackRateHz ?: decoded.sampleRate,
+            bytesPerSample = precisionBytes(),
+            isFloat = preferFloat,
+        ))
             .onSuccess {
                 sink.gain = volume
                 framesWritten = sink.framesPlayed()
@@ -1804,7 +1892,15 @@ class DesktopPlaybackEngine internal constructor(
                 resetPlayhead(track, positionUs)
             }
             .onFailure { failure ->
-                _state.update { it.copy(error = "No audio output: ${failure.message}") }
+                paused = true
+                sink.pause()
+                _state.update {
+                    it.copy(
+                        isPlaying = false,
+                        awaitingAudio = false,
+                        error = "No audio output: ${failure.message}",
+                    )
+                }
             }
     }
 
@@ -2436,6 +2532,8 @@ class DesktopPlaybackEngine internal constructor(
          * timeout: only a worker that outlived its own transport timeout is force-reopened.
          */
         private const val DECODE_STALL_RECOVERY_MS = 22_000L
+        /** Off-thread lossless/manifest verification, bounded to protect instant playback. */
+        private const val FIRST_AUDIO_PROBE_MS = 8_000L
         private const val MAX_DECODE_RECOVERY_ATTEMPTS = 2
 
         /** How many times a lossy substitute is asked to be beaten before the question is closed. */

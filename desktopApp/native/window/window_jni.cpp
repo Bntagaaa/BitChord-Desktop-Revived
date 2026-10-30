@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cwchar>
@@ -401,18 +402,21 @@ int write_audio(const float* samples, int sample_count, float gain) {
 
     const UINT32 total_frames = static_cast<UINT32>(sample_count) / g_audio_channels;
     UINT32 frame_at = 0;
+    auto last_progress = std::chrono::steady_clock::now();
     while (frame_at < total_frames) {
+        // If the endpoint stops draining (seen on some high-rate shared-mode
+        // formats), never trap BitChord's audio thread in this loop forever.
+        // Let Kotlin fall back to 48 kHz or surface a proper playback error.
+        if (std::chrono::steady_clock::now() - last_progress > std::chrono::milliseconds(2500)) {
+            g_audio_error = L"WASAPI render buffer stopped draining";
+            break;
+        }
         if (g_audio_reroute || g_audio_client == nullptr) reroute_locked();
         if (g_audio_client == nullptr) {
-            // Nowhere to play. Let the rest of the block pass in real time, counted as played, so
-            // the track neither races ahead nor wedges this thread until a device appears.
-            const UINT32 skipped = total_frames - frame_at;
-            g_audio_played_offset += skipped;
-            frame_at = total_frames;
-            const int rate = g_audio_rate > 0 ? g_audio_rate : 48'000;
-            guard.unlock();
-            Sleep(static_cast<DWORD>(std::max<uint64_t>(1, uint64_t{skipped} * 1000 / rate)));
-            guard.lock();
+            // A high-rate format can fail to reopen after a device change.
+            // Do not report discarded samples as successfully played forever: return an
+            // incomplete write so Kotlin can retry at the safe device rate.
+            g_audio_error = L"No WASAPI render endpoint is available for this format";
             break;
         }
         UINT32 padding = 0;
@@ -471,6 +475,7 @@ int write_audio(const float* samples, int sample_count, float gain) {
         }
         frame_at += frames;
         g_audio_submitted_frames += frames;
+        last_progress = std::chrono::steady_clock::now();
     }
     return static_cast<int>(frame_at * g_audio_channels * g_audio_bytes_per_sample);
 }

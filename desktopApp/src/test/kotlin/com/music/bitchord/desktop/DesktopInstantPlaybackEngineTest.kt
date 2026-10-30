@@ -7,6 +7,7 @@ import java.nio.ByteOrder
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlin.test.*
 
@@ -31,7 +32,10 @@ class DesktopInstantPlaybackEngineTest {
         val file = File.createTempFile("bitchord-engine-", ".wav").also { files += it; it.writeBytes(wav) }
         return DesktopStream(file.absolutePath)
     }
-    private class Output : DesktopAudioOutput {
+    private class Output(
+        private val acceptsUpToHz: Int = Int.MAX_VALUE,
+        private val throwsAboveHz: Boolean = false,
+    ) : DesktopAudioOutput {
         override var format = DesktopPcmFormat(44100, 2, 2)
         override var gain = 1f
         @Volatile override var isOpen = false
@@ -46,6 +50,10 @@ class DesktopInstantPlaybackEngineTest {
             return Result.success(requested)
         }
         override fun write(samples: FloatArray, count: Int): Int {
+            if (format.sampleRate > acceptsUpToHz) {
+                if (throwsAboveHz) throw IllegalStateException("device rejected high sample rate")
+                return 0
+            }
             assertTrue(samples.take(count).all { it.isFinite() })
             Thread.sleep((count.toLong() * 1000 / format.channels / format.sampleRate).coerceAtLeast(1))
             frames += count / format.channels; writes++
@@ -67,6 +75,50 @@ class DesktopInstantPlaybackEngineTest {
         resolve: suspend (Song) -> DesktopStream): DesktopPlaybackEngine =
         DesktopPlaybackEngine(ended, handoff, output) { song, _, _, _ -> Result.success(resolve(song)).map { DesktopLiveResolution(it) } }
             .also { engines += it }
+
+    @Test fun `unplayable lossless source falls back to the next source before claiming playing`() {
+        val bad = tone(seconds = 0).copy(
+            sourceId = "failed-hires",
+            format = DesktopStreamFormat(codec = "flac", bitDepth = 24, sampleRateHz = 192_000),
+        )
+        val safe = tone(seconds = 6).copy(sourceId = "youtube")
+        val requests = CopyOnWriteArrayList<String>()
+        val output = Output()
+        val engine = DesktopPlaybackEngine({}, {}, output) { _, _, excluded, _ ->
+            requests += excluded ?: "initial"
+            Result.success(DesktopLiveResolution(if (excluded == "failed-hires") safe else bad))
+        }.also { engines += it }
+        engine.setAudioQuality("LOSSLESS")
+        engine.load(song("broken-lossless"))
+        waitFor("working PCM after bad lossless") {
+            "failed-hires" in requests && output.writes > 0
+        }
+        assertTrue(engine.state.value.isPlaying)
+        assertNull(engine.state.value.error)
+        assertEquals("youtube", engine.state.value.streamSourceId)
+    }
+
+    @Test fun `failed high res upgrade preserves existing audible stream`() {
+        val safe = tone(seconds = 6).copy(sourceId = "youtube")
+        val bad = tone(seconds = 0).copy(
+            sourceId = "failed-hires",
+            format = DesktopStreamFormat(codec = "flac", bitDepth = 24, sampleRateHz = 192_000),
+        )
+        val pending = CompletableDeferred<DesktopStream?>()
+        val output = Output()
+        val engine = DesktopPlaybackEngine({}, {}, output) { _, _, _, _ ->
+            Result.success(DesktopLiveResolution(safe, pending))
+        }.also { engines += it }
+        engine.load(song("upgradable"))
+        waitFor("original PCM") { output.writes > 0 }
+        pending.complete(bad)
+        val previousWrites = output.writes
+        Thread.sleep(500)
+        assertTrue(output.writes > previousWrites, "bad lossless must not silence the running track")
+        assertTrue(engine.state.value.isPlaying)
+        assertNull(engine.state.value.error)
+        assertEquals("youtube", engine.state.value.streamSourceId)
+    }
 
     @Test fun `five rapid skips cancel an obsolete resolution and only latest reaches output`() {
         val stream = tone()
@@ -143,6 +195,42 @@ class DesktopInstantPlaybackEngineTest {
         engine.setOutputPrecision("FLOAT_32")
         waitFor("float route") { output.format.isFloat }
         assertNull(engine.state.value.error)
+    }
+
+    @Test fun `high resolution source falls back to 48k when output refuses PCM`() {
+        val stream = tone(seconds = 6, rate = 192_000)
+        val output = Output(acceptsUpToHz = 48_000)
+        val engine = engine(output) { stream }
+        engine.load(song("high-res"))
+        waitFor("48k PCM fallback") {
+            192_000 in output.rates && 48_000 in output.rates && output.writes > 0
+        }
+        assertTrue(engine.state.value.isPlaying, "player should resume after a safe-rate reopen")
+        assertNull(engine.state.value.error)
+    }
+
+    @Test fun `native output throwing on high rate also recovers instead of looping forever`() {
+        val stream = tone(seconds = 6, rate = 192_000)
+        val output = Output(acceptsUpToHz = 48_000, throwsAboveHz = true)
+        val engine = engine(output) { stream }
+        engine.load(song("high-res-exception"))
+        waitFor("exception path reopens at 48k") {
+            48_000 in output.rates && output.writes > 0
+        }
+        assertTrue(engine.state.value.isPlaying)
+        assertNull(engine.state.value.error)
+    }
+
+    @Test fun `player stops with an error if no output accepts any samples`() {
+        val stream = tone(seconds = 6, rate = 192_000)
+        val output = Output(acceptsUpToHz = 0)
+        val engine = engine(output) { stream }
+        engine.load(song("bad-output"))
+        waitFor("failed output becomes visible") {
+            !engine.state.value.isPlaying &&
+                engine.state.value.error?.contains("accepting samples") == true
+        }
+        assertTrue(48_000 in output.rates, "the safe-rate attempt must happen before failing")
     }
 
     @Test fun `crossfade retains the incoming deck and advances queue once`() {
