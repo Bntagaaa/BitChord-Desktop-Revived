@@ -16,6 +16,7 @@ import com.music.bitchord.playback.smart.echoTailSeconds
 import com.music.bitchord.playback.smart.planTransition
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -208,6 +209,8 @@ class DesktopPlaybackEngine internal constructor(
         class Start(val track: Track, val playWhenReady: Boolean, val generation: Long) : Command
         /** Replaces only the playing deck; a quality upgrade must not discard the prepared next deck. */
         class ReplaceCurrent(val track: Track, val playWhenReady: Boolean, val generation: Long) : Command
+        /** Switch the media rendition without clearing the queue or starting an independent player. */
+        class SwitchVersion(val expectedId: String, val track: Track, val confirmation: CompletableDeferred<Boolean>) : Command
         class RecoverCurrent(
             val failed: Track,
             val replacement: Track,
@@ -256,6 +259,45 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     // ---- the surface the application uses -------------------------------
+
+    /**
+     * Prepare an alternate audio/video rendition while the current audio remains audible.
+     * The audio thread validates the expected song before an atomic deck replacement.
+     */
+    suspend fun switchVersion(expectedId: String, replacement: Song): Boolean {
+        if (!running.get() || _state.value.song?.videoId != expectedId) return false
+        val live = DesktopMusicSources.resolveLive(replacement, audioQuality).getOrElse { return false }
+        val prepared = try {
+            val snapshot = _state.value
+            if (snapshot.song?.videoId != expectedId) return false
+            openTrack(replacement, live.stream, snapshot.positionMs.coerceAtLeast(0L))
+                .getOrElse { return false }
+        } finally {
+            live.pendingSubstitute?.cancel()
+        }
+        val latest = _state.value
+        if (!running.get() || latest.song?.videoId != expectedId) {
+            prepared.decoder.close()
+            return false
+        }
+        val millis = latest.positionMs.coerceAtLeast(0L)
+        if (kotlin.math.abs(millis - prepared.startUs / 1_000L) > 250L) {
+            if (!prepared.decoder.seek(millis * 1_000L)) {
+                prepared.decoder.close()
+                return false
+            }
+            prepared.startUs = millis * 1_000L
+        }
+        val ack = CompletableDeferred<Boolean>()
+        commands += Command.SwitchVersion(expectedId, prepared, ack)
+        java.util.concurrent.locks.LockSupport.unpark(thread)
+        try {
+            return ack.await()
+        } catch (cancelled: CancellationException) {
+            ack.cancel()
+            throw cancelled
+        }
+    }
 
     fun load(song: Song, playWhenReady: Boolean = true, startAtMs: Long = 0L, requestedAtNanos: Long = System.nanoTime()) {
         retryingSongId = null
@@ -1579,6 +1621,31 @@ class DesktopPlaybackEngine internal constructor(
                     if (command.generation == loadGeneration.get()) replaceCurrent(command.track, command.playWhenReady)
                     else command.track.decoder.close()
                 }
+                is Command.SwitchVersion -> {
+                    val eligible = running.get() &&
+                        current?.song?.videoId == command.expectedId &&
+                        _state.value.song?.videoId == command.expectedId &&
+                        fadeRemaining <= 0 && loopRuntime == null && !displaySwitched &&
+                        !command.confirmation.isCancelled
+                    if (!eligible) {
+                        command.track.decoder.close()
+                        command.confirmation.complete(false)
+                    } else {
+                        loadGeneration.incrementAndGet()
+                        resolveJob?.cancel()
+                        upgradeJob?.cancel()
+                        recoveryJob?.cancel()
+                        recoveryJob = null
+                        DesktopPlaybackTracker.onVersionSwapped(
+                            command.expectedId, command.track.song.videoId,
+                        )
+                        DesktopScrobbling.onVersionSwapped(
+                            command.expectedId, command.track.song.videoId,
+                        )
+                        replaceCurrent(command.track, playWhenReady = !paused)
+                        command.confirmation.complete(current === command.track)
+                    }
+                }
                 is Command.RecoverCurrent -> {
                     recoveryJob = null
                     val failed = command.failed
@@ -2266,6 +2333,10 @@ class DesktopPlaybackEngine internal constructor(
                 is Command.Start -> command.track.decoder.close()
                 is Command.Upcoming -> command.track.decoder.close()
                 is Command.ReplaceCurrent -> command.track.decoder.close()
+                is Command.SwitchVersion -> {
+                    command.track.decoder.close()
+                    command.confirmation.complete(false)
+                }
                 is Command.ReplaceUpcoming -> command.track.decoder.close()
                 is Command.RecoverCurrent -> { command.replacement.decoder.close(); command.pendingSubstitute?.cancel() }
                 else -> Unit
