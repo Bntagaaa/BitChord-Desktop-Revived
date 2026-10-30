@@ -5775,6 +5775,7 @@ private fun DesktopSidebar(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
+                        .desktopHoverFill(corner = 8.dp, alpha = 0.07f)
                         .clickable(onClick = onOpenAccounts)
                         .padding(horizontal = 4.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,

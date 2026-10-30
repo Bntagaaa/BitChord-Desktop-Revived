@@ -538,6 +538,7 @@ private fun DesktopMenuHeader(title: String, onBack: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .heightIn(min = 32.dp)
+            .desktopHoverFill(alpha = 0.055f)
             .clickable(onClick = onBack)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
