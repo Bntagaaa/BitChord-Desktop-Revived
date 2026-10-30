@@ -74,7 +74,7 @@ if ($Artifacts) {
     $nativeVersion = Property 'ProductVersion'
     $upgrade = Property 'UpgradeCode'
     $product = Property 'ProductCode'
-    if ($nativeVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid MSI version' }
+    if ($nativeVersion -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid MSI version '$nativeVersion' for requested build '$Version'" }
     if ([int]$nativeVersion.Split('.')[2] -gt 65535) { throw 'MSI build exceeds its supported range' }
     if ($upgrade.Trim('{}') -ine '8f3c1d24-6a2b-4f5e-9c17-2b8d54e0a913' -or -not $product) { throw 'MSI upgrade/product identity changed' }
     $exeVersion = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion

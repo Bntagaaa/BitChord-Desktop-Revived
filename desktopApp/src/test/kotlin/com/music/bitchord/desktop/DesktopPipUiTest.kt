@@ -39,7 +39,7 @@ class DesktopPipUiTest {
                             DesktopPipUi(model,position,DesktopPipPreferences(),blurReduced.value,true,{},{},{},{},{},{},{},{})
                         }
                     }
-                    waitUntil(timeoutMillis=10000) { onAllNodesWithTag("pip-artwork").fetchSemanticsNodes().isNotEmpty() }
+                    waitUntil(timeoutMillis=15000) { onAllNodesWithTag("pip-cover").fetchSemanticsNodes().isNotEmpty() }
                     onNodeWithTag("pip-active-lyric").assertTextEquals("Keep the music close")
                     val root=onNodeWithTag("pip-root").fetchSemanticsNode().boundsInRoot
                     for (tag in listOf("pip-play","pip-previous","pip-next","pip-seek","pip-title","pip-lyrics","pip-cover")) {

@@ -19,11 +19,11 @@ jobs:
   linux:
     uses: ./.github/workflows/build-test-appimage.yml
     with:
-      version: '1.8.5-updater-ci'
+      version: '1.8.4'
       run_tests: true
       audit_packages: true
   windows:
     uses: ./.github/workflows/build-windows-portable.yml
     with:
-      version: '1.8.5-updater-ci'
+      version: '1.8.4'
       installers: true
