@@ -4159,7 +4159,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                         if (playerMenuOpen) {
                             // Where the player's "…" sits: the right column's credits row, at
                             // the right edge of the centred two-column layout.
-                            val columnEdge = if (videoBetaEnabled && current.isVideo && windowWidth >= 900.dp && windowHeight >= 540.dp) {
+                            val columnEdge = if (videoBetaEnabled && current.isVideo && windowWidth >= 560.dp && windowHeight >= 420.dp) {
                                 val sidebarWidth = com.music.bitchord.ui.player.desktopVideoSidebarWidth(windowWidth - 56.dp)
                                 windowWidth / 2 - sidebarWidth - 28.dp - 24.dp - 18.dp
                             } else minOf(windowWidth, 1100.dp) / 2 - 47.dp
