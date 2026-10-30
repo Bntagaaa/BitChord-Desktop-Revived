@@ -4,6 +4,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -117,6 +118,48 @@ class DesktopDecodeAheadTest {
         assertEquals(0f, reader.readSamples()!![0])
         assertEquals(0L, reader.underrunMillis)
         reader.close()
+    }
+
+    @Test
+    fun `first audio readiness probe preserves the first decoded block`() {
+        val reader = ahead(CountingSource(blocks = 4))
+        try {
+            assertTrue(reader.awaitFirstAudio(1_000))
+            assertEquals(0f, reader.readSamples()!![0])
+            assertEquals(1f, reader.readSamples()!![0])
+        } finally {
+            reader.close()
+        }
+    }
+
+    @Test
+    fun `first audio probe times out while live decoder is stalled and later succeeds`() {
+        val source = CountingSource(blocks = 4)
+        val blocked = CountDownLatch(1)
+        source.stall = blocked
+        val reader = ahead(source)
+        try {
+            assertFalse(reader.awaitFirstAudio(50), "A stalled URL has not proved it can play")
+            assertEquals(DesktopDecodeState.RUNNING, reader.state)
+            source.stall = null
+            blocked.countDown()
+            assertTrue(reader.awaitFirstAudio(1_000))
+            assertEquals(0f, reader.readSamples()!![0])
+        } finally {
+            blocked.countDown()
+            reader.close()
+        }
+    }
+
+    @Test
+    fun `first audio probe rejects an exhausted stream without consuming anything`() {
+        val reader = ahead(CountingSource(blocks = 0))
+        try {
+            assertFalse(reader.awaitFirstAudio(1_000))
+            assertEquals(DesktopDecodeState.EOF, reader.state)
+        } finally {
+            reader.close()
+        }
     }
 
     @Test

@@ -129,6 +129,21 @@ internal class DesktopDecodeAhead(
         block
     }
 
+    /**
+     * Non-destructive readiness probe for lossless/Hi-Res source handoffs.
+     *
+     * Opening an FFmpeg container does not guarantee the URL can actually decode PCM.
+     * Keep the first block queued while the candidate is checked off the audio thread,
+     * so a failed plugin/manifest never silences the currently playing track.
+     */
+    fun awaitFirstAudio(timeoutMillis: Long): Boolean = lock.withLock {
+        var remaining = TimeUnit.MILLISECONDS.toNanos(timeoutMillis.coerceAtLeast(0L))
+        while (queue.isEmpty() && lifecycle == DesktopDecodeState.RUNNING && remaining > 0L) {
+            remaining = ready.awaitNanos(remaining)
+        }
+        queue.isNotEmpty()
+    }
+
     /** The worker's actual lifecycle, so a dead worker cannot masquerade as buffering forever. */
     val state: DesktopDecodeState
         get() = lock.withLock { lifecycle }
