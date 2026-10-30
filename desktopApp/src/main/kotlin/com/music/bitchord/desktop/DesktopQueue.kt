@@ -51,6 +51,24 @@ internal data class DesktopQueue(
         return copy(songs = songs.take(index + 1) + rebuilt, index = index + 1).afterTransition()
     }
 
+    /**
+     * A music video and its audio recording are two versions of this same queue
+     * row. Do not enqueue another song or change the index; repeated tracks
+     * elsewhere in a playlist must retain their own identities.
+     *
+     * [expectedId] guards against a slow network lookup finishing after Next.
+     */
+    fun replaceCurrentVersion(expectedId: String, replacement: Song): DesktopQueue {
+        val active = current ?: return this
+        if (active.videoId != expectedId || replacement.videoId.isBlank()) return this
+        return copy(songs = songs.toMutableList().also { rows ->
+            rows[index] = replacement.copy(
+                queueEntryId = active.queueEntryId,
+                queueTier = active.queueTier,
+            )
+        })
+    }
+
     fun next(): DesktopQueue = if (hasNext) copy(index = index + 1).afterTransition() else this
 
     fun previous(): DesktopQueue = if (hasPrevious) copy(index = index - 1) else this
