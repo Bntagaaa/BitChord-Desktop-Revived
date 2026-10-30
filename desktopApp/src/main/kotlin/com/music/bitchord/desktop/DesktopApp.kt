@@ -1211,6 +1211,31 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     /** Puts a track at the end of what the listener queued — not the end of the queue. */
     fun addToQueue(song: Song) = enqueue(song, next = false)
 
+    /**
+     * Playlist menu queue actions must not persist the full list once per track.
+     * Preserve ordering and publish one party intent for the entire operation.
+     */
+    fun enqueueSongs(tracks: List<Song>, next: Boolean) {
+        val party = DesktopListenTogether.state.value
+        if (party.controlsLocked) return
+        val playable = tracks.filter { it.unresolvedSpotifyTrack() == null }
+        if (playable.isEmpty()) return
+        if (party.inParty &&
+            liveQueue.upcoming.size + playable.size > DesktopPartySync.MAX_PARTY_UPCOMING_QUEUE
+        ) {
+            DesktopPlayerHost.showMessage(
+                "Queue is full (maximum ${DesktopPartySync.MAX_PARTY_UPCOMING_QUEUE} songs in party)",
+            )
+            return
+        }
+        val source = currentQueueSource()
+        val radio = liveQueue.current?.radioName
+        val normalized = playable.map { canonicalSong(it).copy(radioName = radio).withSource(source) }
+        liveQueue = liveQueue.enqueueBatch(normalized, playNext = next)
+        saveQueue()
+        partySyncHolder[0]?.onLocalIntent()
+    }
+
     /** Starts the station YouTube Music builds around one track. */
     fun startRadio(song: Song) {
         if (partyTrackChangeBlocked()) return
@@ -4852,10 +4877,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             signedIn = youtubeSignedIn,
                             onLibraryChanged = ::reloadLibrary,
                             onStartMix = ::startRadio,
-                            onQueueSongs = { tracks, next ->
-                                if (next) tracks.asReversed().forEach(::playNext)
-                                else tracks.forEach(::addToQueue)
-                            },
+                            onQueueSongs = ::enqueueSongs,
                             songMenu = { track, index ->
                                 if (track.unresolvedSpotifyTrack() == null) {
                                     songMenu(track)

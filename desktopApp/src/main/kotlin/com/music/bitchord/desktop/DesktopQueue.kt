@@ -112,6 +112,15 @@ internal data class DesktopQueue(
         song.asQueueEntry(QueueTier.USER_QUEUE),
     )
 
+    /** Adds an entire playlist with one queue rebuild (no per-track copies). */
+    fun enqueueBatch(tracks: List<Song>, playNext: Boolean): DesktopQueue {
+        if (tracks.isEmpty()) return this
+        val at = QueueTimeline.findUserQueueInsertionIndex(songs, index, isNext = playNext)
+        return copy(songs = songs.toMutableList().apply {
+            addAll(at, tracks.map { it.asQueueEntry(QueueTier.USER_QUEUE) })
+        })
+    }
+
     /** Adds tracks at the end — where AutoPlay's own additions go. */
     fun append(more: List<Song>): DesktopQueue =
         if (more.isEmpty()) this else copy(songs = songs + more)
