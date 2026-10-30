@@ -2079,8 +2079,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     }
     // The account's own history on YouTube Music, which is what the home feed is built out of.
     DisposableEffect(playback.song?.videoId) {
+        val leavingId = playback.song?.videoId
         val previous = playbackEngine.state.value.positionMs / 1_000
-        onDispose { DesktopPlaybackTracker.onTrackChanged(previous) }
+        onDispose { DesktopPlaybackTracker.onTrackChanged(previous, leavingId) }
     }
     LaunchedEffect(playback.song?.videoId, playback.isPlaying) {
         val songId = playback.song?.videoId ?: return@LaunchedEffect
@@ -3271,15 +3272,22 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     return@launch
                 }
                 val replacement = updated.current ?: return@launch
-                val playing = playbackEngine.state.value.isPlaying
+                // Only update the queue and history when the audio-thread handoff has succeeded.
+                // Keeping the existing session prevents an audible stop during the network lookup.
+                val changed = withContext(Dispatchers.IO) {
+                    playbackEngine.switchVersion(original.videoId, replacement)
+                }
+                if (!changed) {
+                    if (liveQueue.current === original) {
+                        DesktopPlayerHost.showMessage("Could not switch version during this transition")
+                    }
+                    return@launch
+                }
                 liveQueue = updated
                 selectedSong = replacement
-                // A music video can have a different intro. Start the chosen version at its own
-                // beginning rather than pretending its timestamps match the catalogue release.
                 history = history.map { if (it.videoId == original.videoId) replacement else it }.distinctBy { it.videoId }
                 saveQueue()
                 persistence.saveHistory(history)
-                playbackEngine.load(replacement, playing)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { DesktopPlayerHost.showMessage("Could not load this version; current playback continues") }
             finally { mediaVersionSwitching = false }
