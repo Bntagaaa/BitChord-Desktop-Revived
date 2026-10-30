@@ -413,15 +413,10 @@ int write_audio(const float* samples, int sample_count, float gain) {
         }
         if (g_audio_reroute || g_audio_client == nullptr) reroute_locked();
         if (g_audio_client == nullptr) {
-            // Nowhere to play. Let the rest of the block pass in real time, counted as played, so
-            // the track neither races ahead nor wedges this thread until a device appears.
-            const UINT32 skipped = total_frames - frame_at;
-            g_audio_played_offset += skipped;
-            frame_at = total_frames;
-            const int rate = g_audio_rate > 0 ? g_audio_rate : 48'000;
-            guard.unlock();
-            Sleep(static_cast<DWORD>(std::max<uint64_t>(1, uint64_t{skipped} * 1000 / rate)));
-            guard.lock();
+            // A high-rate format can fail to reopen after a device change.
+            // Do not report discarded samples as successfully played forever: return an
+            // incomplete write so Kotlin can retry at the safe device rate.
+            g_audio_error = L"No WASAPI render endpoint is available for this format";
             break;
         }
         UINT32 padding = 0;

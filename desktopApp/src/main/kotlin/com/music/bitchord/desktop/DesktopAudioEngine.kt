@@ -1115,7 +1115,12 @@ class DesktopPlaybackEngine internal constructor(
             )
         }
         if (count > 0) track.trace?.mark("pcm")
-        val written = sink.write(samples, count)
+        val written = try {
+            sink.write(samples, count)
+        } catch (failure: Exception) {
+            DesktopTrackLog.log("audio output write failed: ${failure.message}")
+            0
+        }
         if (written > 0) track.trace?.submitted(queuedSourceUs())
         val frameBytes = sink.format.bytesPerSample * sink.format.channels.coerceAtLeast(1)
         framesWritten += written.coerceAtLeast(0) / frameBytes.coerceAtLeast(1)

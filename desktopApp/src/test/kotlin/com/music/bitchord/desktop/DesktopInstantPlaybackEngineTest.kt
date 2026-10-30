@@ -32,7 +32,10 @@ class DesktopInstantPlaybackEngineTest {
         val file = File.createTempFile("bitchord-engine-", ".wav").also { files += it; it.writeBytes(wav) }
         return DesktopStream(file.absolutePath)
     }
-    private class Output(private val acceptsUpToHz: Int = Int.MAX_VALUE) : DesktopAudioOutput {
+    private class Output(
+        private val acceptsUpToHz: Int = Int.MAX_VALUE,
+        private val throwsAboveHz: Boolean = false,
+    ) : DesktopAudioOutput {
         override var format = DesktopPcmFormat(44100, 2, 2)
         override var gain = 1f
         @Volatile override var isOpen = false
@@ -47,7 +50,10 @@ class DesktopInstantPlaybackEngineTest {
             return Result.success(requested)
         }
         override fun write(samples: FloatArray, count: Int): Int {
-            if (format.sampleRate > acceptsUpToHz) return 0
+            if (format.sampleRate > acceptsUpToHz) {
+                if (throwsAboveHz) throw IllegalStateException("device rejected high sample rate")
+                return 0
+            }
             assertTrue(samples.take(count).all { it.isFinite() })
             Thread.sleep((count.toLong() * 1000 / format.channels / format.sampleRate).coerceAtLeast(1))
             frames += count / format.channels; writes++
@@ -200,6 +206,18 @@ class DesktopInstantPlaybackEngineTest {
             192_000 in output.rates && 48_000 in output.rates && output.writes > 0
         }
         assertTrue(engine.state.value.isPlaying, "player should resume after a safe-rate reopen")
+        assertNull(engine.state.value.error)
+    }
+
+    @Test fun `native output throwing on high rate also recovers instead of looping forever`() {
+        val stream = tone(seconds = 6, rate = 192_000)
+        val output = Output(acceptsUpToHz = 48_000, throwsAboveHz = true)
+        val engine = engine(output) { stream }
+        engine.load(song("high-res-exception"))
+        waitFor("exception path reopens at 48k") {
+            48_000 in output.rates && output.writes > 0
+        }
+        assertTrue(engine.state.value.isPlaying)
         assertNull(engine.state.value.error)
     }
 
