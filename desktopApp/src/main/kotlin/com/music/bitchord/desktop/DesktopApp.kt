@@ -2541,19 +2541,18 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         overlays.settingsPage = DesktopSettingsPage.MAIN
     }
 
-    /** Library folders include the same Spotify resource icon used by BitChord Mobile. */
+    /** Folder shortcuts match the default sidebar order; Spotify uses its brand icon. */
     val libraryLinks = remember {
         listOf(
             LibraryLink(
                 item = ShelfItem(
-                    title = "Spotify",
-                    subtitle = "Playlists and Liked Songs · plays via YouTube Music",
+                    title = "History",
+                    subtitle = "Recently played tracks",
                     thumbnailUrl = null,
                     videoId = null,
-                    browseId = SPOTIFY_LIBRARY_ID,
+                    browseId = LOCAL_HISTORY_ID,
                 ),
-                icon = BitChordIcons.Library,
-                logo = SharedUiRes.drawable.spotify_logo,
+                icon = BitChordIcons.Clock,
             ),
             LibraryLink(
                 item = ShelfItem(
@@ -2574,6 +2573,17 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     browseId = LOCAL_MUSIC_ID,
                 ),
                 icon = Icons.Rounded.Folder,
+            ),
+            LibraryLink(
+                item = ShelfItem(
+                    title = "Spotify",
+                    subtitle = "Playlists and Liked Songs · plays via YouTube Music",
+                    thumbnailUrl = null,
+                    videoId = null,
+                    browseId = SPOTIFY_LIBRARY_ID,
+                ),
+                icon = BitChordIcons.Library,
+                logo = SharedUiRes.drawable.spotify_logo,
             ),
         )
     }
@@ -2600,6 +2610,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         val browseId = item.browseId.orEmpty()
         when {
             browseId == SPOTIFY_LIBRARY_ID -> selectDestination(DesktopDestination.SPOTIFY)
+            browseId == LOCAL_HISTORY_ID -> selectDestination(DesktopDestination.HISTORY)
             browseId == LOCAL_DOWNLOADS_ID -> selectDestination(DesktopDestination.DOWNLOADS)
             browseId == LOCAL_MUSIC_ID -> selectDestination(DesktopDestination.LOCAL_MUSIC)
             browseId.startsWith(LOCAL_PLAYLIST_PREFIX) ->
@@ -5143,6 +5154,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             links = libraryLinks,
                             deviceItems = libraryDeviceItems,
                             showTitle = true,
+                            animateHover = !DesktopAppearanceSettings.reduceAnimation.value,
                         )
                         destination == DesktopDestination.HISTORY -> DesktopHistoryPage(
                             // The account's history when there is one, and what
@@ -5668,8 +5680,8 @@ private fun DesktopSidebar(
                 !settingsOpen && (destination == DesktopDestination.SEARCH || destination == DesktopDestination.EXPLORE), collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.SEARCH)
             }
-            // Spotify lives inside Library, so keep Library selected while Spotify is open.
-            DesktopSidebarItem(BitChordIcons.Library, "Library", !settingsOpen && (destination == DesktopDestination.LIBRARY || destination == DesktopDestination.SPOTIFY), collapsed = collapsed) {
+            // Library and Spotify are independent destinations in the default sidebar.
+            DesktopSidebarItem(BitChordIcons.Library, "Library", !settingsOpen && destination == DesktopDestination.LIBRARY, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LIBRARY)
             }
             Spacer(Modifier.height(6.dp))
@@ -5689,6 +5701,12 @@ private fun DesktopSidebar(
             }
             DesktopSidebarItem(BitChordIcons.Library, "Local Music", !settingsOpen && destination == DesktopDestination.LOCAL_MUSIC, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LOCAL_MUSIC)
+            }
+            DesktopSidebarItem(
+                BitChordIcons.Library, "Spotify", !settingsOpen && destination == DesktopDestination.SPOTIFY,
+                collapsed = collapsed, logo = SharedUiRes.drawable.spotify_logo,
+            ) {
+                onDestinationSelected(DesktopDestination.SPOTIFY)
             }
             Spacer(Modifier.height(6.dp))
             HorizontalDivider(color = desktopChromeDivider())
@@ -5788,6 +5806,7 @@ private fun DesktopSidebarItem(
     label: String,
     selected: Boolean,
     collapsed: Boolean = false,
+    logo: org.jetbrains.compose.resources.DrawableResource? = null,
     onClick: () -> Unit,
 ) {
     if (collapsed) {
@@ -5800,6 +5819,7 @@ private fun DesktopSidebarItem(
                 Modifier.fillMaxWidth().height(42.dp)
                     .clip(RoundedCornerShape(7.dp))
                     .background(if (selected) DesktopTheme.palette.navAccent.copy(alpha = 0.12f) else Color.Transparent)
+                    .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
                     .clickable(onClick = onClick),
                 contentAlignment = Alignment.Center,
             ) {
@@ -5807,7 +5827,11 @@ private fun DesktopSidebarItem(
                     Modifier.align(Alignment.CenterStart).width(3.dp).height(18.dp)
                         .background(DesktopTheme.palette.navAccent),
                 )
-                Icon(icon, label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(20.dp))
+                if (logo != null) {
+                    Icon(painterResource(logo), label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(20.dp))
+                } else {
+                    Icon(icon, label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(20.dp))
+                }
             }
         }
         return
@@ -5817,6 +5841,7 @@ private fun DesktopSidebarItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(7.dp))
             .background(if (selected) DesktopTheme.palette.navAccent.copy(alpha = 0.12f) else Color.Transparent)
+            .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
             .clickable(onClick = onClick)
             .padding(horizontal = 9.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -5830,7 +5855,11 @@ private fun DesktopSidebarItem(
             Spacer(Modifier.width(3.dp))
         }
         Spacer(Modifier.width(6.dp))
-        Icon(icon, label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(18.dp))
+        if (logo != null) {
+            Icon(painterResource(logo), label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(18.dp))
+        } else {
+            Icon(icon, label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(18.dp))
+        }
         Spacer(Modifier.width(10.dp))
         Text(
             label,
@@ -6405,6 +6434,7 @@ private const val MESH_SOURCE_PX = 120
 
 /** Enough to scroll through, short of turning the shelf into the history page. */
 /** The Library's "On device" cards — the phone's ids for the two folders, so their cards draw alike. */
+private const val LOCAL_HISTORY_ID = "local:history"
 private const val LOCAL_DOWNLOADS_ID = "local:downloads"
 private const val LOCAL_MUSIC_ID = "local:all"
 private const val LOCAL_PLAYLIST_PREFIX = "desktop-playlist:"
