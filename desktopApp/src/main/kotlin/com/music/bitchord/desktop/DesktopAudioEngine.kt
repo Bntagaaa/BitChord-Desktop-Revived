@@ -270,8 +270,10 @@ class DesktopPlaybackEngine internal constructor(
         val prepared = try {
             val snapshot = _state.value
             if (snapshot.song?.videoId != expectedId) return false
-            openTrack(replacement, live.stream, snapshot.positionMs.coerceAtLeast(0L))
-                .getOrElse { return false }
+            openTrack(
+                replacement, live.stream, snapshot.positionMs.coerceAtLeast(0L),
+                verifyFirstAudio = true,
+            ).getOrElse { return false }
         } finally {
             live.pendingSubstitute?.cancel()
         }
@@ -406,6 +408,7 @@ class DesktopPlaybackEngine internal constructor(
         recoveryAttempt: Int = 0,
         prefetch: Boolean = false,
         trace: DesktopPlaybackTrace? = null,
+        verifyFirstAudio: Boolean = false,
     ): Result<Track> {
         var rawDecoder: DesktopAudioDecoder? = null
         var wrappedDecoder: DesktopDecodeAhead? = null
@@ -452,6 +455,22 @@ class DesktopPlaybackEngine internal constructor(
                     )
                     wrappedDecoder = ahead
                     rawDecoder = null
+                    currentCoroutineContext().ensureActive()
+                    // A lossless addon URL (especially DASH/Hi-Res) can parse successfully
+                    // but never decode a PCM frame. Prove the candidate is playable *before*
+                    // replacing the previous decoder; normal YouTube playback remains instant.
+                    val needsProof = verifyFirstAudio || stream.format.isLossless ||
+                        stream.transport != null ||
+                        (stream.sourceId != null && stream.sourceId != "youtube")
+                    if (needsProof && !runInterruptible { ahead.awaitFirstAudio(FIRST_AUDIO_PROBE_MS) }) {
+                        val why = ahead.failureCause?.message
+                            ?: when (ahead.state) {
+                                DesktopDecodeState.EOF -> "stream ended without audio"
+                                DesktopDecodeState.RUNNING -> "stream did not decode audio within the startup limit"
+                                else -> "audio decoder failed"
+                            }
+                        error("Audio source is not playable: $why")
+                    }
                     currentCoroutineContext().ensureActive()
                     Result.success(
                         Track(
@@ -1299,16 +1318,23 @@ class DesktopPlaybackEngine internal constructor(
             else state
         }
 
+        // Do not keep reopening the same lossless source that just failed to
+        // produce PCM. Move to a different configured source (usually YouTube)
+        // while retaining the original position and play/pause intent.
+        val brokenSource = track.stream.sourceId?.takeUnless { it == "youtube" }
+        brokenSource?.let { refusedSources[track.song.videoId] = it }
+        val excludedSource = brokenSource ?: refusedSources[track.song.videoId]
         recoveryJob?.cancel()
         recoveryJob = scope.launch {
             try {
-                DesktopMusicSources.resolveLive(track.song, audioQuality).fold(
+                resolveSource(track.song, audioQuality, excludedSource, true).fold(
                     onSuccess = { live ->
                         openTrack(
                             song = track.song,
                             stream = live.stream,
                             startAtMs = resumeMs,
                             recoveryAttempt = attempt,
+                            verifyFirstAudio = true,
                         ).fold(
                             onSuccess = { replacement ->
                                 commands += Command.RecoverCurrent(track, replacement, live.pendingSubstitute)
@@ -2436,6 +2462,8 @@ class DesktopPlaybackEngine internal constructor(
          * timeout: only a worker that outlived its own transport timeout is force-reopened.
          */
         private const val DECODE_STALL_RECOVERY_MS = 22_000L
+        /** Off-thread lossless/manifest verification, bounded to protect instant playback. */
+        private const val FIRST_AUDIO_PROBE_MS = 8_000L
         private const val MAX_DECODE_RECOVERY_ATTEMPTS = 2
 
         /** How many times a lossy substitute is asked to be beaten before the question is closed. */
