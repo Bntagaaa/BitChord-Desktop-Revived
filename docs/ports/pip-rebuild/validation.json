@@ -3,7 +3,7 @@
   "branch": "feature/pip-rebuild-from-scratch",
   "suites": {
     "desktop": {
-      "tests": 533,
+      "tests": 534,
       "failures": 0,
       "errors": 0,
       "skipped": 0
@@ -85,8 +85,8 @@
     "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipGeometry.kt": "a47a9a6632aa91747b23686f1020b9ce914a4739ac93c9edbd4416478079bd1b",
     "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipHost.kt": "4abf3f4d31e33fd8a3ee3270fb52317ff9a85b4b17d80d9330596dd08e73d1e5",
     "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipSettings.kt": "c27101f6ea23a7b479ed808ed2f0a21864feeea3432d47717f42595d70b9359c",
-    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipState.kt": "32c98695fa28e33f31bdca79c23c34d7812672b1cab11651e75debeebc62426a",
-    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipUi.kt": "4eae35e0b7d8e8ce847743028e6aeb2872b83644ed2cb114011ad2fe599b1b50",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipState.kt": "0ac5072905acacba737c53e3b2922285d51155b9f076de4e2ad6df13780db669",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipUi.kt": "349830b66098035466bf964a1e9476e9d20ea45c5e605a0e960ef8c967bd1cc4",
     "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipWindow.kt": "0daf96088d29f6c3eed81dd9eb97e244c5658190497bc07fd70c6b0e208ffcec",
     "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlayerSheet.kt": "a1dde4274fc2995cafdb3d806c5cff31597513a79daf0643873aeadb7c7131f3",
     "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowVisibility.kt": "068afcdc4958bd54c09ccf31045cc21bf1dac8fe693366cecadad68be42b0036",
@@ -123,5 +123,12 @@
     "lyrics_session_tests": 3,
     "linux_validation_log": "pip-track-final-linux.log",
     "windows_validation_log": "pip-track-final-windows.log"
+  },
+  "pointer_controls_followup": {
+    "native_robot": "passed next/previous/play-pause icons/return/close",
+    "lyrics": "short-gap regression passed; 160ms fade and 180ms resize obey Reduce Animation",
+    "linux_build": "passed",
+    "physical_audio": "not verified",
+    "windows_build": "not rerun for this follow-up"
   }
 }

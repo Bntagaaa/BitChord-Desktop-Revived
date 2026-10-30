@@ -53,7 +53,14 @@ class DesktopPipNativeTest {
         fun click(tag: String) {
             val node = pip()!!.semanticsOwners.flatMap { nodes(it.unmergedRootSemanticsNode) }
                 .single { it.config.getOrNull(SemanticsProperties.TestTag) == tag }
-            assertTrue(node.config.getOrNull(SemanticsActions.OnClick)?.action?.invoke() == true)
+            val bounds = node.boundsInRoot
+            val native = pip()!!
+            val point = native.contentPane.locationOnScreen
+            Robot().apply {
+                mouseMove(point.x + bounds.center.x.toInt(), point.y + bounds.center.y.toInt())
+                mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+            }
         }
         fun moveSong(by: Int) {
             val index = songs.indexOfFirst { it.videoId == model.value.song?.videoId }
@@ -80,7 +87,7 @@ class DesktopPipNativeTest {
                             val current = lyrics.state
                             model.value.copy(lyricsTrack = current.trackId, lyrics = current.result?.lines,
                                 lyricsLoading = current.loading, lyricsError = current.error)
-                        }, position, {}, { moveSong(-1) }, { moveSong(1) }, {})
+                        }, position, { model.value = model.value.copy(playing = !model.value.playing) }, { moveSong(-1) }, { moveSong(1) }, {})
                         onDispose { host.session = null }
                     }
                 }
@@ -92,6 +99,16 @@ class DesktopPipNativeTest {
                         }
                         controller.show()
                         await("first song in hidden main") { !mainVisible.value && "First song" in renderedText() && "First verse" in renderedText() }
+                        click("pip-play")
+                        await("pause icon after play") {
+                            pip()!!.semanticsOwners.flatMap { nodes(it.unmergedRootSemanticsNode) }
+                                .any { "Pause" in it.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() }
+                        }
+                        click("pip-play")
+                        await("play icon after pause") {
+                            pip()!!.semanticsOwners.flatMap { nodes(it.unmergedRootSemanticsNode) }
+                                .any { "Play" in it.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() }
+                        }
                         val native = pip()
                         model.value = model.value.copy(song = Song("second", "Second song", "Second artist", null))
                         await("second title while lyrics are loading") { "Second song" in renderedText() && "Finding lyrics…" in renderedText() }
@@ -108,13 +125,13 @@ class DesktopPipNativeTest {
                         await("previous command updates title and lyrics") { "Second song" in renderedText() && "Second verse" in renderedText() }
                         assertEquals(listOf("first", "second", "third", "second"), lookups)
                         assertSame(native, pip(), "A song change must not recreate the native window")
-                        controller.restore()
+                        click("pip-action-Return to main window")
                         await("restore from hidden main") { mainVisible.value && pip() == null }
                         mainVisible.value = false
                         delay(100)
                         controller.show()
                         await("reopen from hidden main") { pip()?.isShowing == true && "Second verse" in renderedText() }
-                        controller.close()
+                        click("pip-action-Close picture in picture")
                         await("close while main remains hidden") { pip() == null }
                         println("PIP_TRACK_CHANGE PASS hidden-main/title/artist/lyrics-loading/lyrics-ready/next/previous/one-lookup-per-transition/restore/reopen/close")
                     } catch (error: Throwable) { failure = error }

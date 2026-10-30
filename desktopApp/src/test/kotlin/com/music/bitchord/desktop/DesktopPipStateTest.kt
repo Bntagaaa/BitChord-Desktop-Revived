@@ -39,6 +39,12 @@ class DesktopPipStateTest {
         assertEquals(DesktopPipLyricSelection(2,false), desktopPipLyricSelection(lines,10000))
         assertEquals(DesktopPipLyricSelection(0,false), desktopPipLyricSelection(lines,1500))
     }
+    @Test fun `short vocal breaths do not flash instrumental`() {
+        val lines = listOf(LyricLine(1000, "First", sungUntilMs=2000), LyricLine(2400, "Next"))
+        assertFalse(desktopPipLyricSelection(lines, 2300).instrumental)
+        val explicit = listOf(LyricLine(1000, "First"), LyricLine(2000, ""), LyricLine(2400, "Next"))
+        assertEquals(DesktopPipLyricSelection(0, false), desktopPipLyricSelection(explicit, 2200))
+    }
     @Test fun `old song lyrics are never adapted into a new track`() {
         val state = DesktopPipState(Song("new","Title","Artist",null), true,false,false,10000,true,true,false,
             "old",listOf(LyricLine(1000,"Old words")),false,null)

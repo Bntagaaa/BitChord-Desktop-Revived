@@ -32,12 +32,20 @@ internal data class DesktopPipLayout(val padding: Float, val gap: Float, val tit
 
 internal data class DesktopPipLyricSelection(val index: Int, val instrumental: Boolean)
 
-/** Same line/end semantics as fullscreen; the shared lyric clock supplies the adjusted position. */
+/** Shared clock position, with short vocal breaths retained to avoid instrumental flashes. */
 internal fun desktopPipLyricSelection(lines: List<LyricLine>, adjustedPositionMs: Long): DesktopPipLyricSelection {
-    val index = lines.indexOfLast { it.timeMs <= adjustedPositionMs }
-    val line = lines.getOrNull(index)
+    var index = lines.indexOfLast { it.timeMs <= adjustedPositionMs }
+    var line = lines.getOrNull(index)
+    val next = lines.getOrNull(index + 1)
+    // A brief breath between vocal lines is not an instrumental section.
+    if (line?.isGap == true && next != null && next.timeMs - line.timeMs < 750 && index > 0) {
+        index -= 1
+        line = lines[index]
+        return DesktopPipLyricSelection(index, false)
+    }
     return DesktopPipLyricSelection(index, line == null || line.isGap ||
-        (line.hasKnownEnd && adjustedPositionMs >= line.endMs))
+        (line.hasKnownEnd && adjustedPositionMs >= line.endMs + 250 &&
+            (next == null || next.timeMs - line.endMs >= 750)))
 }
 
 /** Prevent a composition between selection and the lookup effect from displaying the old song. */

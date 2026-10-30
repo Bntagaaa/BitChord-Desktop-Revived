@@ -191,7 +191,7 @@ SDK/build was unavailable locally. Final numerical/build results are recorded in
 
 ## Recorded validation
 
-- **637 tests passed:** desktop 533, shared 70, sharedUi 34; zero failures/errors/skips.
+- **638 tests passed:** desktop 534, shared 70, sharedUi 34; zero failures/errors/skips.
   The native-window opt-in was explicitly enabled in the full local Linux run.
 - The hidden-main regression failed before the fix and passes after it. Rendered
   title/artist/lyrics follow both external changes and PiP Next/Previous without
@@ -206,3 +206,18 @@ SDK/build was unavailable locally. Final numerical/build results are recorded in
   code and unrelated updater/performance branches were not changed or merged.
 - Screenshots were inspected after actual rendering. No regressions were observed
   in executed tests; the device/platform checks above remain release QA.
+
+## Pointer controls and lyric transitions
+
+The native regression now clicks the actual window with AWT Robot instead of
+invoking semantic actions. It checks Next/Previous title and lyric changes,
+Play/Pause icon changes, Return, and Close while main is hidden. These checks use
+a fixture playback state, not physical audio output. The expanded pointer test caught a Close failure after reopening. PiP tooltips
+now use focusable=false so hover popups cannot take focus from the transport or
+window actions. The focused native suite passes after this change. The installed
+build and physical audio output still need to be checked on the reporting device.
+
+Lyrics now crossfade over 160 ms and resize over 180 ms, disabled by Reduce
+Animation. Vocal breaths shorter than 750 ms retain the preceding line instead of
+flashing Instrumental; known vocal ends have a 250 ms grace period. Longer gaps
+remain visible and timestamp-based selection still follows seeks.

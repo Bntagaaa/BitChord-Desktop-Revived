@@ -1,6 +1,7 @@
 package com.music.bitchord.desktop
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
@@ -97,7 +98,7 @@ internal fun DesktopPipUi(
                             PipCover(art, Modifier.width(width).aspectRatio(aspect))
                             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(layout.gap.dp)) {
                                 PipMetadata(state, layout)
-                                if (preferences.lyrics) PipLyrics(state, position, layout.lyricSp,
+                                if (preferences.lyrics) PipLyrics(state, position, layout.lyricSp, reduceAnimation,
                                     Modifier.weight(1f).fillMaxWidth())
                             }
                         }
@@ -110,7 +111,7 @@ internal fun DesktopPipUi(
                                 PipCover(art, Modifier.height(height).aspectRatio(aspect))
                                 Box(Modifier.weight(1f)) { PipMetadata(state, layout) }
                             }
-                            if (preferences.lyrics) PipLyrics(state, position, layout.lyricSp, Modifier.weight(1f).fillMaxWidth())
+                            if (preferences.lyrics) PipLyrics(state, position, layout.lyricSp, reduceAnimation, Modifier.weight(1f).fillMaxWidth())
                         }
                     }
                 }
@@ -192,8 +193,8 @@ private fun PipMetadata(state: DesktopPipState, layout: DesktopPipLayout) {
 @Composable
 private fun PipAction(label: String, icon: ImageVector, onClick: () -> Unit, selected: Boolean = false, enabled: Boolean = true) {
     TooltipBox(positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text(label) } }, state = rememberTooltipState()) {
-        IconButton(onClick, enabled = enabled, modifier = Modifier.size(28.dp)) {
+        tooltip = { PlainTooltip { Text(label) } }, state = rememberTooltipState(), focusable = false) {
+        IconButton(onClick, enabled = enabled, modifier = Modifier.size(28.dp).testTag("pip-action-$label")) {
             Icon(icon, label, tint = Color.White.copy(alpha = if (!enabled) .25f else if (selected) 1f else .55f), modifier = Modifier.size(16.dp))
         }
     }
@@ -232,7 +233,7 @@ private fun PipProgress(state: DesktopPipState, position: PlaybackPosition, onSe
 private fun pipTime(ms: Long) = "${ms.coerceAtLeast(0)/60000}:${((ms.coerceAtLeast(0)/1000)%60).toString().padStart(2, '0')}"
 
 @Composable
-private fun PipLyrics(state: DesktopPipState, position: PlaybackPosition, fontSize: Float, modifier: Modifier) {
+private fun PipLyrics(state: DesktopPipState, position: PlaybackPosition, fontSize: Float, reduceAnimation: Boolean, modifier: Modifier) {
     val lines = state.currentLyrics()
     val label = when {
         state.song == null -> "Your lyrics appear here"
@@ -259,15 +260,18 @@ private fun PipLyrics(state: DesktopPipState, position: PlaybackPosition, fontSi
                 maxHeight >= activeLineHeight * 2 + smallLineHeight * 2 + 14.dp -> 1
                 else -> 0
             }
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Column(Modifier.fillMaxWidth().animateContentSize(tween(if (reduceAnimation) 0 else 180)), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 if (context > 0) for (i in (selection.index-context).coerceAtLeast(0) until selection.index.coerceAtLeast(0)) {
                     Text(lines[i].text, fontSize = (fontSize * .66f).sp, lineHeight = (fontSize * .8f).sp,
                         color = Color.White.copy(alpha = .34f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text(if (selection.instrumental) (if (selection.index < 0) "Intro" else "Instrumental") else lines[selection.index].text,
+                val activeText = if (selection.instrumental) (if (selection.index < 0) "Intro" else "Instrumental") else lines[selection.index].text
+                Crossfade(activeText, animationSpec = tween(if (reduceAnimation) 0 else 160), label = "PiP lyric") { text ->
+                Text(text,
                     fontWeight = FontWeight.Bold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.15f).sp,
                     maxLines = if (lyricHeight < activeLineHeight * 2) 1 else 2, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("pip-active-lyric"))
+                }
                 if (context > 0) for (i in (selection.index+1).coerceAtLeast(0)..minOf(lines.lastIndex, selection.index+context)) {
                     Text(lines[i].text, fontSize = (fontSize * .66f).sp, lineHeight = (fontSize * .8f).sp,
                         color = Color.White.copy(alpha = .34f), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -281,7 +285,7 @@ private fun PipLyrics(state: DesktopPipState, position: PlaybackPosition, fontSi
 @Composable
 internal fun DesktopPipLauncher(onClick: () -> Unit, enabled: Boolean = true, tint: Color = DesktopSecondary) {
     TooltipBox(TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text("Picture in picture") } }, state = rememberTooltipState()) {
+        tooltip = { PlainTooltip { Text("Picture in picture") } }, state = rememberTooltipState(), focusable = false) {
         DesktopToolbarButton(onClick, enabled, size = 32.dp) {
             Icon(Icons.Rounded.PictureInPictureAlt, "Picture in picture", tint = tint, modifier = Modifier.size(18.dp))
         }
