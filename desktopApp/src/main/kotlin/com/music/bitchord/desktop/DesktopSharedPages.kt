@@ -262,6 +262,7 @@ internal fun DesktopPlayPill(
             .then(if (iconOnly) Modifier.size(size) else Modifier.height(size))
             .clip(CircleShape)
             .background(DesktopAccent)
+            .desktopHoverWash()
             .clickable(onClick = onClick)
             .then(if (iconOnly) Modifier else Modifier.padding(horizontal = 32.dp)),
         horizontalArrangement = Arrangement.Center,
@@ -296,6 +297,7 @@ internal fun DesktopCircleButton(
             .size(size)
             .clip(CircleShape)
             .background(DesktopSubtleFill)
+            .desktopHoverWash()
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
