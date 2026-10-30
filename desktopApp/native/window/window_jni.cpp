@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cwchar>
@@ -401,7 +402,15 @@ int write_audio(const float* samples, int sample_count, float gain) {
 
     const UINT32 total_frames = static_cast<UINT32>(sample_count) / g_audio_channels;
     UINT32 frame_at = 0;
+    auto last_progress = std::chrono::steady_clock::now();
     while (frame_at < total_frames) {
+        // If the endpoint stops draining (seen on some high-rate shared-mode
+        // formats), never trap BitChord's audio thread in this loop forever.
+        // Let Kotlin fall back to 48 kHz or surface a proper playback error.
+        if (std::chrono::steady_clock::now() - last_progress > std::chrono::milliseconds(2500)) {
+            g_audio_error = L"WASAPI render buffer stopped draining";
+            break;
+        }
         if (g_audio_reroute || g_audio_client == nullptr) reroute_locked();
         if (g_audio_client == nullptr) {
             // Nowhere to play. Let the rest of the block pass in real time, counted as played, so
@@ -471,6 +480,7 @@ int write_audio(const float* samples, int sample_count, float gain) {
         }
         frame_at += frames;
         g_audio_submitted_frames += frames;
+        last_progress = std::chrono::steady_clock::now();
     }
     return static_cast<int>(frame_at * g_audio_channels * g_audio_bytes_per_sample);
 }

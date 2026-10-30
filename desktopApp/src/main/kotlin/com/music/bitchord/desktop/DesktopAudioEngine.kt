@@ -152,6 +152,9 @@ class DesktopPlaybackEngine internal constructor(
      */
     private val awaitingArm = java.util.concurrent.atomic.AtomicReference<Song?>(null)
     private var retryingSongId: String? = null
+    /** Failed PCM writes are not a playing stream, even if the UI says Play. */
+    private var consecutiveOutputFailures = 0
+    private var outputRecoveryAttempted = false
 
     /** Owned by the audio thread once handed over; never touched from outside. */
     private class Track(
@@ -1114,8 +1117,36 @@ class DesktopPlaybackEngine internal constructor(
         if (count > 0) track.trace?.mark("pcm")
         val written = sink.write(samples, count)
         if (written > 0) track.trace?.submitted(queuedSourceUs())
-        framesWritten += count / sink.format.channels.coerceAtLeast(1)
-        if (count > 0) {
+        val frameBytes = sink.format.bytesPerSample * sink.format.channels.coerceAtLeast(1)
+        framesWritten += written.coerceAtLeast(0) / frameBytes.coerceAtLeast(1)
+        // Native WASAPI can open a high-rate format but later stop draining its buffer.
+        // Never count unwritten samples as delivered, and never claim a silent device is playing.
+        val requestedBytes = count.toLong() * sink.format.bytesPerSample
+        if (count > 0 && written.toLong() < requestedBytes) {
+            consecutiveOutputFailures++
+            if (consecutiveOutputFailures >= 2) {
+                consecutiveOutputFailures = 0
+                if (!outputRecoveryAttempted) {
+                    outputRecoveryAttempted = true
+                    DesktopTrackLog.log("audio output stalled; retrying at 48000 Hz shared mode")
+                    reconfigureSink(fallbackRateHz = 48_000)
+                } else {
+                    paused = true
+                    sink.pause()
+                    DesktopTrackLog.log("audio output failed after 48000 Hz recovery; stopping silent playback")
+                    _state.update {
+                        it.copy(
+                            isPlaying = false,
+                            awaitingAudio = false,
+                            error = "Audio output stopped accepting samples. Change output device or retry playback.",
+                        )
+                    }
+                }
+            }
+            return
+        }
+        consecutiveOutputFailures = 0
+        if (count > 0 && written > 0) {
             // If a watchdog reopen was in flight but the original worker recovered on its own,
             // keep the healthy stream and make the eventual replacement stale.
             if (track.recoveryRequested && track.decoder.state == DesktopDecodeState.RUNNING) {
@@ -1797,6 +1828,8 @@ class DesktopPlaybackEngine internal constructor(
         current = track
         track.decoder.prepareForPlayback()
         fadeRemaining = 0
+        consecutiveOutputFailures = 0
+        outputRecoveryAttempted = false
 
         val decoded = track.decoder.outputFormat
         // Only renegotiate when the device would actually have to change.
@@ -1834,13 +1867,17 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     /** Reopens the output on the current decoder, keeping the track playing. */
-    private fun reconfigureSink() {
+    private fun reconfigureSink(fallbackRateHz: Int? = null) {
         val track = current ?: return
         val decoded = track.decoder.outputFormat
         // Where the next block written carries on from: what was queued on the old line is dropped
         // with it, and the decoder is already past it.
         val positionUs = playhead.peek(framesWritten)
-        sink.open(decoded.copy(bytesPerSample = precisionBytes(), isFloat = preferFloat))
+        sink.open(decoded.copy(
+            sampleRate = fallbackRateHz ?: decoded.sampleRate,
+            bytesPerSample = precisionBytes(),
+            isFloat = preferFloat,
+        ))
             .onSuccess {
                 sink.gain = volume
                 framesWritten = sink.framesPlayed()
@@ -1850,7 +1887,15 @@ class DesktopPlaybackEngine internal constructor(
                 resetPlayhead(track, positionUs)
             }
             .onFailure { failure ->
-                _state.update { it.copy(error = "No audio output: ${failure.message}") }
+                paused = true
+                sink.pause()
+                _state.update {
+                    it.copy(
+                        isPlaying = false,
+                        awaitingAudio = false,
+                        error = "No audio output: ${failure.message}",
+                    )
+                }
             }
     }
 
