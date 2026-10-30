@@ -220,6 +220,26 @@ internal fun DesktopSongMenu(
     )
     val liked = likeStatus == LikeStatus.LIKE
     val disliked = likeStatus == LikeStatus.DISLIKE
+    var showingSongInfo by remember(song.videoId) { mutableStateOf(false) }
+    if (showingSongInfo) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { showingSongInfo = false },
+        title = { Text("Song Info") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(song.title, fontWeight = FontWeight.Bold)
+                Text(song.artist, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                song.albumName?.takeIf(String::isNotBlank)?.let {
+                    Text("Album: $it", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(if (song.isVideo) "Music video" else "Song", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { showingSongInfo = false }) {
+                Text("Done")
+            }
+        },
+    )
     // A local file or a finished download has no YouTube identity behind it to rate, queue into a
     // playlist, fetch again, or share a link for.
     val isOffline = song.localUri != null
@@ -268,24 +288,32 @@ internal fun DesktopSongMenu(
             DesktopMenuDivider()
         }
 
-        if (signedIn && !isOffline) {
-            DesktopMenuRow(
-                icon = if (liked) BitChordIcons.HeartFilled else BitChordIcons.Heart,
-                label = if (liked) "Remove from liked" else "Like",
-                tint = if (liked) DesktopAccent else null,
-                onClick = onToggleLike,
-            )
-            DesktopMenuRow(
-                icon = if (disliked) Icons.Rounded.ThumbDown else Icons.Rounded.ThumbDownOffAlt,
-                label = if (disliked) "Undo dislike" else "Dislike",
-                tint = if (disliked) DesktopAccent else null,
-                onClick = onToggleDislike,
-            )
+        // Mobile's three horizontal actions, using the native BitChord star glyphs.
+        // Ratings stay open so a change can be reverted in the same menu.
+        if (!isOffline) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (signedIn) {
+                    DesktopMenuQuickAction(
+                        if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
+                        "Like", liked, Modifier.weight(1f), onToggleLike)
+                    DesktopMenuQuickAction(
+                        if (disliked) DesktopPhoneMenuIcons.BrokenHeartFilled else DesktopPhoneMenuIcons.BrokenHeart,
+                        "Dislike", disliked, Modifier.weight(1f), onToggleDislike)
+                }
+                DesktopMenuQuickAction(
+                    DesktopPhoneMenuIcons.Share, "Share", false, Modifier.weight(1f), onShare)
+            }
+            DesktopMenuDivider()
         }
         run {
             DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, DesktopStrings["add_to_playlist", "Add to playlist"], onClick = onAddToPlaylist)
         }
         if (signedIn || !isOffline) DesktopMenuDivider()
+
+        DesktopMenuRow(Icons.Rounded.Radio, DesktopStrings["start_radio", "Start radio"], onClick = onStartRadio)
+        DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistPlay, DesktopStrings["play_next", "Play next"], onClick = onPlayNext)
+        DesktopMenuRow(Icons.AutoMirrored.Rounded.QueueMusic, DesktopStrings["add_to_queue", "Add to queue"], onClick = onAddToQueue)
 
         // A saved copy is offered its own way out whatever the track is playing from — a download
         // being played *is* a local file, and hiding the row there left no way to remove it.
@@ -310,31 +338,30 @@ internal fun DesktopSongMenu(
                 onClick = onDownload,
             )
         }
-        DesktopMenuRow(Icons.Rounded.Radio, DesktopStrings["start_radio", "Start radio"], onClick = onStartRadio)
-        DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistPlay, DesktopStrings["play_next", "Play next"], onClick = onPlayNext)
-        DesktopMenuRow(Icons.AutoMirrored.Rounded.QueueMusic, DesktopStrings["add_to_queue", "Add to queue"], onClick = onAddToQueue)
-
         val albumId = song.albumId
         val artistId = song.artistId
         if ((albumId != null && onOpenAlbum != null) || (artistId != null && onOpenArtist != null)) {
             DesktopMenuDivider()
             if (albumId != null && onOpenAlbum != null) {
-                DesktopMenuRow(Icons.Rounded.Album, DesktopStrings["open_album", "Open album"]) { onOpenAlbum(albumId) }
+                DesktopMenuRow(Icons.Rounded.Album, DesktopStrings["open_album", "Open album"], description = song.albumName) { onOpenAlbum(albumId) }
             }
             if (artistId != null && onOpenArtist != null) {
-                DesktopMenuRow(Icons.Rounded.Person, DesktopStrings["open_artist", "Open artist"]) { onOpenArtist(artistId) }
+                DesktopMenuRow(Icons.Rounded.Person, DesktopStrings["open_artist", "Open artist"], description = song.artist) { onOpenArtist(artistId) }
             }
         }
 
+        DesktopMenuDivider()
+        DesktopMenuRow(
+            icon = DesktopPhoneMenuIcons.Info,
+            label = "Song Info",
+            onClick = { showingSongInfo = true },
+        )
         DesktopMenuDivider()
         DesktopMenuRow(
             icon = Icons.Rounded.Bedtime,
             label = DesktopStrings["sleep_timer", "Sleep timer"],
             value = sleepTimerLabel(sleepTimerMinutes, sleepAfterTrack),
         ) { pickingSleepTimer = true }
-        if (!isOffline) {
-            DesktopMenuRow(Icons.Rounded.Share, DesktopStrings["share", "Share"], onClick = onShare)
-        }
     }
 }
 
@@ -378,15 +405,15 @@ internal fun DesktopMenuSurface(onDismiss: () -> Unit, modifier: Modifier = Modi
 
 @Composable
 private fun MenuCard(menuScrollState: androidx.compose.foundation.ScrollState, modifier: Modifier, content: @Composable () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
-    Box(modifier.widthIn(min = 232.dp, max = 300.dp).desktopMenuGlass(shape, tintAlpha = 0.58f)) {
+    val shape = RoundedCornerShape(20.dp)
+    Box(modifier.widthIn(min = 292.dp, max = 330.dp).desktopMenuGlass(shape, tintAlpha = 0.82f)) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .padding(vertical = 6.dp)
                 // A menu with every optional row on it is taller than a small window; capped and
                 // scrolled rather than run off the screen.
-                .heightIn(max = 460.dp)
+                .heightIn(max = 580.dp)
                 .desktopTopScrollFade(menuScrollState)
                 .verticalScroll(menuScrollState),
         ) {
@@ -462,6 +489,36 @@ private fun DesktopMenuDivider() {
     )
 }
 
+/** Tap targets mirror BitChord mobile's Like / Dislike / Share quick-action row. */
+@Composable
+private fun DesktopMenuQuickAction(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    Column(
+        modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (hovered) DesktopRowHover else Color.Transparent)
+            .hoverable(interaction)
+            .clickable(onClick = onClick)
+            .heightIn(min = 66.dp)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Icon(icon, label, tint = if (selected) DesktopAccent else DesktopForeground,
+            modifier = Modifier.size(26.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold, color = DesktopForeground,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
 /** One menu row. */
 @Composable
 private fun DesktopMenuRow(
@@ -469,6 +526,7 @@ private fun DesktopMenuRow(
     label: String,
     tint: Color? = null,
     value: String = "",
+    description: String? = null,
     selected: Boolean = false,
     enabled: Boolean = true,
     busy: Boolean = false,
@@ -480,12 +538,12 @@ private fun DesktopMenuRow(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 5.dp)
-            .clip(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(if (hovered && enabled) DesktopRowHover else Color.Transparent)
             .hoverable(interaction, enabled = enabled)
             .clickable(enabled = enabled, onClick = onClick)
-            .heightIn(min = 32.dp)
-            .padding(horizontal = 9.dp),
+            .heightIn(min = 44.dp)
+            .padding(horizontal = 11.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (busy) {
@@ -495,18 +553,24 @@ private fun DesktopMenuRow(
                 icon,
                 null,
                 tint = tint ?: if (enabled) DesktopForeground.copy(alpha = 0.82f) else DesktopSecondary,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
-        Spacer(Modifier.width(11.dp))
-        Text(
-            label,
-            Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = tint ?: if (enabled) DesktopForeground else DesktopSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = tint ?: if (enabled) DesktopForeground else DesktopSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            description?.takeIf(String::isNotBlank)?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall,
+                    color = DesktopSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
         if (value.isNotBlank()) {
             Text(value, style = MaterialTheme.typography.bodySmall, color = DesktopSecondary)
         }
