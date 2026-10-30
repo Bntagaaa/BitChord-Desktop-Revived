@@ -21,7 +21,10 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 class DesktopVideoPlayerTest {
-    @Test fun realPlayerUsesOneFullscreenControlAndNoLyricsAcrossReopen() = runDesktopComposeUiTest(width = 1440, height = 900) {
+    @Test fun realPlayerUsesOneFullscreenControlAndNoLyricsAcrossReopen() = verify(1440, 900, true)
+    @Test fun compactPlayerRetainsDesktopWatchView() = verify(800, 560, false)
+
+    private fun verify(width: Int, height: Int, export: Boolean) = runDesktopComposeUiTest(width = width, height = height) {
         var canvasCalls = 0
         val beta = MutableStateFlow(true)
         val host = object : PlayerHost by DesktopPlayerHost {
@@ -68,12 +71,14 @@ class DesktopVideoPlayerTest {
             onNodeWithContentDescription("Lyrics").assertDoesNotExist()
             onAllNodesWithContentDescription("Toggle fullscreen").assertCountEquals(1)
             onNodeWithContentDescription("Fullscreen").assertDoesNotExist()
-            val bitmap = onRoot().captureToImage()
-            val pixels = bitmap.toPixelMap()
-            val output = java.awt.image.BufferedImage(bitmap.width, bitmap.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
-            for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) output.setRGB(x, y, pixels[x, y].toArgb())
-            val target = java.io.File("build/reports/desktop-video-player.png")
-            target.parentFile.mkdirs(); javax.imageio.ImageIO.write(output, "png", target)
+            if (export) {
+                val bitmap = onRoot().captureToImage()
+                val pixels = bitmap.toPixelMap()
+                val output = java.awt.image.BufferedImage(bitmap.width, bitmap.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) output.setRGB(x, y, pixels[x, y].toArgb())
+                val target = java.io.File("build/reports/desktop-video-player.png")
+                target.parentFile.mkdirs(); javax.imageio.ImageIO.write(output, "png", target)
+            }
             onNodeWithContentDescription("Toggle fullscreen").performClick()
             mainClock.advanceTimeBy(300)
             onNodeWithTag("desktop-video-sidebar").assertDoesNotExist()
