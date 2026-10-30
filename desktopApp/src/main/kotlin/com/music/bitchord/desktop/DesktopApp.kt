@@ -967,18 +967,18 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         // desktop; never let a shared running order overwrite the queue restored after leaving or
         // after a process restart.
         if (DesktopListenTogether.state.value.inParty) return
-        persistence.saveQueue(liveQueue.songs)
-        persistence.saveString("queue_index", liveQueue.index.toString())
+        persistence.saveQueue(liveQueue.songs, liveQueue.index)
     }
 
     /** Opens whatever the queue is currently pointing at. */
     fun playCurrent(startPlaying: Boolean = true) {
+        val requestedAt = System.nanoTime()
         val song = liveQueue.current ?: return
         selectedSong = song
         history = (listOf(song) + history.filterNot { it.videoId == song.videoId }).take(50)
+        playbackEngine.load(song, startPlaying, requestedAtNanos = requestedAt)
         saveQueue()
         persistence.saveHistory(history)
-        playbackEngine.load(song, startPlaying)
         partySyncHolder[0]?.onLocalIntent(song.videoId)
         scope.launch { DesktopScrobbling.updateNowPlaying(song) }
     }
@@ -1930,7 +1930,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
     // the next song at a different moment and be dragged back by a correcting seek. The transition a
     // party shares is the plain one. The settings themselves are left alone and come back after.
     val inParty = partyState.inParty
-    LaunchedEffect(automix, crossfadeSeconds, inParty, audioQuality, selectedSong?.videoId, queue, liveQueue.index, shuffle, repeatMode) {
+    LaunchedEffect(automix, crossfadeSeconds, inParty, sleepAfterTrack, audioQuality, selectedSong?.videoId, queue, liveQueue.index, shuffle, repeatMode) {
         playbackEngine.setAutomixEnabled(automix && !inParty)
         playbackEngine.setCrossfadeSeconds(if (inParty) 0 else crossfadeSeconds)
         // Exactly what Next would play, so a crossfade can never blend into anything else. Shuffle
@@ -1939,7 +1939,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
         // Repeat-one prepares nothing: the track ends and [onEnded] starts it again, rather than
         // blending into the next one.
         val next = selectedSong
-            ?.takeIf { repeatMode != DesktopRepeatMode.ONE }
+            ?.takeIf { repeatMode != DesktopRepeatMode.ONE && !inParty && !sleepAfterTrack }
             ?.let { liveQueue.followingFor(it.videoId, repeatAll = repeatMode == DesktopRepeatMode.ALL) }
         playbackEngine.prepareNext(next)
     }
@@ -2842,9 +2842,12 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch) 
             onQuit = {
                 // Native work first: the audio thread and the media controls are inside FFmpeg,
                 // WASAPI and WinRT, and exitProcess would unload those libraries under them.
-                playbackEngine.shutdown()
-                DesktopWindowsMedia.stop()
-                exitProcess(0)
+                scope.launch(Dispatchers.IO) {
+                    DesktopPlaybackWrites.flush()
+                    playbackEngine.shutdown()
+                    DesktopWindowsMedia.stop()
+                    exitProcess(0)
+                }
             },
         )
     }
@@ -7635,6 +7638,7 @@ private fun DesktopSettingsScreen(
                 SettingsGroup(DesktopStrings["storage", "Storage"]) {
                     var limitMb by remember { mutableStateOf(DesktopMediaCache.limitMb()) }
                     var cleared by remember { mutableStateOf<String?>(null) }
+                    val cacheScope = rememberCoroutineScope()
                     if (settingsRowVisible(DesktopStrings["song_cache_limit", "Song cache limit"])) {
                     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                         Text(DesktopStrings["song_cache_limit", "Song cache limit"], style = MaterialTheme.typography.bodyLarge)
@@ -7643,7 +7647,7 @@ private fun DesktopSettingsScreen(
                                 "Keeps up to ${formatCacheSize(limitMb)} of downloaded audio on disk. " +
                                     "This can take a noticeable share of your free space."
                             } else {
-                                "Keeps downloaded audio on disk for instant seeking and replays"
+                                "Keeps media on disk. Playback audio ranges use a separate cache capped at 256 MB."
                             },
                             color = DesktopSecondary,
                             style = MaterialTheme.typography.bodySmall,
@@ -7665,8 +7669,11 @@ private fun DesktopSettingsScreen(
                         "Clear song cache",
                         cleared ?: "Frees space used by downloaded audio",
                     ) {
-                        DesktopMediaCache.clear()
-                        cleared = "Song cache cleared"
+                        cacheScope.launch(Dispatchers.IO) {
+                            DesktopMediaCache.clear()
+                            DesktopAudioCache.shared.clear()
+                            withContext(Dispatchers.Main) { cleared = "Song cache cleared" }
+                        }
                     }
                     var imagesCleared by remember { mutableStateOf(false) }
                     SettingsRow(

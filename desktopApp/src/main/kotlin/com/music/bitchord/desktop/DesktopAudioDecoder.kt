@@ -3,6 +3,8 @@ package com.music.bitchord.desktop
 import org.bytedeco.ffmpeg.avcodec.AVCodecContext
 import org.bytedeco.ffmpeg.avcodec.AVPacket
 import org.bytedeco.ffmpeg.avformat.AVFormatContext
+import org.bytedeco.ffmpeg.avformat.AVIOInterruptCB
+import org.bytedeco.ffmpeg.global.avutil.av_dict_free
 import org.bytedeco.ffmpeg.avformat.AVInputFormat
 import org.bytedeco.ffmpeg.avutil.AVChannelLayout
 import org.bytedeco.ffmpeg.avutil.AVDictionary
@@ -82,6 +84,8 @@ internal data class DesktopPcmFormat(
 /** Audio decoding, by way of FFmpeg. */
 internal class DesktopAudioDecoder : DesktopSampleSource {
 
+    private var interrupt: AVIOInterruptCB.Callback_Pointer? = null
+    private var trace: DesktopPlaybackTrace? = null
     private var format: AVFormatContext? = null
     private var codec: AVCodecContext? = null
     private var resampler: SwrContext? = null
@@ -139,6 +143,9 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         windowed: Boolean = false,
         /** Explicit demuxer for an extensionless add-on manifest. */
         transport: String? = null,
+        cacheIdentity: String = "",
+        cancelled: () -> Boolean = { false },
+        trace: DesktopPlaybackTrace? = null,
     ): Result<Unit> = runCatching {
         av_log_set_level(AV_LOG_ERROR)
         ensureNetwork()
@@ -158,17 +165,27 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         av_dict_set(options, "reconnect_delay_max", "5", 0)
         av_dict_set(options, "rw_timeout", "15000000", 0)
 
-        val opened = if (windowed) windowedContext(url, headers) else AVFormatContext(null)
+        this.trace = trace
+        val opened = if (windowed) windowedContext(url, headers, cacheIdentity, cancelled) else avformat_alloc_context()
+        format = opened
+        interrupt = object : AVIOInterruptCB.Callback_Pointer() {
+            override fun call(opaque: Pointer?): Int = if (Thread.currentThread().isInterrupted || cancelled()) 1 else 0
+        }
+        opened.interrupt_callback().callback(interrupt)
         // The code matters.
         val inputFormat: AVInputFormat? = when (transport?.lowercase()) {
             DesktopAddonStream.HLS -> av_find_input_format("hls")
             DesktopAddonStream.DASH -> av_find_input_format("dash")
             else -> null
         }
-        val status = avformat_open_input(opened, if (windowed) null as String? else url, inputFormat, options)
+        val status = try {
+            avformat_open_input(opened, if (windowed) null as String? else url, inputFormat, options)
+        } finally { av_dict_free(options) }
         check(status >= 0) { "could not open stream (${describe(status)})" }
+        trace?.mark("input")
         format = opened
         check(avformat_find_stream_info(opened, null as AVDictionary?) >= 0) { "no stream info" }
+        trace?.mark("probe")
 
         streamIndex = bestRendition(opened)
             ?: av_find_best_stream(opened, AVMEDIA_TYPE_AUDIO, -1, -1, null as org.bytedeco.ffmpeg.avcodec.AVCodec?, 0)
@@ -190,11 +207,13 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         val parameters = stream.codecpar()
         val decoder = avcodec_find_decoder(parameters.codec_id()) ?: error("no decoder for stream")
         val context = avcodec_alloc_context3(decoder)
+        codec = context
         check(avcodec_parameters_to_context(context, parameters) >= 0) { "bad codec parameters" }
         // Lets the decoder keep frame timestamps right when it trims priming samples (Opus's
         // pre-skip, an MP3's encoder delay), which the seek trim in [convert] reads.
         context.pkt_timebase(timeBase)
         check(avcodec_open2(context, decoder, null as AVDictionary?) >= 0) { "decoder refused to open" }
+        trace?.mark("open")
         codec = context
 
         durationUs = when {
@@ -209,7 +228,16 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         packet = av_packet_alloc()
         frame = av_frame_alloc()
         drained = false
-    }.onFailure { close() }
+    }.recoverCatching { failure ->
+        val nativeFallback = windowed && rangeSource?.unsupportedRange == true
+        close()
+        if (nativeFallback && !cancelled() && !Thread.currentThread().isInterrupted) {
+            // A large server response ignoring Range must stream through native HTTP, not be
+            // buffered as an entire file in the JVM or rejected as an unsupported codec.
+            open(url, headers, requested, windowed = false, transport = transport,
+                cacheIdentity = cacheIdentity, cancelled = cancelled, trace = trace).getOrThrow()
+        } else throw failure
+    }
 
     /**
      * The rendition to play when a container offers more than one audio stream — lossless first,
@@ -267,8 +295,8 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
      * A format context reading through [DesktopRangeStream] rather than through FFmpeg's own HTTP
      * client.
      */
-    private fun windowedContext(url: String, headers: Map<String, String>): AVFormatContext {
-        val source = DesktopRangeStream(url, headers)
+    private fun windowedContext(url: String, headers: Map<String, String>, cacheIdentity: String, cancelled: () -> Boolean): AVFormatContext {
+        val source = DesktopRangeStream(url, headers, cacheIdentity = cacheIdentity, cancelled = cancelled)
         val scratch = ByteArray(IO_BUFFER_BYTES)
         val read = object : Read_packet_Pointer_BytePointer_int() {
             override fun call(opaque: Pointer?, buffer: BytePointer?, size: Int): Int {
@@ -370,6 +398,7 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
             )
         }
         sampleCount = count
+        if (count > 0) trace?.mark("pcm")
         return samples
     }
 
@@ -442,6 +471,7 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         val buffer = BytePointer(bytes)
         outputBuffer = buffer
         outputBufferSamples = samples
+        outputPlanes?.deallocate()
         outputPlanes = PointerPointer<BytePointer>(1L).apply { put(0L, buffer) }
     }
 
@@ -478,6 +508,8 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         resampler = null
         codec = null
         format = null
+        interrupt?.deallocate()
+        interrupt = null
         outputBuffer = null
         outputPlanes = null
         outputBufferSamples = 0
@@ -512,7 +544,7 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
 
         private var networkReady = false
 
-        fun ensureNetwork() {
+        @Synchronized fun ensureNetwork() {
             if (networkReady) return
             avformat_network_init()
             networkReady = true

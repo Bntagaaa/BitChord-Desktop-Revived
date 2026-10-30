@@ -43,7 +43,7 @@ internal class DesktopDecodeAhead(
     val durationUs: Long?,
     val measuredFormat: DesktopStreamFormat?,
     /** How far ahead to decode, in samples across all channels. */
-    private val aheadSamples: Int = outputFormat.sampleRate * outputFormat.channels * AHEAD_SECONDS,
+    private var aheadSamples: Int = outputFormat.sampleRate * outputFormat.channels * AHEAD_SECONDS,
     name: String = "BitChord-Decode",
 ) {
 
@@ -76,6 +76,12 @@ internal class DesktopDecodeAhead(
         start()
     }
 
+    /** Expand a speculative opening to the normal underrun-recovery budget when selected. */
+    fun prepareForPlayback() = lock.withLock {
+        aheadSamples = maxOf(aheadSamples, outputFormat.sampleRate * outputFormat.channels * AHEAD_SECONDS)
+        wake.signalAll()
+    }
+
     /** The next decoded block, waiting for the decoder only if it has fallen behind. */
     fun readSamples(): FloatArray? = readSamples(Long.MAX_VALUE)
 
@@ -106,7 +112,10 @@ internal class DesktopDecodeAhead(
         if (block == null) {
             sampleCount = 0
             if (lifecycle == DesktopDecodeState.RUNNING) {
-                if (underrunSinceNanos == 0L) underrunSinceNanos = System.nanoTime()
+                if (underrunSinceNanos == 0L) {
+                    underrunSinceNanos = System.nanoTime()
+                    if (started && DesktopPlaybackDiagnostics.enabled) DesktopPlaybackDiagnostics.underruns.incrementAndGet()
+                }
             } else {
                 underrunSinceNanos = 0L
             }
