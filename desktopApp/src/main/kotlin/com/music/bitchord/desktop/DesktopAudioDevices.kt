@@ -30,6 +30,9 @@ internal object DesktopAudioDevices {
     fun select(id: String) {
         DesktopPersistence().saveString(KEY_DEVICE, id)
         _selected.value = id
+        if (DesktopPlatform.isLinux) {
+            Thread({ DesktopLinuxPulseAudio.route(id) }, "BitChord-Audio-Route").apply { isDaemon = true; start() }
+        }
     }
 
     private val _changes = MutableStateFlow(0)
@@ -53,7 +56,7 @@ internal object DesktopAudioDevices {
                 return endpoints
             }
         }
-        return runCatching {
+        val mixers = runCatching {
             AudioSystem.getMixerInfo()
                 .filter { info ->
                     runCatching {
@@ -63,7 +66,24 @@ internal object DesktopAudioDevices {
                 .map { DesktopAudioDevice(it.name, it.name, it.description.orEmpty()) }
                 .distinctBy { it.id }
         }.getOrDefault(emptyList())
+        if (DesktopPlatform.isLinux) {
+            val sinks = DesktopLinuxPulseAudio.sinks()
+            if (sinks != null) return sinks + mixers
+        }
+        return mixers
     }
+
+    /**
+     * Java Sound exposes raw ALSA plughw endpoints as separate mixers on Linux.
+     * Keep them selectable for users needing direct hardware access, but do not
+     * crowd the everyday output picker with inactive HDMI/PCM subdevices.
+     * This is presentation only: the selected mixer id and playback path stay unchanged.
+     */
+    fun isAdvancedDevice(device: DesktopAudioDevice): Boolean =
+        DesktopPlatform.isLinux && (
+            device.name.contains("plughw:", ignoreCase = true) ||
+            device.name.contains("hw:", ignoreCase = true)
+        )
 
     /** A choice stored by mixer name before endpoint ids, moved onto the endpoint of that name. */
     private fun adoptLegacyChoice(endpoints: List<DesktopAudioDevice>) {
@@ -79,7 +99,7 @@ internal object DesktopAudioDevices {
      * headphones get unplugged, and that should not stop playback.
      */
     fun mixerFor(id: String): Mixer? {
-        if (id == SYSTEM_DEFAULT) return null
+        if (id == SYSTEM_DEFAULT || id.startsWith(DesktopLinuxPulseAudio.PREFIX)) return null
         return runCatching {
             AudioSystem.getMixerInfo()
                 .firstOrNull { it.name == id }
