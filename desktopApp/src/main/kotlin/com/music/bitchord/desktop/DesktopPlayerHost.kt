@@ -67,7 +67,7 @@ internal object DesktopPlayerHost : PlayerHost {
     }
     override val musicVideoAspect = DesktopMusicVideo.aspect
     override val musicVideoQuality = DesktopMusicVideo.quality
-    override fun setMusicVideoQuality(height: Int?) { DesktopMusicVideo.held.value = height }
+    override fun setMusicVideoQuality(height: Int?) { DesktopMusicVideo.setQuality(height) }
     @Composable
     override fun MusicVideo(videoId: String, fit: Boolean, onRenderedChanged: (Boolean) -> Unit, modifier: Modifier) {
         DesktopMusicVideoSurface(videoId, fit, onRenderedChanged, modifier)

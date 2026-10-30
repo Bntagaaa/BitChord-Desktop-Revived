@@ -144,6 +144,15 @@ internal object DesktopMusicVideo {
                 override fun close() = decoder.close()
             }
         }, onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") }, enabled = DesktopVideoBeta.enabled)
+    private const val QUALITY_KEY = "music_video_quality"
+    init {
+        session.held.value = DesktopPersistence().int(QUALITY_KEY, 0).takeIf { it in 144..4320 }
+    }
+    fun setQuality(height: Int?) {
+        val quality = height?.takeIf { it in 144..4320 }
+        session.held.value = quality
+        scope.launch { DesktopPersistence().saveInt(QUALITY_KEY, quality ?: 0) }
+    }
     val held get() = session.held
     val quality get() = session.quality
     val aspect get() = session.aspect
