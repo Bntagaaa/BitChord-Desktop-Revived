@@ -4836,10 +4836,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             onLoadMore = ::loadMoreCollectionSongs,
                             onRename = { overlays.rename = true }.takeIf { openedCollection?.owned == true },
                             onShare = openedCollection
-                                ?.takeIf {
-                                    (it.type == BrowseType.ALBUM || it.type == BrowseType.PLAYLIST) &&
-                                        !it.browseId.startsWith(SPOTIFY_PAGE_PREFIX)
-                                }
+                                ?.takeIf { it.type == BrowseType.ALBUM || it.type == BrowseType.PLAYLIST }
                                 ?.let { collection -> { shareCollection(collection) } },
                             onDelete = { overlays.delete = true }.takeIf { openedCollection?.owned == true },
                             onRemoveFromPlaylist = ::removeFromOpenPlaylist
@@ -4852,6 +4849,26 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                 playSpotifyOrYoutubeSongs(songs.shuffled(), 0, openedCollection?.let { collectionSource(it) })
                             },
                             onDownloadAll = ::downloadAll,
+                            signedIn = youtubeSignedIn,
+                            onLibraryChanged = ::reloadLibrary,
+                            onStartMix = ::startRadio,
+                            onQueueSongs = { tracks, next ->
+                                if (next) tracks.asReversed().forEach(::playNext)
+                                else tracks.forEach(::addToQueue)
+                            },
+                            songMenu = { track, index ->
+                                if (track.unresolvedSpotifyTrack() == null) {
+                                    songMenu(track)
+                                } else {
+                                    DesktopSpotifyPendingSongMenu {
+                                        openedCollection?.let { collection ->
+                                            playSpotifyOrYoutubeSongs(
+                                                collection.songs, index, collectionSource(collection),
+                                            )
+                                        }
+                                    }
+                                }
+                            },
                             animatedCanvas = animatedCanvas,
                             onToggleLike = { song ->
                                 toggleLike(song)
@@ -8487,6 +8504,11 @@ private fun DesktopCollectionPage(
     onPlaySongs: (List<Song>, Int) -> Unit,
     onShuffle: (List<Song>) -> Unit,
     onDownloadAll: (List<Song>) -> Unit,
+    signedIn: Boolean,
+    onLibraryChanged: () -> Unit,
+    onStartMix: (Song) -> Unit,
+    onQueueSongs: (List<Song>, Boolean) -> Unit,
+    songMenu: @Composable (Song, Int) -> Unit,
     animatedCanvas: Boolean,
     onToggleLike: (Song) -> Unit,
     onDownload: (Song) -> Unit,
@@ -8508,6 +8530,19 @@ private fun DesktopCollectionPage(
         }
     }
     var moreOpen by remember(collection.browseId) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val pinnedIds by DesktopAppUiHost.pinnedPlaylists.collectAsState()
+    val playableSongs = remember(songs) { songs.filter { it.unresolvedSpotifyTrack() == null } }
+    // A saved YouTube playlist/album can be toggled from its overflow. Spotify playlists
+    // have no YouTube library state and are never rated against a Spotify identifier.
+    var libraryState by remember(collection.browseId) {
+        mutableStateOf<com.music.bitchord.data.model.LibraryState?>(null)
+    }
+    LaunchedEffect(collection.browseId, signedIn) {
+        libraryState = if (signedIn && !collection.browseId.startsWith(SPOTIFY_PAGE_PREFIX)) {
+            YtMusicRepository.releaseLibraryState(collection.browseId).getOrNull()
+        } else null
+    }
     val subtitleParts = collection.subtitle
         .split(" • ", " · ", " | ")
         .map(String::trim)
@@ -8628,45 +8663,53 @@ private fun DesktopCollectionPage(
                             )
                             Box {
                                 DesktopCircleButton(Icons.Rounded.MoreHoriz, DesktopStrings["more", "More"], onClick = { moreOpen = true })
-                                DesktopDropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
-                                    DropdownMenuItem(
-                                        text = { Text(DesktopStrings["download_all", "Download all"]) },
-                                        leadingIcon = { Icon(BitChordIcons.Download, null) },
-                                        onClick = {
-                                            moreOpen = false
-                                            onDownloadAll(songs.filter { it.unresolvedSpotifyTrack() == null })
-                                        },
+                                if (moreOpen) {
+                                    DesktopCollectionContextMenu(
+                                        actions = DesktopCollectionMenuActions(
+                                            onShuffle = { onShuffle(songs) },
+                                            onFind = {
+                                                searching = !searching
+                                                if (!searching) listQuery = ""
+                                            },
+                                            onStartMix = playableSongs.firstOrNull()?.let { seed ->
+                                                { onStartMix(seed) }
+                                            },
+                                            onPlayNext = playableSongs.takeIf(List<Song>::isNotEmpty)?.let { queue ->
+                                                { onQueueSongs(queue, true) }
+                                            },
+                                            onAddToQueue = playableSongs.takeIf(List<Song>::isNotEmpty)?.let { queue ->
+                                                { onQueueSongs(queue, false) }
+                                            },
+                                            onDownloadAll = playableSongs.takeIf(List<Song>::isNotEmpty)?.let { ready ->
+                                                { onDownloadAll(ready) }
+                                            },
+                                            onShare = onShare,
+                                            onSaveToLibrary = libraryState?.let { status ->
+                                                {
+                                                    scope.launch {
+                                                        YtMusicRepository.setSaved(status.playlistId, !status.saved)
+                                                            .onSuccess {
+                                                                libraryState = status.copy(saved = !status.saved)
+                                                                onLibraryChanged()
+                                                            }
+                                                            .onFailure {
+                                                                DesktopPlayerHost.showMessage(
+                                                                    "Could not update library: ${it.message ?: "Unknown error"}",
+                                                                )
+                                                            }
+                                                    }
+                                                }
+                                            },
+                                            savedToLibrary = libraryState?.saved == true,
+                                            onPin = if (collection.type == BrowseType.PLAYLIST) {
+                                                { DesktopAppUiHost.togglePinnedPlaylist(collection.browseId) }
+                                            } else null,
+                                            pinned = collection.browseId in pinnedIds,
+                                            onRename = onRename,
+                                            onDelete = onDelete,
+                                        ),
+                                        onDismiss = { moreOpen = false },
                                     )
-                                    onShare?.let { share ->
-                                        DropdownMenuItem(
-                                            text = { Text(DesktopStrings["share", "Share"]) },
-                                            leadingIcon = { Icon(Icons.Rounded.Share, null) },
-                                            onClick = {
-                                                moreOpen = false
-                                                share()
-                                            },
-                                        )
-                                    }
-                                    onRename?.let { rename ->
-                                        DropdownMenuItem(
-                                            text = { Text(DesktopStrings["rename", "Rename"]) },
-                                            leadingIcon = { Icon(Icons.Rounded.Edit, null) },
-                                            onClick = {
-                                                moreOpen = false
-                                                rename()
-                                            },
-                                        )
-                                    }
-                                    onDelete?.let { delete ->
-                                        DropdownMenuItem(
-                                            text = { Text(DesktopStrings["delete", "Delete"]) },
-                                            leadingIcon = { Icon(Icons.Rounded.Delete, null) },
-                                            onClick = {
-                                                moreOpen = false
-                                                delete()
-                                            },
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -8702,6 +8745,7 @@ private fun DesktopCollectionPage(
                     downloadInProgress = song.videoId in downloadInProgress,
                     number = index + 1,
                     onRemove = onRemoveFromPlaylist?.takeIf { song.setVideoId != null },
+                    menu = { songMenu(song, index) },
                 )
             }
             if (collection.continuation != null) {
@@ -8731,7 +8775,7 @@ private fun DesktopCollectionPage(
  * table whichever rows can be removed.
  */
 private fun collectionActionsWidth(hasRemove: Boolean): Dp =
-    if (hasRemove) 136.dp else 102.dp
+    if (hasRemove) 170.dp else 136.dp
 
 @Composable
 private fun DesktopCollectionSongRow(
@@ -8749,6 +8793,7 @@ private fun DesktopCollectionSongRow(
     striped: Boolean,
     /** Takes this row out of the playlist being read. */
     onRemove: ((Song) -> Unit)? = null,
+    menu: (@Composable (Song) -> Unit)? = null,
 ) {
     val rowHoverInteraction = remember { MutableInteractionSource() }
     val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
@@ -8857,6 +8902,9 @@ private fun DesktopCollectionSongRow(
                     Icon(BitChordIcons.Plus, DesktopStrings["add_to_playlist", "Add to playlist"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))
                 }
             }
+            // The trailing ellipsis is always on the right of '+' and shares the main
+            // player song menu. Spotify placeholders show a safe matching action instead.
+            menu?.invoke(song)
         }
     }
 }
