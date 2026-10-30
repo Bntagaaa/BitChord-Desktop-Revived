@@ -75,6 +75,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     val raiseRequest by DesktopWindowVisibility.raiseRequest.collectAsState()
     // Hoisted so the player can fill the screen and system caption actions stay synchronized.
     val placement by DesktopWindowMode.placement.collectAsState()
+    val fullScreen by DesktopWindowMode.fullScreen.collectAsState()
     val state = rememberWindowState(width = 1_220.dp, height = 780.dp)
     val pipHost = remember { DesktopPipHost() }
     val appIcon by DesktopAppIconSettings.selected.collectAsState()
@@ -104,6 +105,19 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         resizable = true,
     ) {
         val composeWindow = window
+        // Windows native borderless fullscreen preserves the Skiko window surface.
+        // Do not route through WindowPlacement.Maximized (which retains the caption).
+        LaunchedEffect(composeWindow, fullScreen) {
+            if (DesktopPlatform.isWindows) {
+                java.awt.EventQueue.invokeLater {
+                    DesktopWindowsFullscreen.apply(composeWindow, fullScreen)
+                }
+            }
+        }
+        DisposableEffect(composeWindow) {
+            onDispose { if (DesktopPlatform.isWindows) DesktopWindowsFullscreen.apply(composeWindow, false) }
+        }
+
         // The AppImage updater must never treat merely spawning the JVM as a healthy restart.
         // A real, mapped Compose window acknowledges the launch using a unique local marker.
         LaunchedEffect(composeWindow) {
