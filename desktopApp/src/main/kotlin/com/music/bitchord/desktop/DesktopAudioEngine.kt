@@ -529,7 +529,9 @@ class DesktopPlaybackEngine internal constructor(
                     if (current.streamFormat?.isDolbyAtmos == true) return@launch
                     if (DesktopMusicSources.ceiling(null) != DesktopAudioQuality.LOSSLESS) return@launch
                     val playing = DesktopStream(url = "", format = current.streamFormat ?: DesktopStreamFormat(), sourceId = current.streamSourceId)
-                    if (take(song, DesktopMusicSources.upgradeFor(song, playing))) return@launch
+                    if (take(song, DesktopMusicSources.upgradeFor(
+                        song, playing, excludedSourceId = refusedSources[song.videoId],
+                    ))) return@launch
                 }
                 DesktopTrackLog.log("no better copy of '${song.title}' was found")
             } finally {
@@ -548,6 +550,10 @@ class DesktopPlaybackEngine internal constructor(
         if (better == null) return false
         val current = _state.value
         if (current.song?.videoId != song.videoId) return true
+        if (better.sourceId != null && refusedSources[song.videoId] == better.sourceId) {
+            DesktopTrackLog.log("ignoring previously failed quality source for '${song.title}'")
+            return false
+        }
         if (!DesktopMusicSources.worthSwapping(better.format, current.streamFormat)) {
             DesktopTrackLog.log(
                 "keeping '${song.title}' on what is playing — " +
@@ -567,7 +573,7 @@ class DesktopPlaybackEngine internal constructor(
     private fun swapStream(song: Song, stream: DesktopStream, positionMs: Long) {
         val generation = loadGeneration.get()
         scope.launch {
-            openTrack(song, stream, positionMs).fold(
+            openTrack(song, stream, positionMs, verifyFirstAudio = true).fold(
                 onSuccess = { track ->
                     val latest = _state.value
                     if (latest.song?.videoId != song.videoId) {
@@ -588,9 +594,14 @@ class DesktopPlaybackEngine internal constructor(
                         "could not open the copy of '${song.title}' from " +
                             "${DesktopMusicSources.sourceNameFor(stream)}: ${failure.message}",
                     )
-                    _state.update { it.copy(
-                        error = "Could not switch version: ${failure.message ?: "that copy would not open"}",
-                    ) }
+                    stream.sourceId?.takeUnless { it == "youtube" }?.let {
+                        refusedSources[song.videoId] = it
+                    }
+                    // The original PCM is still playing: report the rejected upgrade as a
+                    // nonfatal source issue rather than putting the player in an error state.
+                    if (_state.value.song?.videoId == song.videoId) {
+                        DesktopPlayerHost.showMessage("Lossless source unavailable; continuing current playback")
+                    }
                 },
             )
         }
@@ -600,14 +611,19 @@ class DesktopPlaybackEngine internal constructor(
     fun reloadCurrent(forceSourceRefresh: Boolean = false) {
         val current = _state.value
         val song = current.song ?: return
-        if (forceSourceRefresh) DesktopAddonSource.clearCompletedTrackCalls()
+        if (forceSourceRefresh) {
+            DesktopAddonSource.clearCompletedTrackCalls()
+            refusedSources.remove(song.videoId)
+        }
         upgradeJob?.cancel()
         DesktopTrackLog.log(
             "re-opening '${song.title}' — pinned to the original: " +
                 "${DesktopOriginalVersion.isPinned(song.videoId)}",
         )
         scope.launch {
-            DesktopMusicSources.resolve(song, audioQuality).fold(
+            DesktopMusicSources.resolve(
+                song, audioQuality, excludedSourceId = refusedSources[song.videoId],
+            ).fold(
                 onSuccess = { stream ->
                     if (_state.value.song?.videoId != song.videoId) return@fold
                     DesktopTrackLog.log("re-opened from ${DesktopMusicSources.sourceNameFor(stream)}")
@@ -656,9 +672,13 @@ class DesktopPlaybackEngine internal constructor(
         _state.update { it.copy(volume = volume) }
     }
 
-    /** Sets the source quality ceiling used the next time a track is resolved. */
+    /** A quality change gives previously refused providers a fresh chance. */
     fun setAudioQuality(quality: String) {
-        audioQuality = quality.uppercase()
+        val next = quality.uppercase()
+        if (audioQuality != next) {
+            audioQuality = next
+            refusedSources.clear()
+        }
     }
 
     fun setCrossfadeSeconds(seconds: Int) {

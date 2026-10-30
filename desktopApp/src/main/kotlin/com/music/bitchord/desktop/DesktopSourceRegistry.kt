@@ -435,6 +435,7 @@ internal object DesktopSourceRegistry {
         song: Song,
         playing: DesktopStream?,
         quality: String? = null,
+        excludedSourceId: String? = null,
     ): DesktopStream? {
         // This is an explicit second look. Empty catalogue answers and failed/expired stream URLs
         // from the first pass must not make the retry a cache hit.
@@ -442,7 +443,9 @@ internal object DesktopSourceRegistry {
         val playingRank = configs().firstOrNull { it.id == playing?.sourceId }?.kind?.rank
             ?: DesktopSourceKind.YOUTUBE.rank
         val better = playbackAdapters(quality).filter {
-            it.config.kind != DesktopSourceKind.YOUTUBE && it.config.kind.rank < playingRank
+            it.config.kind != DesktopSourceKind.YOUTUBE &&
+                it.config.id != excludedSourceId &&
+                it.config.kind.rank < playingRank
         }
         if (better.isEmpty()) return null
         DesktopTrackLog.log(
