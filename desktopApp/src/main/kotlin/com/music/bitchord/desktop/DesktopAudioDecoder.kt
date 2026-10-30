@@ -32,6 +32,7 @@ import org.bytedeco.ffmpeg.global.avformat.avformat_find_stream_info
 import org.bytedeco.ffmpeg.global.avformat.avformat_network_init
 import org.bytedeco.ffmpeg.global.avformat.avformat_open_input
 import org.bytedeco.ffmpeg.global.avutil.AVERROR_EOF
+import org.bytedeco.ffmpeg.global.avutil.AVERROR_EAGAIN
 import org.bytedeco.ffmpeg.global.avutil.AVMEDIA_TYPE_AUDIO
 import org.bytedeco.ffmpeg.global.avutil.AV_LOG_ERROR
 import org.bytedeco.ffmpeg.global.avutil.AV_NOPTS_VALUE
@@ -378,7 +379,12 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
                 continue
             }
             if (received == AVERROR_EOF) return null
-            // Every other negative means "not enough input yet".
+            // Only EAGAIN asks for another packet. Invalid-data and I/O errors are
+            // real failures, not "not enough input": masking them as buffering made
+            // broken lossless streams report Playing with no PCM.
+            if (received != AVERROR_EAGAIN()) {
+                error("audio decode failed (${describe(received)})")
+            }
             if (!pump(container, pkt, context)) return null
         }
     }
@@ -410,13 +416,28 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
     private fun pump(container: AVFormatContext, pkt: AVPacket, context: AVCodecContext): Boolean {
         if (drained) return false
         val read = av_read_frame(container, pkt)
+        if (read == AVERROR_EAGAIN()) {
+            // Live DASH/HLS may temporarily have no packet; this isn't EOF.
+            Thread.sleep(10)
+            return true
+        }
         if (read < 0) {
-            avcodec_send_packet(context, null as AVPacket?)
+            if (read != AVERROR_EOF) error("audio packet read failed (${describe(read)})")
+            val flush = avcodec_send_packet(context, null as AVPacket?)
+            if (flush < 0 && flush != AVERROR_EOF) {
+                error("audio decoder drain failed (${describe(flush)})")
+            }
             drained = true
             return true
         }
-        if (pkt.stream_index() == streamIndex) avcodec_send_packet(context, pkt)
-        av_packet_unref(pkt)
+        try {
+            if (pkt.stream_index() == streamIndex) {
+                val submitted = avcodec_send_packet(context, pkt)
+                if (submitted < 0) error("audio packet rejected (${describe(submitted)})")
+            }
+        } finally {
+            av_packet_unref(pkt)
+        }
         return true
     }
 
@@ -428,7 +449,8 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         val planes = outputPlanes ?: return null
 
         val produced = swr_convert(swr, planes, capacity, decoded.data(), decoded.nb_samples())
-        if (produced <= 0) return ByteArray(0)
+        if (produced < 0) error("audio resampler failed (${describe(produced)})")
+        if (produced == 0) return ByteArray(0)
 
         val stamp = decoded.best_effort_timestamp().takeIf { it != AV_NOPTS_VALUE } ?: decoded.pts()
         val frameUs = if (stamp != AV_NOPTS_VALUE) {
