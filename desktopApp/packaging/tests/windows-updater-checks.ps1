@@ -69,7 +69,17 @@ if ($Artifacts) {
     $database = $windowsInstaller.OpenDatabase([IO.Path]::GetFullPath($msi), 0)
     function Property([string]$Name) {
         $view = $database.OpenView("SELECT Value FROM Property WHERE Property='$Name'")
-        $view.Execute(); $record = $view.Fetch(); $value = $record.StringData(1); $view.Close(); return $value
+        try {
+            # COM method calls can write additional pipeline objects in PowerShell.
+            # Only the actual MSI Property.Value must leave this function.
+            $null = $view.Execute()
+            $record = $view.Fetch()
+            if ($null -eq $record) { throw "Required MSI property '$Name' is missing" }
+            $value = [string]$record.StringData(1)
+            return $value.Trim()
+        } finally {
+            $null = $view.Close()
+        }
     }
     $nativeVersion = (Property 'ProductVersion').Trim()
     $upgrade = (Property 'UpgradeCode').Trim()
