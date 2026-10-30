@@ -10,6 +10,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -38,11 +44,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.model.HomeShelf
@@ -86,9 +94,8 @@ fun LibraryScreen(
     onNewPlaylist: () -> Unit,
     onImportSpotifyPlaylist: (() -> Unit)? = null,
     /**
-     * A shelf's "Show all" — every shelf's row here stops at five cards (see
-     * [LibraryGridShelf]), so this is the only way to reach whatever didn't
-     * fit.
+     * A shelf's "Show all" opens the full grid. Playlists also scroll horizontally
+     * after the initial four-card viewport, like shelves on Home.
      */
     onShowAll: (HomeShelf) -> Unit,
     /**
@@ -116,6 +123,7 @@ fun LibraryScreen(
     deviceItems: List<ShelfItem>,
     /** The big "Library" heading; the desktop's pages carry none. */
     showTitle: Boolean = true,
+    animateHover: Boolean = true,
 ) {
     val pinnedPlaylists by AppUi.host.pinnedPlaylists.collectAsStateWithLifecycle()
     val compactHeadings = LocalDesktopCompactHeadings.current
@@ -144,7 +152,7 @@ fun LibraryScreen(
             }
             item(key = "replay") { replay() }
             if (links.isNotEmpty()) {
-                item(key = "links") { LibraryLinkList(links = links, onClick = onShelfItemClick) }
+                item(key = "links") { LibraryLinkList(links = links, onClick = onShelfItemClick, animateHover = animateHover) }
             }
             if (deviceItems.isNotEmpty()) {
                 item(key = "shelf:$onDevice") {
@@ -241,15 +249,24 @@ data class LibraryLink(val item: ShelfItem, val icon: ImageVector, val logo: Dra
  * look alike because none of them has artwork.
  */
 @Composable
-private fun LibraryLinkList(links: List<LibraryLink>, onClick: (ShelfItem) -> Unit) {
+private fun LibraryLinkList(links: List<LibraryLink>, onClick: (ShelfItem) -> Unit, animateHover: Boolean) {
     Column(Modifier.padding(top = 4.dp, bottom = 22.dp)) {
         links.forEachIndexed { index, link ->
+            val interaction = remember(link.item.browseId) { MutableInteractionSource() }
+            val hovered by interaction.collectIsHoveredAsState()
+            val background by animateColorAsState(
+                targetValue = if (hovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.065f) else Color.Transparent,
+                animationSpec = tween(durationMillis = if (animateHover) 150 else 0),
+                label = "library-link-hover",
+            )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 54.dp)
-                    .clickable { onClick(link.item) }
+                    .background(background, RoundedCornerShape(8.dp))
+                    .hoverable(interaction)
+                    .clickable(interactionSource = interaction, indication = null) { onClick(link.item) }
                     .padding(horizontal = PAGE_GUTTER),
             ) {
                 if (link.logo != null) {
@@ -320,13 +337,14 @@ private fun PlaylistShelf(
         onItemLongPress = onItemLongPress,
         onShowAll = onShowAll,
         pinnedPlaylists = pinnedPlaylists,
-        leadingCard = {
+        leadingCard = { cardWidth ->
             Row(horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING)) {
                 NewShelfCard(
                     icon = BitChordIcons.Plus,
                     label = stringResource(Res.string.new_playlist),
                     subtitle = stringResource(Res.string.saved_to_youtube_music),
                     onClick = onNewPlaylist,
+                    modifier = Modifier.width(cardWidth),
                 )
                 if (onImportSpotifyPlaylist != null) {
                     NewShelfCard(
@@ -335,6 +353,7 @@ private fun PlaylistShelf(
                         subtitle = stringResource(Res.string.import_spotify_subtitle),
                         onClick = onImportSpotifyPlaylist,
                         logo = Res.drawable.spotify_logo,
+                        modifier = Modifier.width(cardWidth),
                     )
                 }
             }
@@ -342,18 +361,15 @@ private fun PlaylistShelf(
     )
 }
 
-/** A Library shelf's preview row never swipes past this many cards. */
+/** How many playlist tiles fit into the first desktop viewport (including New playlist). */
+private const val LIBRARY_PLAYLIST_VISIBLE_CARDS = 4
+/** Other shelves keep their existing compact previews. */
 private const val LIBRARY_ROW_MAX_ITEMS = 5
 
 /**
- * A Library shelf: a sideways-scrolling row of [SHELF_CARD_WIDTH] cards, the
- * same as every other shelf, but stopped at [LIBRARY_ROW_MAX_ITEMS] rather
- * than left to run the shelf's whole length — with a "Show all" beside the
- * title whenever there's more than that, opening the rest as a
- * vertically-scrolling grid instead. See [LibraryGridPage].
- *
- * [leadingCard], if given, occupies the first slot and counts against that
- * cap — see [PlaylistShelf].
+ * Playlist rows use the same lazy horizontal carousel and mouse-wheel/arrow controls as Home.
+ * Four cards fit in the viewport, but the remaining playlists stay reachable by scrolling;
+ * Show all remains available for the full vertical grid. Other shelves keep their preview cap.
  */
 @Composable
 internal fun LibraryGridShelf(
@@ -361,29 +377,48 @@ internal fun LibraryGridShelf(
     onItemClick: (ShelfItem) -> Unit,
     onItemLongPress: (ShelfItem) -> Unit,
     onShowAll: () -> Unit,
-    leadingCard: (@Composable () -> Unit)? = null,
+    leadingCard: (@Composable (Dp) -> Unit)? = null,
     pinnedPlaylists: List<String> = emptyList(),
 ) {
+    val isPlaylist = shelf.title == PLAYLISTS
     val leadingCount = if (leadingCard != null) 1 else 0
-    val visibleItems = shelf.items.take((LIBRARY_ROW_MAX_ITEMS - leadingCount).coerceAtLeast(0))
+    val previewCount = if (isPlaylist) LIBRARY_PLAYLIST_VISIBLE_CARDS else LIBRARY_ROW_MAX_ITEMS
+    val visibleItems = if (isPlaylist) shelf.items
+        else shelf.items.take((previewCount - leadingCount).coerceAtLeast(0))
     Column(Modifier.padding(bottom = 26.dp)) {
         SectionHeader(
             title = shelf.title,
             subtitle = shelf.subtitle,
-            onShowAll = onShowAll.takeIf { shelf.items.size + leadingCount > LIBRARY_ROW_MAX_ITEMS },
+            onShowAll = onShowAll.takeIf { shelf.items.size + leadingCount > previewCount },
         )
-        ShelfRow(
-            contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
-            horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING),
-        ) {
-            leadingCard?.let { card -> item(key = "leading") { card() } }
-            items(visibleItems) { item ->
-                ShelfCard(
-                    item = item,
-                    onClick = { onItemClick(item) },
-                    onLongPress = { onItemLongPress(item) },
-                    isPinned = item.browseId != null && item.browseId in pinnedPlaylists,
-                )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // A maximum of four playlist cards occupy the desktop row at once.
+            // The lazy row still contains all items, so scrolling reveals the rest.
+            val usable = (maxWidth - PAGE_GUTTER * 2).coerceAtLeast(160.dp)
+            val columns = when {
+                usable >= 680.dp -> LIBRARY_PLAYLIST_VISIBLE_CARDS
+                usable >= 470.dp -> 3
+                usable >= 300.dp -> 2
+                else -> 1
+            }
+            val cardWidth = if (isPlaylist) {
+                ((usable - LIBRARY_GRID_SPACING * (columns - 1)) / columns).coerceAtLeast(140.dp)
+            } else SHELF_CARD_WIDTH
+            ShelfRow(
+                contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
+                horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                leadingCard?.let { card -> item(key = "leading") { card(cardWidth) } }
+                items(visibleItems) { item ->
+                    ShelfCard(
+                        item = item,
+                        onClick = { onItemClick(item) },
+                        onLongPress = { onItemLongPress(item) },
+                        modifier = Modifier.width(cardWidth),
+                        isPinned = item.browseId != null && item.browseId in pinnedPlaylists,
+                    )
+                }
             }
         }
     }
