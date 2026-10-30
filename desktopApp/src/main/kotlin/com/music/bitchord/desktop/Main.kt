@@ -76,6 +76,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     // Hoisted so the player can fill the screen and system caption actions stay synchronized.
     val placement by DesktopWindowMode.placement.collectAsState()
     val state = rememberWindowState(width = 1_220.dp, height = 780.dp)
+    val pipHost = remember { DesktopPipHost() }
     val appIcon by DesktopAppIconSettings.selected.collectAsState()
     LaunchedEffect(placement) { state.placement = placement }
     // ...and back, for the times the window is moved between placements by something that is not
@@ -88,6 +89,8 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
             DesktopMemoryOptimizer.onWindowHidden()
         }
     }
+    // Keep the floating host outside the main Window's visibility-paused composition.
+    DesktopPipHostWindow(pipHost)
     Window(
         onCloseRequest = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },
         visible = visible,
@@ -187,7 +190,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         }
         CompositionLocalProvider(LocalDensity provides uiDensity) {
             DesktopFlyoutHost {
-                BitChordDesktopApp(welcomeLaunch)
+                BitChordDesktopApp(welcomeLaunch, pipHost)
             }
         }
     }

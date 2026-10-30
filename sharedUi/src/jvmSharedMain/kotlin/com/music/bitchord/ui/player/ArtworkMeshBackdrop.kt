@@ -100,22 +100,26 @@ fun rememberFullArtworkBlurImage(
     imageUrl: String?,
     artPx: Int = CARD_ART_PX,
     prepare: Boolean = true,
+    /** An existing small cover, e.g. desktop PiP's; avoids another request for the same source. */
+    bitmapOverride: ImageBitmap? = null,
 ): ImageBitmap? {
     val context = LocalPlatformContext.current
     var image by remember(imageUrl) { mutableStateOf(imageUrl?.let(fullBlurCache::get)) }
 
-    LaunchedEffect(imageUrl, artPx, prepare) {
+    LaunchedEffect(imageUrl, artPx, prepare, bitmapOverride) {
         if (!prepare || imageUrl == null || image != null) return@LaunchedEffect
-        val request = ImageRequest.Builder(context)
-            // Same URL as the player's 1200px sleeve, so this is a small decode
-            // from Coil's shared fetch/disk result rather than another download.
-            .data(imageUrl.artworkAt(artPx))
-            .size(FULL_BLUR_SOURCE_PX)
-            .forPixelAccess()
-            .build()
-        val result = SingletonImageLoader.get(context).execute(request)
-        val bitmap = (result as? SuccessResult)?.image?.toImageBitmap() ?: return@LaunchedEffect
-        val blurred = withContext(Dispatchers.Default) { bitmap.boxBlurred(FULL_BLUR_PASSES) }
+        val bitmap = bitmapOverride ?: run {
+            val request = ImageRequest.Builder(context)
+                .data(imageUrl.artworkAt(artPx))
+                .size(FULL_BLUR_SOURCE_PX)
+                .forPixelAccess()
+                .build()
+            val result = SingletonImageLoader.get(context).execute(request)
+            (result as? SuccessResult)?.image?.toImageBitmap() ?: return@LaunchedEffect
+        }
+        val blurred = withContext(Dispatchers.Default) {
+            bitmap.fullBlurSized().boxBlurred(FULL_BLUR_PASSES)
+        }
         val ready = blurred
         fullBlurCache[imageUrl] = ready
         image = ready
@@ -514,6 +518,18 @@ private const val FULL_BLUR_PASSES = 3
 /** A handful of recent covers; each entry is only 64 KiB at 128x128 ARGB. */
 private val fullBlurCache = object : LinkedHashMap<String, ImageBitmap>(0, 0.75f, true) {
     override fun removeEldestEntry(eldest: Map.Entry<String, ImageBitmap>) = size > 8
+}
+
+/** Keep the existing blur budget when a caller supplies its already-loaded cover. */
+private fun ImageBitmap.fullBlurSized(): ImageBitmap {
+    if (width <= FULL_BLUR_SOURCE_PX && height <= FULL_BLUR_SOURCE_PX) return this
+    val scale = minOf(FULL_BLUR_SOURCE_PX.toFloat() / width, FULL_BLUR_SOURCE_PX.toFloat() / height)
+    val size = IntSize((width * scale).roundToInt().coerceAtLeast(1), (height * scale).roundToInt().coerceAtLeast(1))
+    val target = ImageBitmap(size.width, size.height)
+    androidx.compose.ui.graphics.Canvas(target).drawImageRect(this,
+        srcOffset = IntOffset.Zero, srcSize = IntSize(width, height), dstOffset = IntOffset.Zero, dstSize = size,
+        paint = androidx.compose.ui.graphics.Paint().apply { filterQuality = FilterQuality.Low })
+    return target
 }
 
 /** Three small box passes approximate a broad Gaussian blur at thumbnail scale. */

@@ -666,6 +666,12 @@ internal fun rememberLyricPlayhead(position: PlaybackPosition): LyricPlayhead {
     return remember(position, offset) { LyricPlayhead(position, offset) }
 }
 
+/** The same offset/seek-aware clock for a visible desktop floating window, even without focus. */
+@Composable
+fun rememberFloatingLyricsClock(trackKey: String, position: PlaybackPosition, isPlaying: Boolean,
+    visible: Boolean): androidx.compose.runtime.LongState =
+    rememberLyricClock(trackKey, rememberLyricPlayhead(position), isPlaying && position.advancing, visible)
+
 private fun nanosToMs(nanos: Long): Double = nanos / 1_000_000.0
 
 /**
@@ -686,6 +692,7 @@ private fun rememberLyricClock(
     trackKey: Any,
     playhead: LyricPlayhead,
     isPlaying: Boolean,
+    visibleOverride: Boolean? = null,
 ): MutableLongState {
     val clock = remember(trackKey) {
         mutableLongStateOf(Snapshot.withoutReadObservation { playhead.positionMs })
@@ -716,7 +723,7 @@ private fun rememberLyricClock(
     // One loop for the whole run, reading the playhead itself. Keyed on the
     // reading instead, every reading restarted it, and each restart spent a
     // frame waiting for its first frame time — a hitch twice a second.
-    val foreground = rememberIsForeground()
+    val foreground = visibleOverride ?: rememberIsForeground()
     LaunchedEffect(engine, playhead, isPlaying, foreground) {
         if (!isPlaying || !foreground) return@LaunchedEffect
         engine.restart()
