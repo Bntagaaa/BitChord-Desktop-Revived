@@ -74,6 +74,13 @@ jobs:
             dist/BitChord-${{ steps.version.outputs.value }}-linux-x86_64.AppImage \
             "$PWD/appimagetool.AppImage"
 
+      - name: Real AppImage GUI relaunch and recovery
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          xvfb-run -a python3 desktopApp/packaging/tests/appimage-relaunch.py \
+            "dist/BitChord-$BUILD_VERSION-linux-x86_64.AppImage" --output "$RUNNER_TEMP/updater-appimage"
+
       - name: Collect
         run: |
           v=${{ steps.version.outputs.value }}
@@ -83,6 +90,15 @@ jobs:
           ls -lh dist
 
       - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: linux-updater-diagnostics
+          path: |
+            ${{ runner.temp }}/updater-appimage/results.json
+            ${{ runner.temp }}/updater-appimage/**/install.log
+            ${{ runner.temp }}/updater-appimage/**/status
+
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
           path: dist/*
@@ -90,6 +106,7 @@ jobs:
   arch:
     name: Arch / CachyOS · convert Linux DEB
     needs: linux
+    if: ${{ !contains(inputs.version || github.ref_name, '-') }}
     runs-on: ubuntu-latest
     container: archlinux:base-devel
     timeout-minutes: 45
@@ -213,9 +230,16 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item desktopApp/build/compose/binaries/main/msi/*.msi "dist/BitChord-$v-windows-x64.msi"
           Copy-Item desktopApp/build/compose/binaries/main/exe/*.exe "dist/BitChord-$v-windows-x64-setup.exe"
+          New-Item -ItemType File -Force desktopApp/build/compose/binaries/main/app/BitChord/.bitchord-portable | Out-Null
           7z a -tzip -mx=5 "dist/BitChord-$v-windows-x64-portable.zip" `
             "desktopApp/build/compose/binaries/main/app/BitChord/*" | Out-Null
           Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Validate Windows updater helper and actual artifacts
+        shell: pwsh
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.value }}
+        run: ./desktopApp/packaging/tests/windows-updater-checks.ps1 -Artifacts dist -Version $env:BUILD_VERSION
 
       - uses: actions/upload-artifact@v4
         with:
@@ -225,6 +249,7 @@ jobs:
   release:
     name: Publish
     needs: [linux, windows, arch]
+    if: ${{ always() && needs.linux.result == 'success' && needs.windows.result == 'success' && (needs.arch.result == 'success' || needs.arch.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -241,8 +266,8 @@ jobs:
           else
             version="$INPUT_VERSION"
           fi
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Release version must be MAJOR.MINOR.PATCH (e.g. 1.8.2)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+            echo "::error::Release version must be MAJOR.MINOR.PATCH with an optional prerelease suffix"
             exit 1
           fi
           echo "RELEASE_TAG=v$version" >> "$GITHUB_ENV"
@@ -253,7 +278,16 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - run: ls -lh dist
+      - name: Validate artifacts and publish checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          v="${RELEASE_TAG#v}"
+          for suffix in windows-x64-setup.exe windows-x64.msi windows-x64-portable.zip linux-x86_64.AppImage linux-amd64.deb linux-x86_64.rpm; do
+            test -s "dist/BitChord-$v-$suffix"
+          done
+          (cd dist && rm -f SHA256SUMS && sha256sum -- * > SHA256SUMS && sha256sum --check SHA256SUMS)
+          if [[ "$v" == *-* ]]; then echo 'IS_PRERELEASE=true' >> "$GITHUB_ENV"; else echo 'IS_PRERELEASE=false' >> "$GITHUB_ENV"; fi
 
       - name: Select release notes
         shell: bash
@@ -274,6 +308,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: BitChord ${{ env.RELEASE_TAG }}
           draft: true
+          prerelease: ${{ env.IS_PRERELEASE == 'true' }}
           body_path: ${{ env.RELEASE_NOTES_PATH }}
           files: dist/*
         env:

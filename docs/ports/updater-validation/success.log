@@ -1,0 +1,7 @@
+2026-10-29T06:48:00Z stage=helper-started pid=186299 parent_pid=186202 parent_start=12556770 current=$FIXTURE_ROOT/success/installation with spaces/BitChord Test.AppImage staged=$FIXTURE_ROOT/success/installation with spaces/staged.AppImage backup=$FIXTURE_ROOT/success/installation with spaces/previous.AppImage target=1.8.5-updater-audit
+2026-10-29T06:48:00Z stage=old-process-exited
+2026-10-29T06:48:02Z stage=backup-verified path=$FIXTURE_ROOT/success/installation with spaces/previous.AppImage
+2026-10-29T06:48:02Z stage=replacement-complete path=$FIXTURE_ROOT/success/installation with spaces/BitChord Test.AppImage sha256=e7605f0796248b5245de946fa77714e322cb9e62af1317ac2699573560e70549
+2026-10-29T06:48:02Z stage=candidate-started runtime_pid=186350 session=186350
+2026-10-29T06:48:05Z stage=gui-ready pid=186385 start_ticks=12557398 version=1.8.5-updater-audit
+2026-10-29T06:48:05Z stage=success-gui-confirmed

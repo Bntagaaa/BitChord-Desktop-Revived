@@ -1,0 +1,9 @@
+2026-10-29T06:48:59Z stage=helper-started pid=188283 parent_pid=188183 parent_start=12562696 current=$FIXTURE_ROOT/crash/installation with spaces/BitChord Test.AppImage staged=$FIXTURE_ROOT/crash/installation with spaces/staged.AppImage backup=$FIXTURE_ROOT/crash/installation with spaces/previous.AppImage target=1.8.5-updater-audit
+2026-10-29T06:49:00Z stage=old-process-exited
+2026-10-29T06:49:01Z stage=backup-verified path=$FIXTURE_ROOT/crash/installation with spaces/previous.AppImage
+2026-10-29T06:49:01Z stage=replacement-complete path=$FIXTURE_ROOT/crash/installation with spaces/BitChord Test.AppImage sha256=b3bfa54ecc77fe2546fcdea7843a0d7aff20d20ba9fd51fec490910eca31406d
+2026-10-29T06:49:01Z stage=candidate-started runtime_pid=188332 session=188332
+2026-10-29T06:49:02Z stage=candidate-exited-before-gui-ready
+2026-10-29T06:49:04Z stage=rollback-restored backup=$FIXTURE_ROOT/crash/installation with spaces/previous.AppImage
+2026-10-29T06:49:04Z stage=recovery-launch-requested runtime_pid=191993; GUI not yet verified
+2026-10-29T06:49:04Z stage=failed; previous installation preserved

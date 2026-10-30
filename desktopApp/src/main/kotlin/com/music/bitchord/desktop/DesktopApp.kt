@@ -563,46 +563,12 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var welcomeBusy by remember { mutableStateOf<String?>(null) }
     var welcomeError by remember { mutableStateOf<String?>(null) }
     val persistence = remember { DesktopPersistence() }
-    // One non-blocking check per application launch, after the first-run welcome closes.
-    var availableUpdate by remember { mutableStateOf<DesktopUpdateChecker.UpdateInfo?>(null) }
-    var updateCheckCompleted by remember { mutableStateOf(false) }
+    var updater by remember { mutableStateOf<DesktopUpdateService?>(null) }
     LaunchedEffect(showFirstLaunchWelcome) {
-        if (showFirstLaunchWelcome || updateCheckCompleted) return@LaunchedEffect
-        updateCheckCompleted = true
-        availableUpdate = withContext(Dispatchers.IO) { DesktopUpdateChecker.check() }
-    }
-    availableUpdate?.let { update ->
-        AlertDialog(
-            onDismissRequest = { availableUpdate = null },
-            title = { Text("Update available") },
-            text = {
-                Column(modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
-                    Text("BitChord Desktop Revived ${update.version} is available. You have ${DesktopUpdateChecker.currentVersion}.")
-                    update.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-                        Spacer(Modifier.height(12.dp))
-                        Text(notes)
-                    }
-                    if (DesktopUpdateChecker.packagePlatform == DesktopUpdateChecker.PackagePlatform.ARCH_X64) {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            if (update.downloadUrl == null)
-                                "Arch/CachyOS: no native package is attached to this release yet. Check the release page and use the AUR or pacman when available. Do not install the Debian package."
-                            else
-                                "Arch/CachyOS: the native pacman package will open in your browser. Installation remains manual; use your existing package manager to avoid duplicate installations.",
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    DesktopExternalLinks.open(update.downloadUrl ?: update.releaseUrl)
-                    availableUpdate = null
-                }) { Text(if (update.downloadUrl == null) "View release" else "Download") }
-            },
-            dismissButton = {
-                TextButton(onClick = { availableUpdate = null }) { Text("Later") }
-            },
-        )
+        if (!showFirstLaunchWelcome && updater == null) {
+            updater = withContext(Dispatchers.IO) { DesktopUpdateManager.service }
+            updater?.startup()
+        }
     }
     var sidebarCollapsed by remember { mutableStateOf(persistence.string("sidebar_collapsed", "false") == "true") }
     // Expanded drawer is temporary and must not change the saved desktop preference.
@@ -2158,6 +2124,25 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     DisposableEffect(playbackEngine) {
         onDispose { DesktopMusicVideo.stop(); playbackEngine.release() }
     }
+    updater?.let { service ->
+        DesktopUpdateDialog(service) {
+            val ownQueue = if (DesktopListenTogether.state.value.inParty) null else liveQueue.songs.toList() to liveQueue.index
+            val savedHistory = history.toList()
+            desktopUpdateShutdown.finish {
+                ownQueue?.let { (songs, index) ->
+                    persistence.saveQueue(songs)
+                    persistence.saveString("queue_index", index.toString())
+                }
+                persistence.saveHistory(savedHistory)
+                persistence.preferences.flush()
+                DesktopMusicVideo.stop()
+                playbackEngine.shutdown() // Existing bounded 2-second audio-thread join.
+                DesktopWindowsMedia.stop()
+            }
+            exitProcess(0)
+        }
+    }
+
 
     /** Opens an artist's page, from a card, a search row or the player's credit. */
     fun openArtist(browseId: String, name: String) {
@@ -4510,6 +4495,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             CompositionLocalProvider(LocalDesktopPanelIsPage provides true) {
                             when (overlays.settingsPage!!) {
                                 DesktopSettingsPage.MAIN -> DesktopSettingsScreen(
+                                    updater = updater,
                                     query = settingsQuery,
                                     onQueryChange = { settingsQuery = it },
                                     listState = settingsListState,
@@ -7312,6 +7298,7 @@ private enum class DesktopSettingsSection {
     MISCELLANEOUS,
     LANGUAGE,
     ADVANCED,
+    APP_UPDATES,
 }
 
 /**
@@ -7321,6 +7308,7 @@ private enum class DesktopSettingsSection {
  */
 @Composable
 private fun DesktopSettingsScreen(
+    updater: DesktopUpdateService?,
     query: String,
     onQueryChange: (String) -> Unit,
     listState: LazyListState,
@@ -8093,6 +8081,13 @@ private fun DesktopSettingsScreen(
                         DesktopStrings["d_spotify_discord_lastfm_listenbrainz", "Spotify, Discord, Last.fm and ListenBrainz"],
                         onOpenIntegrations,
                     )
+                }
+            }
+            if (section == DesktopSettingsSection.APP_UPDATES) item {
+                SettingsGroup("App Updates") {
+                    if (settingsRowVisible("App Updates", "version stable preview automatic check download")) {
+                        updater?.let { DesktopUpdateSettings(it) }
+                    }
                 }
             }
             if (section == DesktopSettingsSection.ADVANCED) item {
