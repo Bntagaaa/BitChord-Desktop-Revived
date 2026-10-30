@@ -71,9 +71,9 @@ if ($Artifacts) {
         $view = $database.OpenView("SELECT Value FROM Property WHERE Property='$Name'")
         $view.Execute(); $record = $view.Fetch(); $value = $record.StringData(1); $view.Close(); return $value
     }
-    $nativeVersion = Property 'ProductVersion'
-    $upgrade = Property 'UpgradeCode'
-    $product = Property 'ProductCode'
+    $nativeVersion = (Property 'ProductVersion').Trim()
+    $upgrade = (Property 'UpgradeCode').Trim()
+    $product = (Property 'ProductCode').Trim()
     if ($nativeVersion -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid MSI version '$nativeVersion' for requested build '$Version'" }
     if ([int]$nativeVersion.Split('.')[2] -gt 65535) { throw 'MSI build exceeds its supported range' }
     if ($upgrade.Trim('{}') -ine '8f3c1d24-6a2b-4f5e-9c17-2b8d54e0a913' -or -not $product) { throw 'MSI upgrade/product identity changed' }
