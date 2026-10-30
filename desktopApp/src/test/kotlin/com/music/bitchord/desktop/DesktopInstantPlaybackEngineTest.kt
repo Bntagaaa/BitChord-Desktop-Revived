@@ -7,6 +7,7 @@ import java.nio.ByteOrder
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlin.test.*
 
@@ -68,6 +69,50 @@ class DesktopInstantPlaybackEngineTest {
         resolve: suspend (Song) -> DesktopStream): DesktopPlaybackEngine =
         DesktopPlaybackEngine(ended, handoff, output) { song, _, _, _ -> Result.success(resolve(song)).map { DesktopLiveResolution(it) } }
             .also { engines += it }
+
+    @Test fun `unplayable lossless source falls back to the next source before claiming playing`() {
+        val bad = tone(seconds = 0).copy(
+            sourceId = "failed-hires",
+            format = DesktopStreamFormat(codec = "flac", bitDepth = 24, sampleRateHz = 192_000),
+        )
+        val safe = tone(seconds = 6).copy(sourceId = "youtube")
+        val requests = CopyOnWriteArrayList<String>()
+        val output = Output()
+        val engine = DesktopPlaybackEngine({}, {}, output) { _, _, excluded, _ ->
+            requests += excluded ?: "initial"
+            Result.success(DesktopLiveResolution(if (excluded == "failed-hires") safe else bad))
+        }.also { engines += it }
+        engine.setAudioQuality("LOSSLESS")
+        engine.load(song("broken-lossless"))
+        waitFor("working PCM after bad lossless") {
+            "failed-hires" in requests && output.writes > 0
+        }
+        assertTrue(engine.state.value.isPlaying)
+        assertNull(engine.state.value.error)
+        assertEquals("youtube", engine.state.value.streamSourceId)
+    }
+
+    @Test fun `failed high res upgrade preserves existing audible stream`() {
+        val safe = tone(seconds = 6).copy(sourceId = "youtube")
+        val bad = tone(seconds = 0).copy(
+            sourceId = "failed-hires",
+            format = DesktopStreamFormat(codec = "flac", bitDepth = 24, sampleRateHz = 192_000),
+        )
+        val pending = CompletableDeferred<DesktopStream?>()
+        val output = Output()
+        val engine = DesktopPlaybackEngine({}, {}, output) { _, _, _, _ ->
+            Result.success(DesktopLiveResolution(safe, pending))
+        }.also { engines += it }
+        engine.load(song("upgradable"))
+        waitFor("original PCM") { output.writes > 0 }
+        pending.complete(bad)
+        val previousWrites = output.writes
+        Thread.sleep(500)
+        assertTrue(output.writes > previousWrites, "bad lossless must not silence the running track")
+        assertTrue(engine.state.value.isPlaying)
+        assertNull(engine.state.value.error)
+        assertEquals("youtube", engine.state.value.streamSourceId)
+    }
 
     @Test fun `five rapid skips cancel an obsolete resolution and only latest reaches output`() {
         val stream = tone()
