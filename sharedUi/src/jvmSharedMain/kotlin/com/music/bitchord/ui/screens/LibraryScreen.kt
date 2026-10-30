@@ -380,7 +380,8 @@ internal fun LibraryGridShelf(
     leadingCard: (@Composable (Dp) -> Unit)? = null,
     pinnedPlaylists: List<String> = emptyList(),
 ) {
-    val isPlaylist = shelf.title == PLAYLISTS
+    // Keep mobile's existing five-card preview; the four-card carousel is desktop-only.
+    val isPlaylist = shelf.title == PLAYLISTS && LocalDesktopCompactHeadings.current
     val leadingCount = if (leadingCard != null) 1 else 0
     val previewCount = if (isPlaylist) LIBRARY_PLAYLIST_VISIBLE_CARDS else LIBRARY_ROW_MAX_ITEMS
     val visibleItems = if (isPlaylist) shelf.items
