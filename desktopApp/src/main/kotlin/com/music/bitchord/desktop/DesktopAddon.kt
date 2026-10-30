@@ -156,16 +156,27 @@ internal data class DesktopAddonStream(
                 !element.content.equals("none", ignoreCase = true)
         }
 
-    /** The demuxer the addon explicitly selected, including extensionless manifest URLs. */
+    /**
+     * Choose an FFmpeg demuxer when the add-on explicitly advertises a manifest.
+     * Many Hi-Res sources expose extensionless DASH URLs and only mark the stream
+     * as "Hi-Res FLAC (DASH)" in quality/format text. Treat standalone manifest
+     * markers as transport hints, never a plain codec label such as "FLAC".
+     */
     val transport: String?
         get() {
-            val stated = manifest?.ifBlank { null }
-                ?: mediaType?.ifBlank { null }
-                ?: format.ifBlank { null }
-                ?: return null
-            return when (stated.lowercase()) {
+            val explicit = manifest?.ifBlank { null } ?: mediaType?.ifBlank { null }
+            val stated = explicit ?: format.ifBlank { null }
+            val named = when (stated?.lowercase()) {
                 "hls", "m3u8", "application/x-mpegurl", "application/vnd.apple.mpegurl" -> HLS
                 "dash", "mpd", "application/dash+xml" -> DASH
+                else -> null
+            }
+            if (named != null || explicit != null) return named
+            // Metadata can say FLAC (DASH) or FLAC HLS without a manifest field.
+            // The word boundary prevents matching arbitrary codec/container names.
+            return when {
+                DASH_HINT.containsMatchIn(qualityText) -> DASH
+                HLS_HINT.containsMatchIn(qualityText) -> HLS
                 else -> null
             }
         }
@@ -204,6 +215,8 @@ internal data class DesktopAddonStream(
         const val HLS = "hls"
         const val DASH = "dash"
 
+        private val DASH_HINT = Regex("""(?:^|[^a-zA-Z0-9])(?:dash|mpd)(?:$|[^a-zA-Z0-9])""", RegexOption.IGNORE_CASE)
+        private val HLS_HINT = Regex("""(?:^|[^a-zA-Z0-9])(?:hls|m3u8)(?:$|[^a-zA-Z0-9])""", RegexOption.IGNORE_CASE)
         private val ATMOS = ATMOS_HINT
     }
 }

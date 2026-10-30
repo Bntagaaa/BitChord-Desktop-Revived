@@ -83,6 +83,11 @@ class DesktopAddonTest {
         assertEquals(DesktopAddonStream.HLS, DesktopAddonStream(manifest = "hls").transport)
         assertEquals(DesktopAddonStream.HLS, DesktopAddonStream(mediaType = "application/vnd.apple.mpegurl").transport)
         assertEquals(DesktopAddonStream.DASH, DesktopAddonStream(format = "dash").transport)
+        assertEquals(DesktopAddonStream.DASH, DesktopAddonStream(format = "Hi-Res FLAC (DASH)").transport)
+        assertEquals(DesktopAddonStream.DASH, DesktopAddonStream(quality = "24-bit 192 kHz FLAC DASH").transport)
+        assertEquals(DesktopAddonStream.HLS, DesktopAddonStream(format = "FLAC (HLS)").transport)
+        // Explicit "none" must always beat a misleading free-text hint.
+        assertNull(DesktopAddonStream(manifest = "none", quality = "FLAC (DASH)").transport)
         assertNull(DesktopAddonStream(format = "flac").transport)
         assertNull(DesktopAddonStream(format = "none").transport)
     }
