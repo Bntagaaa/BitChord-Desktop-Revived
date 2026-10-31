@@ -2,6 +2,8 @@ package com.music.bitchord.desktop
 
 import com.music.bitchord.ui.screens.desktopTopScrollFade
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +33,10 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.HighQuality
 import androidx.compose.material.icons.rounded.Person
@@ -365,6 +371,100 @@ internal fun DesktopSongMenu(
     }
 }
 
+
+/**
+ * Album, YouTube and Spotify playlist overflow. All visible actions are functional.
+ * Unmatched Spotify tracks must never enter the YouTube Music queue as Spotify IDs.
+ */
+internal data class DesktopCollectionMenuActions(
+    val onShuffle: () -> Unit,
+    val onFind: () -> Unit,
+    val onStartMix: (() -> Unit)?,
+    val onPlayNext: (() -> Unit)?,
+    val onAddToQueue: (() -> Unit)?,
+    val onDownloadAll: (() -> Unit)?,
+    val onShare: (() -> Unit)?,
+    val onSaveToLibrary: (() -> Unit)? = null,
+    val savedToLibrary: Boolean = false,
+    val onPin: (() -> Unit)? = null,
+    val pinned: Boolean = false,
+    val onRename: (() -> Unit)? = null,
+    val onDelete: (() -> Unit)? = null,
+)
+
+@Composable
+internal fun DesktopCollectionContextMenu(
+    actions: DesktopCollectionMenuActions,
+    onDismiss: () -> Unit,
+) {
+    DesktopMenuSurface(onDismiss = onDismiss) {
+        DesktopMenuRow(BitChordIcons.Shuffle, "Shuffle") { onDismiss(); actions.onShuffle() }
+        DesktopMenuRow(BitChordIcons.Search, "Find in playlist") { onDismiss(); actions.onFind() }
+        actions.onStartMix?.let { mix ->
+            DesktopMenuRow(Icons.Rounded.Radio, "Start mix") { onDismiss(); mix() }
+        }
+        DesktopMenuDivider()
+        actions.onPlayNext?.let { next ->
+            DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistPlay, "Play next") { onDismiss(); next() }
+        }
+        actions.onAddToQueue?.let { queue ->
+            DesktopMenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue") { onDismiss(); queue() }
+        }
+        actions.onSaveToLibrary?.let { save ->
+            DesktopMenuRow(
+                icon = if (actions.savedToLibrary) BitChordIcons.Check else Icons.AutoMirrored.Rounded.PlaylistAdd,
+                label = if (actions.savedToLibrary) "Remove from library" else "Save to library",
+            ) { onDismiss(); save() }
+        }
+        actions.onPin?.let { pin ->
+            DesktopMenuRow(
+                icon = Icons.Rounded.PushPin,
+                label = if (actions.pinned) "Unpin playlist" else "Pin playlist",
+                selected = actions.pinned,
+            ) { onDismiss(); pin() }
+        }
+        DesktopMenuDivider()
+        actions.onDownloadAll?.let { download ->
+            DesktopMenuRow(BitChordIcons.Download, "Download all") { onDismiss(); download() }
+        }
+        actions.onShare?.let { share ->
+            DesktopMenuRow(Icons.Rounded.Share, "Share") { onDismiss(); share() }
+        }
+        if (actions.onRename != null || actions.onDelete != null) {
+            DesktopMenuDivider()
+            actions.onRename?.let { rename ->
+                DesktopMenuRow(Icons.Rounded.Edit, "Rename") { onDismiss(); rename() }
+            }
+            actions.onDelete?.let { delete ->
+                DesktopMenuRow(Icons.Rounded.Delete, "Delete playlist") { onDismiss(); delete() }
+            }
+        }
+    }
+}
+
+/** An unmatched Spotify row offers a real resolution action, not broken YouTube verbs. */
+@Composable
+internal fun DesktopSpotifyPendingSongMenu(onResolveAndPlay: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        DesktopMoreButton(onClick = { open = true })
+        if (open) {
+            DesktopMenuSurface(onDismiss = { open = false }) {
+                DesktopMenuRow(Icons.Rounded.PlayArrow, "Find & play on YouTube Music") {
+                    open = false
+                    onResolveAndPlay()
+                }
+                DesktopMenuDivider()
+                DesktopMenuRow(
+                    Icons.AutoMirrored.Rounded.QueueMusic,
+                    "More actions available after matching",
+                    enabled = false,
+                ) {}
+            }
+        }
+    }
+}
+
 private fun sleepTimerLabel(minutes: Int?, afterTrack: Boolean): String = when {
     afterTrack -> "End of track"
     minutes != null -> "$minutes min"
@@ -465,6 +565,7 @@ private fun DesktopMenuHeader(title: String, onBack: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .heightIn(min = 32.dp)
+            .desktopHoverFill(alpha = 0.055f)
             .clickable(onClick = onBack)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -534,12 +635,17 @@ private fun DesktopMenuRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val hoverColor by animateColorAsState(
+        targetValue = if (hovered && enabled) DesktopRowHover else Color.Transparent,
+        animationSpec = tween(durationMillis = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 140),
+        label = "desktop-context-menu-hover",
+    )
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 5.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (hovered && enabled) DesktopRowHover else Color.Transparent)
+            .background(hoverColor)
             .hoverable(interaction, enabled = enabled)
             .clickable(enabled = enabled, onClick = onClick)
             .heightIn(min = 44.dp)
@@ -586,11 +692,16 @@ private fun DesktopMenuRow(
 internal fun DesktopMoreButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val hoverColor by animateColorAsState(
+        targetValue = if (hovered) DesktopForeground.copy(alpha = 0.12f) else Color.Transparent,
+        animationSpec = tween(durationMillis = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 140),
+        label = "desktop-more-button-hover",
+    )
     Box(
         modifier
             .size(34.dp)
             .clip(RoundedCornerShape(17.dp))
-            .background(if (hovered) DesktopForeground.copy(alpha = 0.12f) else Color.Transparent)
+            .background(hoverColor)
             .hoverable(interaction)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,

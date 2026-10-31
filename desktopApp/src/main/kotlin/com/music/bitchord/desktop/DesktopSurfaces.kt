@@ -134,11 +134,12 @@ internal fun panelInset(card: Dp): Dp = if (LocalDesktopPanelIsPage.current) 0.d
 @Composable
 internal fun Modifier.desktopRowClickable(enabled: Boolean = true, onClick: () -> Unit): Modifier {
     val interaction = remember { MutableInteractionSource() }
-    return if (LocalDesktopPanelIsPage.current) {
-        clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
-    } else {
-        clickable(enabled = enabled, onClick = onClick)
-    }
+    // Settings, panels and dialog rows all receive the same faint animated hover.
+    // The previous page-only exception made much of Settings feel inert.
+    val hoverAlpha = if (LocalDesktopPanelIsPage.current) 0.045f else 0.06f
+    return this
+        .then(if (enabled) Modifier.desktopHoverFill(alpha = hoverAlpha) else Modifier)
+        .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
 }
 
 /**
