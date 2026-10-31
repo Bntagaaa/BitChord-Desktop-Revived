@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="Logonew.png" alt="Original BitChord logo" width="140" />
+<img src="Logonew2.png" alt="Original BitChord logo" width="140" />
 
 # BitChord Desktop — Revived
 
