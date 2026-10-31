@@ -5707,17 +5707,18 @@ private fun DesktopSidebar(
                     colorFilter = ColorFilter.tint(DesktopForeground),
                     modifier = Modifier.width(28.dp).height(18.dp),
                 )
-                Spacer(Modifier.width(8.dp))
-                // The supplied Bintang Music Black lettering is converted to vector outlines so
-                // the sidebar wordmark stays sharp without shipping the complete font file.
+                // Match the smaller wordmark in the branding reference. Keep a fixed
+                // proportional drawing size independent of the sidebar's free width.
+                Spacer(Modifier.width(13.dp))
                 Image(
                     painter = painterResource(Res.drawable.bitchord_wordmark),
                     contentDescription = "BitChord",
-                    modifier = Modifier.weight(1f).height(18.dp),
+                    modifier = Modifier.width(84.dp).height(14.dp),
                     alignment = Alignment.CenterStart,
                     contentScale = ContentScale.Fit,
                     colorFilter = ColorFilter.tint(DesktopForeground),
                 )
+                Spacer(Modifier.weight(1f))
                 IconButton(onClick = onToggleCollapse, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Rounded.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                 }
