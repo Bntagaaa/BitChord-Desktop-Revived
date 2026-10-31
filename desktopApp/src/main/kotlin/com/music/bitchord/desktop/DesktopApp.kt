@@ -3762,6 +3762,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                         true
                                     }
                                     overlays.nowPlaying && PlayerBack.dispatch() -> true
+                                    // The OS fullscreen layer is above Now Playing. Exiting it
+                                    // must not leave the main window fullscreen without controls.
+                                    DesktopWindowMode.exitOnEscape() -> true
                                     overlays.nowPlaying -> {
                                         overlays.nowPlaying = false
                                         true
