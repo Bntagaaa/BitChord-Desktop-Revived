@@ -7,6 +7,25 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DesktopWindowModeTest {
+    @Test fun fullscreenToMaximizedMustPassThroughFloating() {
+        assertEquals(
+            listOf(WindowPlacement.Floating, WindowPlacement.Maximized),
+            linuxFullscreenRestorationPath(WindowPlacement.Fullscreen, WindowPlacement.Maximized),
+        )
+        assertEquals(
+            listOf(WindowPlacement.Floating),
+            linuxFullscreenRestorationPath(WindowPlacement.Fullscreen, WindowPlacement.Floating),
+        )
+        assertEquals(
+            listOf(WindowPlacement.Fullscreen),
+            linuxFullscreenRestorationPath(WindowPlacement.Floating, WindowPlacement.Fullscreen),
+        )
+        assertEquals(
+            listOf(WindowPlacement.Maximized),
+            linuxFullscreenRestorationPath(WindowPlacement.Floating, WindowPlacement.Maximized),
+        )
+    }
+
     @Test fun staleLinuxFullscreenObservationNeverUndoesRestore() {
         assertTrue(shouldIgnoreStaleFullscreenObservation(
             isLinux = true, observed = WindowPlacement.Fullscreen, requested = WindowPlacement.Floating))
