@@ -26,6 +26,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.swing.Swing
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
@@ -79,7 +80,11 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     val state = rememberWindowState(width = 1_220.dp, height = 780.dp)
     val pipHost = remember { DesktopPipHost() }
     val appIcon by DesktopAppIconSettings.selected.collectAsState()
-    LaunchedEffect(placement) { state.placement = placement }
+    // Linux restores its native fullscreen state first (see below). Updating WindowState
+    // directly to Maximized would skip fullscreen=false in ComposeWindow's native setter.
+    LaunchedEffect(placement) {
+        if (DesktopPlatform.isWindows) state.placement = placement
+    }
     // Observe externally initiated maximize/restore changes. Do not echo a stale Fullscreen
     // observation back into our controller after a Linux exit request: on KDE/Wayland, Compose
     // can publish Fullscreen once more while the compositor is processing the restore.
@@ -113,26 +118,38 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         resizable = true,
     ) {
         val composeWindow = window
-        // Reassert the desired placement on the actual Linux ComposeWindow, not only its
-        // WindowState mirror. KWin's asynchronous configure event can otherwise leave the
-        // native surface fullscreen while the StateFlow already says Floating.
+        // ComposeWindow.placement=Maximized only sets the maximized bit; it does NOT
+        // clear the fullscreen bit (unlike placement=Floating). Going directly from
+        // Fullscreen -> Maximized therefore leaves KWin fullscreen. Always exit the
+        // graphics-device fullscreen session and pass through Floating first.
         LaunchedEffect(composeWindow, placement) {
             if (DesktopPlatform.isLinux) {
-                repeat(4) { attempt ->
-                    if (DesktopWindowMode.placement.value != placement) return@LaunchedEffect
-                    if (state.placement != placement) state.placement = placement
-                    java.awt.EventQueue.invokeLater {
-                        if (DesktopWindowMode.placement.value == placement &&
-                            composeWindow.isDisplayable && composeWindow.placement != placement) {
-                            composeWindow.placement = placement
+                val destination = placement
+                val transitions = linuxFullscreenRestorationPath(
+                    current = composeWindow.placement, requested = destination,
+                )
+                for (step in transitions) {
+                    if (DesktopWindowMode.placement.value != destination) return@LaunchedEffect
+                    withContext(Dispatchers.Swing) {
+                        if (step != androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+                            // JBR's Wayland GraphicsDevice issues requestUnsetFullScreen()
+                            // to KWin; this is the same fullscreen session Compose owns.
+                            val device = composeWindow.graphicsConfiguration.device
+                            if (device.fullScreenWindow === composeWindow) {
+                                device.fullScreenWindow = null
+                            }
                         }
+                        composeWindow.placement = step
                     }
-                    kotlinx.coroutines.delay(if (attempt == 0) 80L else 180L)
-                    if (composeWindow.placement == placement) return@LaunchedEffect
+                    state.placement = step
+                    // Ensure the floating step has been dispatched to the compositor
+                    // before attempting to maximize the restored window.
+                    if (step == androidx.compose.ui.window.WindowPlacement.Floating &&
+                        destination == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                        delay(100)
+                    }
                 }
-                if (composeWindow.placement != placement) {
-                    DesktopTrackLog.log("linux fullscreen: could not apply requested placement $placement (native=${composeWindow.placement})")
-                }
+                DesktopTrackLog.log("linux window placement: requested $destination, native=${composeWindow.placement}")
             }
         }
 
