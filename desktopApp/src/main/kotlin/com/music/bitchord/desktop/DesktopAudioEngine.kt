@@ -16,6 +16,7 @@ import com.music.bitchord.playback.smart.echoTailSeconds
 import com.music.bitchord.playback.smart.planTransition
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -33,6 +34,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -52,15 +57,23 @@ internal fun blendElapsedUs(samples: Long, channels: Int, sampleRate: Int): Long
     return (samples / channels) * 1_000_000L / sampleRate
 }
 
-class DesktopPlaybackEngine(
+class DesktopPlaybackEngine internal constructor(
     private val onEnded: () -> Unit,
-    private val onCrossfaded: (Song) -> Unit = {},
+    private val onCrossfaded: (Song) -> Unit,
+    private val sink: DesktopAudioOutput,
+    private val resolveSource: suspend (Song, String, String?, Boolean) -> Result<DesktopLiveResolution>,
 ) {
+    constructor(onEnded: () -> Unit, onCrossfaded: (Song) -> Unit = {}) : this(
+        onEnded, onCrossfaded, DesktopAudioSink(),
+        { song, quality, excluded, race ->
+            if (race) DesktopMusicSources.resolveLive(song, quality, excluded)
+            else DesktopMusicSources.resolve(song, quality, excluded).map { DesktopLiveResolution(it) }
+        },
+    )
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _state = MutableStateFlow(DesktopPlaybackState())
     val state: StateFlow<DesktopPlaybackState> = _state.asStateFlow()
 
-    private val sink = DesktopAudioSink()
 
     /** Automix's evidence. */
     private val analyzer = DesktopTrackAnalyzer(
@@ -112,6 +125,9 @@ class DesktopPlaybackEngine(
         }
     }
 
+    private val openGate = Mutex()
+    private val prefetchGate = Mutex()
+    private val nextGeneration = AtomicLong()
     private var resolveJob: Job? = null
     private var upgradeJob: Job? = null
     private var nextResolveJob: Job? = null
@@ -142,6 +158,8 @@ class DesktopPlaybackEngine(
         val song: Song,
         val decoder: DesktopDecodeAhead,
         val stream: DesktopStream,
+        var trace: DesktopPlaybackTrace? = null,
+        val openedAtNanos: Long = System.nanoTime(),
         /**
          * Where in this track its first rendered sample sits.
          *
@@ -168,6 +186,12 @@ class DesktopPlaybackEngine(
         var converter: DesktopRateConverter? = null
 
         /** Back to the decoder at the listener's speed, dropping any beatmatch stretch. */
+        private val sourceExpiresAtMs = Regex("(?:[?&])expire=(\\d+)(?:&|$)").find(stream.url)?.groupValues?.get(1)
+            ?.toLongOrNull()?.takeIf { it in 0..Long.MAX_VALUE / 1000 }?.times(1000) ?: Long.MAX_VALUE
+
+        fun freshForSelection(): Boolean =
+            System.nanoTime() - openedAtNanos < 60_000_000_000L && sourceExpiresAtMs > System.currentTimeMillis() + 5_000
+
         fun dropTempo() {
             // The converter's history is from before whatever moved the decoder.
             converter = null
@@ -180,16 +204,20 @@ class DesktopPlaybackEngine(
     }
 
     private sealed interface Command {
-        class Start(val track: Track, val playWhenReady: Boolean) : Command
+        class Select(val generation: Long, val song: Song, val playWhenReady: Boolean, val startAtMs: Long, val trace: DesktopPlaybackTrace?, val allowReuse: Boolean,
+            val resolve: () -> Unit) : Command
+        class Start(val track: Track, val playWhenReady: Boolean, val generation: Long) : Command
         /** Replaces only the playing deck; a quality upgrade must not discard the prepared next deck. */
-        class ReplaceCurrent(val track: Track, val playWhenReady: Boolean) : Command
+        class ReplaceCurrent(val track: Track, val playWhenReady: Boolean, val generation: Long) : Command
+        /** Switch the media rendition without clearing the queue or starting an independent player. */
+        class SwitchVersion(val expectedId: String, val track: Track, val confirmation: CompletableDeferred<Boolean>) : Command
         class RecoverCurrent(
             val failed: Track,
             val replacement: Track,
             val pendingSubstitute: Deferred<DesktopStream?>?,
         ) : Command
         class RecoveryFailed(val failed: Track, val reason: String) : Command
-        class Upcoming(val track: Track) : Command
+        class Upcoming(val track: Track, val generation: Long) : Command
         /** A better copy of the incoming track, found after it was opened; see [upgradeIncoming]. */
         class ReplaceUpcoming(val track: Track) : Command
         class SeekTo(val millis: Long) : Command
@@ -232,13 +260,53 @@ class DesktopPlaybackEngine(
 
     // ---- the surface the application uses -------------------------------
 
-    fun load(song: Song, playWhenReady: Boolean = true, startAtMs: Long = 0L) {
+    /**
+     * Prepare an alternate audio/video rendition while the current audio remains audible.
+     * The audio thread validates the expected song before an atomic deck replacement.
+     */
+    suspend fun switchVersion(expectedId: String, replacement: Song): Boolean {
+        if (!running.get() || _state.value.song?.videoId != expectedId) return false
+        val live = DesktopMusicSources.resolveLive(replacement, audioQuality).getOrElse { return false }
+        val prepared = try {
+            val snapshot = _state.value
+            if (snapshot.song?.videoId != expectedId) return false
+            openTrack(replacement, live.stream, snapshot.positionMs.coerceAtLeast(0L))
+                .getOrElse { return false }
+        } finally {
+            live.pendingSubstitute?.cancel()
+        }
+        val latest = _state.value
+        if (!running.get() || latest.song?.videoId != expectedId) {
+            prepared.decoder.close()
+            return false
+        }
+        val millis = latest.positionMs.coerceAtLeast(0L)
+        if (kotlin.math.abs(millis - prepared.startUs / 1_000L) > 250L) {
+            if (!prepared.decoder.seek(millis * 1_000L)) {
+                prepared.decoder.close()
+                return false
+            }
+            prepared.startUs = millis * 1_000L
+        }
+        val ack = CompletableDeferred<Boolean>()
+        commands += Command.SwitchVersion(expectedId, prepared, ack)
+        java.util.concurrent.locks.LockSupport.unpark(thread)
+        try {
+            return ack.await()
+        } catch (cancelled: CancellationException) {
+            ack.cancel()
+            throw cancelled
+        }
+    }
+
+    fun load(song: Song, playWhenReady: Boolean = true, startAtMs: Long = 0L, requestedAtNanos: Long = System.nanoTime()) {
         retryingSongId = null
         loadInternal(
             song,
             playWhenReady,
             excludedSourceId = refusedSources[song.videoId],
             startAtMs = startAtMs.coerceAtLeast(0L),
+            trace = DesktopPlaybackDiagnostics.begin(requestedAtNanos),
         )
     }
 
@@ -257,18 +325,24 @@ class DesktopPlaybackEngine(
         startAtMs: Long = 0L,
         /** Why the first attempt failed, when this call is the retry. */
         priorFailure: Throwable? = null,
+        trace: DesktopPlaybackTrace? = null,
     ) {
+        trace?.mark("engine")
         val requestGeneration = loadGeneration.incrementAndGet()
+        nextGeneration.incrementAndGet()
+        nextSong = null
+        nextLocalStream = null
+        awaitingArm.set(null)
         resolveJob?.cancel()
         nextResolveJob?.cancel()
         upgradeJob?.cancel()
         recoveryJob?.cancel()
         recoveryJob = null
-        commands += Command.Flush
         searchingBetterFor = null
         incomingSearchingFor = null
         _state.value = DesktopPlaybackState(song = song, volume = volume, isLoading = true)
-        resolveJob = scope.launch {
+        val resolve = { resolveJob = scope.launch {
+            if (requestGeneration != loadGeneration.get() || !running.get()) return@launch
             // Only when the file is really there: a download record can outlive the file it names,
             // and handing the decoder a path that is not there fails as "could not open stream"
             // with nothing to say why. A missing one falls through to the sources instead.
@@ -278,10 +352,12 @@ class DesktopPlaybackEngine(
             // sitting right there.
             val localUrl = DesktopDownloadManager.savedFile(song)?.toAbsolutePath()?.toString()
             val resolved = localUrl?.let { Result.success(DesktopLiveResolution(DesktopStream(it))) }
-                ?: DesktopMusicSources.resolveLive(song, audioQuality, excludedSourceId)
+                ?: resolveSource(song, audioQuality, excludedSourceId, true)
             resolved.fold(
                 onSuccess = { live ->
-                    val opened = openTrack(song, live.stream, startAtMs)
+                    currentCoroutineContext()[Job]?.invokeOnCompletion { cause -> if (cause != null) live.pendingSubstitute?.cancel() }
+                    trace?.mark("source")
+                    val opened = openTrack(song, live.stream, startAtMs, trace = trace)
                     opened.fold(
                         onSuccess = { track ->
                             if (requestGeneration != loadGeneration.get()) {
@@ -289,7 +365,8 @@ class DesktopPlaybackEngine(
                                 live.pendingSubstitute?.cancel()
                             } else {
                                 searchingBetterFor = song.videoId.takeIf { live.pendingSubstitute != null }
-                                commands += Command.Start(track, playWhenReady)
+                                commands += Command.Start(track, playWhenReady, requestGeneration)
+                                java.util.concurrent.locks.LockSupport.unpark(thread)
                                 live.pendingSubstitute?.let { watchForUpgrade(song, it) }
                             }
                         },
@@ -313,7 +390,12 @@ class DesktopPlaybackEngine(
                     }
                 },
             )
-        }
+        } }
+        val mayReuse = upcoming?.let { it.song == song && startAtMs == 0L && it.freshForSelection() } == true
+        commands += Command.Select(requestGeneration, song, playWhenReady, startAtMs, trace, mayReuse,
+            if (mayReuse) resolve else ({}))
+        if (!mayReuse) resolve() // Source/decoder work overlaps the old output's flush.
+        java.util.concurrent.locks.LockSupport.unpark(thread)
     }
 
     /** Opens a decoder on [stream], off the audio thread, with cancellation-safe ownership. */
@@ -322,15 +404,18 @@ class DesktopPlaybackEngine(
         stream: DesktopStream,
         startAtMs: Long,
         recoveryAttempt: Int = 0,
+        prefetch: Boolean = false,
+        trace: DesktopPlaybackTrace? = null,
     ): Result<Track> {
         var rawDecoder: DesktopAudioDecoder? = null
         var wrappedDecoder: DesktopDecodeAhead? = null
         return try {
-            withContext(Dispatchers.IO) {
+            (if (prefetch) prefetchGate else openGate).withLock { withContext(Dispatchers.IO) {
                 currentCoroutineContext().ensureActive()
                 val decoder = DesktopAudioDecoder()
                 rawDecoder = decoder
-                val opened = decoder.open(
+                val openingJob = currentCoroutineContext()[Job]
+                val opened = runInterruptible { decoder.open(
                     url = stream.url,
                     headers = stream.headers,
                     // Float throughout: the processors work in it and the sink converts once, at the
@@ -338,7 +423,10 @@ class DesktopPlaybackEngine(
                     requested = DesktopPcmFormat(44_100, 2, bytesPerSample = 4, isFloat = true),
                     windowed = stream.windowedReads,
                     transport = stream.transport,
-                )
+                    cacheIdentity = "${song.videoId}|${stream.sourceId}|${stream.format}",
+                    cancelled = { openingJob?.isCancelled == true || !running.get() },
+                    trace = trace,
+                ) }
                 val openFailure = opened.exceptionOrNull()
                 if (openFailure != null) {
                     // DesktopAudioDecoder.open() owns its failure cleanup.
@@ -358,6 +446,8 @@ class DesktopPlaybackEngine(
                         outputFormat = decoder.outputFormat,
                         durationUs = decoder.durationUs,
                         measuredFormat = decoder.measuredFormat,
+                        aheadSamples = decoder.outputFormat.sampleRate * decoder.outputFormat.channels *
+                            (if (prefetch && !automixEnabled && crossfadeSeconds == 0) 2 else 8),
                         name = "BitChord-Decode ${song.title.take(24)}",
                     )
                     wrappedDecoder = ahead
@@ -368,12 +458,13 @@ class DesktopPlaybackEngine(
                             song = song,
                             decoder = ahead,
                             stream = stream,
+                            trace = trace,
                             startUs = startAtMs * 1_000,
                             recoveryAttempt = recoveryAttempt,
                         ),
                     )
                 }
-            }
+            } }
         } catch (cancelled: CancellationException) {
             wrappedDecoder?.close() ?: rawDecoder?.close()
             throw cancelled
@@ -455,6 +546,7 @@ class DesktopPlaybackEngine(
 
     /** Re-opens the current track on a different stream, carrying the playhead over. */
     private fun swapStream(song: Song, stream: DesktopStream, positionMs: Long) {
+        val generation = loadGeneration.get()
         scope.launch {
             openTrack(song, stream, positionMs).fold(
                 onSuccess = { track ->
@@ -470,7 +562,7 @@ class DesktopPlaybackEngine(
                         track.decoder.seek(latest.positionMs * 1_000)
                         track.startUs = latest.positionMs * 1_000
                     }
-                    commands += Command.ReplaceCurrent(track, playWhenReady = latest.isPlaying)
+                    commands += Command.ReplaceCurrent(track, playWhenReady = latest.isPlaying, generation = generation)
                 },
                 onFailure = { failure ->
                     DesktopTrackLog.log(
@@ -573,9 +665,10 @@ class DesktopPlaybackEngine(
                 return
             }
         }
+        nextGeneration.incrementAndGet()
         nextResolveJob?.cancel()
         clearUpcoming()
-        if (song == null || transitionSecondsFor(song) == 0) return
+        if (song == null || DesktopListenTogether.state.value.inParty || DesktopSleepTimer.afterTrack.value) return
         nextSong = song
         // A download plays from its file, here as in [loadInternal] — never from whichever source
         // would have answered for it.
@@ -607,20 +700,29 @@ class DesktopPlaybackEngine(
      * on is swapped in when it answers; see [upgradeIncoming].
      */
     private fun resolveUpcoming(song: Song, local: DesktopStream? = null, race: Boolean = false) {
+        val generation = nextGeneration.get()
         nextResolveJob = scope.launch {
+            // Let current playback produce output before speculative I/O; bursts of skips cancel
+            // this single job. Existing mix preparation retains its earlier timing.
+            if (!automixEnabled && crossfadeSeconds == 0) {
+                state.first { !it.isLoading && !it.awaitingAudio && it.isPlaying }
+                delay(1_000)
+            }
+            currentCoroutineContext().ensureActive()
             val askedAt = System.nanoTime()
             val resolved: Result<DesktopLiveResolution> = when {
                 local != null -> Result.success(DesktopLiveResolution(local))
-                race -> DesktopMusicSources.resolveLive(song, audioQuality)
-                else -> DesktopMusicSources.resolve(song, audioQuality).map { DesktopLiveResolution(it) }
+                race -> resolveSource(song, audioQuality, null, true)
+                else -> resolveSource(song, audioQuality, null, false)
             }
             resolved.fold(
                 onSuccess = { live ->
-                    openTrack(song, live.stream, startAtMs = 0).fold(
+                    currentCoroutineContext()[Job]?.invokeOnCompletion { cause -> if (cause != null) live.pendingSubstitute?.cancel() }
+                    openTrack(song, live.stream, startAtMs = 0, prefetch = true).fold(
                         onSuccess = { track ->
                             // A newer [prepareNext] may have asked for another track while this one
                             // was resolving.
-                            if (nextSong?.videoId != song.videoId) {
+                            if (generation != nextGeneration.get() || nextSong?.videoId != song.videoId) {
                                 track.decoder.close()
                                 live.pendingSubstitute?.cancel()
                                 return@fold
@@ -629,7 +731,7 @@ class DesktopPlaybackEngine(
                                 "incoming '${song.title}' ready from ${DesktopMusicSources.sourceNameFor(live.stream)}" +
                                     " in ${(System.nanoTime() - askedAt) / 1_000_000}ms",
                             )
-                            commands += Command.Upcoming(track)
+                            commands += Command.Upcoming(track, generation)
                             live.pendingSubstitute?.let { upgradeIncoming(song, track.stream, it) }
                         },
                         onFailure = { failure ->
@@ -720,6 +822,7 @@ class DesktopPlaybackEngine(
         recoveryJob?.cancel()
         recoveryJob = null
         loadGeneration.incrementAndGet()
+        nextGeneration.incrementAndGet()
         thread.interrupt()
         scope.cancel()
     }
@@ -753,7 +856,7 @@ class DesktopPlaybackEngine(
     // ---- the audio thread -----------------------------------------------
 
     private var current: Track? = null
-    private var upcoming: Track? = null
+    @Volatile private var upcoming: Track? = null
     private var speedProcessor: DesktopAudioSpeed? = null
     /** One widener per side of a mix, because widening is a property of a track. */
     private var spatial: DesktopSpatialAudio? = null
@@ -866,7 +969,7 @@ class DesktopPlaybackEngine(
             if (paused) sink.pause()
             loopRuntime?.let(::loopPosition)
             if (paused && fadeRemaining > 0) publishBlend(playing = false)
-            Thread.sleep(20)
+            java.util.concurrent.locks.LockSupport.parkNanos(20_000_000L)
             return
         }
         sink.resume()
@@ -969,7 +1072,9 @@ class DesktopPlaybackEngine(
                 skippedUs = skippedFrames.coerceAtLeast(0L) * 1_000_000.0 / rate * deck,
             )
         }
-        sink.write(samples, count)
+        if (count > 0) track.trace?.mark("pcm")
+        val written = sink.write(samples, count)
+        if (written > 0) track.trace?.submitted(queuedSourceUs())
         framesWritten += count / sink.format.channels.coerceAtLeast(1)
         if (count > 0) {
             // If a watchdog reopen was in flight but the original worker recovered on its own,
@@ -1297,8 +1402,25 @@ class DesktopPlaybackEngine(
 
     /** End of a track. */
     private fun finishTrack(track: Track) {
-        if (upcoming != null) {
-            promoteUpcoming()
+        val incoming = upcoming
+        if (incoming != null && !DesktopSleepTimer.afterTrack.value && !DesktopListenTogether.state.value.inParty) {
+            if (fadeRemaining > 0 || displaySwitched) promoteUpcoming()
+            else {
+                // A plain handoff has consumed no incoming PCM. Its clock starts at zero at the
+                // submitted-frame boundary, not at the crossfade's incoming elapsed position.
+                val boundary = framesWritten
+                val sameFormat = sink.format.sampleRate == incoming.decoder.outputFormat.sampleRate &&
+                    sink.format.channels == incoming.decoder.outputFormat.channels
+                if (!sameFormat) sink.drain()
+                upcoming = null
+                nextSong = null
+                startTrack(incoming, !paused)
+                if (sameFormat) {
+                    framesWritten = boundary
+                    playhead.reset(boundary, incoming.startUs, usPerFrame(incoming))
+                }
+                onCrossfaded(incoming.song)
+            }
             return
         }
         track.finished = true
@@ -1321,6 +1443,7 @@ class DesktopPlaybackEngine(
         incomingFilter.open()
         current?.decoder?.close()
         current = incoming
+        incoming.decoder.prepareForPlayback()
         if (incoming.tempo != null && kotlin.math.abs(incoming.tempoRate - 1.0) > .0001) {
             val steps = ceil(kotlin.math.abs(incoming.tempoRate - 1.0) / TEMPO_STEP_PER_BEAT).toInt().coerceAtLeast(1)
             incoming.tempoEaseStep = kotlin.math.abs(incoming.tempoRate - 1.0) / steps
@@ -1460,7 +1583,11 @@ class DesktopPlaybackEngine(
             val command = commands.poll() ?: return
             val wasLoop = loopRuntime != null
             val hadSwitched = displaySwitched
-            if (command is Command.Start || command is Command.SeekTo || command is Command.Reconfigure || command == Command.Flush || command == Command.ClearUpcoming) {
+            if (command is Command.Select && command.generation != loadGeneration.get()) continue
+            if (command is Command.Start && command.generation != loadGeneration.get()) {
+                command.track.decoder.close(); continue
+            }
+            if (command is Command.Select || command is Command.Start || command is Command.SeekTo || command is Command.Reconfigure || command == Command.Flush || command == Command.ClearUpcoming) {
                 val settle = loopRuntime != null && (command is Command.Reconfigure || command == Command.ClearUpcoming)
                 val position = _state.value.positionMs
                 discardLoop()
@@ -1470,8 +1597,55 @@ class DesktopPlaybackEngine(
                 }
             }
             when (command) {
+                is Command.Select -> {
+                    val prepared = upcoming?.takeIf {
+                        command.allowReuse && command.startAtMs == 0L && it.song == command.song &&
+                            it.freshForSelection() &&
+                            it.decoder.state !in setOf(DesktopDecodeState.FAILED, DesktopDecodeState.CLOSED)
+                    }
+                    current?.decoder?.close()
+                    current = null
+                    if (upcoming !== prepared) upcoming?.decoder?.close()
+                    upcoming = null
+                    fadeRemaining = 0
+                    sink.flush()
+                    framesWritten = sink.framesPlayed()
+                    endBlend()
+                    if (prepared != null) {
+                        prepared.trace = command.trace
+                        startTrack(prepared, command.playWhenReady)
+                    } else command.resolve()
+                }
                 is Command.Start -> startTrack(command.track, command.playWhenReady)
-                is Command.ReplaceCurrent -> replaceCurrent(command.track, command.playWhenReady)
+                is Command.ReplaceCurrent -> {
+                    if (command.generation == loadGeneration.get()) replaceCurrent(command.track, command.playWhenReady)
+                    else command.track.decoder.close()
+                }
+                is Command.SwitchVersion -> {
+                    val eligible = running.get() &&
+                        current?.song?.videoId == command.expectedId &&
+                        _state.value.song?.videoId == command.expectedId &&
+                        fadeRemaining <= 0 && loopRuntime == null && !displaySwitched &&
+                        !command.confirmation.isCancelled
+                    if (!eligible) {
+                        command.track.decoder.close()
+                        command.confirmation.complete(false)
+                    } else {
+                        loadGeneration.incrementAndGet()
+                        resolveJob?.cancel()
+                        upgradeJob?.cancel()
+                        recoveryJob?.cancel()
+                        recoveryJob = null
+                        DesktopPlaybackTracker.onVersionSwapped(
+                            command.expectedId, command.track.song.videoId,
+                        )
+                        DesktopScrobbling.onVersionSwapped(
+                            command.expectedId, command.track.song.videoId,
+                        )
+                        replaceCurrent(command.track, playWhenReady = !paused)
+                        command.confirmation.complete(current === command.track)
+                    }
+                }
                 is Command.RecoverCurrent -> {
                     recoveryJob = null
                     val failed = command.failed
@@ -1499,8 +1673,11 @@ class DesktopPlaybackEngine(
                     }
                 }
                 is Command.Upcoming -> {
-                    upcoming?.decoder?.close()
-                    upcoming = command.track
+                    if (command.generation != nextGeneration.get()) command.track.decoder.close()
+                    else {
+                        upcoming?.decoder?.close()
+                        upcoming = command.track
+                    }
                 }
                 is Command.ReplaceUpcoming -> {
                     val track = command.track
@@ -1572,6 +1749,7 @@ class DesktopPlaybackEngine(
         // decoder it is about to read from.
         if (current !== track) current?.decoder?.close()
         current = track
+        track.decoder.prepareForPlayback()
         fadeRemaining = 0
 
         val decoded = track.decoder.outputFormat
@@ -1606,6 +1784,7 @@ class DesktopPlaybackEngine(
         resetPlayhead(track, track.startUs)
         paused = !playWhenReady
         publishTrack(track, isPlaying = playWhenReady)
+        _state.update { it.copy(awaitingAudio = true) }
     }
 
     /** Reopens the output on the current decoder, keeping the track playing. */
@@ -1757,6 +1936,17 @@ class DesktopPlaybackEngine(
         val sampledAt = System.nanoTime()
         if (_state.value.song?.videoId != track.song.videoId) return
         requestAnalysisAround(track)
+        val held = upcoming
+        if (!automixEnabled && crossfadeSeconds == 0 && held != null &&
+            !held.freshForSelection() &&
+            _state.value.durationMs - positionMs in 1..20_000) {
+            // Do not depend on an early speculative connection/URL surviving a long track.
+            nextGeneration.incrementAndGet()
+            nextResolveJob?.cancel()
+            upcoming = null
+            held.decoder.close()
+            resolveUpcoming(held.song, nextLocalStream, race = true)
+        }
         val status = analysisStatus(track)
         // Published when the clock moves *or* when Automix's answer does.
         val moved = _state.value.positionMs / 250 != positionMs / 250
@@ -2138,6 +2328,20 @@ class DesktopPlaybackEngine(
         upcoming?.decoder?.close()
         current = null
         upcoming = null
+        while (true) {
+            when (val command = commands.poll() ?: break) {
+                is Command.Start -> command.track.decoder.close()
+                is Command.Upcoming -> command.track.decoder.close()
+                is Command.ReplaceCurrent -> command.track.decoder.close()
+                is Command.SwitchVersion -> {
+                    command.track.decoder.close()
+                    command.confirmation.complete(false)
+                }
+                is Command.ReplaceUpcoming -> command.track.decoder.close()
+                is Command.RecoverCurrent -> { command.replacement.decoder.close(); command.pendingSubstitute?.cancel() }
+                else -> Unit
+            }
+        }
         sink.close()
     }
 

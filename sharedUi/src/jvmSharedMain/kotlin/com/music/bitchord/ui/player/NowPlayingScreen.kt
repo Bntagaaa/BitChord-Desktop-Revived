@@ -1843,7 +1843,7 @@ fun NowPlayingScreen(
                 }
             }
         }
-        if (videoMode && desktopVideoFullscreen == false && windowWidth >= 900.dp && windowHeight >= 540.dp) {
+        if (videoMode && desktopVideoFullscreen == false && windowWidth >= 560.dp && windowHeight >= 420.dp) {
             Box(modifier.fillMaxSize().then(dockHost)) {
                 fullArtworkBlurContent(Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .55f)))

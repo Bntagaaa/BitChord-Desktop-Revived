@@ -7,150 +7,81 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
-import java.io.File
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
-/**
- * Checks BitChord Desktop Revived's published stable GitHub release once at startup.
- * Download opens a browser; no updater process, package-manager command, or
- * installation runs inside the application.
- */
+/** Official release discovery shared by startup, Settings and downloads. */
 internal object DesktopUpdateChecker {
-
-    data class UpdateInfo(
-        val version: String,
-        val releaseUrl: String,
-        /** The matching package for this platform, or null if the release has none. */
-        val downloadUrl: String?,
-        val notes: String?,
-    )
-
-    internal enum class PackagePlatform { WINDOWS_X64, LINUX_X64, ARCH_X64, UNSUPPORTED }
-
-    private const val LATEST_RELEASE_URL =
-        "https://api.github.com/repos/Bntagaaa/BitChord-Desktop-Revived/releases/latest"
-
     val currentVersion: String = System.getProperty("bitchord.version") ?: "1.8-beta1"
-
     private val json = Json { ignoreUnknownKeys = true }
-
     private val http = HttpClient(CIO) {
-        install(HttpTimeout) {
-            requestTimeoutMillis = 15_000
-            connectTimeoutMillis = 10_000
-        }
+        followRedirects = false
+        install(HttpTimeout) { requestTimeoutMillis = 15_000; connectTimeoutMillis = 10_000 }
     }
 
-    /**
-     * OS identification is intentionally independent of the desktop environment:
-     * CachyOS KDE, GNOME, Niri and other shells all read the same /etc/os-release.
-     * Unknown architectures never receive a mismatched x86_64 installer.
-     */
-    internal fun targetPlatform(osName: String, osRelease: String, architecture: String): PackagePlatform {
-        if (architecture.lowercase() !in setOf("amd64", "x86_64", "x64")) return PackagePlatform.UNSUPPORTED
-        return when {
-            osName.startsWith("Windows", ignoreCase = true) -> PackagePlatform.WINDOWS_X64
-            osName.contains("Linux", ignoreCase = true) && isArchFamily(osRelease) -> PackagePlatform.ARCH_X64
-            osName.contains("Linux", ignoreCase = true) -> PackagePlatform.LINUX_X64
-            else -> PackagePlatform.UNSUPPORTED
-        }
+    internal fun isNewer(latest: String, current: String): Boolean {
+        val left = DesktopUpdateVersion.parse(latest) ?: return false
+        val right = DesktopUpdateVersion.parse(current) ?: return false
+        return left > right
     }
 
-    /** Match os-release ID/ID_LIKE tokens rather than arbitrary product-name substrings. */
-    private fun isArchFamily(osRelease: String): Boolean {
-        val identifiers = osRelease.lineSequence()
-            .map { it.trim() }
-            .filter { it.startsWith("ID=") || it.startsWith("ID_LIKE=") }
-            .flatMap { it.substringAfter('=').trim().trim('"', '\'').lowercase().splitToSequence(' ', '\t') }
-            .filter(String::isNotBlank)
-            .toSet()
-        return identifiers.any { it in setOf("arch", "archlinux", "cachyos", "manjaro", "endeavouros", "garuda", "artix") }
-    }
+    enum class Channel { STABLE, PREVIEW }
+    data class Asset(val name: String, val url: String, val size: Long, val sha256: String?)
+    data class Release(val version: String, val url: String, val notes: String, val preview: Boolean,
+        val asset: Asset?, val manifest: Asset?)
 
-    val packagePlatform: PackagePlatform by lazy {
-        targetPlatform(
-            osName = System.getProperty("os.name").orEmpty(),
-            osRelease = runCatching { File("/etc/os-release").readText() }.getOrDefault(""),
-            architecture = System.getProperty("os.arch").orEmpty(),
-        )
-    }
-
-    suspend fun check(): UpdateInfo? = runCatching {
-        val response = http.get(LATEST_RELEASE_URL) {
+    suspend fun discover(channel: Channel, installation: UpdateInstallation): Release? {
+        check(DesktopUpdateVersion.parse(currentVersion) != null) { "This development version cannot be compared automatically. Use the official release page." }
+        val response = http.get("https://api.github.com/repos/$REPOSITORY/releases?per_page=100") {
             header("Accept", "application/vnd.github+json")
             header("User-Agent", "BitChord-Desktop-Revived-updater")
         }
-        if (!response.status.isSuccess()) return@runCatching null
-        val release = json.parseToJsonElement(response.bodyAsText()) as? JsonObject
-            ?: return@runCatching null
-        val tag = release["tag_name"]?.jsonPrimitive?.contentOrNull ?: return@runCatching null
-        val url = release["html_url"]?.jsonPrimitive?.contentOrNull ?: return@runCatching null
-        val latest = tag.removePrefix("v")
-        if (!isNewer(latest, currentVersion)) return@runCatching null
-        UpdateInfo(
-            version = latest,
-            releaseUrl = url,
-            downloadUrl = installerUrl(release),
-            notes = release["body"]?.jsonPrimitive?.contentOrNull,
-        )
-    }.getOrNull() // Offline, invalid or rate-limited responses must not interrupt playback.
+        check(response.status.value !in setOf(403, 429) || response.headers["X-RateLimit-Remaining"] != "0") { "GitHub update rate limit reached. Try again after the limit resets." }
+        check(response.status.isSuccess()) { "Update service returned HTTP ${response.status.value}. Try again later." }
+        return selectRelease(response.bodyAsText(), channel, installation, currentVersion)
+    }
 
-    /**
-     * Names are produced by release.yml (and its Arch companion, once merged).
-     * Arch packages take precedence on Arch/CachyOS; NEVER fall through to a
-     * Debian installer or AppImage when the native package has not been released.
-     * The dialog then links to the release page for a manual choice.
-     */
-    internal fun installerUrl(
-        release: JsonObject,
-        platform: PackagePlatform = packagePlatform,
-    ): String? {
-        val suffixes = when (platform) {
-            PackagePlatform.WINDOWS_X64 -> listOf("-windows-x64-setup.exe")
-            PackagePlatform.LINUX_X64 -> listOf("-linux-x86_64.AppImage", "-linux-amd64.deb")
-            PackagePlatform.ARCH_X64 -> listOf("-x86_64.pkg.tar.zst")
-            PackagePlatform.UNSUPPORTED -> emptyList()
-        }
-
-        val assets = release["assets"]?.jsonArray?.mapNotNull { it as? JsonObject }.orEmpty()
-        for (suffix in suffixes) {
-            val asset = assets.firstOrNull { candidate ->
-                val name = candidate["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                val expectedPackage = platform != PackagePlatform.ARCH_X64 ||
-                    name.startsWith("bitchord-desktop-revived-bin-", ignoreCase = true)
-                expectedPackage && name.endsWith(suffix, ignoreCase = true) &&
-                    candidate["state"]?.jsonPrimitive?.contentOrNull == "uploaded"
+    internal fun selectRelease(body: String, channel: Channel, installation: UpdateInstallation, current: String): Release? {
+        val releases = json.parseToJsonElement(body).jsonArray.mapNotNull { element ->
+            val obj = element as? JsonObject ?: return@mapNotNull null
+            fun value(key: String) = obj[key]?.jsonPrimitive?.contentOrNull.orEmpty()
+            val tag = value("tag_name")
+            val version = tag.removePrefix("v")
+            val parsed = DesktopUpdateVersion.parse(version) ?: return@mapNotNull null
+            val preview = value("prerelease") == "true" || parsed.pre.isNotEmpty()
+            if (value("draft") == "true" || (preview && channel == Channel.STABLE) || !isNewer(version, current)) return@mapNotNull null
+            val url = value("html_url")
+            if (!officialReleaseUrl(url) || java.net.URI(url).rawPath != "/$REPOSITORY/releases/tag/$tag") return@mapNotNull null
+            val assets = obj["assets"]?.jsonArray.orEmpty().mapNotNull { item ->
+                val a = item as? JsonObject ?: return@mapNotNull null
+                fun field(key: String) = a[key]?.jsonPrimitive?.contentOrNull.orEmpty()
+                val name = field("name"); val download = field("browser_download_url")
+                if (field("state") != "uploaded" || !assetBelongsToRelease(url, download) ||
+                    !download.endsWith("/" + name) || !Regex("[A-Za-z0-9._-]+").matches(name)) return@mapNotNull null
+                Asset(name, download, field("size").toLongOrNull() ?: 0,
+                    field("digest").removePrefix("sha256:").takeIf { field("digest").startsWith("sha256:") && it.matches(Regex("[a-fA-F0-9]{64}")) })
             }
-            asset?.get("browser_download_url")?.jsonPrimitive?.contentOrNull?.let { return it }
+            val expected = installation.format.suffix?.let { "BitChord-$version$it" }
+            val asset = assets.filter { it.name == expected && it.size > 0 }.singleOrNull()
+            Release(version, url, value("body").take(32_000), preview, asset,
+                assets.filter { it.name == "SHA256SUMS" && it.size in 1..262144 }.singleOrNull())
         }
-        return null
+        // Prefer a release matching this distribution; never cross-fallback to another format.
+        return releases.filter { installation.format.suffix == null || it.asset != null }
+            .maxByOrNull { DesktopUpdateVersion.parse(it.version)!! }
+            ?: releases.maxByOrNull { DesktopUpdateVersion.parse(it.version)!! }
     }
 
-    private data class ParsedVersion(val parts: List<Int>, val preRelease: Boolean)
-
-    private fun parseVersion(raw: String): ParsedVersion? {
-        val base = raw.substringBefore('-')
-        val components = base.split('.')
-        if (components.isEmpty() || components.any { it.isEmpty() || it.any { ch -> !ch.isDigit() } }) {
-            return null
-        }
-        val parts = components.map { it.toIntOrNull() ?: return null }
-        return ParsedVersion(parts, '-' in raw)
-    }
-
-    /** Compare numeric components, treating a test/beta as older than its stable release. */
-    internal fun isNewer(latest: String, current: String): Boolean {
-        val left = parseVersion(latest) ?: return false
-        val right = parseVersion(current) ?: return false
-        for (i in 0 until maxOf(left.parts.size, right.parts.size)) {
-            val a = left.parts.getOrElse(i) { 0 }
-            val b = right.parts.getOrElse(i) { 0 }
-            if (a != b) return a > b
-        }
-        return right.preRelease && !left.preRelease
-    }
+    const val REPOSITORY = "Bntagaaa/BitChord-Desktop-Revived"
+    internal fun officialReleaseUrl(url: String): Boolean = runCatching {
+        val uri = java.net.URI(url)
+        uri.scheme == "https" && uri.host == "github.com" && uri.port == -1 && uri.userInfo == null &&
+            uri.rawPath.startsWith("/$REPOSITORY/releases/tag/") && uri.rawPath.substringAfter("/tag/").isNotBlank() &&
+            !uri.rawPath.contains("..") && !uri.rawPath.contains('%') && uri.query == null && uri.fragment == null
+    }.getOrDefault(false)
+    internal fun assetBelongsToRelease(releaseUrl: String, assetUrl: String): Boolean = runCatching {
+        officialReleaseUrl(releaseUrl) && officialAssetUrl(assetUrl) &&
+            java.net.URI(assetUrl).rawPath.substringBeforeLast('/') == java.net.URI(releaseUrl).rawPath.replace("/releases/tag/", "/releases/download/")
+    }.getOrDefault(false)
+    internal fun officialAssetUrl(url: String): Boolean = officialReleaseUrl(url.replace("/releases/download/", "/releases/tag/")) &&
+        java.net.URI(url).rawPath.startsWith("/$REPOSITORY/releases/download/")
 }

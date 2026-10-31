@@ -125,6 +125,27 @@ class DesktopQueueTest {
     }
 
     @Test
+    fun playNextPlaylistKeepsTheTrackOrderAndOneManualSection() {
+        val queue = DesktopQueue(songs("cur") + queued("q1") + songs("album") + mix("mix"), index = 0)
+            .enqueueBatch(songs("a", "b", "c"), playNext = true)
+
+        assertEquals(listOf("cur", "a", "b", "c", "q1", "album", "mix"), queue.ids())
+        assertEquals(0, queue.index)
+        assertTrue(queue.songs.subList(1, 4).all { it.queueTier == QueueTier.USER_QUEUE })
+        assertTrue(queue.songs.subList(1, 4).all { it.queueEntryId != null })
+    }
+
+    @Test
+    fun addPlaylistToQueueAppendsAboveAlbumAndAutoplay() {
+        val queue = DesktopQueue(songs("cur") + queued("q1") + songs("album") + mix("mix"), index = 0)
+            .enqueueBatch(songs("a", "b"), playNext = false)
+
+        assertEquals(listOf("cur", "q1", "a", "b", "album", "mix"), queue.ids())
+        assertEquals(QueueTier.USER_QUEUE, queue.songs[2].queueTier)
+        assertTrue(queue.enqueueBatch(emptyList(), playNext = true) === queue)
+    }
+
+    @Test
     fun clearTakesOnlyWhatWasQueuedByHand() {
         val queue = DesktopQueue(songs("cur") + queued("q1", "q2") + songs("ctx") + mix("m1"), index = 0)
             .withoutUserQueue()

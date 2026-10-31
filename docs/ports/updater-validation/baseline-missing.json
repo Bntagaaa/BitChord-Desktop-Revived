@@ -1,0 +1,22 @@
+{
+  "helper_exit": 1,
+  "new_windows": [
+    [
+      4194311,
+      97061
+    ]
+  ],
+  "ready": null,
+  "backup": false,
+  "log": [
+    "BitChord updater: Installed verified AppImage: $FIXTURE_ROOT/BitChord with spaces.AppImage",
+    "BitChord updater: Started candidate process 97059; waiting for visible-window confirmation.",
+    "BitChord updater: New AppImage did not confirm its window within 75 seconds.",
+    "BitChord updater: Updated AppImage failed startup; reverting to previous version.",
+    "BitChord updater: Previous AppImage restored.",
+    "BitChord updater: Relaunching the previous AppImage."
+  ],
+  "source_commit": "7eaa99bc89111d6ad2c33c44f617ed76ae57e87e",
+  "scenario": "real packaged AppImage with unavailable readiness parent; runtime killed while JVM window survives",
+  "mode": "APPIMAGE_EXTRACT_AND_RUN=1; Xvfb"
+}

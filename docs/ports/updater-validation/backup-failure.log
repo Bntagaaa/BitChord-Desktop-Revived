@@ -1,0 +1,6 @@
+2026-10-29T06:49:16Z stage=helper-started pid=192288 parent_pid=192180 parent_start=12564364 current=$FIXTURE_ROOT/backup-failure/installation with spaces/BitChord Test.AppImage staged=$FIXTURE_ROOT/backup-failure/installation with spaces/staged.AppImage backup=$FIXTURE_ROOT/backup-failure/installation with spaces/previous.AppImage target=1.8.5-updater-audit
+2026-10-29T06:49:16Z stage=old-process-exited
+cp: cannot create regular file '$FIXTURE_ROOT/backup-failure/installation with spaces/previous.AppImage': Permission denied
+2026-10-29T06:49:17Z stage=backup-creation-failed
+2026-10-29T06:49:17Z stage=recovery-launch-requested runtime_pid=192325; GUI not yet verified
+2026-10-29T06:49:17Z stage=failed; previous installation preserved

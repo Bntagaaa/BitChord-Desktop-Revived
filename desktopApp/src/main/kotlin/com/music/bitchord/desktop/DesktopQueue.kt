@@ -51,6 +51,24 @@ internal data class DesktopQueue(
         return copy(songs = songs.take(index + 1) + rebuilt, index = index + 1).afterTransition()
     }
 
+    /**
+     * A music video and its audio recording are two versions of this same queue
+     * row. Do not enqueue another song or change the index; repeated tracks
+     * elsewhere in a playlist must retain their own identities.
+     *
+     * [expectedId] guards against a slow network lookup finishing after Next.
+     */
+    fun replaceCurrentVersion(expectedId: String, replacement: Song): DesktopQueue {
+        val active = current ?: return this
+        if (active.videoId != expectedId || replacement.videoId.isBlank()) return this
+        return copy(songs = songs.toMutableList().also { rows ->
+            rows[index] = replacement.copy(
+                queueEntryId = active.queueEntryId,
+                queueTier = active.queueTier,
+            )
+        })
+    }
+
     fun next(): DesktopQueue = if (hasNext) copy(index = index + 1).afterTransition() else this
 
     fun previous(): DesktopQueue = if (hasPrevious) copy(index = index - 1) else this
@@ -93,6 +111,15 @@ internal data class DesktopQueue(
         QueueTimeline.findUserQueueInsertionIndex(songs, index, isNext = playNext),
         song.asQueueEntry(QueueTier.USER_QUEUE),
     )
+
+    /** Adds an entire playlist with one queue rebuild (no per-track copies). */
+    fun enqueueBatch(tracks: List<Song>, playNext: Boolean): DesktopQueue {
+        if (tracks.isEmpty()) return this
+        val at = QueueTimeline.findUserQueueInsertionIndex(songs, index, isNext = playNext)
+        return copy(songs = songs.toMutableList().apply {
+            addAll(at, tracks.map { it.asQueueEntry(QueueTier.USER_QUEUE) })
+        })
+    }
 
     /** Adds tracks at the end — where AutoPlay's own additions go. */
     fun append(more: List<Song>): DesktopQueue =

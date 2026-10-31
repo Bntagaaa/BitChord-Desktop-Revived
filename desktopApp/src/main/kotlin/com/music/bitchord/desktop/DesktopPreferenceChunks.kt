@@ -28,7 +28,7 @@ internal object DesktopPreferenceChunks {
     }
 
     /** Replaces what is stored under [key]. */
-    fun write(preferences: Preferences, key: String, value: String) {
+    fun write(preferences: Preferences, key: String, value: String, flush: Boolean = true) {
         val chunks = value.xmlSafe().chunked(CHUNK_SIZE).ifEmpty { listOf("") }
         chunks.forEachIndexed { index, chunk -> preferences.put("$key.$index", chunk) }
         // Now that the value is readable in its new form, retire the old one: the unchunked key,
@@ -39,7 +39,7 @@ internal object DesktopPreferenceChunks {
             preferences.remove("$key.$index")
             index++
         }
-        runCatching { preferences.flush() }
+        if (flush) runCatching { preferences.flush() }
     }
 
     /** Removes both legacy and chunked forms of one logical value. */

@@ -21,7 +21,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-fun desktopVideoSidebarWidth(contentWidth: Dp): Dp = (contentWidth * .25f).coerceIn(300.dp, 450.dp)
+fun desktopVideoSidebarWidth(contentWidth: Dp): Dp =
+    if (contentWidth < 760.dp) (contentWidth * .37f).coerceIn(205.dp, 280.dp)
+    else (contentWidth * .25f).coerceIn(300.dp, 450.dp)
 
 /** Queue-only watch view. Controls share one horizontal strip, followed by the timeline. */
 @Composable
@@ -39,7 +41,7 @@ fun DesktopMusicVideoLayout(
     onOpenCaption: () -> Unit = {},
 ) {
     CompositionLocalProvider(LocalContentColor provides Color.White) {
-        Column(modifier.fillMaxSize().padding(start = 28.dp, end = 28.dp, top = 40.dp, bottom = 24.dp)) {
+        Column(modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 36.dp, bottom = 12.dp)) {
             Box(Modifier.fillMaxWidth().height(36.dp), contentAlignment = Alignment.Center) {
                 Text(caption, color = Color.White.copy(alpha = .65f), style = MaterialTheme.typography.labelMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -69,9 +71,9 @@ fun DesktopMusicVideoLayout(
                                         trackActions()
                                     }
                                     Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Box(Modifier.width(240.dp)) { transport() }
-                                        Box(Modifier.width(180.dp)) { volume() }
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Box(Modifier.weight(.57f)) { transport() }
+                                        Box(Modifier.weight(.43f)) { volume() }
                                     }
                                 }
                             }

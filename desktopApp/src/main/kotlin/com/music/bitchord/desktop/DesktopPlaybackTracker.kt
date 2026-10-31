@@ -34,7 +34,7 @@ internal object DesktopPlaybackTracker {
     private const val OPEN_RETRY_DELAY_MS = 2_000L
 
     private class Session(
-        val videoId: String,
+        var videoId: String,
         val cpn: String,
         val tracking: Tracking,
     ) {
@@ -80,9 +80,21 @@ internal object DesktopPlaybackTracker {
         }
     }
 
-    /** Call when the queue moves on. */
-    fun onTrackChanged(positionSeconds: Long) {
+    /**
+     * Upstream v1.8.2 treats video/audio version changes as the same listen.
+     * Preserve the tracking session and ignore the outgoing version's cleanup.
+     */
+    fun onVersionSwapped(fromVideoId: String, toVideoId: String) {
+        session?.takeIf { it.videoId == fromVideoId }?.videoId = toVideoId
+        // A session being opened for the previous id has not landed yet.
+        // Let the next onPlaying() create one for the new id instead.
+        if (opening == fromVideoId) opening = null
+    }
+
+    /** Call when the queue moves on (not when only the video/audio version changes). */
+    fun onTrackChanged(positionSeconds: Long, leavingVideoId: String? = null) {
         val closing = session ?: return
+        if (leavingVideoId != null && closing.videoId != leavingVideoId) return
         session = null
         scope.launch {
             runCatching { flush(closing, positionSeconds, final = true) }
@@ -163,6 +175,9 @@ internal object DesktopPlaybackTracker {
         }
         val fresh = Session(videoId, Innertube.newCpn(), tracking)
         val status = Innertube.pingPlayback(tracking.playbackUrl, fresh.cpn)
+        // The user can switch audio/video versions while this network request
+        // is in flight. Never replace a newer tracking session with an old one.
+        if (opening != videoId) return@withLock true
         session = fresh
         DesktopTrackLog.log("history: entry created for '$videoId' (HTTP $status)")
         true

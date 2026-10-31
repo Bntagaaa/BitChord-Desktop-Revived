@@ -1,0 +1,134 @@
+{
+  "base_commit": "3fd06fd5ad1bf5e6289c21da3d0a72c0068b44e7",
+  "branch": "feature/pip-rebuild-from-scratch",
+  "suites": {
+    "desktop": {
+      "tests": 534,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "shared": {
+      "tests": 70,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "sharedUi": {
+      "tests": 34,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "linux_distribution": "passed final :desktopApp:createDistributable",
+  "native_x11": {
+    "enabled": true,
+    "result": "passed",
+    "evidence": [
+      "PIP_TRACK_CHANGE PASS hidden-main/title/artist/lyrics-loading/lyrics-ready/next/previous/one-lookup-per-transition/restore/reopen/close",
+      "PIP_NATIVE PASS mapped/one-peer/free-resize/pin/restore/close-to-tray/native-close/unexpected-dispose"
+    ],
+    "limitation": "Xvfb without a full WM; proves mapped AWT peers, dimensions/pin flags/disposal, not real-desktop stacking or caption behavior."
+  },
+  "windows_cross_build": "passed final :desktopApp:windowsPortable -Pbitchord.target=windows",
+  "windows_runtime": "not available",
+  "android": "Android sources unchanged; shared JVM tests passed; Android SDK unavailable locally",
+  "workflow_lint": "actionlint passed .github/workflows/check.yml",
+  "screenshots": {
+    "source": "Generated fixture artwork/text rendered by production PiP UI; not live account/audio captures",
+    "dimensions": [
+      [
+        340,
+        180
+      ],
+      [
+        360,
+        210
+      ],
+      [
+        437,
+        283
+      ],
+      [
+        500,
+        340
+      ],
+      [
+        639,
+        360
+      ],
+      [
+        700,
+        350
+      ],
+      [
+        820,
+        410
+      ],
+      [
+        1000,
+        300
+      ],
+      [
+        360,
+        620
+      ]
+    ]
+  },
+  "audio_continuity": "Open/close/restore issue no playback commands; real audible output/physical media-device validation unavailable",
+  "memory_cpu": "No numerical process RSS/CPU benchmark; resource ownership/bounds reviewed in pip-rebuild.md",
+  "source_sha256": {
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopApp.kt": "4ef6272e98a30952c048b40448095e353cfb8525c1f866baba936c585664540b",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLyricsSession.kt": "684d9156ba9b20703833b4c7657bd4088da145bb97b79dce0ce147692ed53477",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipController.kt": "b1ecab493b8b44b1eb3026b369d8ef60b7268b7c6cbfb61f225f05516a4b0067",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipGeometry.kt": "a47a9a6632aa91747b23686f1020b9ce914a4739ac93c9edbd4416478079bd1b",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipHost.kt": "4abf3f4d31e33fd8a3ee3270fb52317ff9a85b4b17d80d9330596dd08e73d1e5",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipSettings.kt": "c27101f6ea23a7b479ed808ed2f0a21864feeea3432d47717f42595d70b9359c",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipState.kt": "0ac5072905acacba737c53e3b2922285d51155b9f076de4e2ad6df13780db669",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipUi.kt": "349830b66098035466bf964a1e9476e9d20ea45c5e605a0e960ef8c967bd1cc4",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipWindow.kt": "0daf96088d29f6c3eed81dd9eb97e244c5658190497bc07fd70c6b0e208ffcec",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlayerSheet.kt": "a1dde4274fc2995cafdb3d806c5cff31597513a79daf0643873aeadb7c7131f3",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowVisibility.kt": "068afcdc4958bd54c09ccf31045cc21bf1dac8fe693366cecadad68be42b0036",
+    "desktopApp/src/main/kotlin/com/music/bitchord/desktop/Main.kt": "dca61055f920699c81655b4a691e5a075409d9d5f7a5c294bc24a3aa256e1335",
+    "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/ArtworkMeshBackdrop.kt": "d062189b490654c978fc87de0a1d8469caf09c96d5dde45c099a3c5dff736e2a",
+    "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerLyrics.kt": "07877625cf1b68a5fd59b9f9f8d8864c25609b049d107f1e050fa69374a94cd8"
+  },
+  "artwork_fetch_test": {
+    "result": "passed",
+    "origin_requests": 1,
+    "cache_control": "no-store",
+    "same_loaded_cover_supplies_prepared_blur": true,
+    "resized_to": [
+      [
+        437,
+        283
+      ],
+      [
+        820,
+        410
+      ],
+      [
+        360,
+        620
+      ]
+    ]
+  },
+  "windows_cross_build_limitation": "Linux cross-build lacks optional bitchord_analysis.dll; it does not certify live Windows audio/Automix/SMTC or native window behavior.",
+  "initial_implementation_commit": "720b22f1ad707360494fab6c6e4c09ba7306950c",
+  "track_change_fix": {
+    "parent_commit": "e6889871736eee6e4a95c902f7a6f9e2bcedfa92",
+    "before": "Reproduced native timeout after selecting second song with main hidden; rendered First song, First artist, First verse.",
+    "after": "Native regression passed with actual rendered semantics for external track changes, Next/Previous, delayed lyrics, restore, reopen, close; one lookup per transition and same native peer.",
+    "lyrics_session_tests": 3,
+    "linux_validation_log": "pip-track-final-linux.log",
+    "windows_validation_log": "pip-track-final-windows.log"
+  },
+  "pointer_controls_followup": {
+    "native_robot": "passed next/previous/play-pause icons/return/close",
+    "lyrics": "short-gap regression passed; 160ms fade and 180ms resize obey Reduce Animation",
+    "linux_build": "passed",
+    "physical_audio": "not verified",
+    "windows_build": "not rerun for this follow-up"
+  }
+}

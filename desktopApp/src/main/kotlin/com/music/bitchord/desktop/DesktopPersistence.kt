@@ -65,13 +65,33 @@ class DesktopPersistence {
      */
     private val UNSET = "\u0000unset"
 
-    fun history(): List<Song> = readSongs(KEY_HISTORY)
+    fun history(): List<Song> = latestHistory ?: readSongs(KEY_HISTORY)
 
-    fun saveHistory(songs: List<Song>) = writeSongs(KEY_HISTORY, songs.take(MAX_HISTORY))
+    fun saveHistory(songs: List<Song>) {
+        val snapshot = songs.take(MAX_HISTORY)
+        synchronized(playbackSnapshotLock) {
+            latestHistory = snapshot
+            DesktopPlaybackWrites.submit(KEY_HISTORY) {
+                DesktopPreferenceChunks.write(preferences, KEY_HISTORY, snapshot.map(::encodeSong).joinToString("\n"), flush = false)
+                preferences.flush()
+            }
+        }
+    }
 
-    fun queue(): List<Song> = readSongs(KEY_QUEUE)
+    fun queue(): List<Song> = latestQueue?.first ?: readSongs(KEY_QUEUE)
 
-    fun saveQueue(songs: List<Song>) = writeSongs(KEY_QUEUE, songs.take(MAX_QUEUE))
+    fun saveQueue(songs: List<Song>, index: Int? = null) {
+        val snapshot = songs.take(MAX_QUEUE)
+        synchronized(playbackSnapshotLock) {
+            latestQueue = snapshot to index
+            DesktopPlaybackWrites.submit(KEY_QUEUE) {
+                // Queue and cursor belong to one ordered snapshot; serialize only on the writer.
+                DesktopPreferenceChunks.write(preferences, KEY_QUEUE, snapshot.map(::encodeSong).joinToString("\n"), flush = false)
+                if (index != null) DesktopPreferenceChunks.write(preferences, "queue_index", index.toString(), flush = false)
+                preferences.flush()
+            }
+        }
+    }
 
     /** Tracks pinned to YouTube's own upload — see [DesktopOriginalVersion]. */
     internal fun originalVersionIds(): Set<String> = readLines(KEY_ORIGINAL_VERSIONS).toSet()
@@ -195,7 +215,8 @@ class DesktopPersistence {
     }
 
     fun string(key: String, default: String = ""): String =
-        DesktopPreferenceChunks.read(preferences, key) ?: default
+        (if (key == "queue_index") latestQueue?.second?.toString() else null)
+            ?: DesktopPreferenceChunks.read(preferences, key) ?: default
 
     fun saveString(key: String, value: String) =
         DesktopPreferenceChunks.write(preferences, key, value)
@@ -294,6 +315,9 @@ class DesktopPersistence {
         runCatching { String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8) }.getOrDefault("")
 
     private companion object {
+        private val playbackSnapshotLock = Any()
+        @Volatile private var latestQueue: Pair<List<Song>, Int?>? = null
+        @Volatile private var latestHistory: List<Song>? = null
         const val KEY_LIKED_IDS = "liked_ids"
         const val KEY_DISLIKED_IDS = "disliked_ids"
         const val KEY_HISTORY = "history"

@@ -3,6 +3,17 @@ name: Build tes Appimage
 # One-click portable Linux build from the branch selected in Actions.
 # This workflow does NOT publish a release or modify the AUR.
 on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: "1.8.5-updater-ci"
+      run_tests:
+        type: boolean
+        default: true
+      audit_packages:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
@@ -76,13 +87,29 @@ jobs:
           chmod +x appimagetool.AppImage
           chmod +x gradlew desktopApp/packaging/appimage.sh
 
+      - name: Native package tools for updater audit
+        if: ${{ inputs.audit_packages }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot
+
       - name: Run tests
         if: ${{ inputs.run_tests }}
-        run: ./gradlew :shared:jvmTest :desktopApp:test "-Pbitchord.version=${{ steps.meta.outputs.version }}"
+        run: xvfb-run -a ./gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=${{ steps.meta.outputs.version }}"
 
-      # No .deb/.rpm build: use the jpackage app image and wrap it once.
+      # Manual quick builds wrap jpackage once; the reusable audit also checks native packages.
       - name: Build portable Linux application
         run: ./gradlew :desktopApp:createDistributable "-Pbitchord.version=${{ steps.meta.outputs.version }}" --build-cache
+
+      - name: Build and inspect DEB/RPM for updater audit
+        if: ${{ inputs.audit_packages }}
+        shell: bash
+        env:
+          BUILD_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          ./gradlew :desktopApp:packageDeb :desktopApp:packageRpm "-Pbitchord.version=$BUILD_VERSION"
+          dpkg-deb -f desktopApp/build/compose/binaries/main/deb/*.deb Package Version Architecture
+          rpm -qp --queryformat '%{NAME} %{VERSION} %{ARCH}\n' desktopApp/build/compose/binaries/main/rpm/*.rpm
 
       - name: Check native libraries and bundled models
         shell: bash
@@ -119,6 +146,15 @@ jobs:
           sha256sum "$appimage"
           ls -lh "$appimage"
 
+      - name: Actual AppImage updater GUI and recovery tests
+        shell: bash
+        env:
+          BUILD_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          xvfb-run -a python3 desktopApp/packaging/tests/appimage-relaunch.py \
+            "dist/BitChord-$BUILD_VERSION-linux-x86_64.AppImage" --output "$RUNNER_TEMP/updater-appimage"
+          echo "AppImage replacement/relaunch/recovery GUI tests passed (extract-and-run); inspect results.json for FUSE runtime coverage." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload CachyOS portable AppImage
         uses: actions/upload-artifact@v4
         with:
@@ -136,4 +172,8 @@ jobs:
           path: |
             desktopApp/build/reports/tests/
             shared/build/reports/tests/
+            ${{ runner.temp }}/updater-appimage/results.json
+            ${{ runner.temp }}/updater-appimage/**/install.log
+            ${{ runner.temp }}/updater-appimage/**/status
+            ${{ runner.temp }}/updater-appimage/**/after.png
           if-no-files-found: ignore

@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,6 +56,7 @@ internal fun DesktopPlayerSheet(
     visible: Boolean,
     onDismiss: () -> Unit,
     dragToDismiss: Boolean = true,
+    onOpenPip: (() -> Unit)? = null,
     content: @Composable BoxScope.(windowWidth: Dp, windowHeight: Dp) -> Unit,
 ) {
     // Mounted while it animates out, so the slide down is seen.
@@ -108,7 +110,8 @@ internal fun DesktopPlayerSheet(
                     Icon(Icons.Rounded.KeyboardArrowDown, "Minimize player", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
-            Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+            Row(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                if (onOpenPip != null) DesktopPipLauncher(onOpenPip, tint = Color.White)
                 DesktopToolbarButton(onClick = { DesktopWindowMode.toggle() }, size = 32.dp) {
                     Icon(if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen, "Toggle fullscreen", tint = Color.White, modifier = Modifier.size(20.dp))
                 }

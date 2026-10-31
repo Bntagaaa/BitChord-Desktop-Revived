@@ -1,0 +1,91 @@
+package com.music.bitchord.desktop
+
+import androidx.compose.ui.window.WindowPlacement
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class DesktopWindowModeTest {
+    @Test fun fullscreenToMaximizedMustPassThroughFloating() {
+        assertEquals(
+            listOf(WindowPlacement.Floating, WindowPlacement.Maximized),
+            linuxFullscreenRestorationPath(WindowPlacement.Fullscreen, WindowPlacement.Maximized),
+        )
+        assertEquals(
+            listOf(WindowPlacement.Floating),
+            linuxFullscreenRestorationPath(WindowPlacement.Fullscreen, WindowPlacement.Floating),
+        )
+        assertEquals(
+            listOf(WindowPlacement.Fullscreen),
+            linuxFullscreenRestorationPath(WindowPlacement.Floating, WindowPlacement.Fullscreen),
+        )
+        assertEquals(
+            listOf(WindowPlacement.Maximized),
+            linuxFullscreenRestorationPath(WindowPlacement.Floating, WindowPlacement.Maximized),
+        )
+    }
+
+    @Test fun staleLinuxFullscreenObservationNeverUndoesRestore() {
+        assertTrue(shouldIgnoreStaleFullscreenObservation(
+            isLinux = true, observed = WindowPlacement.Fullscreen, requested = WindowPlacement.Floating))
+        assertTrue(shouldIgnoreStaleFullscreenObservation(
+            isLinux = true, observed = WindowPlacement.Fullscreen, requested = WindowPlacement.Maximized))
+        assertFalse(shouldIgnoreStaleFullscreenObservation(
+            isLinux = true, observed = WindowPlacement.Fullscreen, requested = WindowPlacement.Fullscreen))
+        assertFalse(shouldIgnoreStaleFullscreenObservation(
+            isLinux = false, observed = WindowPlacement.Fullscreen, requested = WindowPlacement.Floating))
+        assertFalse(shouldIgnoreStaleFullscreenObservation(
+            isLinux = true, observed = WindowPlacement.Floating, requested = WindowPlacement.Floating))
+    }
+
+    @Test fun linuxExitIgnoresStaleFullscreenAndCanReenter() {
+        val mode = DesktopWindowPlacementController(isWindows = false)
+        mode.toggle()
+        assertEquals(WindowPlacement.Fullscreen, mode.placement.value)
+        mode.adopt(WindowPlacement.Floating) // delayed state from before entry
+        assertTrue(mode.fullScreen.value)
+        mode.adopt(WindowPlacement.Fullscreen) // entry acknowledged
+        assertTrue(mode.exitOnEscape())
+        assertEquals(WindowPlacement.Floating, mode.placement.value)
+        mode.adopt(WindowPlacement.Fullscreen) // old snapshot while exit is pending
+        assertFalse(mode.fullScreen.value)
+        assertEquals(WindowPlacement.Floating, mode.placement.value)
+        mode.adopt(WindowPlacement.Floating)
+        assertFalse(mode.exitOnEscape())
+        mode.toggle()
+        assertTrue(mode.fullScreen.value)
+    }
+
+    @Test fun restoresPreviousMaximizedPlacement() {
+        val mode = DesktopWindowPlacementController(isWindows = false)
+        mode.adopt(WindowPlacement.Maximized)
+        mode.toggle()
+        mode.adopt(WindowPlacement.Fullscreen)
+        mode.exit()
+        mode.adopt(WindowPlacement.Fullscreen)
+        assertEquals(WindowPlacement.Maximized, mode.placement.value)
+        mode.adopt(WindowPlacement.Maximized)
+        assertTrue(mode.maximized.value)
+    }
+
+    @Test fun externalFullscreenStillSynchronizes() {
+        val mode = DesktopWindowPlacementController(isWindows = false)
+        mode.adopt(WindowPlacement.Fullscreen)
+        assertTrue(mode.fullScreen.value)
+        mode.adopt(WindowPlacement.Floating)
+        assertFalse(mode.fullScreen.value)
+    }
+
+    @Test fun windowsFullscreenDoesNotChangeComposePlacement() {
+        val mode = DesktopWindowPlacementController(isWindows = true)
+        mode.toggle()
+        assertTrue(mode.fullScreen.value)
+        assertEquals(WindowPlacement.Floating, mode.placement.value)
+        mode.adopt(WindowPlacement.Maximized)
+        assertTrue(mode.fullScreen.value)
+        mode.exit()
+        assertFalse(mode.fullScreen.value)
+        assertEquals(WindowPlacement.Floating, mode.placement.value)
+    }
+}

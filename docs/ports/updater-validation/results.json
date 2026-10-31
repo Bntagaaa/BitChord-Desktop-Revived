@@ -1,0 +1,169 @@
+{
+  "target_version": "1.8.5-updater-audit",
+  "normal_runtime": "unavailable-in-environment",
+  "extract_and_run": [
+    {
+      "case": "success",
+      "helper_exit": 0,
+      "old_jvm_pid": 186202,
+      "new_jvm_pid": 186385,
+      "mapped_windows": [
+        {
+          "window": 6291463,
+          "pid": 186385,
+          "width": 1220,
+          "height": 780
+        }
+      ],
+      "readiness": "token=<redacted-operation-nonce>\npid=186385\nstart_ticks=12557398\nversion=1.8.5-updater-audit\nstate=gui-ready\n",
+      "backup_retained": true,
+      "user_data_preserved": true
+    },
+    {
+      "case": "hangup",
+      "helper_exit": 0,
+      "old_jvm_pid": 186674,
+      "new_jvm_pid": 186849,
+      "mapped_windows": [
+        {
+          "window": 6291463,
+          "pid": 186849,
+          "width": 1220,
+          "height": 780
+        }
+      ],
+      "readiness": "token=<redacted-operation-nonce>\npid=186849\nstart_ticks=12558797\nversion=1.8.5-updater-audit\nstate=gui-ready\n",
+      "backup_retained": true,
+      "user_data_preserved": true
+    },
+    {
+      "case": "missing",
+      "helper_exit": 2,
+      "old_jvm_pid": 187116,
+      "new_jvm_pid": 187298,
+      "mapped_windows": [
+        {
+          "window": 6291463,
+          "pid": 187298,
+          "width": 1220,
+          "height": 780
+        }
+      ],
+      "readiness": null,
+      "backup_retained": true,
+      "user_data_preserved": true
+    },
+    {
+      "case": "crash",
+      "helper_exit": 1,
+      "old_jvm_pid": 188183,
+      "new_jvm_pid": 191998,
+      "mapped_windows": [
+        {
+          "window": 6291463,
+          "pid": 191998,
+          "width": 1220,
+          "height": 780
+        }
+      ],
+      "readiness": null,
+      "backup_retained": true,
+      "user_data_preserved": true
+    },
+    {
+      "case": "backup-failure",
+      "helper_exit": 1,
+      "old_jvm_pid": 192180,
+      "new_jvm_pid": 192330,
+      "mapped_windows": [
+        {
+          "window": 6291463,
+          "pid": 192330,
+          "width": 1220,
+          "height": 780
+        }
+      ],
+      "readiness": null,
+      "backup_retained": false,
+      "user_data_preserved": true
+    },
+    {
+      "case": "legacy",
+      "helper_exit": 0,
+      "old_jvm_pid": 192516,
+      "new_jvm_pid": 192636,
+      "mapped_windows": [
+        {
+          "window": 6291463,
+          "pid": 192636,
+          "width": 1220,
+          "height": 780
+        }
+      ],
+      "readiness": "window-ready\npid=192636\nversion=1.8.5-updater-audit\n",
+      "backup_retained": true,
+      "user_data_preserved": true
+    }
+  ],
+  "environment": {
+    "os": "Linux x86_64",
+    "jdk": "21.0.9",
+    "display": "Xvfb :99",
+    "renderer": "Skiko software fallback",
+    "live_release_api": "Forbidden",
+    "old_public_version": "1.8.4-updater-audit"
+  },
+  "packaging": {
+    "appimage": "real package built and relaunched in six helper/GUI cases, including the exact legacy installed helper",
+    "deb": {
+      "package": "bitchord",
+      "version": "1.8.29",
+      "arch": "amd64",
+      "install_test": false
+    },
+    "rpm": {
+      "package": "bitchord",
+      "version": "1.8.29-1",
+      "arch": "x86_64",
+      "install_test": false
+    },
+    "windows_jvm_portable": "cross-built and inspected; not Windows-executed; optional Automix/SMTC natives absent",
+    "windows_exe_msi": "not built/executed locally; CI job prepared; native Windows host required",
+    "powershell": "both helper and fixture scripts parsed with PowerShell 7.4.6 on Linux; Windows execution not claimed",
+    "native_build_override_checks": {
+      "1200": "1.8.1200",
+      "1201": "1.8.1201",
+      "not-a-number": "configuration rejected"
+    },
+    "workflow_static": "actionlint 1.7.7: four changed/calling workflows passed"
+  },
+  "commands": {
+    "linux_suites": "DISPLAY=:99 XDG_CACHE_HOME=/workspace/.cache python3 /workspace/.cloud-setup/gradle1109.py -I /workspace/.cloud-setup/test-runtime.gradle :shared:jvmTest :sharedUi:jvmTest :desktopApp:test :desktopApp:createDistributable -Pbitchord.version=1.8.5-updater-audit",
+    "native_packages": "RPM_CONFIGDIR=/workspace/.cloud-setup/root/usr/lib/rpm DISPLAY=:99 XDG_CACHE_HOME=/workspace/.cache python3 /workspace/.cloud-setup/updater-audit/gradle.py :desktopApp:packageDeb :desktopApp:packageRpm -Pbitchord.version=1.8.5-updater-audit",
+    "appimage_gui": "DISPLAY=:99 python3 desktopApp/packaging/tests/appimage-relaunch.py /workspace/.cloud-setup/updater-audit/compatible.AppImage --old /workspace/.cloud-setup/updater-audit/fixed-old.AppImage --output /workspace/.cloud-setup/updater-audit/compatible-tests --java /workspace/.cloud-setup/jdk-21.0.9+10/bin/java",
+    "windows_cross_build": "python3 /workspace/.cloud-setup/gradle1109.py :desktopApp:windowsPortable -Pbitchord.target=windows -Pbitchord.version=1.8.5-updater-audit"
+  },
+  "hosted_ci_status": "not observed: GitHub API requests are Forbidden",
+  "unit_suites": {
+    "shared": {
+      "tests": 70,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "sharedUi": {
+      "tests": 34,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "desktopApp": {
+      "tests": 548,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "appimage_sha256": "e7605f0796248b5245de946fa77714e322cb9e62af1317ac2699573560e70549",
+  "tested_bundled_helper_sha256": "cdad8a3e9409bd1314c81d1ec1b9e30ebc9cd6a9f39b6e1bab9c3143f6074ece"
+}

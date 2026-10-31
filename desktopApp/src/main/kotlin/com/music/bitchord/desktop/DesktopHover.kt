@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -41,9 +42,10 @@ internal fun Modifier.desktopHoverLift(
 ): Modifier = composed {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val reduceAnimation by DesktopAppearanceSettings.reduceAnimation.collectAsState()
     val lift by animateFloatAsState(
-        targetValue = if (hovered) 1f else 0f,
-        animationSpec = tween(HOVER_MS),
+        targetValue = if (hovered && !reduceAnimation) 1f else 0f,
+        animationSpec = tween(if (reduceAnimation) 0 else HOVER_MS),
         label = "hoverLift",
     )
     this
@@ -76,9 +78,10 @@ private const val HOVER_MS = 140
 internal fun Modifier.desktopHoverWash(): Modifier = composed {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val reduceAnimation by DesktopAppearanceSettings.reduceAnimation.collectAsState()
     val wash by animateFloatAsState(
         targetValue = if (hovered) 1f else 0f,
-        animationSpec = tween(WASH_MS),
+        animationSpec = tween(if (reduceAnimation) 0 else WASH_MS),
         label = "hoverWash",
     )
     val hoverTint = DesktopForeground
@@ -106,13 +109,14 @@ internal fun Modifier.desktopNoHoverClickable(
 ): Modifier = composed {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val reduceAnimation by DesktopAppearanceSettings.reduceAnimation.collectAsState()
     val hoverBackground by animateColorAsState(
         targetValue = if (hoverHighlight && hovered) {
             DesktopForeground.copy(alpha = if (DesktopTheme.isDark) 0.09f else 0.075f)
         } else {
             Color.Transparent
         },
-        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = if (reduceAnimation) 0 else 170, easing = FastOutSlowInEasing),
         label = "desktop-row-hover-background",
     )
     this
@@ -140,18 +144,21 @@ internal fun Modifier.desktopHoverFill(
 ): Modifier = composed {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val reduceAnimation by DesktopAppearanceSettings.reduceAnimation.collectAsState()
     val wash by animateFloatAsState(
         targetValue = if (hovered) 1f else 0f,
-        animationSpec = tween(WASH_MS),
+        animationSpec = tween(if (reduceAnimation) 0 else WASH_MS),
         label = "hoverFill",
     )
+    // Theme-aware tint: black in light mode, white in dark mode.
+    val tint = DesktopForeground
     this
         .hoverable(interaction)
         .drawBehind {
             if (wash <= 0.01f) return@drawBehind
             val radius = corner.toPx()
             drawRoundRect(
-                color = androidx.compose.ui.graphics.Color.White.copy(alpha = alpha * wash),
+                color = tint.copy(alpha = alpha * wash),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius),
             )
         }

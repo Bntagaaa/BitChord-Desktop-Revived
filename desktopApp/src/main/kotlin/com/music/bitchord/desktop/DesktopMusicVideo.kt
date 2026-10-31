@@ -73,7 +73,7 @@ internal class DesktopVideoSession(
                     quality.value = MusicVideoQualityUi(stream.heights, height, stream.height)
                     val pixels = ByteArray(decoder.width * decoder.height * 4)
                     var lastSeek = -1
-                    var lastPosition = -1L
+                    var lastTargetMs: Long? = null
                     var producedFrame = false
                     while (currentCoroutineContext().isActive) {
                         val audio = clock.value
@@ -89,7 +89,13 @@ internal class DesktopVideoSession(
                             continue
                         }
                         val target = videoClockPosition(audio, speed())
-                        if (lastSeek != audio.seeks || (lastPosition >= 0 && abs(target - lastPosition) > 1500)) {
+                        // Compare successive audio clock samples, not video frame PTS:
+                        // FFmpeg may seek to an earlier keyframe and otherwise seek forever.
+                        val oldTarget = lastTargetMs
+                        val jumped = oldTarget != null &&
+                            (target < oldTarget - 750 || target > oldTarget + 2_000)
+                        lastTargetMs = target
+                        if (lastSeek != audio.seeks || jumped) {
                             check(decoder.seekTo(target)) { "Video seek failed" }
                             lastSeek = audio.seeks
                         }
@@ -99,9 +105,9 @@ internal class DesktopVideoSession(
                             continue
                         }
                         ensureActive()
-                        lastPosition = decoder.frameTimeMs
-                        if (lastPosition + 80 < target) continue
-                        val wait = ((lastPosition - target) / speed().coerceAtLeast(.1f)).toLong()
+                        val frameTime = decoder.frameTimeMs
+                        if (frameTime + 80 < target) continue
+                        val wait = ((frameTime - target) / speed().coerceAtLeast(.1f)).toLong()
                         if (wait > 0) delay(wait.coerceAtMost(1000))
                         val latest = clock.value
                         if (latest.song?.videoId != id || latest.seeks != audio.seeks ||
@@ -138,6 +144,15 @@ internal object DesktopMusicVideo {
                 override fun close() = decoder.close()
             }
         }, onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") }, enabled = DesktopVideoBeta.enabled)
+    private const val QUALITY_KEY = "music_video_quality"
+    init {
+        session.held.value = DesktopPersistence().int(QUALITY_KEY, 0).takeIf { it in 144..4320 }
+    }
+    fun setQuality(height: Int?) {
+        val quality = height?.takeIf { it in 144..4320 }
+        session.held.value = quality
+        scope.launch { DesktopPersistence().saveInt(QUALITY_KEY, quality ?: 0) }
+    }
     val held get() = session.held
     val quality get() = session.quality
     val aspect get() = session.aspect

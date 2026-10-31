@@ -42,6 +42,7 @@ class DesktopRangeStreamTest {
                 return@createContext
             }
             val slice = body.copyOfRange(from, to + 1)
+            exchange.responseHeaders.add("Cache-Control", "public, max-age=3600")
             exchange.responseHeaders.add("Content-Range", "bytes $from-$to/${body.size}")
             exchange.sendResponseHeaders(206, slice.size.toLong())
             exchange.responseBody.use { it.write(slice) }
@@ -102,6 +103,40 @@ class DesktopRangeStreamTest {
         val stream = DesktopRangeStream(url, windowBytes = 32 * 1024)
         stream.seek(body.size.toLong())
         assertEquals(-1, stream.read(ByteArray(16), 16))
+    }
+
+    @Test
+    fun `reopening and seeking reuse only requested cached spans`() = serve { url, requested ->
+        val first = DesktopRangeStream(url, windowBytes = 32 * 1024)
+        val buffer = ByteArray(16)
+        first.read(buffer, buffer.size)
+        first.seek(200_000); first.read(buffer, buffer.size)
+        val count = requested.size
+        val replay = DesktopRangeStream(url, windowBytes = 32 * 1024)
+        replay.read(buffer, buffer.size)
+        replay.seek(200_000); replay.read(buffer, buffer.size)
+        assertContentEquals(body.copyOfRange(200_000, 200_016), buffer)
+        assertEquals(count, requested.size)
+        replay.seek(100_000); replay.read(buffer, buffer.size)
+        assertEquals(count + 1, requested.size)
+    }
+
+    @Test
+    fun `authenticated requests and expired signed URLs bypass disk reuse`() = serve { url, requested ->
+        repeat(2) {
+            DesktopRangeStream(url, headers = mapOf("Authorization" to "Bearer test-only"), windowBytes = 32 * 1024)
+                .read(ByteArray(16), 16)
+        }
+        assertEquals(2, requested.size)
+        repeat(2) { DesktopRangeStream("$url?expire=1", windowBytes = 32 * 1024).read(ByteArray(16), 16) }
+        assertEquals(4, requested.size)
+    }
+
+    @Test
+    fun `rendition namespace changes never reuse older bytes`() = serve { url, requested ->
+        DesktopRangeStream(url, windowBytes = 32 * 1024, cacheIdentity = "song|opus").read(ByteArray(16), 16)
+        DesktopRangeStream(url, windowBytes = 32 * 1024, cacheIdentity = "song|flac").read(ByteArray(16), 16)
+        assertEquals(2, requested.size)
     }
 
     @Test

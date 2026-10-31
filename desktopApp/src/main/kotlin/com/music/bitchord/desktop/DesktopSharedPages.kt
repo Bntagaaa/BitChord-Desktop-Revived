@@ -87,8 +87,22 @@ internal object DesktopAppUiHost : AppUiHost {
         _homeRecentsViewType.value = value
     }
 
-    /** Nothing is pinned here: the desktop has no pin action to put anything first. */
-    override val pinnedPlaylists: StateFlow<List<String>> = MutableStateFlow(emptyList())
+    /** Playlist pins are local preferences, shared by Library cards and playlist overflow menus. */
+    private const val KEY_PINNED_PLAYLISTS = "pinned_playlists"
+    private val _pinnedPlaylists = MutableStateFlow(
+        persistence.string(KEY_PINNED_PLAYLISTS, "").split('\n').filter(String::isNotBlank).distinct(),
+    )
+    override val pinnedPlaylists: StateFlow<List<String>> = _pinnedPlaylists
+
+    fun togglePinnedPlaylist(browseId: String): Boolean {
+        if (browseId.isBlank()) return false
+        val existing = _pinnedPlaylists.value
+        val updated = if (browseId in existing) existing.filterNot { it == browseId }
+            else existing + browseId
+        persistence.saveString(KEY_PINNED_PLAYLISTS, updated.joinToString("\n"))
+        _pinnedPlaylists.value = updated
+        return browseId in updated
+    }
 
     private val _librarySort = MutableStateFlow(
         runCatching { LibrarySort.valueOf(persistence.string(KEY_LIBRARY_SORT, LibrarySort.DEFAULT.name)) }
@@ -248,6 +262,7 @@ internal fun DesktopPlayPill(
             .then(if (iconOnly) Modifier.size(size) else Modifier.height(size))
             .clip(CircleShape)
             .background(DesktopAccent)
+            .desktopHoverWash()
             .clickable(onClick = onClick)
             .then(if (iconOnly) Modifier else Modifier.padding(horizontal = 32.dp)),
         horizontalArrangement = Arrangement.Center,
@@ -282,6 +297,7 @@ internal fun DesktopCircleButton(
             .size(size)
             .clip(CircleShape)
             .background(DesktopSubtleFill)
+            .desktopHoverWash()
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

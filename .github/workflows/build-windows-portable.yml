@@ -1,6 +1,14 @@
 name: Windows Portable Quick Build
 
 on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: "1.8.5-updater-ci"
+      installers:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
@@ -44,10 +52,35 @@ jobs:
           printf 'LASTFM_API_KEY=%s\n' "$LASTFM_API_KEY" > local.properties
           printf 'LASTFM_SECRET=%s\n' "$LASTFM_SECRET" >> local.properties
 
+      - name: Validate version
+        id: meta
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $version = if ($env:INPUT_VERSION) { $env:INPUT_VERSION } else { 'dev-test' }
+          if ($version -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$') { throw 'Invalid build label' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: WiX for installer audit
+        if: ${{ inputs.installers }}
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip -OutFile "$env:RUNNER_TEMP/wix.zip"
+          Expand-Archive "$env:RUNNER_TEMP/wix.zip" -DestinationPath "$env:RUNNER_TEMP/wix"
+          "$env:RUNNER_TEMP/wix" >> $env:GITHUB_PATH
+
+      - name: Updater unit tests
+        if: ${{ inputs.installers }}
+        shell: pwsh
+        env:
+          BUILD_VERSION: ${{ steps.meta.outputs.version }}
+        run: .\gradlew.bat :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=$env:BUILD_VERSION"
+
       - name: Build portable application only
         shell: pwsh
         run: |
-          .\gradlew.bat :desktopApp:createDistributable "-Pbitchord.version=${{ inputs.version }}" --build-cache
+          .\gradlew.bat :desktopApp:createDistributable "-Pbitchord.version=${{ steps.meta.outputs.version }}" --build-cache
 
       - name: Package portable ZIP
         shell: pwsh
@@ -61,17 +94,43 @@ jobs:
             throw "Expected exactly one app directory in $appRoot; found $($appDirs.Count)"
           }
           New-Item -ItemType Directory -Force dist | Out-Null
-          $version = "${{ inputs.version }}" -replace '[^a-zA-Z0-9._-]', '-'
+          $version = "${{ steps.meta.outputs.version }}" -replace '[^a-zA-Z0-9._-]', '-'
           $zipPath = Join-Path $env:GITHUB_WORKSPACE "dist/BitChord-$version-windows-x64-portable.zip"
+          New-Item -ItemType File -Force (Join-Path $appDirs[0].FullName ".bitchord-portable") | Out-Null
           Push-Location $appRoot
           try {
             & 7z a -tzip -mx=3 $zipPath $appDirs[0].Name
             if ($LASTEXITCODE -ne 0) { throw "7-Zip packaging failed" }
           } finally {
             Pop-Location
+            # A later EXE/MSI audit must not package the portable-only marker.
+            Remove-Item -LiteralPath (Join-Path $appDirs[0].FullName ".bitchord-portable") -ErrorAction SilentlyContinue
           }
           if (-not (Test-Path $zipPath)) { throw "Portable ZIP not created" }
           Get-Item $zipPath | Select-Object Name, Length
+
+      - name: Build EXE and MSI for updater audit
+        if: ${{ inputs.installers }}
+        shell: pwsh
+        env:
+          BUILD_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          .\gradlew.bat :desktopApp:packageExe :desktopApp:packageMsi "-Pbitchord.version=$env:BUILD_VERSION"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Copy-Item desktopApp/build/compose/binaries/main/exe/*.exe "dist/BitChord-$env:BUILD_VERSION-windows-x64-setup.exe"
+          Copy-Item desktopApp/build/compose/binaries/main/msi/*.msi "dist/BitChord-$env:BUILD_VERSION-windows-x64.msi"
+          ./desktopApp/packaging/tests/windows-updater-checks.ps1 -Artifacts dist -Version $env:BUILD_VERSION
+          "Unit/helper fixture tests and real artifact metadata passed; actual BitChord installer upgrade not exercised." >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload updater diagnostics
+        if: ${{ always() && inputs.installers }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-updater-checks
+          path: |
+            ${{ runner.temp }}/bitchord-updater-checks/**/*.log
+            ${{ runner.temp }}/bitchord-updater-checks/results.json
+            desktopApp/build/reports/tests/
 
       - name: Upload portable ZIP
         uses: actions/upload-artifact@v4

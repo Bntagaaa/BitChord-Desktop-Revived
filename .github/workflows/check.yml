@@ -36,10 +36,17 @@ jobs:
       - name: Validate short numeric test label
         run: ./gradlew :desktopApp:help "-Pbitchord.version=1"
 
+      - name: Set up X11 for native PiP validation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
       # Regression coverage for the packaging failure: the app may use a descriptive
       # test label, but native installer metadata must remain a valid numeric version.
       - name: Tests
-        run: ./gradlew :shared:jvmTest :desktopApp:test "-Pbitchord.version=test-visua"
+        env:
+          BITCHORD_PIP_NATIVE_TEST: '1'
+        run: xvfb-run -a ./gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua"
 
       - name: Build the distributable
         run: ./gradlew :desktopApp:createDistributable "-Pbitchord.version=test-visua"
@@ -49,6 +56,14 @@ jobs:
           jar=$(ls desktopApp/build/compose/binaries/main/app/BitChord/lib/app/desktopApp*.jar)
           jar tf "$jar" | grep -q 'native/libbitchord_analysis.so'
           jar tf "$jar" | grep -q 'models/.*\.onnx'
+
+      - name: Upload PiP render evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-linux-render-evidence
+          path: desktopApp/build/reports/pip-rebuild/
+          if-no-files-found: ignore
 
       - name: Upload test reports
         if: failure()
@@ -84,7 +99,7 @@ jobs:
 
       # Keep Windows' EXE/MSI metadata valid for the same descriptive build labels.
       - name: Tests
-        run: .\gradlew.bat :shared:jvmTest :desktopApp:test "-Pbitchord.version=test-visua"
+        run: .\gradlew.bat :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua"
 
       - name: Build the distributable
         run: .\gradlew.bat :desktopApp:createDistributable "-Pbitchord.version=test-visua"
@@ -97,6 +112,14 @@ jobs:
           jar tf "$jar" | grep -q 'models/.*\.onnx'
           # WinRT, so only MSVC can build it and only this job ever does.
           jar tf "$jar" | grep -q 'native/bitchord_smtc.dll'
+
+      - name: Upload PiP render evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-windows-render-evidence
+          path: desktopApp/build/reports/pip-rebuild/
+          if-no-files-found: ignore
 
       - name: Upload test reports
         if: failure()

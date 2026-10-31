@@ -12,7 +12,7 @@ Manual rendition matching requires the same title/version and artist but allows 
 
 Version selection preserves the current queue slot, entry ID, tier, source and neighboring songs. A version change replaces the local history entry rather than adding a second entry. Lookup failures leave playback alone; obsolete lookups are canceled on song/account/profile changes and rejected if the current queue entry changes. Local files and Listen Together parties do not offer the action. Pause/play state is retained.
 
-Each version starts at its own beginning: music videos can contain additional intros and outros, so this change does not claim measured audio-to-video timestamp alignment across different recordings. Video frames within the selected recording follow pause, speed and seek from the existing audio clock. Late frames from before a pause/seek are discarded, and the video decoder remains available for repeat/seek after EOF.
+Switching between audio and music-video renditions keeps the live playback position (in milliseconds) and pause/play state, preparing the replacement while the current audio keeps playing. Different recordings may have extra intros or outros, so equal timestamps do not guarantee identical musical phrases. Video frames follow the replacement audio clock, including pause, speed and seek. Late frames from before a pause/seek are discarded, and the video decoder remains available for repeat/seek after EOF.
 
 Regression coverage: queue version round trips, retained source/entry identity and neighbors, stale result rejection, unchanged/wrong-type result rejection. Existing video clock/native frame lifetime tests remain applicable. Live YouTube extraction and device A/V synchronization require network/device validation; local automated tests do not certify them.
 
@@ -35,3 +35,12 @@ An unsuccessful resolution or an initially empty video shows an explicit retry s
 Session regression tests count resolution/open/close operations across repeated view transfers, hidden playback and restore, track changes, quality changes, stop, explicit retry and seeks after EOF. Decode failures close resources and expose a failure state. Compose tests exercise 1440×900 and 960×600, check panel bounds, timeline position, square audio versus 16:9 video thumbnails, absence of lyrics and a single fullscreen toggle. An additional test renders the actual NowPlayingScreen and exercises fullscreen → windowed → minimized → restored without starting a Canvas lookup.
 
 `desktopApp/build/reports/desktop-video-player.png` captures the actual player components with a placeholder video; `desktop-video-layout.png` is the structural viewport test. Neither is a live YouTube playback capture. Live extraction and device A/V synchronization still require network/device validation.
+
+## v1.8.4 Windows and compact desktop fixes
+
+- Native Windows borderless fullscreen uses the original decorated HWND, removes its caption/frame while fullscreen, covers the current monitor and restores previous bounds/placement on exit. Normal Maximize stays separate; Linux keeps Compose fullscreen.
+- Watch layout remains desktop-style down to 560×420 dp. Sidebar adapts on compact windows and transport/volume widths flex rather than overlapping.
+- Song context menu uses the mobile Like/Dislike/Share quick actions, star and broken-heart vector icons, grouped controls, album/artist descriptions, and Song Info. It uses the existing `desktopMenuGlass`, respecting the global Reduce Blur override.
+- Added 800×560 compose layout/player regression cases, in addition to existing 960×600 and 1440×900 tests.
+
+Device and CI verification of Windows HWND fullscreen and live media switching are still required; these notes describe the intended implementation, not a passing test run.

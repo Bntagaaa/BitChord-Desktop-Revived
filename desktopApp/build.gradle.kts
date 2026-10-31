@@ -28,7 +28,15 @@ val targetOs: String = (providers.gradleProperty("bitchord.target").orNull ?: wh
 // including Linux AppImage builds that never package a Windows installer.
 // Preserve the original label for the app and artifacts; use the project's
 // default major/minor only for installer metadata when the prefix is unusable.
-val desktopVersionCode = 29
+// Published updates need a monotonically increasing native build number: otherwise all
+// 1.8.x installers have the same MSI version and Windows may treat an update as a repair.
+// Release workflow runs share one counter, including preview → stable transitions.
+val desktopVersionCode = providers.gradleProperty("bitchord.packageBuild").orNull?.let {
+    requireNotNull(it.toIntOrNull()) { "bitchord.packageBuild must be an integer; refusing a silent installer-version fallback" }
+}
+    ?: System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { 1_000 + it }
+    ?: 29
+require(desktopVersionCode in 0..65_535) { "Native package build must be between 0 and 65535" }
 val numericPackagePrefix = appVersion.substringBefore('-')
 val requestedMajorMinor = Regex("""^(\d+)\.(\d+)(?:\.\d+)*$""")
     .matchEntire(numericPackagePrefix)
@@ -42,6 +50,12 @@ val requestedMajorMinor = Regex("""^(\d+)\.(\d+)(?:\.\d+)*$""")
     }
 val defaultMajorMinor = defaultAppVersion.substringBefore('-')
 val nativePackageVersion = "${requestedMajorMinor ?: defaultMajorMinor}.$desktopVersionCode"
+
+tasks.register("updaterPackagingMetadata") {
+    group = "verification"
+    description = "Reports public/native updater versions without exposing launcher credentials."
+    doLast { logger.lifecycle("Updater packaging: public=$appVersion native=$nativePackageVersion target=$targetOs build=$desktopVersionCode") }
+}
 
 if (requestedMajorMinor == null) {
     logger.lifecycle(
@@ -437,7 +451,7 @@ val windowsPortableAssemble by tasks.registering {
                 appendLine("set \"HERE=%~dp0\"")
                 appendLine("set \"RUNNER=java\"")
                 appendLine("if defined JAVA_HOME set \"RUNNER=%JAVA_HOME%\\bin\\java\"")
-                append("\"%RUNNER%\" -Dbitchord.version=$version")
+                append("\"%RUNNER%\" -Dbitchord.version=$version -Dbitchord.distribution=portable")
                 if (moduleIndex.isNotBlank()) append(" -Dbitchord.module.index=$moduleIndex")
                 if (lastfmKey.isNotBlank() && lastfmSharedSecret.isNotBlank()) {
                     append(" -Dbitchord.lastfm.key=$lastfmKey -Dbitchord.lastfm.secret=$lastfmSharedSecret")
@@ -446,6 +460,7 @@ val windowsPortableAssemble by tasks.registering {
                 appendLine("endlocal")
             },
         )
+        File(target, ".bitchord-portable").writeText("")
 
         // What "it builds" is not the same as "it runs", and the difference is exactly what shipped
         // a broken archive.
@@ -503,7 +518,7 @@ compose.desktop {
         mainClass = composeMainClass
         jvmArgs("-Xmx512m")
         jvmArgs("-XX:+UseG1GC", "-XX:G1PeriodicGCInterval=20000", "-XX:G1PeriodicGCSystemLoadThreshold=0")
-        jvmArgs("-Dbitchord.version=$appVersion")
+        jvmArgs("-Dbitchord.version=$appVersion", "-Dbitchord.distribution=installed")
         if (desktopModuleIndexUrl.isNotBlank()) {
             jvmArgs("-Dbitchord.module.index=$desktopModuleIndexUrl")
         }

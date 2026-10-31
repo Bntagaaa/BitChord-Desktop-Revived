@@ -45,14 +45,20 @@ internal object DesktopLinuxAudioWatcher {
         started = true
         scope.launch {
             var last = readCards()
+            var lastSinks = DesktopLinuxPulseAudio.snapshot()
             while (true) {
                 delay(POLL_MS)
                 val now = readCards()
-                if (now != last) {
+                val sinks = DesktopLinuxPulseAudio.snapshot()
+                if (now != last || sinks != lastSinks) {
                     last = now
+                    lastSinks = sinks
                     DesktopAudioDevices.systemChanged()
                     DesktopTrackLog.log("audio devices changed ($now)")
                 }
+                // A Bluetooth sink-input can appear after playback begins; route it even if
+                // the sink inventory itself has not changed.
+                DesktopLinuxPulseAudio.route(DesktopAudioDevices.selected.value)
             }
         }
     }

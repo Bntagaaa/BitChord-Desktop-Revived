@@ -1,0 +1,29 @@
+name: Updater reliability
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'desktopApp/src/**/DesktopUpdate*'
+      - 'desktopApp/src/**/DesktopPrepared*'
+      - 'desktopApp/src/main/kotlin/com/music/bitchord/desktop/Main.kt'
+      - 'desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopApp.kt'
+      - 'desktopApp/src/main/resources/updater/**'
+      - 'desktopApp/packaging/**'
+      - 'desktopApp/build.gradle.kts'
+      - '.github/workflows/*updater*'
+      - '.github/workflows/build-test-appimage.yml'
+      - '.github/workflows/build-windows-portable.yml'
+permissions:
+  contents: read
+jobs:
+  linux:
+    uses: ./.github/workflows/build-test-appimage.yml
+    with:
+      version: '1.8.4'
+      run_tests: true
+      audit_packages: true
+  windows:
+    uses: ./.github/workflows/build-windows-portable.yml
+    with:
+      version: '1.8.4'
+      installers: true

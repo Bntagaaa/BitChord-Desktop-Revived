@@ -25,6 +25,7 @@ import kotlin.test.assertTrue
 class DesktopVideoLayoutTest {
     @Test fun wideWatchLayoutKeepsVideoAndSidebarSeparate() = verify(1440, 900, true)
     @Test fun compactDesktopKeepsControlsAndQueueReachable() = verify(960, 600, false)
+    @Test fun reducedWidthStillUsesDesktopVideoAndSidebar() = verify(800, 560, false)
 
     private fun verify(width: Int, height: Int, export: Boolean) = runDesktopComposeUiTest(width = width, height = height) {
         PlayerPlatform.install(DesktopPlayerHost)
