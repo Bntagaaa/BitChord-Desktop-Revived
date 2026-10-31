@@ -72,6 +72,33 @@ class DesktopAutomixTest {
     }
 
     @Test
+    fun `optional loop-region failures do not discard a usable DSP analysis`() = runBlocking {
+        DesktopAnalysisRuntime.ensureStarted()
+        if (!DesktopAnalysisRuntime.available) {
+            println("analysis library unavailable — skipping")
+            return@runBlocking
+        }
+
+        val analyzer = DesktopTrackAnalyzer(
+            loopRegion = { _, _, _, _, _ ->
+                throw IllegalStateException("simulated optional range-read failure")
+            },
+        )
+        try {
+            val measured = analyse(
+                analyzer,
+                id = "optional-region-${System.nanoTime()}",
+                bpm = 120.0,
+                seconds = 90.0,
+            )
+            assertTrue(measured.isUsable, "an optional loop-region failure discarded the DSP analysis")
+            assertTrue(measured.bpm > 0, "the DSP tempo estimate was lost")
+        } finally {
+            analyzer.release()
+        }
+    }
+
+    @Test
     fun `with no analysis the planner still answers, which is what keeps a plain fade working`() {
         val song = Song("a", "A", "Artist", null)
         val other = Song("b", "B", "Artist", null)
