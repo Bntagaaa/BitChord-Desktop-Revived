@@ -1,6 +1,7 @@
 <div align="center">
 
-<img width="1920" height="1080" alt="Dekstop" src="https://github.com/user-attachments/assets/7f4664c5-0ce3-4b06-a6a2-e0fe6e65101f" />
+<img width="1920" height="1080" alt="Dekstop (1)" src="https://github.com/user-attachments/assets/724e80d6-61ab-4152-81dc-a1884c485f0c" />
+
 
 # BitChord Desktop — Revived
 
