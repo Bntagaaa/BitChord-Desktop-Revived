@@ -85,9 +85,9 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     // can publish Fullscreen once more while the compositor is processing the restore.
     LaunchedEffect(state) {
         snapshotFlow { state.placement }.collect { observed ->
-            if (DesktopPlatform.isLinux &&
-                observed == androidx.compose.ui.window.WindowPlacement.Fullscreen &&
-                DesktopWindowMode.placement.value != observed) {
+            if (shouldIgnoreStaleFullscreenObservation(
+                    DesktopPlatform.isLinux, observed, DesktopWindowMode.placement.value
+                )) {
                 return@collect
             }
             DesktopWindowMode.adopt(observed)
