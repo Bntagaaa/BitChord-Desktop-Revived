@@ -13,6 +13,8 @@ import com.music.bitchord.playback.smart.CurveWindow
 import com.music.bitchord.playback.smart.VocalTracker
 import com.music.bitchord.playback.smart.VocalSpectrogram
 import com.music.bitchord.playback.smart.levelFromRms
+import com.music.bitchord.playback.loopmix.LoopRegion
+import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -40,6 +42,11 @@ internal class DesktopTrackAnalyzer(
      */
     private val stopped: () -> Boolean = { false },
     private val onAnalysed: (String) -> Unit = {},
+    /**
+     * Optional transition windows enrich the DSP result but must never invalidate it.
+     */
+    private val loopRegion: (DesktopStream, Double, Double, Int, () -> Boolean) -> LoopRegion? =
+        ::desktopLoopRegion,
 ) {
     /** One analysis at a time, on a thread of this class's own making. */
     private val worker: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
@@ -197,15 +204,31 @@ internal class DesktopTrackAnalyzer(
         stream: DesktopStream,
         durationSeconds: Double,
     ): TrackAnalysis? {
-        val features = decode(stream, TrackFeatures.sampleRate)
-            ?.let { TrackFeatures.analyze(it, durationSeconds) }
-            ?: return null
+        // Reuse the same range-cache namespace across the independent decodes. Signed YouTube
+        // URLs are not persisted to disk, but local/immutable sources still benefit from reuse.
+        val cacheIdentity = "automix|$trackId|${stream.sourceId.orEmpty()}|${stream.format}"
+        val featureSamples = decode(stream, TrackFeatures.sampleRate, cacheIdentity) ?: return null
+        val features = TrackFeatures.analyze(featureSamples, durationSeconds) ?: run {
+            DesktopTrackLog.log("automix: DSP feature extraction returned no result for '$trackId'")
+            return null
+        }
 
         if (cancelled()) return null
         // The model runs at its own rate, so it gets its own decode rather than a resample of the
-        // analyser's.
-        beatsUsed = true
-        val grid = decode(stream, MelSpectrogram.sampleRate)?.let { beats.track(it) }
+        // analyser's. It is an enhancement: a model failure leaves the DSP beat estimate usable.
+        val beatSamples = decode(stream, MelSpectrogram.sampleRate, cacheIdentity)
+        val grid = beatSamples?.let { samples ->
+            beatsUsed = true
+            runCatching { beats.track(samples) }
+                .onFailure { failure ->
+                    if (failure is CancellationException) throw failure
+                    DesktopTrackLog.log(
+                        "automix: beat-grid pass skipped for '$trackId': " +
+                            (failure.message ?: failure.javaClass.simpleName),
+                    )
+                }
+                .getOrNull()
+        }
 
         val vocalWindows = ArrayList<CurveWindow>()
         val levelWindows = ArrayList<CurveWindow>()
@@ -215,11 +238,30 @@ internal class DesktopTrackAnalyzer(
             if (cancelled()) return null
             val end = minOf(durationSeconds, start + 20.0)
             if (end <= start) continue
-            val region = desktopLoopRegion(stream, start, end, 44100, ::cancelled) ?: continue
+            // Loop-region and vocal windows are refinements, not prerequisites. Android's
+            // TrackAnalyzer treats an unreadable region as a missing window; desktop must do the
+            // same instead of letting one transient range-read failure discard the whole track.
+            val region = runCatching {
+                loopRegion(stream, start, end, 44100, ::cancelled)
+            }.onFailure { failure ->
+                if (failure is CancellationException) throw failure
+                DesktopTrackLog.log(
+                    "automix: optional loop window at ${start}s skipped for '$trackId': " +
+                        (failure.message ?: failure.javaClass.simpleName),
+                )
+            }.getOrNull() ?: continue
+
             vocalsUsed = true
-            vocals.track(region.left, region.right, 44100.0)?.let {
-                vocalWindows += CurveWindow(start, VocalSpectrogram.frameRate, it)
-            }
+            val vocalValues = runCatching {
+                vocals.track(region.left, region.right, 44100.0)
+            }.onFailure { failure ->
+                if (failure is CancellationException) throw failure
+                DesktopTrackLog.log(
+                    "automix: optional vocal pass at ${start}s skipped for '$trackId': " +
+                        (failure.message ?: failure.javaClass.simpleName),
+                )
+            }.getOrNull()
+            vocalValues?.let { vocalWindows += CurveWindow(start, VocalSpectrogram.frameRate, it) }
             val hop = 4410
             val values = FloatArray((region.left.size + hop - 1) / hop) { index ->
                 val from = index * hop
@@ -276,7 +318,7 @@ internal class DesktopTrackAnalyzer(
     }
 
     /** The whole track as mono float at [rate]. */
-    private fun decode(stream: DesktopStream, rate: Double): FloatArray? {
+    private fun decode(stream: DesktopStream, rate: Double, cacheIdentity: String): FloatArray? {
         val decoder = DesktopAudioDecoder()
         val opened = decoder.open(
             url = stream.url,
@@ -284,8 +326,16 @@ internal class DesktopTrackAnalyzer(
             requested = DesktopPcmFormat(rate.toInt(), channels = 1, bytesPerSample = 4, isFloat = true),
             windowed = stream.windowedReads,
             transport = stream.transport,
+            cacheIdentity = cacheIdentity,
+            cancelled = ::cancelled,
         )
         if (opened.isFailure) {
+            val failure = opened.exceptionOrNull()
+            DesktopTrackLog.log(
+                "automix: could not open ${stream.sourceId ?: "source"} stream " +
+                    "(${stream.format.summary}): " +
+                    (failure?.message ?: failure?.javaClass?.simpleName ?: "unknown decoder error"),
+            )
             decoder.close()
             return null
         }
@@ -301,7 +351,13 @@ internal class DesktopTrackAnalyzer(
                 total += count
                 if (total > MAX_SAMPLES) break
             }
-            if (total == 0) return null
+            if (total == 0) {
+                DesktopTrackLog.log(
+                    "automix: decoder returned no PCM samples from ${stream.sourceId ?: "source"} " +
+                        "(${stream.format.summary})",
+                )
+                return null
+            }
             val samples = FloatArray(total)
             var at = 0
             for (block in out) {
@@ -309,7 +365,14 @@ internal class DesktopTrackAnalyzer(
                 at += block.size
             }
             if (decoder.outputFormat.sampleRate == rate.toInt()) samples else {
-                MelSpectrogram.resample(samples, decoder.outputFormat.sampleRate.toDouble(), rate)
+                MelSpectrogram.resample(samples, decoder.outputFormat.sampleRate.toDouble(), rate).also {
+                    if (it == null || it.isEmpty()) {
+                        DesktopTrackLog.log(
+                            "automix: resampling ${stream.sourceId ?: "source"} audio to " +
+                                "${rate.toInt()} Hz returned no samples",
+                        )
+                    }
+                }
             }
         } finally {
             decoder.close()
