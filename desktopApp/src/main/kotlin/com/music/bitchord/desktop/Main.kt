@@ -26,6 +26,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.swing.Swing
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
@@ -75,14 +76,27 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     val raiseRequest by DesktopWindowVisibility.raiseRequest.collectAsState()
     // Hoisted so the player can fill the screen and system caption actions stay synchronized.
     val placement by DesktopWindowMode.placement.collectAsState()
+    val fullScreen by DesktopWindowMode.fullScreen.collectAsState()
     val state = rememberWindowState(width = 1_220.dp, height = 780.dp)
     val pipHost = remember { DesktopPipHost() }
     val appIcon by DesktopAppIconSettings.selected.collectAsState()
-    LaunchedEffect(placement) { state.placement = placement }
-    // ...and back, for the times the window is moved between placements by something that is not
-    // us; see [DesktopWindowMode.adopt].
+    // Linux restores its native fullscreen state first (see below). Updating WindowState
+    // directly to Maximized would skip fullscreen=false in ComposeWindow's native setter.
+    LaunchedEffect(placement) {
+        if (DesktopPlatform.isWindows) state.placement = placement
+    }
+    // Observe externally initiated maximize/restore changes. Do not echo a stale Fullscreen
+    // observation back into our controller after a Linux exit request: on KDE/Wayland, Compose
+    // can publish Fullscreen once more while the compositor is processing the restore.
     LaunchedEffect(state) {
-        snapshotFlow { state.placement }.collect(DesktopWindowMode::adopt)
+        snapshotFlow { state.placement }.collect { observed ->
+            if (shouldIgnoreStaleFullscreenObservation(
+                    DesktopPlatform.isLinux, observed, DesktopWindowMode.placement.value
+                )) {
+                return@collect
+            }
+            DesktopWindowMode.adopt(observed)
+        }
     }
     LaunchedEffect(visible, state.isMinimized) {
         if (!visible || state.isMinimized) {
@@ -104,6 +118,96 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         resizable = true,
     ) {
         val composeWindow = window
+        // ComposeWindow.placement=Maximized only sets the maximized bit; it does NOT
+        // clear the fullscreen bit (unlike placement=Floating). Going directly from
+        // Fullscreen -> Maximized therefore leaves KWin fullscreen. Always exit the
+        // graphics-device fullscreen session and pass through Floating first.
+        LaunchedEffect(composeWindow, placement) {
+            if (DesktopPlatform.isLinux) {
+                val destination = placement
+                val device = composeWindow.graphicsConfiguration.device
+                // JVM graphics-device fullscreen can still be active even if a late
+                // window-state observation describes a different placement.
+                val current = if (device.fullScreenWindow === composeWindow)
+                    androidx.compose.ui.window.WindowPlacement.Fullscreen
+                else composeWindow.placement
+                val transitions = linuxFullscreenRestorationPath(
+                    current = current, requested = destination,
+                )
+                for (step in transitions) {
+                    if (DesktopWindowMode.placement.value != destination) return@LaunchedEffect
+                    withContext(Dispatchers.Swing) {
+                        if (step != androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+                            // JBR's Wayland GraphicsDevice issues requestUnsetFullScreen()
+                            // to KWin; this is the same fullscreen session Compose owns.
+                            val device = composeWindow.graphicsConfiguration.device
+                            if (device.fullScreenWindow === composeWindow) {
+                                device.fullScreenWindow = null
+                            }
+                        }
+                        composeWindow.placement = step
+                    }
+                    state.placement = step
+                    // Ensure the floating step has been dispatched to the compositor
+                    // before attempting to maximize the restored window.
+                    if (step == androidx.compose.ui.window.WindowPlacement.Floating &&
+                        destination == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                        delay(100)
+                    }
+                }
+                DesktopTrackLog.log("linux window placement: requested $destination, native=${composeWindow.placement}")
+            }
+        }
+
+        // AWT receives these keys even when a Compose child/embedded video has focus.
+        // Exit is deliberately on KEY_PRESSED (not KEY_UP), which is not guaranteed when
+        // a Wayland fullscreen transition replaces/defocuses the current surface.
+        DisposableEffect(composeWindow) {
+            val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
+            val dispatcher = java.awt.KeyEventDispatcher { event ->
+                if (!DesktopPlatform.isLinux ||
+                    event.id != java.awt.event.KeyEvent.KEY_PRESSED ||
+                    (event.keyCode != java.awt.event.KeyEvent.VK_ESCAPE &&
+                        event.keyCode != java.awt.event.KeyEvent.VK_F11) ||
+                    !javax.swing.SwingUtilities.isDescendingFrom(event.component, composeWindow) ||
+                    (!DesktopWindowMode.fullScreen.value &&
+                        composeWindow.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen &&
+                        state.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen)
+                ) {
+                    false
+                } else {
+                    DesktopWindowMode.exit()
+                    // Emergency path must also clear the GraphicsDevice fullscreen session
+                    // before attempting to restore a maximized window.
+                    val device = composeWindow.graphicsConfiguration.device
+                    if (device.fullScreenWindow === composeWindow) {
+                        device.fullScreenWindow = null
+                    }
+                    val restore = DesktopWindowMode.placement.value
+                    composeWindow.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                    if (restore != androidx.compose.ui.window.WindowPlacement.Floating) {
+                        composeWindow.placement = restore
+                    }
+                    state.placement = restore
+                    true
+                }
+            }
+            focusManager.addKeyEventDispatcher(dispatcher)
+            onDispose { focusManager.removeKeyEventDispatcher(dispatcher) }
+        }
+        // Windows native borderless fullscreen preserves the Skiko window surface.
+        // Do not route through WindowPlacement.Maximized (which retains the caption).
+        LaunchedEffect(composeWindow, fullScreen) {
+            if (DesktopPlatform.isWindows) {
+                java.awt.EventQueue.invokeLater {
+                    DesktopWindowsFullscreen.apply(composeWindow, fullScreen)
+                }
+            }
+        }
+        DisposableEffect(composeWindow) {
+            onDispose { if (DesktopPlatform.isWindows) DesktopWindowsFullscreen.apply(composeWindow, false) }
+        }
+
         // The AppImage updater must never treat merely spawning the JVM as a healthy restart.
         // A real, mapped Compose window acknowledges the launch using a unique local marker.
         LaunchedEffect(composeWindow) {
