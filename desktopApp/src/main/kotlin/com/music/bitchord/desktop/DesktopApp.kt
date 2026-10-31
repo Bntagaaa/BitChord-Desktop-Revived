@@ -5657,6 +5657,10 @@ private fun DesktopSidebar(
         animationSpec = tween(durationMillis = 180),
         label = "Sidebar width",
     )
+    // UI zoom reduces Compose density, making 13 dp text only ~10 px at 80%.
+    // Keep this brand wordmark at least its 100% physical size for legibility.
+    val uiScalePercent by DesktopUiScaleSettings.percent.collectAsState()
+    val wordmarkScaleCompensation = (100f / uiScalePercent).coerceAtLeast(1f)
     val micaSidebarEnabled by DesktopAppearanceSettings.micaSidebar.collectAsState()
     val wallpaperTone by DesktopSidebarMica.wallpaperTone.collectAsState()
     LaunchedEffect(micaSidebarEnabled) {
@@ -5707,24 +5711,19 @@ private fun DesktopSidebar(
                     colorFilter = ColorFilter.tint(DesktopForeground),
                     modifier = Modifier.width(28.dp).height(18.dp),
                 )
-                // Match the smaller wordmark in the branding reference. Keep a fixed
-                // proportional drawing size independent of the sidebar's free width.
+                // Keep the compact, proportional wordmark clear at 80% through 125%
+                // UI zoom. The SVG also has breathing room around its glyph outlines.
                 Spacer(Modifier.width(13.dp))
-                // Give the wordmark extra vertical breathing room at 100% UI scale
-                // without stretching it or changing the header's overall proportions.
-                Box(
-                    modifier = Modifier.width(84.dp).height(18.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Image(
-                        painter = painterResource(Res.drawable.bitchord_wordmark),
-                        contentDescription = "BitChord",
-                        modifier = Modifier.width(84.dp).height(13.dp),
-                        alignment = Alignment.CenterStart,
-                        contentScale = ContentScale.Fit,
-                        colorFilter = ColorFilter.tint(DesktopForeground),
-                    )
-                }
+                Image(
+                    painter = painterResource(Res.drawable.bitchord_wordmark),
+                    contentDescription = "BitChord",
+                    modifier = Modifier
+                        .width(84.dp * wordmarkScaleCompensation)
+                        .height(18.dp * wordmarkScaleCompensation),
+                    alignment = Alignment.CenterStart,
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(DesktopForeground),
+                )
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onToggleCollapse, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Rounded.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
