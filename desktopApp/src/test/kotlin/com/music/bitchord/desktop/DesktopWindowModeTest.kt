@@ -7,6 +7,19 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DesktopWindowModeTest {
+    @Test fun staleLinuxFullscreenObservationNeverUndoesRestore() {
+        assertTrue(shouldIgnoreStaleFullscreenObservation(
+            isLinux = true, observed = WindowPlacement.Fullscreen, requested = WindowPlacement.Floating))
+        assertTrue(shouldIgnoreStaleFullscreenObservation(
+            isLinux = true, observed = WindowPlacement.Fullscreen, requested = WindowPlacement.Maximized))
+        assertFalse(shouldIgnoreStaleFullscreenObservation(
+            isLinux = true, observed = WindowPlacement.Fullscreen, requested = WindowPlacement.Fullscreen))
+        assertFalse(shouldIgnoreStaleFullscreenObservation(
+            isLinux = false, observed = WindowPlacement.Fullscreen, requested = WindowPlacement.Floating))
+        assertFalse(shouldIgnoreStaleFullscreenObservation(
+            isLinux = true, observed = WindowPlacement.Floating, requested = WindowPlacement.Floating))
+    }
+
     @Test fun linuxExitIgnoresStaleFullscreenAndCanReenter() {
         val mode = DesktopWindowPlacementController(isWindows = false)
         mode.toggle()
