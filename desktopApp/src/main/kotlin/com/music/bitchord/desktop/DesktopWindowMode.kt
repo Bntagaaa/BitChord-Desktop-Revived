@@ -109,6 +109,20 @@ internal fun shouldIgnoreStaleFullscreenObservation(
     requested: WindowPlacement,
 ): Boolean = isLinux && observed == WindowPlacement.Fullscreen && requested != WindowPlacement.Fullscreen
 
+/**
+ * ComposeWindow.placement's Maximized setter does not unset its Fullscreen flag.
+ * Linux must leave the fullscreen session via Floating before applying maximize.
+ */
+internal fun linuxFullscreenRestorationPath(
+    current: WindowPlacement,
+    requested: WindowPlacement,
+): List<WindowPlacement> =
+    if (current == WindowPlacement.Fullscreen && requested == WindowPlacement.Maximized) {
+        listOf(WindowPlacement.Floating, WindowPlacement.Maximized)
+    } else {
+        listOf(requested)
+    }
+
 /** Shared host for the desktop's player, window chrome, and escape handler. */
 internal object DesktopWindowMode {
     private val controller = DesktopWindowPlacementController(DesktopPlatform.isWindows)
