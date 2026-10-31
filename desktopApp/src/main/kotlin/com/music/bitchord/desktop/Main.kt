@@ -80,10 +80,18 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     val pipHost = remember { DesktopPipHost() }
     val appIcon by DesktopAppIconSettings.selected.collectAsState()
     LaunchedEffect(placement) { state.placement = placement }
-    // ...and back, for the times the window is moved between placements by something that is not
-    // us; see [DesktopWindowMode.adopt].
+    // Observe externally initiated maximize/restore changes. Do not echo a stale Fullscreen
+    // observation back into our controller after a Linux exit request: on KDE/Wayland, Compose
+    // can publish Fullscreen once more while the compositor is processing the restore.
     LaunchedEffect(state) {
-        snapshotFlow { state.placement }.collect(DesktopWindowMode::adopt)
+        snapshotFlow { state.placement }.collect { observed ->
+            if (DesktopPlatform.isLinux &&
+                observed == androidx.compose.ui.window.WindowPlacement.Fullscreen &&
+                DesktopWindowMode.placement.value != observed) {
+                return@collect
+            }
+            DesktopWindowMode.adopt(observed)
+        }
     }
     LaunchedEffect(visible, state.isMinimized) {
         if (!visible || state.isMinimized) {
@@ -105,6 +113,52 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         resizable = true,
     ) {
         val composeWindow = window
+        // Reassert the desired placement on the actual Linux ComposeWindow, not only its
+        // WindowState mirror. KWin's asynchronous configure event can otherwise leave the
+        // native surface fullscreen while the StateFlow already says Floating.
+        LaunchedEffect(composeWindow, placement) {
+            if (DesktopPlatform.isLinux) {
+                repeat(4) { attempt ->
+                    if (DesktopWindowMode.placement.value != placement) return@LaunchedEffect
+                    if (state.placement != placement) state.placement = placement
+                    java.awt.EventQueue.invokeLater {
+                        if (DesktopWindowMode.placement.value == placement &&
+                            composeWindow.isDisplayable && composeWindow.placement != placement) {
+                            composeWindow.placement = placement
+                        }
+                    }
+                    kotlinx.coroutines.delay(if (attempt == 0) 80L else 180L)
+                    if (composeWindow.placement == placement) return@LaunchedEffect
+                }
+                if (composeWindow.placement != placement) {
+                    DesktopTrackLog.log("linux fullscreen: could not apply requested placement $placement (native=${composeWindow.placement})")
+                }
+            }
+        }
+
+        // AWT receives these keys even when a Compose child/embedded video has focus.
+        // Exit is deliberately on KEY_PRESSED (not KEY_UP), which is not guaranteed when
+        // a Wayland fullscreen transition replaces/defocuses the current surface.
+        DisposableEffect(composeWindow) {
+            val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
+            val dispatcher = java.awt.KeyEventDispatcher { event ->
+                if (!DesktopPlatform.isLinux ||
+                    event.id != java.awt.event.KeyEvent.KEY_PRESSED ||
+                    (event.keyCode != java.awt.event.KeyEvent.VK_ESCAPE &&
+                        event.keyCode != java.awt.event.KeyEvent.VK_F11) ||
+                    !DesktopWindowMode.fullScreen.value ||
+                    !javax.swing.SwingUtilities.isDescendingFrom(event.component, composeWindow)
+                ) {
+                    false
+                } else {
+                    DesktopWindowMode.exit()
+                    // The placement effect above sends the native command as well.
+                    true
+                }
+            }
+            focusManager.addKeyEventDispatcher(dispatcher)
+            onDispose { focusManager.removeKeyEventDispatcher(dispatcher) }
+        }
         // Windows native borderless fullscreen preserves the Skiko window surface.
         // Do not route through WindowPlacement.Maximized (which retains the caption).
         LaunchedEffect(composeWindow, fullScreen) {
