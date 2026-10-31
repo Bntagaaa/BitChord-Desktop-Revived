@@ -84,6 +84,14 @@ if(WIN32)
     set_target_properties(bitchord_analysis PROPERTIES PREFIX "")
 endif()
 
+# The analyser is extracted and loaded via System.load() from the user's data folder.
+# Windows GitHub runners have MinGW DLLs on PATH, but normal Windows installations do
+# not. Link GCC, libstdc++ and winpthreads statically so the packaged analyser does
+# not fail with "Can't find dependent libraries" on end-user machines.
+if(MINGW)
+    target_link_options(bitchord_analysis PRIVATE -static -static-libgcc -static-libstdc++)
+endif()
+
 # The Windows media controls, which are WinRT. MSVC builds them with C++/WinRT;
 # MinGW has no C++/WinRT, so it builds smtc_abi.cpp — the same exports written
 # against the raw ABI headers — whenever its headers carry the Media namespace.
