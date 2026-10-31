@@ -146,13 +146,19 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
                     event.id != java.awt.event.KeyEvent.KEY_PRESSED ||
                     (event.keyCode != java.awt.event.KeyEvent.VK_ESCAPE &&
                         event.keyCode != java.awt.event.KeyEvent.VK_F11) ||
-                    !DesktopWindowMode.fullScreen.value ||
-                    !javax.swing.SwingUtilities.isDescendingFrom(event.component, composeWindow)
+                    !javax.swing.SwingUtilities.isDescendingFrom(event.component, composeWindow) ||
+                    (!DesktopWindowMode.fullScreen.value &&
+                        composeWindow.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen &&
+                        state.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen)
                 ) {
                     false
                 } else {
                     DesktopWindowMode.exit()
-                    // The placement effect above sends the native command as well.
+                    // Emergency path: reach the real native window even if the controller has
+                    // already lost track of KWin's fullscreen state.
+                    val restore = DesktopWindowMode.placement.value
+                    state.placement = restore
+                    if (composeWindow.placement != restore) composeWindow.placement = restore
                     true
                 }
             }
