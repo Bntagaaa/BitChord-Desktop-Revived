@@ -131,9 +131,20 @@ internal object DesktopWindowMode {
     val fullScreen: StateFlow<Boolean> = controller.fullScreen
     val maximized: StateFlow<Boolean> = controller.maximized
 
-    fun toggle() = controller.toggle()
+    fun toggle() {
+        val previous = controller.fullScreen.value
+        controller.toggle()
+        DesktopTrackLog.log(
+            "window fullscreen button: $previous -> ${controller.fullScreen.value}; " +
+                "requested placement=${controller.placement.value}"
+        )
+    }
     fun toggleMaximized() = controller.toggleMaximized()
-    fun exit() = controller.exit()
+    fun exit() {
+        val previous = controller.fullScreen.value
+        controller.exit()
+        if (previous) DesktopTrackLog.log("window fullscreen exit: requested ${controller.placement.value}")
+    }
     fun exitOnEscape(): Boolean = controller.exitOnEscape()
     fun adopt(placement: WindowPlacement) = controller.adopt(placement)
 }
