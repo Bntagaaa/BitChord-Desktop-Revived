@@ -1211,6 +1211,31 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     /** Puts a track at the end of what the listener queued — not the end of the queue. */
     fun addToQueue(song: Song) = enqueue(song, next = false)
 
+    /**
+     * Playlist menu queue actions must not persist the full list once per track.
+     * Preserve ordering and publish one party intent for the entire operation.
+     */
+    fun enqueueSongs(tracks: List<Song>, next: Boolean) {
+        val party = DesktopListenTogether.state.value
+        if (party.controlsLocked) return
+        val playable = tracks.filter { it.unresolvedSpotifyTrack() == null }
+        if (playable.isEmpty()) return
+        if (party.inParty &&
+            liveQueue.upcoming.size + playable.size > DesktopPartySync.MAX_PARTY_UPCOMING_QUEUE
+        ) {
+            DesktopPlayerHost.showMessage(
+                "Queue is full (maximum ${DesktopPartySync.MAX_PARTY_UPCOMING_QUEUE} songs in party)",
+            )
+            return
+        }
+        val source = currentQueueSource()
+        val radio = liveQueue.current?.radioName
+        val normalized = playable.map { canonicalSong(it).copy(radioName = radio).withSource(source) }
+        liveQueue = liveQueue.enqueueBatch(normalized, playNext = next)
+        saveQueue()
+        partySyncHolder[0]?.onLocalIntent()
+    }
+
     /** Starts the station YouTube Music builds around one track. */
     fun startRadio(song: Song) {
         if (partyTrackChangeBlocked()) return
@@ -2541,19 +2566,18 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         overlays.settingsPage = DesktopSettingsPage.MAIN
     }
 
-    /** Library folders include the same Spotify resource icon used by BitChord Mobile. */
+    /** Folder shortcuts match the default sidebar order; Spotify uses its brand icon. */
     val libraryLinks = remember {
         listOf(
             LibraryLink(
                 item = ShelfItem(
-                    title = "Spotify",
-                    subtitle = "Playlists and Liked Songs · plays via YouTube Music",
+                    title = "History",
+                    subtitle = "Recently played tracks",
                     thumbnailUrl = null,
                     videoId = null,
-                    browseId = SPOTIFY_LIBRARY_ID,
+                    browseId = LOCAL_HISTORY_ID,
                 ),
-                icon = BitChordIcons.Library,
-                logo = SharedUiRes.drawable.spotify_logo,
+                icon = BitChordIcons.Clock,
             ),
             LibraryLink(
                 item = ShelfItem(
@@ -2574,6 +2598,17 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     browseId = LOCAL_MUSIC_ID,
                 ),
                 icon = Icons.Rounded.Folder,
+            ),
+            LibraryLink(
+                item = ShelfItem(
+                    title = "Spotify",
+                    subtitle = "Playlists and Liked Songs · plays via YouTube Music",
+                    thumbnailUrl = null,
+                    videoId = null,
+                    browseId = SPOTIFY_LIBRARY_ID,
+                ),
+                icon = BitChordIcons.Library,
+                logo = SharedUiRes.drawable.spotify_logo,
             ),
         )
     }
@@ -2600,6 +2635,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         val browseId = item.browseId.orEmpty()
         when {
             browseId == SPOTIFY_LIBRARY_ID -> selectDestination(DesktopDestination.SPOTIFY)
+            browseId == LOCAL_HISTORY_ID -> selectDestination(DesktopDestination.HISTORY)
             browseId == LOCAL_DOWNLOADS_ID -> selectDestination(DesktopDestination.DOWNLOADS)
             browseId == LOCAL_MUSIC_ID -> selectDestination(DesktopDestination.LOCAL_MUSIC)
             browseId.startsWith(LOCAL_PLAYLIST_PREFIX) ->
@@ -4825,10 +4861,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             onLoadMore = ::loadMoreCollectionSongs,
                             onRename = { overlays.rename = true }.takeIf { openedCollection?.owned == true },
                             onShare = openedCollection
-                                ?.takeIf {
-                                    (it.type == BrowseType.ALBUM || it.type == BrowseType.PLAYLIST) &&
-                                        !it.browseId.startsWith(SPOTIFY_PAGE_PREFIX)
-                                }
+                                ?.takeIf { it.type == BrowseType.ALBUM || it.type == BrowseType.PLAYLIST }
                                 ?.let { collection -> { shareCollection(collection) } },
                             onDelete = { overlays.delete = true }.takeIf { openedCollection?.owned == true },
                             onRemoveFromPlaylist = ::removeFromOpenPlaylist
@@ -4841,6 +4874,23 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                 playSpotifyOrYoutubeSongs(songs.shuffled(), 0, openedCollection?.let { collectionSource(it) })
                             },
                             onDownloadAll = ::downloadAll,
+                            signedIn = youtubeSignedIn,
+                            onLibraryChanged = ::reloadLibrary,
+                            onStartMix = ::startRadio,
+                            onQueueSongs = ::enqueueSongs,
+                            songMenu = { track, index ->
+                                if (track.unresolvedSpotifyTrack() == null) {
+                                    songMenu(track)
+                                } else {
+                                    DesktopSpotifyPendingSongMenu {
+                                        openedCollection?.let { collection ->
+                                            playSpotifyOrYoutubeSongs(
+                                                collection.songs, index, collectionSource(collection),
+                                            )
+                                        }
+                                    }
+                                }
+                            },
                             animatedCanvas = animatedCanvas,
                             onToggleLike = { song ->
                                 toggleLike(song)
@@ -5143,6 +5193,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             links = libraryLinks,
                             deviceItems = libraryDeviceItems,
                             showTitle = true,
+                            animateHover = !DesktopAppearanceSettings.reduceAnimation.value,
                         )
                         destination == DesktopDestination.HISTORY -> DesktopHistoryPage(
                             // The account's history when there is one, and what
@@ -5668,8 +5719,8 @@ private fun DesktopSidebar(
                 !settingsOpen && (destination == DesktopDestination.SEARCH || destination == DesktopDestination.EXPLORE), collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.SEARCH)
             }
-            // Spotify lives inside Library, so keep Library selected while Spotify is open.
-            DesktopSidebarItem(BitChordIcons.Library, "Library", !settingsOpen && (destination == DesktopDestination.LIBRARY || destination == DesktopDestination.SPOTIFY), collapsed = collapsed) {
+            // Library and Spotify are independent destinations in the default sidebar.
+            DesktopSidebarItem(BitChordIcons.Library, "Library", !settingsOpen && destination == DesktopDestination.LIBRARY, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LIBRARY)
             }
             Spacer(Modifier.height(6.dp))
@@ -5689,6 +5740,12 @@ private fun DesktopSidebar(
             }
             DesktopSidebarItem(BitChordIcons.Library, "Local Music", !settingsOpen && destination == DesktopDestination.LOCAL_MUSIC, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LOCAL_MUSIC)
+            }
+            DesktopSidebarItem(
+                BitChordIcons.Library, "Spotify", !settingsOpen && destination == DesktopDestination.SPOTIFY,
+                collapsed = collapsed, logo = SharedUiRes.drawable.spotify_logo,
+            ) {
+                onDestinationSelected(DesktopDestination.SPOTIFY)
             }
             Spacer(Modifier.height(6.dp))
             HorizontalDivider(color = desktopChromeDivider())
@@ -5740,6 +5797,7 @@ private fun DesktopSidebar(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
+                        .desktopHoverFill(corner = 8.dp, alpha = 0.07f)
                         .clickable(onClick = onOpenAccounts)
                         .padding(horizontal = 4.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -5788,6 +5846,7 @@ private fun DesktopSidebarItem(
     label: String,
     selected: Boolean,
     collapsed: Boolean = false,
+    logo: org.jetbrains.compose.resources.DrawableResource? = null,
     onClick: () -> Unit,
 ) {
     if (collapsed) {
@@ -5800,6 +5859,7 @@ private fun DesktopSidebarItem(
                 Modifier.fillMaxWidth().height(42.dp)
                     .clip(RoundedCornerShape(7.dp))
                     .background(if (selected) DesktopTheme.palette.navAccent.copy(alpha = 0.12f) else Color.Transparent)
+                    .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
                     .clickable(onClick = onClick),
                 contentAlignment = Alignment.Center,
             ) {
@@ -5807,7 +5867,11 @@ private fun DesktopSidebarItem(
                     Modifier.align(Alignment.CenterStart).width(3.dp).height(18.dp)
                         .background(DesktopTheme.palette.navAccent),
                 )
-                Icon(icon, label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(20.dp))
+                if (logo != null) {
+                    Icon(painterResource(logo), label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(20.dp))
+                } else {
+                    Icon(icon, label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(20.dp))
+                }
             }
         }
         return
@@ -5817,6 +5881,7 @@ private fun DesktopSidebarItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(7.dp))
             .background(if (selected) DesktopTheme.palette.navAccent.copy(alpha = 0.12f) else Color.Transparent)
+            .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
             .clickable(onClick = onClick)
             .padding(horizontal = 9.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -5830,7 +5895,11 @@ private fun DesktopSidebarItem(
             Spacer(Modifier.width(3.dp))
         }
         Spacer(Modifier.width(6.dp))
-        Icon(icon, label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(18.dp))
+        if (logo != null) {
+            Icon(painterResource(logo), label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(18.dp))
+        } else {
+            Icon(icon, label, tint = if (selected) DesktopTheme.palette.navAccent else DesktopSecondary, modifier = Modifier.size(18.dp))
+        }
         Spacer(Modifier.width(10.dp))
         Text(
             label,
@@ -6405,6 +6474,7 @@ private const val MESH_SOURCE_PX = 120
 
 /** Enough to scroll through, short of turning the shelf into the history page. */
 /** The Library's "On device" cards — the phone's ids for the two folders, so their cards draw alike. */
+private const val LOCAL_HISTORY_ID = "local:history"
 private const val LOCAL_DOWNLOADS_ID = "local:downloads"
 private const val LOCAL_MUSIC_ID = "local:all"
 private const val LOCAL_PLAYLIST_PREFIX = "desktop-playlist:"
@@ -8457,6 +8527,11 @@ private fun DesktopCollectionPage(
     onPlaySongs: (List<Song>, Int) -> Unit,
     onShuffle: (List<Song>) -> Unit,
     onDownloadAll: (List<Song>) -> Unit,
+    signedIn: Boolean,
+    onLibraryChanged: () -> Unit,
+    onStartMix: (Song) -> Unit,
+    onQueueSongs: (List<Song>, Boolean) -> Unit,
+    songMenu: @Composable (Song, Int) -> Unit,
     animatedCanvas: Boolean,
     onToggleLike: (Song) -> Unit,
     onDownload: (Song) -> Unit,
@@ -8478,6 +8553,19 @@ private fun DesktopCollectionPage(
         }
     }
     var moreOpen by remember(collection.browseId) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val pinnedIds by DesktopAppUiHost.pinnedPlaylists.collectAsState()
+    val playableSongs = remember(songs) { songs.filter { it.unresolvedSpotifyTrack() == null } }
+    // A saved YouTube playlist/album can be toggled from its overflow. Spotify playlists
+    // have no YouTube library state and are never rated against a Spotify identifier.
+    var libraryState by remember(collection.browseId) {
+        mutableStateOf<com.music.bitchord.data.model.LibraryState?>(null)
+    }
+    LaunchedEffect(collection.browseId, signedIn) {
+        libraryState = if (signedIn && !collection.browseId.startsWith(SPOTIFY_PAGE_PREFIX)) {
+            YtMusicRepository.releaseLibraryState(collection.browseId).getOrNull()
+        } else null
+    }
     val subtitleParts = collection.subtitle
         .split(" • ", " · ", " | ")
         .map(String::trim)
@@ -8598,45 +8686,53 @@ private fun DesktopCollectionPage(
                             )
                             Box {
                                 DesktopCircleButton(Icons.Rounded.MoreHoriz, DesktopStrings["more", "More"], onClick = { moreOpen = true })
-                                DesktopDropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
-                                    DropdownMenuItem(
-                                        text = { Text(DesktopStrings["download_all", "Download all"]) },
-                                        leadingIcon = { Icon(BitChordIcons.Download, null) },
-                                        onClick = {
-                                            moreOpen = false
-                                            onDownloadAll(songs.filter { it.unresolvedSpotifyTrack() == null })
-                                        },
+                                if (moreOpen) {
+                                    DesktopCollectionContextMenu(
+                                        actions = DesktopCollectionMenuActions(
+                                            onShuffle = { onShuffle(songs) },
+                                            onFind = {
+                                                searching = !searching
+                                                if (!searching) listQuery = ""
+                                            },
+                                            onStartMix = playableSongs.firstOrNull()?.let { seed ->
+                                                { onStartMix(seed) }
+                                            },
+                                            onPlayNext = playableSongs.takeIf(List<Song>::isNotEmpty)?.let { queue ->
+                                                { onQueueSongs(queue, true) }
+                                            },
+                                            onAddToQueue = playableSongs.takeIf(List<Song>::isNotEmpty)?.let { queue ->
+                                                { onQueueSongs(queue, false) }
+                                            },
+                                            onDownloadAll = playableSongs.takeIf(List<Song>::isNotEmpty)?.let { ready ->
+                                                { onDownloadAll(ready) }
+                                            },
+                                            onShare = onShare,
+                                            onSaveToLibrary = libraryState?.let { status ->
+                                                {
+                                                    scope.launch {
+                                                        YtMusicRepository.setSaved(status.playlistId, !status.saved)
+                                                            .onSuccess {
+                                                                libraryState = status.copy(saved = !status.saved)
+                                                                onLibraryChanged()
+                                                            }
+                                                            .onFailure {
+                                                                DesktopPlayerHost.showMessage(
+                                                                    "Could not update library: ${it.message ?: "Unknown error"}",
+                                                                )
+                                                            }
+                                                    }
+                                                }
+                                            },
+                                            savedToLibrary = libraryState?.saved == true,
+                                            onPin = if (collection.type == BrowseType.PLAYLIST) {
+                                                { DesktopAppUiHost.togglePinnedPlaylist(collection.browseId) }
+                                            } else null,
+                                            pinned = collection.browseId in pinnedIds,
+                                            onRename = onRename,
+                                            onDelete = onDelete,
+                                        ),
+                                        onDismiss = { moreOpen = false },
                                     )
-                                    onShare?.let { share ->
-                                        DropdownMenuItem(
-                                            text = { Text(DesktopStrings["share", "Share"]) },
-                                            leadingIcon = { Icon(Icons.Rounded.Share, null) },
-                                            onClick = {
-                                                moreOpen = false
-                                                share()
-                                            },
-                                        )
-                                    }
-                                    onRename?.let { rename ->
-                                        DropdownMenuItem(
-                                            text = { Text(DesktopStrings["rename", "Rename"]) },
-                                            leadingIcon = { Icon(Icons.Rounded.Edit, null) },
-                                            onClick = {
-                                                moreOpen = false
-                                                rename()
-                                            },
-                                        )
-                                    }
-                                    onDelete?.let { delete ->
-                                        DropdownMenuItem(
-                                            text = { Text(DesktopStrings["delete", "Delete"]) },
-                                            leadingIcon = { Icon(Icons.Rounded.Delete, null) },
-                                            onClick = {
-                                                moreOpen = false
-                                                delete()
-                                            },
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -8672,6 +8768,7 @@ private fun DesktopCollectionPage(
                     downloadInProgress = song.videoId in downloadInProgress,
                     number = index + 1,
                     onRemove = onRemoveFromPlaylist?.takeIf { song.setVideoId != null },
+                    menu = { songMenu(song, index) },
                 )
             }
             if (collection.continuation != null) {
@@ -8701,7 +8798,7 @@ private fun DesktopCollectionPage(
  * table whichever rows can be removed.
  */
 private fun collectionActionsWidth(hasRemove: Boolean): Dp =
-    if (hasRemove) 136.dp else 102.dp
+    if (hasRemove) 170.dp else 136.dp
 
 @Composable
 private fun DesktopCollectionSongRow(
@@ -8719,6 +8816,7 @@ private fun DesktopCollectionSongRow(
     striped: Boolean,
     /** Takes this row out of the playlist being read. */
     onRemove: ((Song) -> Unit)? = null,
+    menu: (@Composable (Song) -> Unit)? = null,
 ) {
     val rowHoverInteraction = remember { MutableInteractionSource() }
     val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
@@ -8827,6 +8925,9 @@ private fun DesktopCollectionSongRow(
                     Icon(BitChordIcons.Plus, DesktopStrings["add_to_playlist", "Add to playlist"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))
                 }
             }
+            // The trailing ellipsis is always on the right of '+' and shares the main
+            // player song menu. Spotify placeholders show a safe matching action instead.
+            menu?.invoke(song)
         }
     }
 }
