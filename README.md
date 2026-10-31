@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="Logonew2.png" alt="Original BitChord logo" width="140" />
+<img width="1920" height="1080" alt="Dekstop" src="https://github.com/user-attachments/assets/7f4664c5-0ce3-4b06-a6a2-e0fe6e65101f" />
 
 # BitChord Desktop — Revived
 
@@ -20,7 +20,7 @@
 > [!IMPORTANT]
 > **Independent community project.** This repository continues development of the original PC/desktop app after its discontinuation upstream. It is a fork of [BitChord by @kushagrasinghx](https://github.com/kushagrasinghx/BitChord), but it is **not an official continuation** and is not endorsed, maintained, or supported by the original creator or upstream maintainers. We respect the original work, preserve its attribution and license, and welcome community contributions.
 
-<img width="1920" height="1080" alt="Dekstop" src="https://github.com/user-attachments/assets/7f4664c5-0ce3-4b06-a6a2-e0fe6e65101f" />
+
 
 
 <div align="center">
