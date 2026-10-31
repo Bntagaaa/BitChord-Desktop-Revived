@@ -34,6 +34,10 @@
 
 #include <jni.h>
 
+#include <cmath>
+#include <iomanip>
+#include <locale>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -57,15 +61,22 @@ void AppendString(std::string& out, const std::string& value) {
 }
 
 void AppendNumber(std::string& out, double value) {
-  // Not finite means the field never got a defensible value; null reads as
-  // absent on the Kotlin side, which is what every consumer already handles.
-  if (!(value == value) || value > 1e308 || value < -1e308) {
+  // JSON requires '.' as its decimal separator, regardless of the device's
+  // LC_NUMERIC locale. snprintf("%.6g") follows the process C locale, so a
+  // locale with comma decimals used to produce invalid JSON such as
+  // {"duration":279,3,"bpm":119,9}. The Kotlin parser then rejected every
+  // otherwise successful native analysis as Failed.
+  if (!std::isfinite(value)) {
     out += "null";
     return;
   }
-  char buffer[32];
-  snprintf(buffer, sizeof(buffer), "%.6g", value);
-  out += buffer;
+  // Keep the previous six significant digits, but explicitly format with
+  // the invariant C++ locale instead of changing any global locale setting.
+  // This is portable to the Android NDK, Linux, MinGW and MSVC toolchains.
+  std::ostringstream formatted;
+  formatted.imbue(std::locale::classic());
+  formatted << std::setprecision(6) << value;
+  out += formatted.str();
 }
 
 void AppendDoubles(std::string& out, const std::vector<double>& values) {
