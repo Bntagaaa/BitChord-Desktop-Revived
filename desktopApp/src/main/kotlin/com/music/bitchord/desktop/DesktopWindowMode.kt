@@ -98,6 +98,17 @@ internal class DesktopWindowPlacementController(private val isWindows: Boolean) 
     }
 }
 
+/**
+ * A late Fullscreen snapshot after an explicit restore is not a fresh user command.
+ * In particular, KWin/Wayland can report it between state=Floating and the actual surface
+ * completing its exit. Allow external maximize/restore observations as before.
+ */
+internal fun shouldIgnoreStaleFullscreenObservation(
+    isLinux: Boolean,
+    observed: WindowPlacement,
+    requested: WindowPlacement,
+): Boolean = isLinux && observed == WindowPlacement.Fullscreen && requested != WindowPlacement.Fullscreen
+
 /** Shared host for the desktop's player, window chrome, and escape handler. */
 internal object DesktopWindowMode {
     private val controller = DesktopWindowPlacementController(DesktopPlatform.isWindows)
