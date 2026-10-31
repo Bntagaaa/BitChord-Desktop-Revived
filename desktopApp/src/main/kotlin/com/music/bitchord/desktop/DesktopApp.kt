@@ -283,6 +283,7 @@ import androidx.compose.ui.unit.sp
 import bitchord.desktopapp.generated.resources.Res
 import bitchord.desktopapp.generated.resources.logo
 import bitchord.desktopapp.generated.resources.bitchord_logo_original
+import bitchord.desktopapp.generated.resources.bitchord_wordmark
 import bitchord.desktopapp.generated.resources.player_transport_lyrics
 import bitchord.desktopapp.generated.resources.player_transport_next
 import bitchord.desktopapp.generated.resources.player_transport_pause
@@ -5707,7 +5708,16 @@ private fun DesktopSidebar(
                     modifier = Modifier.width(28.dp).height(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("BitChord", modifier = Modifier.weight(1f), color = DesktopForeground, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
+                // The supplied Bintang Music Black lettering is converted to vector outlines so
+                // the sidebar wordmark stays sharp without shipping the complete font file.
+                Image(
+                    painter = painterResource(Res.drawable.bitchord_wordmark),
+                    contentDescription = "BitChord",
+                    modifier = Modifier.weight(1f).height(18.dp),
+                    alignment = Alignment.CenterStart,
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(DesktopForeground),
+                )
                 IconButton(onClick = onToggleCollapse, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Rounded.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                 }
