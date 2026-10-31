@@ -5710,14 +5710,21 @@ private fun DesktopSidebar(
                 // Match the smaller wordmark in the branding reference. Keep a fixed
                 // proportional drawing size independent of the sidebar's free width.
                 Spacer(Modifier.width(13.dp))
-                Image(
-                    painter = painterResource(Res.drawable.bitchord_wordmark),
-                    contentDescription = "BitChord",
-                    modifier = Modifier.width(84.dp).height(14.dp),
-                    alignment = Alignment.CenterStart,
-                    contentScale = ContentScale.Fit,
-                    colorFilter = ColorFilter.tint(DesktopForeground),
-                )
+                // Give the wordmark extra vertical breathing room at 100% UI scale
+                // without stretching it or changing the header's overall proportions.
+                Box(
+                    modifier = Modifier.width(84.dp).height(18.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Image(
+                        painter = painterResource(Res.drawable.bitchord_wordmark),
+                        contentDescription = "BitChord",
+                        modifier = Modifier.width(84.dp).height(13.dp),
+                        alignment = Alignment.CenterStart,
+                        contentScale = ContentScale.Fit,
+                        colorFilter = ColorFilter.tint(DesktopForeground),
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onToggleCollapse, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Rounded.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
