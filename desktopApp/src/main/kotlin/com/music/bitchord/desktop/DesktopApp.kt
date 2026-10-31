@@ -283,6 +283,7 @@ import androidx.compose.ui.unit.sp
 import bitchord.desktopapp.generated.resources.Res
 import bitchord.desktopapp.generated.resources.logo
 import bitchord.desktopapp.generated.resources.bitchord_logo_original
+import bitchord.desktopapp.generated.resources.bitchord_wordmark
 import bitchord.desktopapp.generated.resources.player_transport_lyrics
 import bitchord.desktopapp.generated.resources.player_transport_next
 import bitchord.desktopapp.generated.resources.player_transport_pause
@@ -5656,6 +5657,10 @@ private fun DesktopSidebar(
         animationSpec = tween(durationMillis = 180),
         label = "Sidebar width",
     )
+    // UI zoom reduces Compose density, making 13 dp text only ~10 px at 80%.
+    // Keep this brand wordmark at least its 100% physical size for legibility.
+    val uiScalePercent by DesktopUiScaleSettings.percent.collectAsState()
+    val wordmarkScaleCompensation = (100f / uiScalePercent).coerceAtLeast(1f)
     val micaSidebarEnabled by DesktopAppearanceSettings.micaSidebar.collectAsState()
     val wallpaperTone by DesktopSidebarMica.wallpaperTone.collectAsState()
     LaunchedEffect(micaSidebarEnabled) {
@@ -5706,8 +5711,20 @@ private fun DesktopSidebar(
                     colorFilter = ColorFilter.tint(DesktopForeground),
                     modifier = Modifier.width(28.dp).height(18.dp),
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("BitChord", modifier = Modifier.weight(1f), color = DesktopForeground, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
+                // Keep the compact, proportional wordmark clear at 80% through 125%
+                // UI zoom. The SVG also has breathing room around its glyph outlines.
+                Spacer(Modifier.width(13.dp))
+                Image(
+                    painter = painterResource(Res.drawable.bitchord_wordmark),
+                    contentDescription = "BitChord",
+                    modifier = Modifier
+                        .width(84.dp * wordmarkScaleCompensation)
+                        .height(18.dp * wordmarkScaleCompensation),
+                    alignment = Alignment.CenterStart,
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(DesktopForeground),
+                )
+                Spacer(Modifier.weight(1f))
                 IconButton(onClick = onToggleCollapse, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Rounded.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                 }
