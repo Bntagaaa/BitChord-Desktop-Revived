@@ -366,7 +366,7 @@ internal class DesktopTrackAnalyzer(
             }
             if (decoder.outputFormat.sampleRate == rate.toInt()) samples else {
                 MelSpectrogram.resample(samples, decoder.outputFormat.sampleRate.toDouble(), rate).also {
-                    if (it.isNullOrEmpty()) {
+                    if (it == null || it.isEmpty()) {
                         DesktopTrackLog.log(
                             "automix: resampling ${stream.sourceId ?: "source"} audio to " +
                                 "${rate.toInt()} Hz returned no samples",
