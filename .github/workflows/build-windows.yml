@@ -76,6 +76,10 @@ jobs:
             :desktopApp:createDistributable `
             "-Pbitchord.version=${{ inputs.version }}"
 
+      - name: Verify Automix native runtime and packaged models
+        shell: pwsh
+        run: ./desktopApp/packaging/tests/windows-automix-check.ps1
+
       - name: Collect artifacts
         shell: pwsh
         run: |
