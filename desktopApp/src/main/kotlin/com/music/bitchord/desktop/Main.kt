@@ -125,8 +125,14 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         LaunchedEffect(composeWindow, placement) {
             if (DesktopPlatform.isLinux) {
                 val destination = placement
+                val device = composeWindow.graphicsConfiguration.device
+                // JVM graphics-device fullscreen can still be active even if a late
+                // window-state observation describes a different placement.
+                val current = if (device.fullScreenWindow === composeWindow)
+                    androidx.compose.ui.window.WindowPlacement.Fullscreen
+                else composeWindow.placement
                 val transitions = linuxFullscreenRestorationPath(
-                    current = composeWindow.placement, requested = destination,
+                    current = current, requested = destination,
                 )
                 for (step in transitions) {
                     if (DesktopWindowMode.placement.value != destination) return@LaunchedEffect
@@ -171,11 +177,18 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
                     false
                 } else {
                     DesktopWindowMode.exit()
-                    // Emergency path: reach the real native window even if the controller has
-                    // already lost track of KWin's fullscreen state.
+                    // Emergency path must also clear the GraphicsDevice fullscreen session
+                    // before attempting to restore a maximized window.
+                    val device = composeWindow.graphicsConfiguration.device
+                    if (device.fullScreenWindow === composeWindow) {
+                        device.fullScreenWindow = null
+                    }
                     val restore = DesktopWindowMode.placement.value
+                    composeWindow.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                    if (restore != androidx.compose.ui.window.WindowPlacement.Floating) {
+                        composeWindow.placement = restore
+                    }
                     state.placement = restore
-                    if (composeWindow.placement != restore) composeWindow.placement = restore
                     true
                 }
             }
