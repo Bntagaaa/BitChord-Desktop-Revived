@@ -2005,6 +2005,17 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     }
     val playback by playbackEngine.state.collectAsState()
 
+    // The native allocator trim is a separate low-frequency background operation. Do not
+    // trim during playback, stream loading, or Automix work; keep Instant Playback responsive.
+    LaunchedEffect(playback.isPlaying, playback.isLoading, automix) {
+        val busy = playback.isPlaying || playback.isLoading || automix
+        DesktopMemoryOptimizer.onPlaybackStateChanged(busy)
+        if (!busy) {
+            delay(90_000L)
+            DesktopMemoryOptimizer.onPausedIdle()
+        }
+    }
+
     // The shared player reads the playhead off this one object, and only where it
     // draws it — see PlaybackPosition — so a tick never recomposes the player.
     val playerPosition = remember { PlaybackPosition() }

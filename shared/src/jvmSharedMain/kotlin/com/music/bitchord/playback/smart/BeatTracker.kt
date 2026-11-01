@@ -71,6 +71,7 @@ class BeatTracker(
     )
 
     @Volatile private var session: OrtSession? = null
+    @Volatile private var sessionOptions: OrtSession.SessionOptions? = null
     @Volatile private var sessionThreads = 0
     private val lock = Any()
 
@@ -80,11 +81,13 @@ class BeatTracker(
         session?.takeIf { sessionThreads == threads }?.let { return it }
         synchronized(lock) {
             session?.takeIf { sessionThreads == threads }?.let { return it }
-            runCatching { session?.close() }
-            session = null
+            closeSessionLocked()
             return runCatching {
                 val file = File(modelPath())
-                val options = OrtSession.SessionOptions().apply {
+                // Options own native resources and must outlive their OrtSession.
+                val options = OrtSession.SessionOptions()
+                try {
+                    options.apply {
                     setIntraOpNumThreads(threads)
                     setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
                     // ORT's arena allocator keeps every block it has ever needed, which for this
@@ -94,12 +97,16 @@ class BeatTracker(
                     // allocating per run is the right trade.
                     setCPUArenaAllocator(false)
                     setMemoryPatternOptimization(false)
-                }
-                OrtEnvironment.getEnvironment().createSession(file.absolutePath, options)
-                    .also {
+                    }
+                    OrtEnvironment.getEnvironment().createSession(file.absolutePath, options).also {
                         session = it
+                        sessionOptions = options
                         sessionThreads = threads
                     }
+                } catch (failure: Throwable) {
+                    runCatching { options.close() }
+                    throw failure
+                }
             }.onFailure { AnalysisLog.warn("Beat model unavailable; falling back to no grid", it) }
                 .getOrNull()
         }
@@ -206,12 +213,17 @@ class BeatTracker(
         true
     }.onFailure { AnalysisLog.warn("Beat inference failed", it) }.getOrDefault(false)
 
+    /** Close the session first: ONNX SessionOptions may retain callbacks the session uses. */
+    private fun closeSessionLocked() {
+        runCatching { session?.close() }
+        session = null
+        runCatching { sessionOptions?.close() }
+        sessionOptions = null
+        sessionThreads = 0
+    }
+
     fun release() {
-        synchronized(lock) {
-            runCatching { session?.close() }
-            session = null
-            sessionThreads = 0
-        }
+        synchronized(lock) { closeSessionLocked() }
     }
 
     companion object {

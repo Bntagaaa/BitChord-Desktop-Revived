@@ -101,6 +101,8 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     LaunchedEffect(visible, state.isMinimized) {
         if (!visible || state.isMinimized) {
             DesktopMemoryOptimizer.onWindowHidden()
+        } else {
+            DesktopMemoryOptimizer.onWindowShown()
         }
     }
     // Keep the floating host outside the main Window's visibility-paused composition.

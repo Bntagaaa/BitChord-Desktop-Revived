@@ -503,6 +503,7 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         codec?.let { avcodec_free_context(it) }
         format?.let { avformat_close_input(it) }
         outputBuffer?.deallocate()
+        outputPlanes?.deallocate()
         frame = null
         packet = null
         resampler = null

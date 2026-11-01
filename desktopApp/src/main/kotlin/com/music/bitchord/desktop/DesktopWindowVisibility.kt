@@ -60,7 +60,7 @@ internal object DesktopWindowVisibility {
         // the app having broken rather than as it having been hidden.
         DesktopWindowMode.exit()
         _visible.value = false
-        DesktopMemoryOptimizer.onWindowHidden()
+        // Main observes visibility and runs cleanup exactly once, off the AWT close callback.
         runCatching { onClosedToTray() }.onFailure { DesktopTrackLog.log("PiP activation failed; remaining in tray") }
         DesktopTrackLog.log("window closed to the tray; playback continues")
         return false

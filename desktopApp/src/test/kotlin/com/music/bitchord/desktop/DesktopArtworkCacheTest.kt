@@ -63,6 +63,12 @@ class DesktopArtworkCacheTest {
     }
 
     @Test
+    fun oversizedImageIsNotRetainedByDesktopArtworkCache() {
+        assertFalse(DesktopArtworkCache.shouldCache(20_000, 20_000))
+        assertTrue(DesktopArtworkCache.shouldCache(120, 120))
+    }
+
+    @Test
     fun clearingGivesEverythingBack() {
         val cache = lru(100)
         repeat(5) { cache.put("x-$it", 10L) }

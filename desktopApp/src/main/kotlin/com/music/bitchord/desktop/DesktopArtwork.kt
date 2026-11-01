@@ -17,10 +17,19 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Decoded artwork, kept to a budget.
@@ -32,34 +41,68 @@ import java.net.URI
 internal object DesktopArtworkCache {
 
     /**
-     * A sixth of the heap, within reason.
-     *
-     * Derived rather than fixed so the budget still makes sense against whatever `-Xmx` the
-     * launcher was given, and clamped at both ends so a small heap still caches something and a
-     * large one does not decide it may hold half a gigabyte of thumbnails.
+     * Bound the decoded-image cache, not just compressed HTTP payloads. A decoded 1000px
+     * bitmap can be several MiB even when its JPEG is tiny.
      */
     internal val budgetBytes: Long =
         (Runtime.getRuntime().maxMemory() / 6).coerceIn(32L * 1024 * 1024, 128L * 1024 * 1024)
 
-    /** Four bytes a pixel, which is what every format here decodes to. */
     private val images = DesktopByteBudgetLru<ImageBitmap>(budgetBytes) {
         it.width.toLong() * it.height.toLong() * 4L
     }
+    private val cacheLifecycleLock = Any()
+    private val cacheEpoch = AtomicLong(0)
+    private val requests = ConcurrentHashMap<String, CompletableDeferred<ImageBitmap?>>()
+    private val worker = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Prevent a wall of parallel network/decode jobs when Home, Search and playlists mount.
+    private val loadSlots = Semaphore(4)
 
     val heldBytes: Long get() = images.heldBytes
 
-    /** Everything held, dropped — what the Storage settings' "Clear image cache" does. */
-    fun clear() = images.clear()
+    internal fun shouldCache(width: Int, height: Int): Boolean =
+        width > 0 && height > 0 && width.toLong() * height.toLong() <= budgetBytes / 4L
 
+    /** Drop cached artwork without allowing an older request to repopulate it on completion. */
+    fun clear() = synchronized(cacheLifecycleLock) {
+        cacheEpoch.incrementAndGet()
+        images.clear()
+    }
+
+    /** Single-flight by URL: all collectors share one fetch/decode and the worker outlives
+     * a single composable's cancellation. The caller still owns the returned bitmap reference. */
     suspend fun load(url: String?): ImageBitmap? {
         if (url.isNullOrBlank()) return null
         images.get(url)?.let { return it }
-        return runCatching {
-            URI(url).toURL().openConnection().apply {
-                connectTimeout = 10_000
-                readTimeout = 10_000
-            }.getInputStream().use { stream -> stream.readBytes().decodeToImageBitmap() }
-        }.getOrNull()?.also { images.put(url, it) }
+
+        val request = CompletableDeferred<ImageBitmap?>()
+        val ongoing = requests.putIfAbsent(url, request)
+        if (ongoing != null) return ongoing.await()
+        val epoch = cacheEpoch.get()
+        worker.launch {
+            try {
+                val bitmap = loadSlots.withPermit {
+                    images.get(url) ?: runCatching {
+                        URI(url).toURL().openConnection().apply {
+                            connectTimeout = 10_000
+                            readTimeout = 10_000
+                        }.getInputStream().use { stream -> stream.readBytes().decodeToImageBitmap() }
+                    }.getOrNull()
+                }
+                if (bitmap != null && shouldCache(bitmap.width, bitmap.height)) {
+                    synchronized(cacheLifecycleLock) {
+                        if (cacheEpoch.get() == epoch) images.put(url, bitmap)
+                    }
+                }
+                request.complete(bitmap)
+            } catch (cancelled: CancellationException) {
+                request.cancel(cancelled)
+            } catch (_: Exception) {
+                request.complete(null)
+            } finally {
+                requests.remove(url, request)
+            }
+        }
+        return request.await()
     }
 }
 
