@@ -56,7 +56,7 @@ class DesktopBeatAwarePcmTest {
         repeat(10) { assertEquals(first, transitionPrefixFrames(plan, clock.peek(479520), 1024, 48000)) }
     }
 
-    @Test fun allTransitionStrategiesStayFiniteAndBoundCorrelatedMasterPeaks() {
+    @Test fun allTransitionStrategiesStayFiniteWithUpstreamHeadroom() {
         val gains = FloatArray(2)
         for (style in com.music.bitchord.playback.smart.TransitionStyle.entries) {
             val plan = TransitionPlan(transitionStyle = style, bassSwap = true, beatSeconds = 0.5, fadeSeconds = 8.0)
@@ -67,7 +67,10 @@ class DesktopBeatAwarePcmTest {
                 val headroom = overlapHeadroom(gains[0], gains[1])
                 val sample = sin(2 * PI * 440 * frame / 48000).toFloat()
                 val mixed = (sample * gains[0] + sample * gains[1]) * headroom
-                assertTrue(mixed.isFinite() && abs(mixed) <= 1.000001f, "$style at $frame")
+                val sum = gains[0] + gains[1]
+                val reference = sample * sum / kotlin.math.sqrt(sum.coerceAtLeast(1f))
+                assertEquals(reference, mixed, 0.000001f, "$style at $frame")
+                assertTrue(mixed.isFinite() && abs(mixed) <= kotlin.math.sqrt(2f) + 0.000001f)
                 assertTrue(abs(mixed - previous) < 0.1f, "$style introduced an envelope discontinuity")
                 previous = mixed
             }

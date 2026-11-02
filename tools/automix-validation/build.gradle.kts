@@ -14,7 +14,7 @@ sourceSets {
     }
     test {
         kotlin.srcDirs("$repo/shared/src/commonTest/kotlin", "$repo/desktopApp/src/test/kotlin")
-        kotlin.include("com/music/bitchord/playback/smart/*.kt", "**/DesktopTempoBufferTest.kt", "**/DesktopTransitionFilterTest.kt", "**/DesktopTransitionEchoTest.kt", "**/DesktopPlayheadTest.kt", "**/DesktopBeatAwarePcmTest.kt", "**/DesktopPcmWriteTest.kt")
+        kotlin.include("com/music/bitchord/playback/smart/*.kt", "**/DesktopTempoBufferTest.kt", "**/DesktopTransitionFilterTest.kt", "**/DesktopTransitionEchoTest.kt", "**/DesktopPlayheadTest.kt", "**/DesktopBeatAwarePcmTest.kt", "**/DesktopPcmWriteTest.kt", "**/DesktopUpstreamCurvesTest.kt")
     }
 }
 tasks.test { testLogging { events("passed", "skipped", "failed") } }

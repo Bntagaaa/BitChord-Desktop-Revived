@@ -1,5 +1,8 @@
 # AutoMix for Windows and Linux — integration/v1.8.4
 
+> Historical report for the initial implementation. The later upstream-parity update
+> supersedes its custom planner/alignment/headroom changes; see [the current parity report](automix-upstream-parity.md).
+
 Base inspected: `700ef284b86e5383b3c2a0c932611b4da6c75142`.
 Working branch: `fix/automix-beat-aware-crossplatform-184`.
 Validation date: 2026-11-02. This is an implementation report, not a release certification.

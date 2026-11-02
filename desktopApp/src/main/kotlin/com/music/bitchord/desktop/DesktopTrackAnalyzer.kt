@@ -1,3 +1,27 @@
+/*
+ * Desktop model-window orchestration adapted from BitChord b690dc14.
+ * Modeled on Orchard's own TrackAnalyzer (https://github.com/SFG5453/Orchard).
+ * Phase 1 was the DSP-only pass (native/analyzer/audio_analysis.cpp); Phase 2
+ * adds the Beat This! ONNX model (see [BeatTracker]) and Phase 3 the
+ * open-unmix vocal mask (see [VocalTracker]), both over the head and tail of
+ * the track, which is the only part a transition ever reads.
+ *
+ * Copyright (C) 2026 Kushagra Singh
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+ * Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package com.music.bitchord.desktop
 
 import com.music.bitchord.data.model.Song
@@ -13,6 +37,9 @@ import com.music.bitchord.playback.smart.CurveWindow
 import com.music.bitchord.playback.smart.VocalTracker
 import com.music.bitchord.playback.smart.VocalSpectrogram
 import com.music.bitchord.playback.smart.levelFromRms
+import com.music.bitchord.playback.smart.heuristicVocalOnModelScale
+import kotlin.math.ceil
+import kotlin.math.max
 import com.music.bitchord.playback.loopmix.LoopRegion
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
@@ -42,6 +69,7 @@ internal class DesktopTrackAnalyzer(
      */
     private val stopped: () -> Boolean = { false },
     private val onAnalysed: (String) -> Unit = {},
+    private val persistResult: ((String, TrackAnalysis) -> Unit)? = null,
     /**
      * Optional transition windows enrich the DSP result but must never invalidate it.
      */
@@ -56,7 +84,7 @@ internal class DesktopTrackAnalyzer(
     }
 
     /** Analyses kept between runs, so a track measured yesterday is not measured again today. */
-    private val store = AnalysisStore { DesktopAnalysisRuntime.analysisHome().resolve("loop-v1").also { it.mkdirs() } }
+    private val store = AnalysisStore { DesktopAnalysisRuntime.analysisHome().resolve("upstream-b690dc14-v2").also { it.mkdirs() } }
 
     private val results = ConcurrentHashMap<String, TrackAnalysis>()
     private val running = ConcurrentHashMap.newKeySet<String>()
@@ -130,7 +158,7 @@ internal class DesktopTrackAnalyzer(
             }
             return
         }
-        if (results.containsKey(trackId) || restored(trackId) != null) return
+        if (results[trackId]?.isUsable == true || restored(trackId)?.isUsable == true) return
         // Asked every tick; a track that just failed is not resolved and decoded again each time.
         failedAt[trackId]?.let { if (System.currentTimeMillis() - it < RETRY_AFTER_MS) return }
         if (!running.add(trackId)) return
@@ -141,8 +169,8 @@ internal class DesktopTrackAnalyzer(
                 if (local != null) " from the file" else " from YouTube Opus",
         )
 
-        worker.execute {
-            run {
+        try { worker.execute {
+            try {
                 if (cancelled()) {
                     running.remove(trackId)
                     return@execute
@@ -169,17 +197,31 @@ internal class DesktopTrackAnalyzer(
                 if (analysis != null && cancelled()) { running.remove(trackId); return@execute }
                 if (analysis != null) {
                     failedAt.remove(trackId)
-                    store.save(trackId, analysis)
+                    // A filesystem/cache failure must not erase usable in-memory evidence or
+                    // leave the track permanently marked as running.
                     results[trackId] = analysis
+                    if (!analysis.isUsable) {
+                        failed += trackId
+                        failedAt[trackId] = System.currentTimeMillis()
+                    }
+                    runCatching {
+                        if (persistResult != null) persistResult.invoke(trackId, analysis)
+                        else store.save(trackId, analysis)
+                    }.onFailure { DesktopTrackLog.log("automix: could not persist '$trackId': ${it.message}") }
                     DesktopTrackLog.log(
                         "analysed '${song.title}': ${"%.1f".format(analysis.bpm)} bpm" +
                             ", ${analysis.downbeats.size} downbeats" +
                             ", key ${analysis.key.ifBlank { "unknown" }}",
                     )
-                    onAnalysed(trackId)
+                    runCatching { onAnalysed(trackId) }
+                        .onFailure { DesktopTrackLog.log("automix: analysis observer failed for '$trackId': ${it.message}") }
                 }
+            } finally {
                 running.remove(trackId)
             }
+        } } catch (closed: java.util.concurrent.RejectedExecutionException) {
+            running.remove(trackId)
+            if (!released.get()) throw closed
         }
     }
 
@@ -207,115 +249,178 @@ internal class DesktopTrackAnalyzer(
         // Reuse the same range-cache namespace across the independent decodes. Signed YouTube
         // URLs are not persisted to disk, but local/immutable sources still benefit from reuse.
         val cacheIdentity = "automix|$trackId|${stream.sourceId.orEmpty()}|${stream.format}"
-        val featureSamples = decode(stream, TrackFeatures.sampleRate, cacheIdentity) ?: return null
-        val features = TrackFeatures.analyze(featureSamples, durationSeconds) ?: run {
-            DesktopTrackLog.log("automix: DSP feature extraction returned no result for '$trackId'")
-            return null
-        }
-
+        val features = structuralFeatures(stream, durationSeconds, cacheIdentity) ?: return null
         if (cancelled()) return null
-        // The model runs at its own rate, so it gets its own decode rather than a resample of the
-        // analyser's. It is an enhancement: a model failure leaves the DSP beat estimate usable.
-        val beatSamples = decode(stream, MelSpectrogram.sampleRate, cacheIdentity)
-        val grid = beatSamples?.let { samples ->
-            beatsUsed = true
-            runCatching { beats.track(samples) }
-                .onFailure { failure ->
-                    if (failure is CancellationException) throw failure
-                    DesktopTrackLog.log(
-                        "automix: beat-grid pass skipped for '$trackId': " +
-                            (failure.message ?: failure.javaClass.simpleName),
-                    )
-                }
-                .getOrNull()
-        }
-
-        val vocalWindows = ArrayList<CurveWindow>()
-        val levelWindows = ArrayList<CurveWindow>()
-        val starts = listOf(0.0, 20.0, durationSeconds - 60, durationSeconds - 40, durationSeconds - 20)
-            .map { it.coerceAtLeast(0.0) }.distinct().sorted()
-        for (start in starts) {
+        // Same bounded head/tail model windows, overlap stitching and mask fusion as
+        // upstream TrackAnalyzer at b690dc14. Only decoding/transport is desktop-specific.
+        val span = if (VocalSpectrogram.available) {
+            (VocalTracker.FIXED_FRAMES - 2) * VocalSpectrogram.hop / VocalSpectrogram.sampleRate
+        } else BeatTracker.WINDOW_SECONDS
+        val headEnd = minOf(durationSeconds, 2 * span - WINDOW_OVERLAP_SECONDS)
+        val tailStart = max(0.0, durationSeconds - (3 * span - 2 * WINDOW_OVERLAP_SECONDS))
+        val regions = ArrayList<Region>()
+        for ((from, to) in modelWindows(headEnd, tailStart, durationSeconds, span)) {
             if (cancelled()) return null
-            val end = minOf(durationSeconds, start + 20.0)
-            if (end <= start) continue
-            // Loop-region and vocal windows are refinements, not prerequisites. Android's
-            // TrackAnalyzer treats an unreadable region as a missing window; desktop must do the
-            // same instead of letting one transient range-read failure discard the whole track.
-            val region = runCatching {
-                loopRegion(stream, start, end, 44100, ::cancelled)
-            }.onFailure { failure ->
-                if (failure is CancellationException) throw failure
-                DesktopTrackLog.log(
-                    "automix: optional loop window at ${start}s skipped for '$trackId': " +
-                        (failure.message ?: failure.javaClass.simpleName),
-                )
-            }.getOrNull() ?: continue
-
-            vocalsUsed = true
-            val vocalValues = runCatching {
-                vocals.track(region.left, region.right, 44100.0)
-            }.onFailure { failure ->
-                if (failure is CancellationException) throw failure
-                DesktopTrackLog.log(
-                    "automix: optional vocal pass at ${start}s skipped for '$trackId': " +
-                        (failure.message ?: failure.javaClass.simpleName),
-                )
-            }.getOrNull()
-            vocalValues?.let { vocalWindows += CurveWindow(start, VocalSpectrogram.frameRate, it) }
-            val hop = 4410
-            val values = FloatArray((region.left.size + hop - 1) / hop) { index ->
-                val from = index * hop
-                val until = minOf(from + hop, region.left.size)
-                var squared = 0.0
-                for (i in from until until) {
-                    val mono = (region.left[i] + region.right[i]) * .5
-                    squared += mono * mono
-                }
-                levelFromRms(kotlin.math.sqrt(squared / (until - from).coerceAtLeast(1))).toFloat()
-            }
-            levelWindows += CurveWindow(start, 10.0, values)
+            analyseRegion(stream, from, to, features)?.let(regions::add)
         }
-        fun side(from: Double, until: Double): BeatSide? {
-            val found = grid ?: return null
-            val points = found.beats.filter { it >= from && it <= until }
-            if (points.size < 8) return null
-            val intervals = points.zipWithNext { a, b -> b - a }.filter { it > .1 }.sorted()
-            if (intervals.isEmpty()) return null
-            val bpm = 60.0 / intervals[intervals.size / 2]
-            return BeatSide(points, found.downbeats.filter { it >= from && it <= until }, bpm, found.beatConfidence)
+        if (cancelled()) return null
+        val all = seamBeats(regions)
+        val headSide = beatSide(all, 0.0, headEnd)
+        val tailSide = beatSide(all, tailStart, durationSeconds)
+        val head = headSide?.toGrid()
+        val tail = tailSide?.toGrid()
+        val leading = tail ?: head
+        val masks = regions.mapNotNull { it.vocalMask }
+        val merged = if (features.energyCurve.isEmpty() || masks.isEmpty()) null else {
+            val values = DoubleArray(features.energyCurve.size) { NEUTRAL_VOCAL }
+            for (source in masks) for (index in values.indices) {
+                if (index < source.size && source[index] != NEUTRAL_VOCAL) values[index] = source[index]
+            }
+            values.toList()
         }
         return TrackAnalysis(
-            headBeats = side(0.0, minOf(45.0, durationSeconds)),
-            tailBeats = side((durationSeconds - 65).coerceAtLeast(0.0), durationSeconds),
-            vocalWindows = vocalWindows, levelWindows = levelWindows,
-            status = TrackAnalysis.STATUS_READY,
-            trackId = trackId,
-            duration = durationSeconds,
-            // The grid wins where it has an opinion: a trained model reads meter, which
-            // autocorrelation cannot.
-            bpm = grid?.bpm ?: features.bpm,
-            beatInterval = grid?.beatInterval ?: features.beatInterval,
-            beatConfidence = grid?.beatConfidence ?: features.beatConfidence,
-            downbeats = grid?.downbeats ?: features.downbeats,
-            firstBeat = grid?.firstBeat ?: features.firstBeat,
-            phraseBoundaries = features.phraseBoundaries,
-            key = features.key,
-            keyConfidence = features.keyConfidence,
-            audibleStartTime = features.audibleStartTime,
-            pickupTime = features.pickupTime,
-            introEndTime = features.introEndTime,
-            contentEndTime = features.contentEndTime,
-            outroStartTime = features.outroStartTime,
-            mixInTime = features.mixInTime,
-            mixOutTime = features.mixOutTime,
-            mixInCandidates = features.mixInCandidates,
-            mixOutCandidates = features.mixOutCandidates,
-            energyCurve = features.energyCurve,
-            lowEnergyCurve = features.lowEnergyCurve,
-            vocalActivityMask = features.vocalActivityMask,
-            vocalProbability = features.vocalProbability,
+            status = TrackAnalysis.STATUS_READY, trackId = trackId, duration = durationSeconds,
+            contentEndTime = features.contentEndTime.takeIf { it > 0 } ?: durationSeconds,
+            bpm = leading?.bpm ?: features.bpm,
+            beatInterval = leading?.beatInterval ?: features.beatInterval,
+            beatConfidence = leading?.beatConfidence ?: features.beatConfidence,
+            downbeats = (head?.downbeats.orEmpty() + tail?.downbeats.orEmpty()).ifEmpty { features.downbeats }.sorted(),
+            firstBeat = head?.firstBeat ?: features.firstBeat,
+            phraseBoundaries = features.phraseBoundaries, key = features.key, keyConfidence = features.keyConfidence,
+            audibleStartTime = features.audibleStartTime, pickupTime = features.pickupTime,
+            introEndTime = features.introEndTime, outroStartTime = features.outroStartTime,
+            mixInTime = features.mixInTime, mixOutTime = features.mixOutTime,
+            mixInCandidates = features.mixInCandidates, mixOutCandidates = features.mixOutCandidates,
+            energyCurve = features.energyCurve, lowEnergyCurve = features.lowEnergyCurve,
+            vocalActivityMask = merged ?: features.vocalActivityMask.map(::heuristicVocalOnModelScale),
+            vocalProbability = features.vocalProbability, headBeats = headSide, tailBeats = tailSide,
+            vocalWindows = regions.mapNotNull { it.vocalWindow }, levelWindows = regions.mapNotNull { it.levelWindow },
         )
     }
+
+    // Returning only features releases whole-track PCM before any ONNX inference begins.
+    private fun structuralFeatures(stream: DesktopStream, seconds: Double, cacheIdentity: String): TrackFeatures.Features? =
+        decode(stream, TrackFeatures.sampleRate, cacheIdentity)?.let { TrackFeatures.analyze(it, seconds) }
+
+    private class Region(val grid: BeatTracker.Grid?, val vocalMask: DoubleArray?, val seconds: Double,
+        val start: Double, val vocalWindow: CurveWindow?, val levelWindow: CurveWindow?)
+
+    private fun modelInput(region: LoopRegion): FloatArray? {
+        val mono = FloatArray(region.left.size) { (region.left[it] + region.right[it]) * 0.5f }
+        return MelSpectrogram.resample(mono, 44100.0, MelSpectrogram.sampleRate)
+    }
+
+    private fun analyseRegion(stream: DesktopStream, from: Double, to: Double, features: TrackFeatures.Features): Region? {
+        val stereo = runCatching { loopRegion(stream, from, to, 44100, ::cancelled) }
+            .onFailure { if (it is CancellationException) throw it
+                DesktopTrackLog.log("automix: optional region [$from, $to] failed: ${it.message}") }.getOrNull() ?: return null
+        if (stereo.left.size < 44100 || stereo.left.size != stereo.right.size) return null
+        val input = modelInput(stereo)
+        beatsUsed = true
+        val grid = runCatching { input?.let { beats.track(it, offsetSeconds = stereo.start) } }
+            .onFailure { if (it is CancellationException) throw it
+                DesktopTrackLog.log("automix: optional beat pass failed: ${it.message}") }.getOrNull()
+        val maxSamples = ((VocalTracker.FIXED_FRAMES - 2) * VocalSpectrogram.hop / VocalSpectrogram.sampleRate * 44100).toInt()
+            .coerceAtMost(stereo.left.size)
+        vocalsUsed = true
+        val vocal = runCatching {
+            if (!VocalSpectrogram.available || maxSamples <= 0) null else vocals.track(
+                if (maxSamples < stereo.left.size) stereo.left.copyOf(maxSamples) else stereo.left,
+                if (maxSamples < stereo.right.size) stereo.right.copyOf(maxSamples) else stereo.right, 44100.0)
+        }.onFailure { if (it is CancellationException) throw it
+            DesktopTrackLog.log("automix: optional vocal pass failed: ${it.message}") }.getOrNull()
+        val mask = vocal?.let { values -> DoubleArray(features.energyCurve.size) { index ->
+            val at = ((features.energyCurve[index].time - stereo.start) * VocalSpectrogram.frameRate).toInt()
+            if (at in values.indices) values[at].toDouble() else NEUTRAL_VOCAL
+        } }
+        val frame = 4410
+        val levels = FloatArray(stereo.left.size / frame) { index ->
+            var sum = 0.0; var n = 0
+            for (i in index * frame until (index + 1) * frame step 4) {
+                val sample = (stereo.left[i] + stereo.right[i]) * 0.5f
+                sum += sample * sample; n++
+            }
+            levelFromRms(kotlin.math.sqrt(sum / n)).toFloat()
+        }
+        return Region(grid, mask, stereo.left.size / 44100.0, stereo.start,
+            vocal?.let { CurveWindow(stereo.start, VocalSpectrogram.frameRate, it) },
+            if (levels.isEmpty()) null else CurveWindow(stereo.start, 10.0, levels))
+    }
+
+    private fun modelWindows(headEnd: Double, tailStart: Double, duration: Double, span: Double): List<Pair<Double, Double>> {
+        val spans = if (tailStart <= headEnd) {
+            listOf(0.0 to duration)
+        } else {
+            listOf(0.0 to headEnd, tailStart to duration)
+        }
+        val windows = ArrayList<Pair<Double, Double>>()
+        for ((from, to) in spans) {
+            val length = to - from
+            if (length < 1.0) continue
+            if (length <= span) {
+                windows += from to to
+                continue
+            }
+            // As few windows as cover the span with at least the overlap between
+            // neighbours, spread evenly from its start to its end.
+            val count = ceil((length - WINDOW_OVERLAP_SECONDS) / (span - WINDOW_OVERLAP_SECONDS) - 1e-6).toInt()
+            val stride = (length - span) / (count - 1)
+            for (index in 0 until count) {
+                val start = from + index * stride
+                windows += start to minOf(to, start + span)
+            }
+        }
+        return windows
+    }
+
+    /** One beat list across the windows: at each overlap, the earlier window's beats before its midpoint, the later's after. */
+    private class Beats(val beats: List<Double>, val downbeats: List<Double>, val confidence: Double)
+
+    private fun seamBeats(regions: List<Region>): Beats {
+        val graded = regions.filter { it.grid != null }.sortedBy { it.start }
+        if (graded.isEmpty()) return Beats(emptyList(), emptyList(), 0.0)
+        val beats = ArrayList<Double>()
+        val downbeats = ArrayList<Double>()
+        var weighted = 0.0
+        var count = 0
+        for ((index, region) in graded.withIndex()) {
+            val grid = region.grid!!
+            val previous = graded.getOrNull(index - 1)
+            val next = graded.getOrNull(index + 1)
+            val from = previous?.let { (it.start + it.seconds + region.start) / 2 }
+                ?.takeIf { it > region.start } ?: Double.NEGATIVE_INFINITY
+            val until = next?.let { (region.start + region.seconds + it.start) / 2 }
+                ?.takeIf { it < region.start + region.seconds } ?: Double.POSITIVE_INFINITY
+            val kept = grid.beats.filter { it >= from && it < until }
+            beats += kept
+            downbeats += grid.downbeats.filter { it >= from && it < until }
+            weighted += grid.beatConfidence * kept.size
+            count += kept.size
+        }
+        return Beats(beats.sorted(), downbeats.sorted(), if (count > 0) weighted / count else 0.0)
+    }
+
+    /** The model's grid over [from]..[to], or null where it found too few beats there. */
+    private fun beatSide(all: Beats, from: Double, to: Double): BeatSide? {
+        val beats = all.beats.filter { it >= from && it <= to }
+        val bpm = BeatTracker.tempoFromBeats(beats)
+        if (bpm <= 0) return null
+        return BeatSide(
+            beats = beats,
+            downbeats = all.downbeats.filter { it >= from && it <= to },
+            bpm = bpm,
+            confidence = all.confidence,
+        )
+    }
+
+    private fun BeatSide.toGrid() = BeatTracker.Grid(
+        beats = beats,
+        downbeats = downbeats,
+        bpm = bpm,
+        beatInterval = 60 / bpm,
+        firstBeat = beats.first(),
+        beatConfidence = confidence,
+    )
 
     /** The whole track as mono float at [rate]. */
     private fun decode(stream: DesktopStream, rate: Double, cacheIdentity: String): FloatArray? {
@@ -399,6 +504,8 @@ internal class DesktopTrackAnalyzer(
 
         /** How long a track that failed to be measured waits before it is tried again. */
         const val RETRY_AFTER_MS = 60_000L
+        private const val NEUTRAL_VOCAL = 0.2
+        private const val WINDOW_OVERLAP_SECONDS = 1.0
 
         /**
          * A ceiling of about twenty minutes at the analyser's rate, so a mis-tagged eight-hour
