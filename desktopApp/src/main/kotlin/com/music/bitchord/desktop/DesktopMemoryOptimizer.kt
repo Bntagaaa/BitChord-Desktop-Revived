@@ -61,6 +61,7 @@ internal object DesktopMemoryOptimizer {
         scope.launch {
             try {
                 if (windowHidden) {
+                    DesktopCoilImageLoader.trimInactive(24L * 1024 * 1024)
                     runCatching { DesktopMediaCache.trim() }
                         .onFailure { DesktopTrackLog.log("memory: disk cache trim failed: ${it.message}") }
                 }

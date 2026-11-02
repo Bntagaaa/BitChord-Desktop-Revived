@@ -69,6 +69,32 @@ class DesktopArtworkCacheTest {
     }
 
     @Test
+    fun idleTrimRetainsTheMostRecentlyViewedCovers() {
+        val cache = lru(100)
+        cache.put("a", 20)
+        cache.put("b", 20)
+        cache.put("c", 20)
+        cache.put("d", 20)
+        cache.get("a")
+        cache.trimToBytes(40)
+        assertEquals(40L, cache.heldBytes)
+        assertTrue(cache.contains("a"))
+        assertTrue(cache.contains("d"))
+        assertFalse(cache.contains("b"))
+        assertFalse(cache.contains("c"))
+    }
+
+    @Test
+    fun idleTrimDoesNotLowerTheNormalBudget() {
+        val cache = lru(100)
+        cache.put("a", 40)
+        cache.put("b", 40)
+        cache.trimToBytes(20)
+        cache.put("c", 40)
+        assertEquals(80L, cache.heldBytes)
+    }
+
+    @Test
     fun clearingGivesEverythingBack() {
         val cache = lru(100)
         repeat(5) { cache.put("x-$it", 10L) }

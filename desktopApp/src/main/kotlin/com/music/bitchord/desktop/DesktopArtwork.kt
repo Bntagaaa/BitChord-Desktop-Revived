@@ -66,6 +66,13 @@ internal object DesktopArtworkCache {
         images.clear()
     }
 
+    /** The images still on screen remain referenced by Compose; only old LRU entries go. */
+    fun trimInactive(targetBytes: Long): Long = synchronized(cacheLifecycleLock) {
+        val before = images.heldBytes
+        images.trimToBytes(targetBytes)
+        (before - images.heldBytes).coerceAtLeast(0L)
+    }
+
     /** Runs within the calling composition's coroutine, so disposed items cancel
      * waiting requests instead of leaving independent jobs downloading off-screen covers. */
     suspend fun load(url: String?): ImageBitmap? {

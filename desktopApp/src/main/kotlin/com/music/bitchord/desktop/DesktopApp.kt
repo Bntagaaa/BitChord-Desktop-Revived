@@ -577,6 +577,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     val oldTopPlayerEnabled by DesktopAppearanceSettings.enableOldTopMusicPlayerStyle.collectAsState()
     val useOldExploreCards by DesktopAppearanceSettings.useOldExploreCards.collectAsState()
     var destination by remember { mutableStateOf(DesktopDestination.LISTEN_NOW) }
+    val tabCachePolicy = remember { DesktopTabCachePolicy() }
     val searchSession = remember { DesktopSearchSession<SearchResult>() }
     val query by searchSession.query
     var searchFilter by searchSession.filter
@@ -654,6 +655,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var exploreState by remember { mutableStateOf<UiState<List<MoodGenreSection>>>(UiState.Loading) }
     var newState by remember { mutableStateOf<UiState<List<HomeShelf>>>(UiState.Loading) }
     var newReloads by remember { mutableStateOf(0) }
+    var handledNewReloads by remember { mutableStateOf(-1) }
     var selectedMoodGenre by remember { mutableStateOf<MoodGenre?>(null) }
     // Bumped by a retry so the loaders below re-run without the state they are keyed on having to
     // change to something and back again.
@@ -2538,8 +2540,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
 
     fun selectDestination(next: DesktopDestination) {
         val page = if (next == DesktopDestination.EXPLORE) DesktopDestination.SEARCH else next
-        val alreadyOnSearch = destination == DesktopDestination.SEARCH && selectedMoodGenre == null &&
-            openedArtist == null && openedCollection == null && openedBrowse == null && overlays.settingsPage == null
         if (page != DesktopDestination.SEARCH) releaseShortcutTextFocus()
         if (page == DesktopDestination.LIBRARY && libraryStale) {
             libraryStale = false
@@ -2553,12 +2553,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         selectedMoodGenre = null
         libraryShowAll = null
         if (page == DesktopDestination.SEARCH) {
-            if (!alreadyOnSearch) {
-                searchJob?.cancel()
-                searchSession.reset()
-                searchSuggestions = emptyList()
-                searchTypeahead = emptyList()
-            }
+            // Keep the lightweight query/results/filter between tab visits, not old image bitmaps.
             searchFocusRequested = true
         }
         destination = page
@@ -2729,6 +2724,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         val signedIn = DesktopYouTubeAuth.isSignedIn
         homeIdentity = "$signedIn/${DesktopAccounts.activeAccountId()}"
         homeState = UiState.Loading
+        tabCachePolicy.invalidate("home")
         homeContinuation = null
         homeSeenTitles.clear()
         homeLoadingMore = false
@@ -2743,6 +2739,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                         if (generation != homeGeneration) return@fold
                         homeContinuation = feed.continuation
                         publishHomeShelves(feed.shelves)
+                        tabCachePolicy.markFresh("home")
                     },
                     onFailure = {
                         if (generation == homeGeneration && homeState !is UiState.Success) {
@@ -2768,6 +2765,40 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                         if (generation == homeGeneration) publishHomeShelves(shelves)
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Only the first Home feed is revalidated after a long absence. Previous shelves, their
+     * pagination, and scroll coordinates stay in place; failed refreshes keep old content.
+     */
+    fun refreshHomeSilently() {
+        if (homeState !is UiState.Success || homeJob?.isActive == true ||
+            !tabCachePolicy.isStale("home", TAB_FEED_TTL_NANOS)
+        ) return
+        val generation = homeGeneration
+        val identity = homeIdentity
+        homeJob = scope.launch {
+            DesktopSearchClient.home().onSuccess { feed ->
+                if (generation != homeGeneration || identity != homeIdentity ||
+                    destination != DesktopDestination.LISTEN_NOW
+                ) return@onSuccess
+                val previous = (homeState as? UiState.Success)?.data ?: return@onSuccess
+                val latest = feed.shelves.filter { it.items.isNotEmpty() }
+                    .associateBy { it.title.trim().lowercase() }
+                val existingKeys = previous.mapTo(HashSet()) { it.title.trim().lowercase() }
+                val updated = previous.map { old ->
+                    if (old.title.contains("Recently Played", ignoreCase = true)) old
+                    else latest[old.title.trim().lowercase()] ?: old
+                } + feed.shelves.filter { shelf ->
+                    shelf.items.isNotEmpty() && shelf.title.trim().lowercase() !in existingKeys
+                }
+                if (updated != previous) homeState = UiState.Success(updated)
+                homeSeenTitles.addAll(updated.map { it.title.trim().lowercase() })
+                tabCachePolicy.markFresh("home")
+            }.onFailure {
+                DesktopTrackLog.log("home: silent refresh skipped, cached feed preserved: " + it.message)
             }
         }
     }
@@ -2962,14 +2993,14 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         }
     }
 
-    suspend fun loadNew() {
+    suspend fun loadNew(preserveExisting: Boolean = false) {
         if (!youtubeSourceEnabled) {
             newState = UiState.Error("YouTube Music is disabled")
             return
         }
-        newState = UiState.Loading
-        // Explore is the country-aware New page feed: its Trending shelf links to
-        // YouTube Music's own regional chart playlist instead of a guessed playlist.
+        val oldSuccess = newState as? UiState.Success
+        if (!preserveExisting || oldSuccess == null) newState = UiState.Loading
+        // Keep old cards visible while refreshing older metadata in the background.
         DesktopSearchClient.homeSupplement("FEmusic_explore").fold(
             onSuccess = { feed ->
                 val shelves = feed.filter { shelf ->
@@ -2977,20 +3008,65 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                         !shelf.title.contains("episode", ignoreCase = true) &&
                         !shelf.title.contains("podcast", ignoreCase = true)
                 }
-                newState = if (shelves.isNotEmpty()) UiState.Success(shelves)
-                else UiState.Error("Nothing new to show right now")
+                if (shelves.isNotEmpty()) {
+                    newState = UiState.Success(shelves)
+                    tabCachePolicy.markFresh("new")
+                } else if (oldSuccess == null) {
+                    newState = UiState.Error("Nothing new to show right now")
+                }
             },
             onFailure = { failure ->
-                newState = UiState.Error(failure.message ?: "Could not load new music")
+                if (oldSuccess == null) {
+                    newState = UiState.Error(failure.message ?: "Could not load new music")
+                } else {
+                    DesktopTrackLog.log("new: silent refresh skipped, cached feed preserved: " + failure.message)
+                }
             },
         )
     }
 
     LaunchedEffect(destination, newReloads) {
-        if (destination == DesktopDestination.NEW &&
-            (newState is UiState.Loading || newReloads > 0)
-        ) {
-            loadNew()
+        if (destination != DesktopDestination.NEW) return@LaunchedEffect
+        val firstLoad = newState is UiState.Loading
+        val explicitRefresh = handledNewReloads >= 0 && newReloads != handledNewReloads
+        val stale = newState is UiState.Success &&
+            tabCachePolicy.isStale("new", TAB_FEED_TTL_NANOS)
+        if (firstLoad || explicitRefresh || stale) {
+            handledNewReloads = newReloads
+            loadNew(preserveExisting = !firstLoad)
+        } else {
+            handledNewReloads = newReloads
+        }
+    }
+
+    LaunchedEffect(destination) {
+        if (destination == DesktopDestination.LISTEN_NOW) refreshHomeSilently()
+    }
+
+    // After two minutes without browsing, release cold decoded bitmaps in both image
+    // pipelines. Keep metadata and recently viewed covers so returning remains instant.
+    val browsingScrollActive = when (destination) {
+        DesktopDestination.LISTEN_NOW -> homeListState.isScrollInProgress
+        DesktopDestination.NEW -> newListState.isScrollInProgress
+        DesktopDestination.SEARCH -> if (selectedMoodGenre != null)
+            moodGenreListState.isScrollInProgress else searchListState.isScrollInProgress
+        DesktopDestination.LIBRARY -> libraryListState.isScrollInProgress ||
+            libraryGridState.isScrollInProgress
+        DesktopDestination.EXPLORE -> exploreListState.isScrollInProgress
+        else -> false
+    }
+    LaunchedEffect(destination, browsingScrollActive, overlays.nowPlaying) {
+        if (browsingScrollActive || overlays.nowPlaying) return@LaunchedEffect
+        delay(TAB_IMAGE_IDLE_MILLIS)
+        withContext(Dispatchers.IO) {
+            val desktopBytes = DesktopArtworkCache.trimInactive(TAB_IMAGE_IDLE_CACHE_BYTES)
+            val coilBytes = DesktopCoilImageLoader.trimInactive(TAB_IMAGE_IDLE_CACHE_BYTES)
+            if (desktopBytes > 0 || coilBytes > 0) {
+                DesktopTrackLog.log(
+                    "memory: idle artwork trim desktop=" + desktopBytes / 1024 +
+                        "KiB coil=" + coilBytes / 1024 + "KiB"
+                )
+            }
         }
     }
 
@@ -3133,6 +3209,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         youtubeSignedIn = DesktopYouTubeAuth.isSignedIn
         if (!DesktopYouTubeAuth.isSignedIn) {
             libraryState = UiState.Success(LibraryPage(emptyList(), emptyList(), emptyList()))
+            tabCachePolicy.invalidate("library")
             loadedAccountId = null
             loadedProfileId = null
             return@LaunchedEffect
@@ -3144,16 +3221,19 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         if (destination != DesktopDestination.LIBRARY && !overlays.playlistDialog) {
             return@LaunchedEffect
         }
-        if (!accountChanged && libraryState is UiState.Success && destination == DesktopDestination.LIBRARY) {
+        val cacheKey = "library:" + activeAccountId + ":" + activeProfileId
+        val keepCached = !accountChanged && libraryState is UiState.Success
+        if (keepCached && !tabCachePolicy.isStale(cacheKey, TAB_FEED_TTL_NANOS)) {
             return@LaunchedEffect
         }
-        libraryState = UiState.Loading
+        if (!keepCached) libraryState = UiState.Loading
         DesktopSearchClient.library().fold(
             onSuccess = { page ->
                 // The continuation is a job to run, not page state — it is consumed below.
                 libraryState = UiState.Success(page.copy(likedContinuation = null))
                 loadedAccountId = activeAccountId
                 loadedProfileId = activeProfileId
+                tabCachePolicy.markFresh(cacheKey)
                 DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.LIBRARY_LOADED)
                 DesktopTrackLog.log(
                     "library: ${page.likedSongs.size} liked, ${page.librarySongs.size} added, " +
@@ -3185,7 +3265,13 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     }
                 }
             },
-            onFailure = { libraryState = UiState.Error(it.message ?: "Could not load your library") },
+            onFailure = { failure ->
+                if (!keepCached) {
+                    libraryState = UiState.Error(failure.message ?: "Could not load your library")
+                } else {
+                    DesktopTrackLog.log("library: silent refresh skipped, cached feed preserved: " + failure.message)
+                }
+            },
         )
         // A session refused mid-flight is dropped by the request itself, so the answer to "are we
         // signed in" is only settled once the call is over.
@@ -7078,6 +7164,11 @@ private data class DesktopNavEntry(
 }
 
 /** Deep enough for any way back anyone takes; the oldest fall off. */
+/** Data revalidation is cheap and lazy; artwork retention is a separate shorter TTL. */
+private val TAB_FEED_TTL_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(10)
+private const val TAB_IMAGE_IDLE_MILLIS = 120_000L
+private const val TAB_IMAGE_IDLE_CACHE_BYTES = 24L * 1024 * 1024
+
 private const val NAV_HISTORY_LIMIT = 50
 
 @Composable

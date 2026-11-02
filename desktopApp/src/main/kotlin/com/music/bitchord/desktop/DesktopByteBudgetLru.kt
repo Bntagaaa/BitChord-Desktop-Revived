@@ -40,10 +40,15 @@ internal class DesktopByteBudgetLru<V : Any>(
         held = 0L
     }
 
+    /** Lower the temporary cache budget while keeping recently visited covers warm. */
+    fun trimToBytes(targetBytes: Long) = synchronized(entries) {
+        trim(targetBytes.coerceIn(0L, budgetBytes))
+    }
+
     /** Drops the coldest entries until the budget is met, always leaving the newest. */
-    private fun trim() {
+    private fun trim(limitBytes: Long = budgetBytes) {
         val iterator = entries.entries.iterator()
-        while (held > budgetBytes && entries.size > 1 && iterator.hasNext()) {
+        while (held > limitBytes && entries.size > 1 && iterator.hasNext()) {
             held -= sizeOf(iterator.next().value)
             iterator.remove()
         }
