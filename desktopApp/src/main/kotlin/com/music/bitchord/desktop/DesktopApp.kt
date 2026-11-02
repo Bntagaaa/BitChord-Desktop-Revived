@@ -7292,6 +7292,7 @@ private fun DesktopLibrarySongContent(
                     DesktopArtwork(
                         song.thumbnailUrl,
                         Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(12.dp)),
+                        px = CARD_ART_PX,
                         hoverMode = ArtworkHoverMode.DARKEN_ONLY,
                         hovered = artworkHovered,
                     )
@@ -7348,6 +7349,7 @@ private fun DesktopLibraryGroupingContent(
                     DesktopArtwork(
                         group.value.firstOrNull()?.thumbnailUrl,
                         Modifier.fillMaxWidth().height(150.dp).clip(CircleShape),
+                        px = CARD_ART_PX,
                         hoverMode = ArtworkHoverMode.DARKEN_ONLY,
                         hovered = artworkHovered,
                     )
@@ -7374,6 +7376,7 @@ private fun DesktopLibraryGroupingContent(
                     DesktopArtwork(
                         group.value.firstOrNull()?.thumbnailUrl,
                         Modifier.size(54.dp).clip(CircleShape),
+                        px = ROW_ART_PX,
                         hoverMode = ArtworkHoverMode.DARKEN_ONLY,
                         hovered = artworkHovered,
                     )
@@ -8657,6 +8660,7 @@ private fun DesktopCollectionPage(
                         DesktopArtwork(
                             collection.thumbnailUrl ?: songs.firstOrNull()?.thumbnailUrl,
                             Modifier.fillMaxSize(),
+                            px = HEADER_ART_PX,
                         )
                         albumCanvas?.let {
                             DesktopCanvasView(it.url, Modifier.fillMaxSize(), fallbackUrl = it.fallbackUrl)
@@ -9259,6 +9263,7 @@ internal fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
             DesktopArtwork(
                 item.thumbnailUrl,
                 Modifier.fillMaxSize(),
+                px = CARD_ART_PX,
                 hoverMode = ArtworkHoverMode.DARKEN_ONLY,
                 hovered = artworkHovered,
             )

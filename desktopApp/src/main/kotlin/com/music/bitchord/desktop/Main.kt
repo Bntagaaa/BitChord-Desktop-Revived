@@ -31,6 +31,9 @@ import org.jetbrains.compose.resources.painterResource
 
 fun main() {
     DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.PROCESS_ENTRY)
+    // Shared Home, Explore and Search load imagery with Coil rather than DesktopArtworkCache.
+    // Install the desktop-only image budget before the first Compose AsyncImage is mounted.
+    DesktopCoilImageLoader.install()
     // Read the per-install welcome marker before services initialize or write preferences.
     val welcomeLaunch = DesktopWelcomeOnboarding.inspectStartup()
     // Before any WebView exists, so sign-in and PoToken pages share the same cookie jar.
