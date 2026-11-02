@@ -58,13 +58,25 @@ and repeat JNI execution against the packaged DLL bytes. The standalone regressi
 matrix runs on Windows, and the packaging matrix builds EXE, MSI and portable ZIP.
 
 **Build/test results.** No Windows runtime, MinGW cross-compiler, Wine or PowerShell
-was available in the local environment. Windows compilation, DLL execution,
-physical playback, EXE/MSI installation and portable execution are **untested
-locally**. Added CI jobs/checks are not reported as executed or passed.
+was available locally. However, the actual [Windows engine/JNI CI job](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/41436731583/job/125248242192)
+for commit `337653d8` succeeded. It compiled the selected production planner/PCM
+sources, ran their focused regressions, built the native analyser with MinGW,
+audited DLL imports, loaded the DLL on Windows, and ran the real JNI BPM/downbeat/
+resampling probe.
+
+The [Windows EXE/MSI/portable CI job](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/41436731583/job/125248242726)
+for the same commit succeeded in 10m44s. It ran the full shared/UI/desktop tests,
+compiled the application, built the portable tree/ZIP and EXE/MSI installers,
+validated packaged DLL/models with real JNI calls, and passed the existing real
+artifact metadata/updater-helper checks. A 326 MB portable ZIP artifact was uploaded.
+The installer files were built and audited; that workflow uploads only the portable
+ZIP, not the EXE/MSI files. It explicitly does not exercise an actual installer upgrade.
 
 **Remaining limitations.** WASAPI endpoint changes, hardware clock behavior,
-audible continuity and listening quality require Windows CI and device testing.
-Do not treat the Linux JVM results as Windows execution evidence.
+audible continuity, physical playback, listening quality, and actual installer/portable
+GUI operation still require device testing. Passing collecting-sink tests does not
+establish physical audio output quality.
+The Windows evidence comes from its own CI runner, not the Linux JVM results.
 
 ## Linux
 
@@ -89,6 +101,8 @@ extracted AppImage tree in the existing AppImage workflow.
   production sources and runs musical planner, loop planner, render-clock,
   mixed-block FIFO, gain/filter/echo and partial-write regressions. It does not
   compile the full application or execute the full playback engine.
+- The [Linux engine/JNI CI job](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/41436731583/job/125248243051)
+  for commit `337653d8` also succeeded, including its real native probe.
 - Linux native analyser: CMake/GNU C++ build passed. The real JNI library loaded;
   a synthetic 120 BPM accented track measured **120.003 BPM**, produced ordered
   downbeats, and passed resampling length/finite-PCM checks.
@@ -99,28 +113,38 @@ extracted AppImage tree in the existing AppImage workflow.
 - Changed workflow YAML parses; Linux checker shell syntax and `git diff --check`
   pass. These do not establish installer or application readiness.
 
-**Remaining limitations.** AppImage construction/execution, real Java Sound
-playback, PipeWire/PulseAudio device changes, perceptual quality and full application
-compilation remain unverified in this environment. There is no desktop audio/display
+**Remote full-build results.** The [Linux AppImage CI job](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/41436731583/job/125248242756)
+for commit `337653d8` succeeded in 8m14s. This ran the full shared/UI/desktop tests
+(including the real-engine lifecycle regressions), compiled the application,
+built the distributable and AppImage, checked native/models resources, executed
+JNI against the packaged `.so` and extracted AppImage tree, and completed the
+workflow's AppImage relaunch/recovery checks. A 329 MB AppImage artifact was produced.
+This remote success does not remove the local JitPack access blocker.
+
+**Remaining limitations.** Physical Java Sound playback, PipeWire/PulseAudio device
+changes and perceptual listening quality remain unverified. There is no desktop audio/display
 session available for a physical listening test.
 
 ## Behavior comparison and acceptance matrix
 
-| Capability | Windows implementation | Linux implementation | Local evidence |
+| Capability | Windows implementation | Linux implementation | Observed evidence |
 | --- | --- | --- | --- |
-| Musical strategies, BPM and cue policy | Shared planner | Same planner | Focused JVM regressions pass on Linux |
+| Musical strategies, BPM and cue policy | Shared planner | Same planner | Focused JVM regressions pass locally and in both OS CI jobs |
 | Dynamic duration and incoming tempo | Adaptive beats, fixed incoming stretch | Identical | Slow/fast and tempo-direction regressions pass |
 | Downbeat scheduling | Static cue alignment, submitted-frame seam | Identical | Offset-grid/rate/vocal-safe/frame-boundary tests pass |
 | PCM overlap and headroom | Same float mixer and FIFO | Same float mixer and FIFO | FIFO/envelope/partial-write regressions pass |
-| Seek/skip/pause/queue lifecycle | Shared engine cancellation/preparation | Identical | Existing and new full-engine tests require full build; unrun locally |
+| Seek/skip/pause/queue lifecycle | Shared engine cancellation/preparation | Identical | Full engine tests pass in both Windows and Linux package CI |
 | Fallback and normal Crossfade | Explicit fade fallback; separate gain curve | Identical | Pure fallback and ordinary-plan regressions pass |
-| Native analyser | Static MinGW runtime, DLL import/load audit | `.so` dependency/load audit | Real Linux JNI passed; Windows unrun |
+| Native analyser | Static MinGW runtime, DLL import/load audit | `.so` dependency/load audit | Real JNI passed locally on Linux and in both OS CI jobs |
 | Output integration | WASAPI, Java Sound fallback | Java Sound/system routing | Hardware behavior untested on both |
-| Packages | EXE, MSI, portable ZIP | AppImage | CI configured; package execution unverified locally |
+| Packages | EXE, MSI, portable ZIP | AppImage | Both package CI jobs passed; actual Windows installer upgrade remains untested |
 
 The intended musical behavior is identical; the OS-specific boundary is output
-and native packaging. This report does not claim Windows parity has been verified
-by execution or that the completion criteria are fully met.
+and native packaging. The focused musical/PCM regressions and JNI probe have passed on each OS.
+Full-engine tests and both packaging pipelines also passed in
+[CI run 41436731583](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/41436731583),
+which finished successfully in 10m48s. Physical audio/listening checks remain open
+on both platforms, and actual Windows installer upgrades remain untested.
 
 ## Reproduction and remaining actions
 
@@ -145,3 +169,13 @@ The cloud configuration draft includes `jitpack.io` for dependency resolution an
 blocked local operations can be retried. Saving that draft does not apply it or
 prove the full build works. Review CI artifacts and complete both platforms'
 device/listening and package checks before merging or releasing.
+
+
+## Delivery status
+
+Implementation commit `337653d87aa4577d9498a730aff3de1b9002fb18` was pushed to
+`fix/automix-beat-aware-crossplatform-184`. Its cross-platform workflow passed all
+four jobs. PR creation targeting `integration/v1.8.4` was attempted with `gh pr create`
+but the environment rejected `https://api.github.com/graphql` with HTTP 403. No PR
+was created by that attempt. Apply the saved API-domain requirement, then retry
+creation; do not interpret the pushed branch or successful CI run as a submitted PR.
