@@ -241,6 +241,8 @@ data class TransitionPlan(
     val echoSeconds: Double = 0.0,
     /** Why the policy landed where it did, when it declined to be more ambitious. */
     val policyReasons: List<String> = emptyList(),
+    /** Static cue alignment; independent of live phase-lock speed modulation. */
+    val downbeatAligned: Boolean = false,
 ) {
     /** Convenience for the engine, which schedules in milliseconds. */
     val fadeMs: Long get() = (fadeSeconds * 1000).roundToLong()
@@ -1629,7 +1631,7 @@ private fun mixPlan(
     val handoffBpm = if (currentBpm > 0) currentBpm else nextBpm
     // Advanced also blends any pair a speed-up matches on two trusted grids —
     // the 5-10% apart that used to be left to a filter ride.
-    val sameBeatBlend = (traits == null || incomingPlaybackRate >= 1.0) && (
+    val sameBeatBlend = (
         currentBpm > 0 && nextBpm > 0 &&
             abs(1 - normalizedTempoRatio(currentBpm, nextBpm)) <= 0.05 &&
             (analysis.beatConfidence.orZero() >= 0.2 || nextAnalysis.beatConfidence.orZero() >= 0.2) ||
@@ -1701,7 +1703,13 @@ private fun mixPlan(
 
     if (sameBeatBlend && beatSeconds > 0) {
         val introDropTime = incomingHandoffTime / max(0.8, incomingPlaybackRate)
-        val clamped = clamp(introDropTime, min(12.0, maximumOverlap), maximumOverlap)
+        // The adaptive musical duration must survive execution planning. The old 12-second
+        // lower bound overrode the 8/16/32-beat energy/key/vocal decision for matched pairs.
+        val clamped = if (traits != null) {
+            clamp(overlap, min(handoffSeconds, maximumOverlap), maximumOverlap)
+        } else {
+            clamp(introDropTime, min(12.0, maximumOverlap), maximumOverlap)
+        }
         val totalOverlap = if (traits != null) wholeBars(clamped, beatSeconds, maximumOverlap) else clamped
         val targetStart = max(0.0, mixEnd - totalOverlap)
         val earliestTransitionStart = max(0.0, mixEnd - maximumOverlap)

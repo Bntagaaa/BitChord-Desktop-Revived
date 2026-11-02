@@ -206,4 +206,20 @@ class DesktopDecodeAheadTest {
         reader.close()
     }
 
+
+    @Test fun `a rejected asynchronous cue seek is a failure instead of wrong-position PCM`() {
+        val source = object : DesktopSampleSource {
+            override val sampleCount = 4
+            override fun readSamples() = FloatArray(4)
+            override fun seek(micros: Long) = false
+            override fun close() {}
+        }
+        val reader = ahead(source, aheadSamples = 4)
+        try {
+            assertTrue(reader.seek(1_000_000))
+            assertNull(reader.readSamples(2000))
+            assertEquals(DesktopDecodeState.FAILED, reader.state)
+            assertTrue(reader.failureCause?.message?.contains("seek") == true)
+        } finally { reader.close() }
+    }
 }
