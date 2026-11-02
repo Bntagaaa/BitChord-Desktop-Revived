@@ -86,10 +86,28 @@ Observed locally: all 25 canonical-file hashes match, **71 focused tests passed*
 and the rebuilt native JNI probe passed (120 BPM input measured 120.003 BPM,
 ordered downbeats, valid resampled PCM).
 
-The new full-engine lifecycle tests require the complete application build.
-Local dependency access still returns HTTP 403 for JitPack, and GitHub API access
-is also blocked. The branch's existing four-job CI matrix will validate the
-changed implementation on real Windows/Linux runners and build EXE/MSI/portable
-and AppImage outputs. Results for this update must be recorded separately from
-the earlier successful implementation run. Physical device/listening checks
-remain unverified on both platforms.
+The full [CI run 41447022620](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/41447022620)
+for implementation commit `d77475ba` passed all four jobs:
+
+| Platform | Focused/core and JNI | Full application regressions | Packaging |
+| --- | --- | --- | --- |
+| Windows | Passed, including source/model hash identity and MinGW dependency audit | Passed, including unchanged queue updates, six consecutive tracks, and persistence/observer failures | EXE/MSI and portable built; packaged DLL/model/JNI and metadata/helper audits passed |
+| Linux | Passed, including source/model hash identity and real JNI analysis | Passed, including the same new multi-track and failure regressions | AppImage built; packaged/extracted `.so` JNI and relaunch/recovery checks passed |
+
+The [Windows package job](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/41447022620/job/125282572667)
+succeeded in 10m51s and the
+[Linux package job](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/41447022620/job/125282572505)
+in 6m35s. These are CI durations, not comparative performance benchmarks.
+Windows uploads its portable ZIP; EXE/MSI are built and audited by that workflow
+but not uploaded. Linux uploads the AppImage. No release was published.
+
+The six-track regression uses real FFmpeg/decode workers and a collecting PCM
+sink with accelerated timing; it validates repeated engine handoffs, not physical
+speakers or arbitrary remote playlists. Device/listening checks and actual
+Windows installer upgrades remain unverified. The existing native-load fix is
+preserved on Windows and Linux.
+
+Local JitPack and GitHub API requests still return HTTP 403. Full-build validation
+above comes from the actual OS CI runners, not an unexecuted local command.
+The branch is pushed, but PR creation targeting `integration/v1.8.4` remains
+blocked by access to `api.github.com`; its updated title/body are prepared.
