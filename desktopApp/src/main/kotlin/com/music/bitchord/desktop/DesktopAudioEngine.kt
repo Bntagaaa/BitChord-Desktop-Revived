@@ -694,6 +694,10 @@ class DesktopPlaybackEngine internal constructor(
     fun setAutomixEnabled(enabled: Boolean) {
         if (automixEnabled == enabled) return
         automixEnabled = enabled
+        if (analysisSource == null) analyzer.focusOn(
+            if (enabled) _state.value.song?.videoId else null,
+            if (enabled) nextSong?.videoId else null,
+        )
         commands += Command.TransitionSettingsChanged
         if (!enabled && crossfadeSeconds == 0) clearUpcoming()
     }
@@ -731,8 +735,12 @@ class DesktopPlaybackEngine internal constructor(
         nextGeneration.incrementAndGet()
         nextResolveJob?.cancel()
         clearUpcoming()
-        if (song == null || DesktopListenTogether.state.value.inParty || DesktopSleepTimer.afterTrack.value) return
+        if (song == null || DesktopListenTogether.state.value.inParty || DesktopSleepTimer.afterTrack.value) {
+            if (analysisSource == null) analyzer.focusOn(if (automixEnabled) _state.value.song?.videoId else null, null)
+            return
+        }
         nextSong = song
+        if (analysisSource == null && automixEnabled) analyzer.focusOn(_state.value.song?.videoId, song.videoId)
         nextPreparedQuality = audioQuality
         // A download plays from its file, here as in [loadInternal] — never from whichever source
         // would have answered for it.
@@ -1906,6 +1914,7 @@ class DesktopPlaybackEngine internal constructor(
         // decoder it is about to read from.
         if (current !== track) current?.decoder?.close()
         current = track
+        if (analysisSource == null && automixEnabled) analyzer.focusOn(track.song.videoId, nextSong?.videoId)
         track.decoder.prepareForPlayback()
         fadeRemaining = 0
 
@@ -1992,7 +2001,11 @@ class DesktopPlaybackEngine internal constructor(
         val next = upcoming
         // A track held back from read-ahead has no decoder yet, but is measured all the same.
         val held = if (next == null) nextSong else null
-        if (track.song.isVideoOrigin || next?.song?.isVideoOrigin == true || held?.isVideoOrigin == true) return
+        if (track.song.isVideoOrigin || next?.song?.isVideoOrigin == true || held?.isVideoOrigin == true) {
+            analyzer.focusOn(null, null)
+            return
+        }
+        analyzer.focusOn(track.song.videoId, next?.song?.videoId ?: held?.videoId)
         requestAnalysis(track)
         next?.let(::requestAnalysis)
         held?.let { analyzer.request(it, nextLocalStream, it.durationText.durationSeconds()) }
