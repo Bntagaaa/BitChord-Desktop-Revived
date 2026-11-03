@@ -63,7 +63,8 @@ added to the macOS launcher path.
   registers play/pause/toggle/next/previous commands. Callbacks return to the AWT
   event thread. Listener tokens are removed on disposal. Hardware media keys and
   Control Center routing still require manual verification on a real Mac.
-- Source credentials and SecretStore sessions use Login Keychain via Security;
+- Source credentials, SecretStore sessions, Spotify/Discord/Last.fm/ListenBrainz
+  credentials and Listen Together membership tokens use Login Keychain via Security;
   locked/denied Keychain errors preserve data and do not silently downgrade new
   macOS credentials to plaintext. Existing legacy source credentials migrate after
   a successful Keychain write. Java Preferences retains ordinary settings.

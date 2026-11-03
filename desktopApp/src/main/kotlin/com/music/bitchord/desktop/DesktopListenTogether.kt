@@ -168,9 +168,14 @@ internal object DesktopListenTogether {
         val staleCode = persistence.string(KEY_CODE)
         val staleToken = persistence.string(KEY_TOKEN)
         val staleServer = persistence.string(KEY_ACTIVE_SERVER).ifBlank { defaultHttpBase() }
-        persistence.saveString(KEY_CODE, "")
-        persistence.saveString(KEY_TOKEN, "")
-        persistence.saveString(KEY_ACTIVE_SERVER, "")
+        val retireMembership = {
+            persistence.saveString(KEY_TOKEN, "")
+            persistence.saveString(KEY_CODE, "")
+            persistence.saveString(KEY_ACTIVE_SERVER, "")
+        }
+        if (DesktopPlatform.isMac) runCatching(retireMembership)
+            .onFailure { DesktopTrackLog.log("Listen Together credential cleanup deferred until Login Keychain is unlocked") }
+        else retireMembership()
         if (staleCode.isNotBlank() && staleToken.isNotBlank()) {
             scope.launch {
                 runCatching {

@@ -227,12 +227,28 @@ class DesktopPersistence {
         runCatching { preferences.flush() }
     }
 
-    fun string(key: String, default: String = ""): String =
-        (if (key == "queue_index") latestQueue?.second?.toString() else null)
+    fun string(key: String, default: String = ""): String {
+        if (DesktopPlatform.isMac && DesktopMacKeychain.ownsPreference(key)) {
+            return runCatching {
+                DesktopMacKeychain.read(key)?.let { return@runCatching it }
+                val legacy = DesktopPreferenceChunks.read(preferences, key) ?: return@runCatching default
+                // Retire plaintext only after the Keychain confirms the migration.
+                if (legacy.isNotEmpty()) DesktopMacKeychain.write(key, legacy)
+                DesktopPreferenceChunks.remove(preferences, key)
+                legacy
+            }.onFailure { DesktopTrackLog.log("Login Keychain credential unavailable; unlock the Keychain to reconnect") }
+                .getOrDefault(default)
+        }
+        return (if (key == "queue_index") latestQueue?.second?.toString() else null)
             ?: DesktopPreferenceChunks.read(preferences, key) ?: default
+    }
 
-    fun saveString(key: String, value: String) =
-        DesktopPreferenceChunks.write(preferences, key, value)
+    fun saveString(key: String, value: String) {
+        if (DesktopPlatform.isMac && DesktopMacKeychain.ownsPreference(key)) {
+            if (value.isEmpty()) DesktopMacKeychain.remove(key) else DesktopMacKeychain.write(key, value)
+            DesktopPreferenceChunks.remove(preferences, key)
+        } else DesktopPreferenceChunks.write(preferences, key, value)
+    }
 
     /** A configured module index, when one is still set up. */
     fun moduleIndexUrl(): String =

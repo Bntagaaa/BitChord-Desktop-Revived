@@ -8,6 +8,10 @@ import com.sun.jna.ptr.PointerByReference
 
 /** Login Keychain generic passwords. Secrets never enter command arguments or logs. */
 internal object DesktopMacKeychain {
+    private val preferenceKeys = setOf("spotify_spdc_token", "discord_token", "lastfm_session_key",
+        "listenbrainz_token", "listen_together_token")
+    fun ownsPreference(key: String): Boolean = key in preferenceKeys
+
     private interface Security : Library {
         fun SecKeychainFindGenericPassword(keychain: Pointer?, serviceLength: Int, service: ByteArray,
             accountLength: Int, account: ByteArray, length: IntByReference?, data: PointerByReference?, item: PointerByReference?): Int

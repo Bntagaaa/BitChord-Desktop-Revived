@@ -59,6 +59,14 @@ class DesktopMacCompatibilityTest {
             DesktopShortcutKey(java.awt.event.KeyEvent.VK_K, ctrl = true, secondaryModifier = true), false, false, false))
     }
 
+    @Test fun integrationCredentialsUseKeychainWhileOrdinarySettingsStayInPreferences() {
+        for (key in listOf("spotify_spdc_token", "discord_token", "lastfm_session_key", "listenbrainz_token", "listen_together_token")) {
+            assertTrue(DesktopMacKeychain.ownsPreference(key))
+        }
+        assertFalse(DesktopMacKeychain.ownsPreference("theme"))
+        assertFalse(DesktopMacKeychain.ownsPreference("queue_index"))
+    }
+
     @Test fun nativeMediaBridgeIsSafeOnOtherPlatforms() {
         if (DesktopPlatform.isMac) return
         DesktopMacMedia.stop()
