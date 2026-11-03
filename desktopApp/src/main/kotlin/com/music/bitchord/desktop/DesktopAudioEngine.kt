@@ -145,6 +145,7 @@ class DesktopPlaybackEngine internal constructor(
     @Volatile private var audioQuality = "HIGH"
     @Volatile private var crossfadeSeconds = 0
     @Volatile private var automixEnabled = false
+    @Volatile private var automixPhraseBars = 0
     @Volatile private var nextSong: Song? = null
     @Volatile private var nextPreparedQuality: String? = null
     private val queuedUpcoming = ConcurrentHashMap.newKeySet<Long>()
@@ -695,6 +696,15 @@ class DesktopPlaybackEngine internal constructor(
         automixEnabled = enabled
         commands += Command.TransitionSettingsChanged
         if (!enabled && crossfadeSeconds == 0) clearUpcoming()
+    }
+
+    /** 0 = adaptive, 8/16 = fixed phrase overlap when the beat grid is reliable. */
+    fun setAutomixPhraseBars(bars: Int) {
+        val selected = when (bars) { 8, 16 -> bars; else -> 0 }
+        if (automixPhraseBars == selected) return
+        automixPhraseBars = selected
+        // Replan the next handoff without tearing down a mix already in progress.
+        commands += Command.TransitionSettingsChanged
     }
 
     /** Resolves and prepares the next queue item without starting it. */
@@ -2223,7 +2233,7 @@ class DesktopPlaybackEngine internal constructor(
     /** The marker on the scrubber, showing where the mix will happen before it happens. */
     private fun prepareLoop(track: Track, positionMs: Long, duration: Long) {
         val incoming = upcoming ?: return
-        if (!automixEnabled || DesktopListenTogether.state.value.inParty || playbackSpeed != 1f ||
+        if (!automixEnabled || automixPhraseBars != 0 || DesktopListenTogether.state.value.inParty || playbackSpeed != 1f ||
             skipSilenceEnabled || fadeRemaining > 0 || loopRuntime != null || sink.format.channels != 2) return
         // Upstream never splices a loop from a YouTube analysis into an unrelated
         // add-on master. Local files are analysed from the same bytes they play.
@@ -2321,7 +2331,7 @@ class DesktopPlaybackEngine internal constructor(
     private fun acceptLoop(track: Track): LoopPlayback? {
         val ready = pendingLoop.getAndSet(null) ?: return null
         if (ready.outgoing !== track || ready.incoming !== upcoming || fadeRemaining > 0 ||
-            !automixEnabled || playbackSpeed != 1f || skipSilenceEnabled || DesktopListenTogether.state.value.inParty ||
+            !automixEnabled || automixPhraseBars != 0 || playbackSpeed != 1f || skipSilenceEnabled || DesktopListenTogether.state.value.inParty ||
             sink.format.sampleRate != ready.session.sampleRate || sink.format.channels != 2 || !loopWordsClear(ready) ||
             playhead.peek(framesWritten) > (ready.session.plan.out.loopStart * 1_000_000).toLong()) {
             ready.session.close()
@@ -2502,6 +2512,7 @@ class DesktopPlaybackEngine internal constructor(
             fadeSeconds = if (manualSeconds > 0) manualSeconds.toDouble() else AUTOMIX_FALLBACK_SECONDS.toDouble(),
             mode = if (smart) CrossfadeMode.SMART else CrossfadeMode.STANDARD,
             advanced = smart,
+            phraseBars = if (smart) automixPhraseBars else 0,
         )
         return plan
     }
