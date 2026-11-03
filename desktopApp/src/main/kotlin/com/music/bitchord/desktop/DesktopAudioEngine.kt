@@ -107,10 +107,13 @@ class DesktopPlaybackEngine internal constructor(
         // there; the plain `default` mixer follows the desktop's routing on its own under
         // PipeWire, so it needs no help.
         DesktopLinuxAudioWatcher.ensureStarted()
+        val initialOutputRevision = DesktopAudioDevices.changes.value
         scope.launch {
-            DesktopAudioDevices.changes.collect {
+            DesktopAudioDevices.changes.collect { revision ->
                 if (DesktopPlatform.isWindows) return@collect // its native side moves the stream itself
-                if (DesktopPlatform.isMac) commands += Command.Reconfigure
+                // StateFlow's first snapshot is not a hardware change. A change that arrives
+                // before collection starts is still observed by comparing with construction time.
+                if (DesktopPlatform.isMac && revision != initialOutputRevision) commands += Command.Reconfigure
                 observedOutputDevice.let { chosen ->
                     if (chosen != DesktopAudioDevices.SYSTEM_DEFAULT &&
                         DesktopAudioDevices.mixerFor(chosen) == null

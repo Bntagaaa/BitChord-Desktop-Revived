@@ -39,6 +39,7 @@ class DesktopInstantPlaybackEngineTest {
         override val bufferBytes = 0
         val rates = CopyOnWriteArrayList<Int>()
         @Volatile var writes = 0
+        @Volatile var pauseAcknowledged = false
         private var frames = 0L
         override fun isUsingSelection(id: String) = isOpen
         override fun open(requested: DesktopPcmFormat): Result<DesktopPcmFormat> {
@@ -52,8 +53,8 @@ class DesktopInstantPlaybackEngineTest {
             return count * format.bytesPerSample
         }
         override fun framesPlayed() = frames
-        override fun pause() {}
-        override fun resume() {}
+        override fun pause() { pauseAcknowledged = true }
+        override fun resume() { pauseAcknowledged = false }
         override fun flush() {}
         override fun drain() {}
         override fun close() { isOpen = false }
@@ -135,7 +136,10 @@ class DesktopInstantPlaybackEngineTest {
         val stream = tone(); val output = Output()
         val engine = engine(output) { stream }
         engine.load(song("first")); waitFor("PCM") { output.writes > 0 }
-        engine.pause(); Thread.sleep(150)
+        engine.pause()
+        // An already submitted block may finish after the UI requests pause. The sink
+        // acknowledgement proves the audio thread has passed that block and stopped.
+        waitFor("audio sink paused") { output.pauseAcknowledged }
         val pausedWrites = output.writes
         Thread.sleep(100); assertEquals(pausedWrites, output.writes)
         engine.seekTo(3000); engine.setPlaybackSpeed(1.25f); engine.play()
