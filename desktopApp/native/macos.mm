@@ -9,6 +9,7 @@ static jclass receiver;
 static jmethodID onButton;
 static NSMutableArray *targets;
 static bool playingNow;
+static bool active;
 static id appearanceObserver;
 static AudioObjectPropertyListenerBlock audioListener;
 static AudioObjectPropertyAddress audioProperties[] = {
@@ -20,14 +21,18 @@ static void mainSync(dispatch_block_t block) {
     if ([NSThread isMainThread]) block(); else dispatch_sync(dispatch_get_main_queue(), block);
 }
 static void sendButton(jint button) {
-    JNIEnv *env = nullptr;
-    bool attached = vm->GetEnv((void **)&env, JNI_VERSION_1_8) == JNI_EDETACHED;
-    if (attached && vm->AttachCurrentThread((void **)&env, nullptr) != JNI_OK) return;
-    if (env && receiver) {
-        env->CallStaticVoidMethod(receiver, onButton, button);
-        if (env->ExceptionCheck()) env->ExceptionClear();
-    }
-    if (attached) vm->DetachCurrentThread();
+    // Serialize callbacks with teardown. Queued callbacks after stop never touch a freed JNI ref.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!active || !receiver) return;
+        JNIEnv *env = nullptr;
+        bool attached = vm->GetEnv((void **)&env, JNI_VERSION_1_8) == JNI_EDETACHED;
+        if (attached && vm->AttachCurrentThread((void **)&env, nullptr) != JNI_OK) return;
+        if (env) {
+            env->CallStaticVoidMethod(receiver, onButton, button == 7 ? (playingNow ? 1 : 0) : button);
+            if (env->ExceptionCheck()) env->ExceptionClear();
+        }
+        if (attached) vm->DetachCurrentThread();
+    });
 }
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_music_bitchord_desktop_DesktopMacMedia_nativeStart(JNIEnv *env, jobject instance) {
@@ -38,6 +43,7 @@ Java_com_music_bitchord_desktop_DesktopMacMedia_nativeStart(JNIEnv *env, jobject
     env->DeleteLocalRef(local);
     if (!onButton) { env->DeleteGlobalRef(receiver); receiver = nullptr; return JNI_FALSE; }
     mainSync(^{
+        active = true;
         MPRemoteCommandCenter *center = MPRemoteCommandCenter.sharedCommandCenter;
         targets = [NSMutableArray array];
         NSArray<MPRemoteCommand *> *commands = @[center.playCommand, center.pauseCommand,
@@ -46,7 +52,7 @@ Java_com_music_bitchord_desktop_DesktopMacMedia_nativeStart(JNIEnv *env, jobject
             MPRemoteCommand *command = commands[i];
             command.enabled = YES;
             id token = [command addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *event) {
-                sendButton(i == 4 ? (playingNow ? 1 : 0) : (jint)i);
+                sendButton(i == 4 ? 7 : (jint)i);
                 return MPRemoteCommandHandlerStatusSuccess;
             }];
             [targets addObject:@[command, token]];
@@ -68,6 +74,7 @@ Java_com_music_bitchord_desktop_DesktopMacMedia_nativeStart(JNIEnv *env, jobject
 extern "C" JNIEXPORT void JNICALL
 Java_com_music_bitchord_desktop_DesktopMacMedia_nativeStop(JNIEnv *env, jobject) {
     mainSync(^{
+        active = false;
         for (NSArray *pair in targets) [(MPRemoteCommand *)pair[0] removeTarget:pair[1]];
         targets = nil;
         [NSDistributedNotificationCenter.defaultCenter removeObserver:appearanceObserver];

@@ -62,6 +62,7 @@ internal data class DesktopShortcutKey(
     val alt: Boolean = false,
     val shift: Boolean = false,
     val pressed: Boolean = true,
+    val secondaryModifier: Boolean = false,
 )
 
 /** Key-down dispatch, with one action per physical press even when the OS repeats key-downs. */
@@ -86,6 +87,7 @@ internal class DesktopShortcutDispatcher {
             release(key.keyCode)
             return null
         }
+        if (key.secondaryModifier) return null
         val shortcut = DesktopShortcut.matching(key.keyCode, key.ctrl, key.alt, key.shift) ?: return null
         if (shortcutsModalOpen && shortcut != DesktopShortcut.SHOW_SHORTCUTS) return null
         if (anotherModalOpen) return null

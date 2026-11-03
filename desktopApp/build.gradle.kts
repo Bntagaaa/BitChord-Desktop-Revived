@@ -305,6 +305,7 @@ val buildAnalysisNative by tasks.registering {
             null
         }
         providers.exec {
+            isIgnoreExitValue = true
             commandLine(
                 buildList {
                     addAll(listOf(cmakeBinary(), "-S", cmakeSource.absolutePath, "-B", outputDir.absolutePath))
@@ -329,10 +330,17 @@ val buildAnalysisNative by tasks.registering {
                 },
             )
             environment("JAVA_HOME", javaHome)
+        }.also { output ->
+            logger.lifecycle(output.standardOutput.asText.get())
+            logger.lifecycle(output.standardError.asText.get())
         }.result.get().assertNormalExitValue()
         providers.exec {
+            isIgnoreExitValue = true
             commandLine(cmakeBinary(), "--build", outputDir.absolutePath, "--config", "Release", "-j", "4")
             environment("JAVA_HOME", javaHome)
+        }.also { output ->
+            logger.lifecycle(output.standardOutput.asText.get())
+            logger.lifecycle(output.standardError.asText.get())
         }.result.get().assertNormalExitValue()
     }
 }

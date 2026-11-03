@@ -37,7 +37,8 @@ internal object DesktopSecretStore {
 
     /** The first secret stored under [attributes], as bytes. */
     fun lookup(attributes: Map<String, String>): ByteArray? = if (DesktopPlatform.isMac) {
-        DesktopMacKeychain.read(macAccount(attributes))?.toByteArray(Charsets.UTF_8)
+        runCatching { DesktopMacKeychain.read(macAccount(attributes))?.toByteArray(Charsets.UTF_8) }
+            .onFailure { DesktopTrackLog.log("Login Keychain session unavailable; unlock the Keychain to reconnect") }.getOrNull()
     } else withService { _, service, session ->
         val found = service.SearchItems(attributes)
         val items = buildList {

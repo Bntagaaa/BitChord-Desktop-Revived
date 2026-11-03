@@ -128,7 +128,15 @@ class DesktopPersistence {
         val protected = DesktopPreferenceChunks.read(preferences, KEY_SOURCE_CONFIGS_PROTECTED)
         val legacy = DesktopPreferenceChunks.read(preferences, KEY_SOURCE_CONFIGS)
         val raw = if (DesktopPlatform.isMac) {
-            DesktopMacKeychain.read(KEY_SOURCE_CONFIGS) ?: legacy
+            val lookup = runCatching { DesktopMacKeychain.read(KEY_SOURCE_CONFIGS) }
+            if (lookup.isFailure) {
+                DesktopTrackLog.log("Login Keychain unavailable; source credentials left untouched. Unlock the login Keychain and reopen Settings.")
+                return listOf(
+                    DesktopSourceConfig("jiosaavn", DesktopSourceKind.JIOSAAVN, enabled = sourceEnabled("jiosaavn")),
+                    DesktopSourceConfig("youtube", DesktopSourceKind.YOUTUBE),
+                )
+            }
+            lookup.getOrNull() ?: legacy
         } else if (protected != null) {
             runCatching { Base64.getDecoder().decode(protected) }.getOrNull()
                 ?.let(DesktopWindowsCrypto::unprotect)

@@ -11,17 +11,17 @@ internal object DesktopMacMedia {
     @Volatile private var controller: DesktopWindowsMedia.Controller? = null
     private var started = false
 
-    fun start(value: DesktopWindowsMedia.Controller) {
+    @Synchronized fun start(value: DesktopWindowsMedia.Controller) {
         if (!DesktopPlatform.isMac) return
         controller = value
         if (available && !started) started = nativeStart()
     }
-    fun stop() {
+    @Synchronized fun stop() {
         if (started) nativeStop()
         started = false
         controller = null
     }
-    fun publish(state: DesktopPlaybackState) {
+    @Synchronized fun publish(state: DesktopPlaybackState) {
         if (!started) return
         nativeUpdate(state.song?.title.orEmpty(), state.song?.artist.orEmpty(), state.isPlaying,
             state.positionMs, state.durationMs)

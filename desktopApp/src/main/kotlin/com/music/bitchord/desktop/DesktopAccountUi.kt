@@ -374,7 +374,8 @@ internal fun DesktopSignInDialog(
                     "Sign in right from BitChord. If Google does not allow this embedded browser, " +
                         "use the secure Chrome/Edge option or an existing browser profile below."
                 } else if (interactiveBrowser != null) {
-                    "Sign in using ${interactiveBrowser.label}, then close its browser window " +
+                    if (DesktopPlatform.isMac) "After signing in and opening YouTube Music, quit the browser with Command-Q to return to BitChord."
+                    else "Sign in using ${interactiveBrowser.label}, then close its browser window " +
                         "after YouTube Music opens to return to BitChord."
                 } else {
                     "Choose a signed-in browser profile to connect to YouTube Music."
@@ -483,7 +484,9 @@ internal fun DesktopSignInDialog(
                                 Column(Modifier.weight(1f)) {
                                     Text(browser.label, color = DesktopForeground)
                                     Text(
-                                        if (busy == browser.label) {
+                                        if (DesktopPlatform.isMac) {
+                                            "After signing in, quit ${browser.name} with Command-Q"
+                                        } else if (busy == browser.label) {
                                             "Finish signing in, then close Chrome"
                                         } else {
                                             "Opens normal Chrome; close it when signed in"

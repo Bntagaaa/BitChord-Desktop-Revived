@@ -81,9 +81,13 @@ jobs:
       - name: Verify app and native architecture; execute bundled native smoke
         env:
           BUILD_ARCH: ${{ matrix.arch }}
-        run: python3 desktopApp/packaging/macos/verify-bundle.py
+        run: |
+          set -o pipefail
+          python3 desktopApp/packaging/macos/verify-bundle.py 2>&1 | tee macos-verify.log
       - name: GUI startup smoke (requires a visible window)
-        run: python3 desktopApp/packaging/macos/smoke-startup.py
+        run: |
+          set -o pipefail
+          python3 desktopApp/packaging/macos/smoke-startup.py 2>&1 | tee macos-gui.log
       - name: Upload installers
         if: always()
         uses: actions/upload-artifact@v4
@@ -106,14 +110,21 @@ jobs:
         if: failure()
         run: |
           python3 - <<'PY'
-          import os,pathlib,re
+          import os,pathlib,re,xml.etree.ElementTree as ET
           emitted = 0
           for path in pathlib.Path('.').glob('macos-*.log'):
               for line in path.read_text(errors='replace').splitlines():
-                  if emitted < 12 and (line.startswith('e: ') or line.startswith('  Line ') or 'error:' in line.lower()):
+                  if emitted < 12 and (line.startswith('e: ') or line.startswith('  Line ') or line.startswith('CMake Error') or 'error:' in line.lower()):
                       escaped = line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
                       print('::error title=macOS build diagnostic::' + escaped[:1500])
                       emitted += 1
+          for path in pathlib.Path('.').glob('*/build/test-results/**/TEST-*.xml'):
+              for case in ET.parse(path).getroot().iter('testcase'):
+                  for failure in list(case):
+                      if emitted < 20 and failure.tag in ('failure', 'error'):
+                          message = case.get('classname', '') + '.' + case.get('name', '') + ': ' + failure.get('message', '')
+                          print('::error title=macOS test failure::' + message[:1500].replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D'))
+                          emitted += 1
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
               for path in pathlib.Path('.').glob('macos-*.log'):
                   out.write('\n### '+path.name+'\n```text\n'+ '\n'.join(path.read_text(errors='replace').splitlines()[-100:])+'\n```\n')

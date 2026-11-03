@@ -3708,6 +3708,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             alt = event.isAltPressed,
                             shift = event.isShiftPressed,
                             pressed = pressed,
+                            secondaryModifier = DesktopPlatform.isMac && event.isCtrlPressed,
                         )
 
                         // Quick Search owns navigation and play/dismiss keys, while ordinary
@@ -3720,7 +3721,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             ctrl = shortcutKey.ctrl,
                             alt = shortcutKey.alt,
                             shift = shortcutKey.shift,
-                            meta = event.isMetaPressed,
+                            meta = if (DesktopPlatform.isMac) event.isCtrlPressed else event.isMetaPressed,
                             globalShortcut = DesktopShortcut.matching(
                                 shortcutKey.keyCode, shortcutKey.ctrl, shortcutKey.alt, shortcutKey.shift,
                             ) != null,

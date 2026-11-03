@@ -51,6 +51,14 @@ class DesktopMacCompatibilityTest {
         assertEquals(null, DesktopMacKeychain.read(key))
     }
 
+    @Test fun macControlModifierDoesNotTriggerPlainSpaceOrCommandBindings() {
+        val dispatcher = DesktopShortcutDispatcher()
+        assertEquals(null, dispatcher.dispatch(
+            DesktopShortcutKey(java.awt.event.KeyEvent.VK_SPACE, secondaryModifier = true), false, false, false))
+        assertEquals(null, dispatcher.dispatch(
+            DesktopShortcutKey(java.awt.event.KeyEvent.VK_K, ctrl = true, secondaryModifier = true), false, false, false))
+    }
+
     @Test fun nativeMediaBridgeIsSafeOnOtherPlatforms() {
         if (DesktopPlatform.isMac) return
         DesktopMacMedia.stop()
