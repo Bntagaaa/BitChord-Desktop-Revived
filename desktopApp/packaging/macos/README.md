@@ -17,6 +17,14 @@ its opaque decorated window and existing Reduce Blur behavior instead. Apple
 Spaces fullscreen uses the JDK macOS adapter, separate from Win32 fullscreen.
 No extra native blur layer is installed.
 
+## Supported OS baseline
+
+Apple Silicon requires macOS 14 or later; Intel requires macOS 13.3 or later.
+These minima come from the actual bundled ONNX dylib Mach-O headers and are
+encoded in Info.plist. The verifier also checks that inspected libraries do not
+require a newer OS than the bundle declares. CI runs on macOS 15; physical devices
+and earlier supported OS versions still need manual verification.
+
 ## Build on each architecture
 
 Install an architecture-matching JDK 21 and Xcode command-line tools. CMake must

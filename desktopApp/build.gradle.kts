@@ -608,6 +608,8 @@ compose.desktop {
             macOS {
                 iconFile.set(project.file("packaging/icons/AppIcon.icns"))
                 bundleID = "com.music.bitchord"
+                // Minimum OS encoded in the bundled ONNX Mach-O binaries.
+                minimumSystemVersion = if (isArm64) "14.0" else "13.3"
                 appCategory = "public.app-category.music"
                 dockName = "BitChord"
                 infoPlist {
