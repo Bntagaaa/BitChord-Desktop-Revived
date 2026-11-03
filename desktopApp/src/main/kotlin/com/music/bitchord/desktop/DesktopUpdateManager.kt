@@ -22,7 +22,7 @@ internal class DesktopUpdateService(
     private val downloader: DesktopUpdateDownloader = DesktopUpdateDownloader(),
     private val persistence: DesktopPersistence = DesktopPersistence(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-    private val directory: Path = Path.of(System.getProperty("user.home"), ".cache", "bitchord", "updates"),
+    private val directory: Path = if (DesktopPlatform.isMac) DesktopMacPaths.caches.resolve("bitchord/updates") else Path.of(System.getProperty("user.home"), ".cache", "bitchord", "updates"),
     private val prepare: (UpdateInstallation, Path, String, String) -> DesktopPreparedUpdate = DesktopUpdateInstaller::prepare,
 ) {
     val canAutoInstall = DesktopUpdateInstaller.canInstall(installation)

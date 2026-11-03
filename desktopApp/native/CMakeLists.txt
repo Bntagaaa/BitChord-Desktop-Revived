@@ -126,3 +126,12 @@ elseif(MSVC)
     # The WinRT umbrella import library.
     target_link_libraries(bitchord_smtc PRIVATE windowsapp gdi32)
 endif()
+
+# Built by Apple Clang on the native architecture, with system frameworks only.
+if(APPLE)
+    enable_language(OBJCXX)
+    add_library(bitchord_macos SHARED macos.mm)
+    target_include_directories(bitchord_macos PRIVATE "$ENV{JAVA_HOME}/include" "$ENV{JAVA_HOME}/include/darwin")
+    target_compile_options(bitchord_macos PRIVATE -fobjc-arc)
+    target_link_libraries(bitchord_macos PRIVATE "-framework Foundation" "-framework MediaPlayer")
+endif()

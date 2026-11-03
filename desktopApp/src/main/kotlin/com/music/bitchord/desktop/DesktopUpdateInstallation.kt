@@ -11,6 +11,7 @@ internal enum class UpdateFormat(val suffix: String?, val guidance: String) {
     DEB("-linux-amd64.deb", "Open the verified package with your system package installer. Authorization is handled by your package manager."),
     RPM("-linux-x86_64.rpm", "Open the verified package with your system package installer. Authorization is handled by your package manager."),
     ARCH(null, "Update through pacman or your AUR helper. BitChord will not replace package-managed files."),
+    MACOS(null, "Download the DMG or PKG for your Mac (Apple Silicon arm64 or Intel x64) from the official release page. Quit BitChord before replacing the app; automatic replacement of a running app is disabled."),
     UNKNOWN(null, "Automatic installation is unavailable for this installation. See the release instructions."),
 }
 
@@ -49,6 +50,9 @@ internal data class UpdateInstallation(val format: UpdateFormat, val appImage: P
         }.getOrDefault(false)
 
         internal fun classify(os: String, arch: String, image: String?, portable: Boolean, installed: Boolean, owner: String): UpdateInstallation {
+            if (os.startsWith("Mac", true)) return UpdateInstallation(
+                if (arch.lowercase() in setOf("aarch64", "arm64", "amd64", "x86_64", "x64")) UpdateFormat.MACOS else UpdateFormat.UNKNOWN,
+            )
             if (arch.lowercase() !in setOf("amd64", "x86_64", "x64")) return UpdateInstallation(UpdateFormat.UNKNOWN)
             if (os.startsWith("Windows", true)) return UpdateInstallation(when {
                 portable -> UpdateFormat.WINDOWS_PORTABLE

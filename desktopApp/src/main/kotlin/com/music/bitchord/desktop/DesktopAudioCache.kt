@@ -85,7 +85,9 @@ internal class DesktopAudioCache(
         fun identity(value: String): String = sha(value.toByteArray()).joinToString("") { "%02x".format(it) }
         private fun sha(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
         val shared by lazy {
-            val root = if (DesktopPlatform.isWindows) {
+            val root = if (DesktopPlatform.isMac) {
+                DesktopMacPaths.caches
+            } else if (DesktopPlatform.isWindows) {
                 System.getenv("LOCALAPPDATA")?.let(Path::of) ?: Path.of(System.getProperty("user.home"), "AppData", "Local")
             } else {
                 System.getenv("XDG_CACHE_HOME")?.takeIf { Path.of(it).isAbsolute }?.let(Path::of)

@@ -30,6 +30,7 @@ import kotlinx.coroutines.swing.Swing
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
+    DesktopMacApplication.configure()
     DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.PROCESS_ENTRY)
     // Read the per-install welcome marker before services initialize or write preferences.
     val welcomeLaunch = DesktopWelcomeOnboarding.inspectStartup()
@@ -70,6 +71,10 @@ fun main() {
 }
 
 private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = application {
+    DisposableEffect(Unit) {
+        DesktopMacApplication.install { exitApplication() }
+        onDispose { DesktopMacApplication.uninstall() }
+    }
     // Closing puts the window away rather than ending the process, while there is a tray icon to
     // bring it back from — see [DesktopWindowVisibility].
     val visible by DesktopWindowVisibility.visible.collectAsState()
@@ -83,7 +88,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     // Linux restores its native fullscreen state first (see below). Updating WindowState
     // directly to Maximized would skip fullscreen=false in ComposeWindow's native setter.
     LaunchedEffect(placement) {
-        if (DesktopPlatform.isWindows) state.placement = placement
+        if (!DesktopPlatform.isLinux) state.placement = placement
     }
     // Observe externally initiated maximize/restore changes. Do not echo a stale Fullscreen
     // observation back into our controller after a Linux exit request: on KDE/Wayland, Compose

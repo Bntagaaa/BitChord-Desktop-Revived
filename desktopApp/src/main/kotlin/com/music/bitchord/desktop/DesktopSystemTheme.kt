@@ -9,6 +9,7 @@ internal object DesktopSystemTheme {
     fun isDark(): Boolean = when {
         DesktopPlatform.isWindows -> windowsDark()
         DesktopPlatform.isLinux -> linuxDark()
+        DesktopPlatform.isMac -> command("/usr/bin/defaults", "read", "-g", "AppleInterfaceStyle")?.trim().equals("Dark", true)
         else -> false
     }
 

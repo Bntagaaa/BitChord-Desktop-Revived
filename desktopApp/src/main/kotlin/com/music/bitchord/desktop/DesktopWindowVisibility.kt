@@ -55,7 +55,7 @@ internal object DesktopWindowVisibility {
      * @return true when the caller should end the application; false when the
      */
     fun onCloseRequest(): Boolean {
-        if (!keepRunningWhenClosed) return true
+        if (!keepRunningWhenClosed && !DesktopPlatform.isMac) return true
         // A window put away full-screen comes back full-screen with nothing on it, which reads as
         // the app having broken rather than as it having been hidden.
         DesktopWindowMode.exit()

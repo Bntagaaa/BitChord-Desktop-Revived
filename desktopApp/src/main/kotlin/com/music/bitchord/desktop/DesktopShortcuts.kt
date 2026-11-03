@@ -44,8 +44,8 @@ internal enum class DesktopShortcut(
 
     val keycaps: List<String>
         get() = buildList {
-            if (ctrl) add("Ctrl")
-            if (alt) add("Alt")
+            if (ctrl) add(if (DesktopPlatform.isMac) "Cmd" else "Ctrl")
+            if (alt) add(if (DesktopPlatform.isMac) "Option" else "Alt")
             if (shift) add("Shift")
             add(keyLabel)
         }

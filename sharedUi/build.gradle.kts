@@ -27,7 +27,7 @@ val CMP_DESKTOP =
     // against a ShaderBrush.createShader that returns skia's Shader; 1.12 changed that return
     // type, so on 1.12 every blur dies with NoSuchMethodError. Windows stays on the plugin's
     // own 1.10.3 / skiko 0.9; only Linux moves to 1.12.
-    if (System.getProperty("os.name").contains("Windows", ignoreCase = true)) "1.10.3" else "1.12.0"
+    if (System.getProperty("os.name").contains("Linux", ignoreCase = true)) "1.12.0" else "1.10.3"
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")

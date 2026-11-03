@@ -1883,16 +1883,16 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     // The Windows half of the same idea. Linux has MPRIS above; on Windows this
     // is what the media keys and the volume flyout's card talk to.
     DisposableEffect(playbackEngine) {
-        DesktopWindowsMedia.start(
-            DesktopWindowsMedia.Controller(
+        val mediaController = DesktopWindowsMedia.Controller(
                 onPlay = ::playFromUser,
                 onPause = ::pauseFromUser,
                 onNext = ::playNext,
                 onPrevious = ::playPrevious,
                 onStop = ::pauseFromUser,
-            ),
-        )
-        onDispose { DesktopWindowsMedia.stop() }
+            )
+        DesktopWindowsMedia.start(mediaController)
+        DesktopMacMedia.start(mediaController)
+        onDispose { DesktopWindowsMedia.stop(); DesktopMacMedia.stop() }
     }
 
     LaunchedEffect(playbackSpeed) { playbackEngine.setPlaybackSpeed(playbackSpeed) }
@@ -2082,6 +2082,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     LaunchedEffect(playback.song?.videoId, playback.isPlaying, playback.durationMs) {
         DesktopScrobbling.onPlaybackStateChanged(playback)
         DesktopWindowsMedia.publish(playback)
+        DesktopMacMedia.publish(playback)
     }
     // Refetched on opening the page rather than cached for the session: the
     // point of it is that something played elsewhere shows up here.
@@ -2165,6 +2166,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                 DesktopMusicVideo.stop()
                 playbackEngine.shutdown() // Existing bounded 2-second audio-thread join.
                 DesktopWindowsMedia.stop()
+                DesktopMacMedia.stop()
             }
             exitProcess(0)
         }
@@ -2835,6 +2837,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     DesktopPlaybackWrites.flush()
                     playbackEngine.shutdown()
                     DesktopWindowsMedia.stop()
+                DesktopMacMedia.stop()
                     exitProcess(0)
                 }
             },
@@ -3701,7 +3704,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                         val pressed = event.type == KeyEventType.KeyDown
                         val shortcutKey = DesktopShortcutKey(
                             keyCode = event.key.nativeKeyCode,
-                            ctrl = event.isCtrlPressed,
+                            ctrl = if (DesktopPlatform.isMac) event.isMetaPressed else event.isCtrlPressed,
                             alt = event.isAltPressed,
                             shift = event.isShiftPressed,
                             pressed = pressed,
