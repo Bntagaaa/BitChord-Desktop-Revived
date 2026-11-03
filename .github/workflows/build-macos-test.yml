@@ -204,3 +204,46 @@ jobs:
           for path in Path('linux-reports').rglob('classes/*.html'):
               parser=Failures(); parser.feed(path.read_text(errors='replace'))
           PY
+
+  android-regression:
+    name: Android Dev Debug regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      # The Android workflow uses Java 17; shared desktop toolchains also declare Java 21.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the existing Android dev variant
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew :app:assembleDevDebug --stacktrace --console=plain \
+            "-Dorg.gradle.java.installations.paths=$JAVA_HOME_17_X64,$JAVA_HOME_21_X64" 2>&1 | tee android-regression.log
+      - name: Retain Android regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-Android-regression
+          path: |
+            app/build/outputs/apk/dev/debug/*.apk
+            android-regression.log
+      - name: Report Android compiler failures
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          lines=Path('android-regression.log').read_text(errors='replace').splitlines()
+          if '* What went wrong:' in lines:
+              index=lines.index('* What went wrong:')
+              print('::error title=Android Gradle failure::'+' | '.join(lines[index+1:index+12]).replace('%','%25')[:2500])
+          for line in [line for line in lines if line.startswith('e: ') or 'error:' in line.lower()][:12]:
+              print('::error title=Android compiler::'+line.replace('%','%25')[:1500])
+          PY
