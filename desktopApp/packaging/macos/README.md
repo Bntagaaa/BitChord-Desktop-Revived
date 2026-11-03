@@ -59,7 +59,8 @@ architecture and JNI loading. JNI smoke runs through the native app launcher and
 external Java command is used. Fat dependency jars (ONNX/JNA/Skiko) may contain foreign-platform resources;
 only matching macOS resources are loaded and verified. The official Skiko x64
 archive contains both arm64 and x64 dylibs; the verifier requires the resource
-whose filename and Mach-O architecture match the app. No foreign executable is
+whose filename and Mach-O architecture match the app, including the loose native
+file that Compose extracts beside the packaged jars before jpackage/signing. No foreign executable is
 added to the macOS launcher path.
 
 ## Platform adapters
@@ -72,7 +73,9 @@ added to the macOS launcher path.
   FFmpeg/PCM engine. CoreAudio default-device and inventory events reconfigure the
   output; the JDK sleep listener triggers the same recovery after wake.
 - MediaPlayer publishes title, artist, duration, position and playback state and
-  registers play/pause/toggle/next/previous commands. Callbacks return to the AWT
+  registers play/pause/toggle/next/previous commands. A single playback-state
+  subscription keeps metadata and commands current while the window is hidden,
+  with native progress interpolation and resynchronization after seeks or speed changes. Callbacks return to the AWT
   event thread. Listener tokens are removed on disposal. Hardware media keys and
   Control Center routing still require manual verification on a real Mac.
 - Source credentials, SecretStore sessions, Spotify/Discord/Last.fm/ListenBrainz

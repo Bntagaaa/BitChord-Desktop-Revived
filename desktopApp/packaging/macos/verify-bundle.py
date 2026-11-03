@@ -62,6 +62,11 @@ required = {
     'model': lambda s: s.startswith('models/') and s.endswith('.onnx'),
 }
 found = set()
+# Compose extracts the selected Skiko native from its jar before jpackage/signing.
+# Check both supported layouts; inactive CPU resources may remain inside the universal jar.
+for library in contents.rglob(f'libskiko-macos-{skiko_arch}.dylib'):
+    inspect(library)
+    found.add('skiko')
 with tempfile.TemporaryDirectory() as temp:
     for jar in jars:
         with zipfile.ZipFile(jar) as archive:

@@ -1891,11 +1891,16 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                 onStop = ::pauseFromUser,
             )
         DesktopWindowsMedia.start(mediaController)
-        DesktopMacMedia.start(mediaController)
+        DesktopMacMedia.start(mediaController, playbackEngine.state) {
+            if (playbackEngine.state.value.isPlaying) pauseFromUser() else playFromUser()
+        }
         onDispose { DesktopWindowsMedia.stop(); DesktopMacMedia.stop() }
     }
 
-    LaunchedEffect(playbackSpeed) { playbackEngine.setPlaybackSpeed(playbackSpeed) }
+    LaunchedEffect(playbackSpeed) {
+        playbackEngine.setPlaybackSpeed(playbackSpeed)
+        DesktopMacMedia.setRate(playbackSpeed)
+    }
     LaunchedEffect(volume) { playbackEngine.setVolume(volume) }
     LaunchedEffect(audioQuality) { playbackEngine.setAudioQuality(audioQuality.name) }
     LaunchedEffect(automixPerformance) {
@@ -2082,7 +2087,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     LaunchedEffect(playback.song?.videoId, playback.isPlaying, playback.durationMs) {
         DesktopScrobbling.onPlaybackStateChanged(playback)
         DesktopWindowsMedia.publish(playback)
-        DesktopMacMedia.publish(playback)
     }
     // Refetched on opening the page rather than cached for the session: the
     // point of it is that something played elsewhere shows up here.

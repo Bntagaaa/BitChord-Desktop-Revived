@@ -8,7 +8,6 @@ static JavaVM *vm;
 static jclass receiver;
 static jmethodID onButton;
 static NSMutableArray *targets;
-static bool playingNow;
 static bool active;
 static id appearanceObserver;
 static AudioObjectPropertyListenerBlock audioListener;
@@ -28,7 +27,7 @@ static void sendButton(jint button) {
         bool attached = vm->GetEnv((void **)&env, JNI_VERSION_1_8) == JNI_EDETACHED;
         if (attached && vm->AttachCurrentThread((void **)&env, nullptr) != JNI_OK) return;
         if (env) {
-            env->CallStaticVoidMethod(receiver, onButton, button == 7 ? (playingNow ? 1 : 0) : button);
+            env->CallStaticVoidMethod(receiver, onButton, button);
             if (env->ExceptionCheck()) env->ExceptionClear();
         }
         if (attached) vm->DetachCurrentThread();
@@ -104,16 +103,20 @@ static NSString *string(JNIEnv *env, jstring value) {
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_music_bitchord_desktop_DesktopMacMedia_nativeUpdate(JNIEnv *env, jobject,
-    jstring title, jstring artist, jboolean playing, jlong position, jlong duration) {
+    jstring title, jstring artist, jboolean playing, jlong position, jlong duration, jdouble rate) {
     NSString *track = string(env, title), *performer = string(env, artist);
     // Synchronous dispatch bounds ownership and ensures stop cannot be followed by stale updates.
     mainSync(^{
-        playingNow = playing;
         MPNowPlayingInfoCenter *info = MPNowPlayingInfoCenter.defaultCenter;
+        if (track.length == 0) {
+            info.nowPlayingInfo = nil;
+            info.playbackState = MPNowPlayingPlaybackStateStopped;
+            return;
+        }
         info.nowPlayingInfo = @{MPMediaItemPropertyTitle: track, MPMediaItemPropertyArtist: performer,
             MPMediaItemPropertyPlaybackDuration: @((double)duration / 1000.0),
             MPNowPlayingInfoPropertyElapsedPlaybackTime: @((double)position / 1000.0),
-            MPNowPlayingInfoPropertyPlaybackRate: @(playing ? 1.0 : 0.0)};
+            MPNowPlayingInfoPropertyPlaybackRate: @(playing ? rate : 0.0)};
         info.playbackState = playing ? MPNowPlayingPlaybackStatePlaying : MPNowPlayingPlaybackStatePaused;
     });
 }
