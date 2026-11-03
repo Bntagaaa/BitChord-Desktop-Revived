@@ -38,7 +38,7 @@ class DesktopMacCompatibilityTest {
         assertFalse(controller.fullScreen.value)
     }
 
-    @Test fun loginKeychainRoundTrip() {
+    @org.junit.Test(timeout = 30_000) fun loginKeychainRoundTrip() {
         if (!DesktopPlatform.isMac) return
         val key = "ci-roundtrip-${java.util.UUID.randomUUID()}"
         try {

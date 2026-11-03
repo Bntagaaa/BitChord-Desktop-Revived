@@ -51,6 +51,8 @@ jobs:
           python3 -c 'import os,platform; assert platform.machine() == ("arm64" if os.environ["EXPECTED_ARCH"] == "arm64" else "x86_64")'
           file "$JAVA_HOME/bin/java"
           chmod +x gradlew
+      - name: Create isolated unlocked test keychain
+        run: bash desktopApp/packaging/macos/ci-keychain.sh setup
       - name: Compile and run shared and desktop tests
         run: |
           set -o pipefail
@@ -80,6 +82,10 @@ jobs:
               if len(files) == 1:
                   shutil.copy2(files[0], f'macos-artifacts/BitChord-Revived-macOS-{os.environ["BUILD_ARCH"]}.{extension}')
           PY
+      # A packaged launcher has a different identity from the Gradle test JVM.
+      # Fresh storage avoids a cross-identity Keychain permission dialog during GUI smoke.
+      - name: Reset test keychain for packaged launch
+        run: bash desktopApp/packaging/macos/ci-keychain.sh reset
       - name: Verify app and native architecture; execute bundled native smoke
         env:
           BUILD_ARCH: ${{ matrix.arch }}
@@ -108,6 +114,9 @@ jobs:
             desktopApp/build/test-results/
             shared/build/reports/tests/
             sharedUi/build/reports/tests/
+      - name: Remove disposable test keychain
+        if: always()
+        run: bash desktopApp/packaging/macos/ci-keychain.sh cleanup
       - name: Failure summary
         if: failure()
         run: |

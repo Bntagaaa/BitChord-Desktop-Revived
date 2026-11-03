@@ -36,6 +36,11 @@ verified against actions/runner-images. Both native JDKs are explicitly selected
 The feature-branch push trigger enables testing before a PR exists; integration
 pushes, integration PRs and workflow_dispatch also run the matrix.
 
+Each CI job creates an unlocked disposable Keychain for native credential tests,
+then resets it before packaged startup to avoid cross-identity permission dialogs.
+It restores the runner default and deletes the temporary Keychain afterward.
+This uses no Apple account or signing credentials.
+
 Each job uploads `BitChord-Revived-macOS-{arm64,x64}` containing identically named
 DMG and PKG files, plus separate diagnostics. Look under the run's Artifacts area.
 Normal Gradle packages retain the numeric native version in their metadata.
