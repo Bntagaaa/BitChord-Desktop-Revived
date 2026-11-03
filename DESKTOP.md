@@ -1,9 +1,9 @@
 # BitChord Desktop
 
 BitChord now has a Kotlin Multiplatform shared module and a Compose Multiplatform
-desktop application for Linux and Windows. Desktop uses the JVM target, which is
-the supported Compose Multiplatform desktop model; macOS is intentionally not a
-configured target.
+desktop application for Linux, Windows, and macOS (Intel and Apple Silicon).
+Desktop uses the shared JVM target. See [macOS development builds](desktopApp/packaging/macos/README.md)
+for native adapters, DMG/PKG builds, CI verification and manual testing.
 
 The desktop target uses Java 21. Run it on Linux with the JDK and native
 libraries available in the shell:

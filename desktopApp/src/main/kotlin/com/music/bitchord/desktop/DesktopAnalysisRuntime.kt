@@ -16,7 +16,8 @@ internal object DesktopAnalysisRuntime {
     private val home: Path by lazy {
         val base = if (DesktopPlatform.isMac) DesktopMacPaths.applicationSupport.toString() else System.getenv("XDG_DATA_HOME")?.takeIf { it.isNotBlank() }
             ?: "${System.getProperty("user.home")}/.local/share"
-        Path.of(base, "bitchord", "analysis")
+        val directory = Path.of(base, "bitchord", "analysis")
+        if (DesktopPlatform.isMac) directory.resolve(System.getProperty("os.arch")) else directory
     }
 
     /** Where unpacked resources and cached analyses live. */

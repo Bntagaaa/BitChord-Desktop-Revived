@@ -27,6 +27,30 @@ class DesktopMacCompatibilityTest {
         assertEquals(listOf("Cmd", "K"), DesktopShortcut.QUICK_SEARCH.keycaps)
     }
 
+    @Test fun macFullscreenKeepsFloatingPlacementAndAdoptsNativeExit() {
+        val controller = DesktopWindowPlacementController(isWindows = false, isMac = true)
+        controller.toggle()
+        assertTrue(controller.fullScreen.value)
+        assertEquals(androidx.compose.ui.window.WindowPlacement.Floating, controller.placement.value)
+        controller.adopt(androidx.compose.ui.window.WindowPlacement.Floating)
+        assertTrue(controller.fullScreen.value)
+        controller.adoptNativeFullscreen(false)
+        assertFalse(controller.fullScreen.value)
+    }
+
+    @Test fun loginKeychainRoundTrip() {
+        if (!DesktopPlatform.isMac) return
+        val key = "ci-roundtrip-${java.util.UUID.randomUUID()}"
+        try {
+            assertEquals(null, DesktopMacKeychain.read(key))
+            DesktopMacKeychain.write(key, "first secret")
+            assertEquals("first secret", DesktopMacKeychain.read(key))
+            DesktopMacKeychain.write(key, "updated secret")
+            assertEquals("updated secret", DesktopMacKeychain.read(key))
+        } finally { DesktopMacKeychain.remove(key) }
+        assertEquals(null, DesktopMacKeychain.read(key))
+    }
+
     @Test fun nativeMediaBridgeIsSafeOnOtherPlatforms() {
         if (DesktopPlatform.isMac) return
         DesktopMacMedia.stop()
