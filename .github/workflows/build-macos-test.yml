@@ -64,19 +64,19 @@ jobs:
       - name: Compile and run shared and desktop tests
         run: |
           set -o pipefail
-          ./gradlew --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :shared:jvmTest :sharedUi:jvmTest :desktopApp:test --stacktrace 2>&1 | tee macos-tests.log
+          ./gradlew --build-cache --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :shared:jvmTest :sharedUi:jvmTest :desktopApp:test --stacktrace 2>&1 | tee macos-tests.log
       - name: Create bundled application
         run: |
           set -o pipefail
-          ./gradlew --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :desktopApp:createDistributable --stacktrace 2>&1 | tee macos-app.log
+          ./gradlew --build-cache --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :desktopApp:createDistributable --stacktrace 2>&1 | tee macos-app.log
       - name: Build DMG
         run: |
           set -o pipefail
-          ./gradlew --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :desktopApp:packageDmg --stacktrace 2>&1 | tee macos-dmg.log
+          ./gradlew --build-cache --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :desktopApp:packageDmg --stacktrace 2>&1 | tee macos-dmg.log
       - name: Build PKG
         run: |
           set -o pipefail
-          ./gradlew --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :desktopApp:packagePkg --stacktrace 2>&1 | tee macos-pkg.log
+          ./gradlew --build-cache --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :desktopApp:packagePkg --stacktrace 2>&1 | tee macos-pkg.log
       - name: Collect installers even if a later check fails
         if: always()
         env:
