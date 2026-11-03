@@ -733,6 +733,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                 .getOrDefault(AutomixPerformanceMode.BALANCED),
         )
     }
+    var automixDuration by remember {
+        mutableStateOf(DesktopAutomixDuration.fromStored(persistence.string("automix_duration", "ADAPTIVE")))
+    }
     var shuffle by remember { mutableStateOf(persistence.boolean("shuffle", false)) }
     var repeatMode by remember {
         mutableStateOf(
@@ -1900,6 +1903,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     LaunchedEffect(audioQuality) { playbackEngine.setAudioQuality(audioQuality.name) }
     LaunchedEffect(automixPerformance) {
         playbackEngine.setAutomixPerformance(automixPerformance)
+    }
+    LaunchedEffect(automixDuration) {
+        playbackEngine.setAutomixPhraseBars(automixDuration.phraseBars)
     }
     // Every one of the seven settings renders the same curve, so they are collected together
     // rather than destructured — seven sources of one tuning is seven chances to read them in the
@@ -4553,6 +4559,11 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                     onAutomixChange = {
                                         automix = it
                                         persistence.saveBoolean("automix", it)
+                                    },
+                                    automixDuration = automixDuration,
+                                    onAutomixDurationChange = {
+                                        automixDuration = it
+                                        persistence.saveString("automix_duration", it.name)
                                     },
                                     automixPerformance = automixPerformance,
                                     onAutomixPerformanceChange = {
@@ -7414,6 +7425,8 @@ private fun DesktopSettingsScreen(
     onAutoplayChange: (Boolean) -> Unit,
     automix: Boolean,
     onAutomixChange: (Boolean) -> Unit,
+    automixDuration: DesktopAutomixDuration,
+    onAutomixDurationChange: (DesktopAutomixDuration) -> Unit,
     automixPerformance: AutomixPerformanceMode,
     onAutomixPerformanceChange: (AutomixPerformanceMode) -> Unit,
     shuffle: Boolean,
@@ -7555,6 +7568,33 @@ private fun DesktopSettingsScreen(
                         automix,
                         onAutomixChange,
                     )
+                    if (automix && settingsRowVisible(DesktopStrings["automix_duration", "Automix duration"], "Adaptive 8 Bars 16 Bars longer overlaps")) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                            Text(DesktopStrings["automix_duration", "Automix duration"], fontWeight = FontWeight.Medium)
+                            Text(
+                                "How long the two songs play together",
+                                color = DesktopSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                DesktopAutomixDuration.entries.forEach { duration ->
+                                    FilterChip(
+                                        colors = desktopChipColors(),
+                                        selected = automixDuration == duration,
+                                        onClick = { onAutomixDurationChange(duration) },
+                                        label = { Text(duration.optionLabel) },
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                automixDuration.description,
+                                color = DesktopSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
                     if (settingsRowVisible(DesktopStrings["automix_performance", "Automix performance"], DesktopStrings["automix_performance_subtitle", "Sets how much CPU background analysis may use"])) {
                         Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
                             Text(DesktopStrings["automix_performance", "Automix performance"], fontWeight = FontWeight.Medium)

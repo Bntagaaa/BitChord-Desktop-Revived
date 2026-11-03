@@ -82,6 +82,10 @@ jobs:
         run: |
           .\gradlew.bat :desktopApp:createDistributable "-Pbitchord.version=${{ steps.meta.outputs.version }}" --build-cache
 
+      - name: Verify Automix native runtime and packaged models
+        shell: pwsh
+        run: ./desktopApp/packaging/tests/windows-automix-check.ps1
+
       - name: Package portable ZIP
         shell: pwsh
         run: |

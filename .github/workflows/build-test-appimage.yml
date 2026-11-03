@@ -122,6 +122,10 @@ jobs:
           grep -Fq 'native/libbitchord_analysis.so' "$RUNNER_TEMP/desktop-jar-contents.txt"
           grep -Eq '^models/.*\.onnx$' "$RUNNER_TEMP/desktop-jar-contents.txt"
 
+      - name: Validate packaged AutoMix analyser with real JNI calls
+        shell: bash
+        run: bash desktopApp/packaging/tests/linux-automix-check.sh
+
       - name: Build AppImage
         shell: bash
         run: |
@@ -143,6 +147,7 @@ jobs:
           test -x squashfs-root/usr/bin/BitChord
           test -f squashfs-root/bitchord.desktop
           test -f squashfs-root/bitchord.png
+          bash desktopApp/packaging/tests/linux-automix-check.sh squashfs-root/usr
           sha256sum "$appimage"
           ls -lh "$appimage"
 

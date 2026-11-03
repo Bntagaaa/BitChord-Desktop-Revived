@@ -31,7 +31,7 @@ class DesktopInstantPlaybackEngineTest {
         val file = File.createTempFile("bitchord-engine-", ".wav").also { files += it; it.writeBytes(wav) }
         return DesktopStream(file.absolutePath)
     }
-    private class Output : DesktopAudioOutput {
+    private class Output(private val acceleration: Int = 1) : DesktopAudioOutput {
         override var format = DesktopPcmFormat(44100, 2, 2)
         override var gain = 1f
         @Volatile override var isOpen = false
@@ -47,7 +47,7 @@ class DesktopInstantPlaybackEngineTest {
         }
         override fun write(samples: FloatArray, count: Int): Int {
             assertTrue(samples.take(count).all { it.isFinite() })
-            Thread.sleep((count.toLong() * 1000 / format.channels / format.sampleRate).coerceAtLeast(1))
+            Thread.sleep((count.toLong() * 1000 / format.channels / format.sampleRate / acceleration).coerceAtLeast(1))
             frames += count / format.channels; writes++
             return count * format.bytesPerSample
         }
@@ -64,8 +64,9 @@ class DesktopInstantPlaybackEngineTest {
         error("timed out: $description")
     }
     private fun engine(output: Output, ended: () -> Unit = {}, handoff: (Song) -> Unit = {},
+        analysis: ((String) -> com.music.bitchord.playback.smart.TrackAnalysis)? = null,
         resolve: suspend (Song) -> DesktopStream): DesktopPlaybackEngine =
-        DesktopPlaybackEngine(ended, handoff, output) { song, _, _, _ -> Result.success(resolve(song)).map { DesktopLiveResolution(it) } }
+        DesktopPlaybackEngine(ended, handoff, output, analysis) { song, _, _, _ -> Result.success(resolve(song)).map { DesktopLiveResolution(it) } }
             .also { engines += it }
 
     @Test fun `five rapid skips cancel an obsolete resolution and only latest reaches output`() {
@@ -240,4 +241,123 @@ class DesktopInstantPlaybackEngineTest {
         } finally { server.stop(0) }
     }
 
+
+    private fun measured(id: String): com.music.bitchord.playback.smart.TrackAnalysis {
+        val beat = if (id == "second") 60.0 / 122 else 0.5
+        return com.music.bitchord.playback.smart.TrackAnalysis(
+            trackId = id, duration = 55.0, bpm = 60 / beat, beatInterval = beat,
+            beatConfidence = 0.95, firstBeat = 0.5, audibleStartTime = 0.5,
+            mixInTime = 4.5, contentEndTime = 54.0,
+            downbeats = generateSequence(0.5) { it + 4 * beat }.takeWhile { it < 55 }.toList(),
+        )
+    }
+
+    private fun autoMixPlan(): com.music.bitchord.playback.smart.TransitionPlan {
+        val planned = com.music.bitchord.playback.smart.planTransition(
+            analysis = measured("first"), nextAnalysis = measured("second"),
+            currentTrack = com.music.bitchord.playback.smart.TransitionTrackInfo("first", 55_000),
+            nextTrack = com.music.bitchord.playback.smart.TransitionTrackInfo("second", 55_000),
+            duration = 55.0, mode = com.music.bitchord.playback.smart.CrossfadeMode.SMART, advanced = true,
+        )
+        return planned
+    }
+
+    private fun autoMixStartMs(): Long = ((autoMixPlan().transitionStart - 1.0) * 1000).toLong()
+
+    @Test fun `analysed AutoMix pauses and a seek before handoff cancels the old overlap`() {
+        val stream = tone(seconds = 55)
+        val output = Output()
+        val engine = engine(output, analysis = ::measured) { stream }
+        engine.setAutomixEnabled(true)
+        engine.load(song("first")); waitFor("first PCM") { output.writes > 0 }
+        engine.prepareNext(song("second"))
+        Thread.sleep(300)
+        engine.seekTo(autoMixStartMs())
+        waitFor("musical overlap") { engine.state.value.mixing }
+        engine.pause(); Thread.sleep(150)
+        val stopped = output.writes
+        Thread.sleep(100); assertEquals(stopped, output.writes)
+        engine.seekTo(1000); engine.play()
+        waitFor("outgoing seek after cancelled overlap") {
+            engine.state.value.song?.videoId == "first" && engine.state.value.positionMs in 900..4000 &&
+                !engine.state.value.mixing && output.writes > stopped
+        }
+        assertNull(engine.state.value.error)
+    }
+
+    @Test fun `analysed AutoMix promotes once and continues from the incoming cue`() {
+        val stream = tone(seconds = 55)
+        val output = Output()
+        val handoffs = CopyOnWriteArrayList<String>()
+        val engine = engine(output, handoff = { handoffs += it.videoId }, analysis = ::measured) { stream }
+        engine.setAutomixEnabled(true)
+        engine.load(song("first")); waitFor("first PCM") { output.writes > 0 }
+        engine.prepareNext(song("second")); Thread.sleep(300)
+        engine.seekTo(autoMixStartMs())
+        waitFor("musical overlap") { engine.state.value.mixing }
+        val planned = autoMixPlan()
+        val completedPosition = ((planned.incomingCueTime + planned.fadeSeconds * planned.incomingPlaybackRate) * 1000).toLong() - 500
+        waitFor("completed musical overlap") {
+            engine.state.value.song?.videoId == "second" && !engine.state.value.mixing &&
+                engine.state.value.positionMs >= completedPosition
+        }
+        assertEquals(1, handoffs.count { it == "second" })
+        assertTrue(engine.state.value.positionMs > 1000)
+        val writes = output.writes
+        waitFor("incoming PCM continues") { output.writes > writes + 2 }
+        assertNull(engine.state.value.error)
+    }
+
+    @Test fun `unchanged queue updates preserve the prepared incoming decoder during AutoMix`() {
+        val stream = tone(seconds = 55)
+        val output = Output(acceleration = 4)
+        val requests = CopyOnWriteArrayList<String>()
+        val handoffs = CopyOnWriteArrayList<String>()
+        val engine = engine(output, handoff = { handoffs += it.videoId }, analysis = ::measured) {
+            requests += it.videoId; stream
+        }
+        engine.setAutomixEnabled(true)
+        engine.load(song("first")); waitFor("first PCM") { output.writes > 0 }
+        engine.prepareNext(song("second")); waitFor("incoming resolve") { "second" in requests }
+        Thread.sleep(150)
+        engine.seekTo(autoMixStartMs())
+        waitFor("active AutoMix") { engine.state.value.mixing }
+        repeat(5) {
+            engine.setAutomixEnabled(true)
+            engine.setCrossfadeSeconds(0)
+            engine.prepareNext(song("second"))
+        }
+        waitFor("same incoming handoff") { "second" in handoffs }
+        assertEquals(1, requests.count { it == "second" }, "unchanged queue updates reopened the incoming deck")
+        assertEquals(1, handoffs.count { it == "second" })
+        assertNull(engine.state.value.error)
+    }
+
+    @Test fun `AutoMix continues through six consecutive tracks and deferred queue handoffs`() {
+        val stream = tone(seconds = 55)
+        val output = Output(acceleration = 20)
+        val order = (0..5).map { "chain-$it" }
+        val handoffs = CopyOnWriteArrayList<String>()
+        val resolved = CopyOnWriteArrayList<String>()
+        lateinit var player: DesktopPlaybackEngine
+        player = engine(output, handoff = { selected ->
+            handoffs += selected.videoId
+            val index = order.indexOf(selected.videoId)
+            // Like the real UI, queue preparation occurs at the midpoint while the old
+            // outgoing deck is still being retired, so this request must be deferred.
+            player.prepareNext(order.getOrNull(index + 1)?.let(::song))
+        }, analysis = ::measured) { selected -> resolved += selected.videoId; stream }
+        player.setAutomixEnabled(true)
+        player.load(song(order.first()))
+        waitFor("chain starts") { output.writes > 0 }
+        player.prepareNext(song(order[1]))
+        for (next in order.drop(1)) {
+            waitFor("handoff to $next") { next in handoffs }
+            assertNull(player.state.value.error)
+        }
+        assertEquals(order.drop(1), handoffs.toList())
+        order.drop(1).forEach { id -> assertEquals(1, resolved.count { it == id }, "reopened $id") }
+        waitFor("sixth track still playing") { player.state.value.song?.videoId == order.last() && player.state.value.positionMs > 1000 }
+        assertNull(player.state.value.error)
+    }
 }

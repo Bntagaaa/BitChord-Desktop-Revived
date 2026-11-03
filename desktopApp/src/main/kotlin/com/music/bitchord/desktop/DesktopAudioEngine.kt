@@ -9,6 +9,7 @@ import com.music.bitchord.data.settings.TransitionWindow
 import com.music.bitchord.playback.EqCurve
 import com.music.bitchord.playback.TransitionFilter
 import com.music.bitchord.playback.smart.CrossfadeMode
+import com.music.bitchord.playback.smart.TrackAnalysis
 import com.music.bitchord.playback.smart.TransitionPlan
 import com.music.bitchord.playback.smart.TransitionStyle
 import com.music.bitchord.playback.smart.TransitionTrackInfo
@@ -61,11 +62,12 @@ class DesktopPlaybackEngine internal constructor(
     private val onEnded: () -> Unit,
     private val onCrossfaded: (Song) -> Unit,
     private val sink: DesktopAudioOutput,
+    private val analysisSource: ((String) -> TrackAnalysis)? = null,
     private val resolveSource: suspend (Song, String, String?, Boolean) -> Result<DesktopLiveResolution>,
 ) {
     constructor(onEnded: () -> Unit, onCrossfaded: (Song) -> Unit = {}) : this(
         onEnded, onCrossfaded, DesktopAudioSink(),
-        { song, quality, excluded, race ->
+        resolveSource = { song, quality, excluded, race ->
             if (race) DesktopMusicSources.resolveLive(song, quality, excluded)
             else DesktopMusicSources.resolve(song, quality, excluded).map { DesktopLiveResolution(it) }
         },
@@ -74,6 +76,8 @@ class DesktopPlaybackEngine internal constructor(
     private val _state = MutableStateFlow(DesktopPlaybackState())
     val state: StateFlow<DesktopPlaybackState> = _state.asStateFlow()
 
+
+    private fun analysisFor(id: String): TrackAnalysis = analysisSource?.invoke(id) ?: analyzer.analysisFor(id)
 
     /** Automix's evidence. */
     private val analyzer = DesktopTrackAnalyzer(
@@ -141,7 +145,10 @@ class DesktopPlaybackEngine internal constructor(
     @Volatile private var audioQuality = "HIGH"
     @Volatile private var crossfadeSeconds = 0
     @Volatile private var automixEnabled = false
+    @Volatile private var automixPhraseBars = 0
     @Volatile private var nextSong: Song? = null
+    @Volatile private var nextPreparedQuality: String? = null
+    private val queuedUpcoming = ConcurrentHashMap.newKeySet<Long>()
 
     /** [nextSong]'s downloaded file, when it has one, for its analysis. */
     @Volatile private var nextLocalStream: DesktopStream? = null
@@ -175,6 +182,9 @@ class DesktopPlaybackEngine internal constructor(
         var recoveryRequested = false
         var finished = false
         var tempo: DesktopTempoBuffer? = null
+        var preparedTransition: TransitionPlan? = null
+        var nextTransitionPlanUs = 0L
+        var cachedTransition: TransitionPlan? = null
         var tempoRate = 1.0
         var tempoEaseStep = 0.0
         var tempoEaseEveryFrames = 0L
@@ -222,6 +232,7 @@ class DesktopPlaybackEngine internal constructor(
         class ReplaceUpcoming(val track: Track) : Command
         class SeekTo(val millis: Long) : Command
         data object ClearUpcoming : Command
+        data object TransitionSettingsChanged : Command
         data object Reconfigure : Command
         data object Flush : Command
     }
@@ -242,13 +253,41 @@ class DesktopPlaybackEngine internal constructor(
     @Volatile private var loopRuntime: LoopPlayback? = null
     private var loopBuildJob: Job? = null
     private var loopAttemptedPair: Pair<Track, Track>? = null
-    private val loopLyrics = java.util.concurrent.ConcurrentHashMap<String, List<com.music.bitchord.playback.smart.LoopMix.Span>>()
+    private class LoopLyrics(val spans: List<com.music.bitchord.playback.smart.LoopMix.Span>?)
+    private val loopLyrics = ConcurrentHashMap<String, LoopLyrics>()
+    private val loopLyricsAsked = ConcurrentHashMap.newKeySet<String>()
+    private val loopLyricsRevision = AtomicLong()
+    private var loopAttemptedEvidence: String? = null
+
     fun setLoopLyrics(id: String, lines: List<com.music.bitchord.data.lyrics.LyricLine>?) {
-        if (lines == null) loopLyrics.remove(id) else {
-            loopLyrics[id] = com.music.bitchord.playback.smart.LoopMix.sungSpans(lines.map {
-                com.music.bitchord.playback.smart.LoopMix.Line(it.timeMs, it.sungUntilMs, it.text.isBlank())
+        // Like upstream: plain text is not timing evidence, and a completed lookup
+        // with no synced words is distinct from a lookup still in flight.
+        val spans = lines?.takeIf { found -> found.count { it.timeMs > 0 } >= 4 }?.let { found ->
+            com.music.bitchord.playback.smart.LoopMix.sungSpans(found.map { line ->
+                com.music.bitchord.playback.smart.LoopMix.Line(line.timeMs,
+                    line.sungUntilMs ?: line.words.lastOrNull()?.endMs, line.isGap || line.text.isBlank())
             })
-            if (loopLyrics.size > 4) loopLyrics.keys.firstOrNull { it != id }?.let(loopLyrics::remove)
+        }
+        val previous = loopLyrics.put(id, LoopLyrics(spans))
+        loopLyricsAsked += id
+        if (previous == null || previous.spans != spans) loopLyricsRevision.incrementAndGet()
+        if (loopLyrics.size > 8) loopLyrics.keys.firstOrNull {
+            it != id && it != current?.song?.videoId && it != upcoming?.song?.videoId
+        }?.let { loopLyrics.remove(it); loopLyricsAsked.remove(it) }
+    }
+
+    private fun askLoopLyrics(track: Track) {
+        val id = track.song.videoId
+        if (loopLyrics.containsKey(id) || !loopLyricsAsked.add(id)) return
+        scope.launch {
+            val lines = try {
+                DesktopLyricsClient.lookup(track.song, (track.decoder.durationUs ?: 0L) / 1000).getOrNull()?.lines
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                DesktopTrackLog.log("automix: lyrics unavailable for '$id': ${failure.message}")
+                null
+            }
+            setLoopLyrics(id, lines)
         }
     }
 
@@ -629,6 +668,7 @@ class DesktopPlaybackEngine internal constructor(
 
     fun setPlaybackSpeed(speed: Float) {
         playbackSpeed = speed.coerceIn(0.25f, 3.0f)
+        commands += Command.TransitionSettingsChanged
     }
 
     fun setVolume(value: Float) {
@@ -643,14 +683,32 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     fun setCrossfadeSeconds(seconds: Int) {
-        crossfadeSeconds = seconds.coerceIn(0, MAX_CROSSFADE_SECONDS)
+        val requested = seconds.coerceIn(0, MAX_CROSSFADE_SECONDS)
+        if (crossfadeSeconds == requested) return
+        crossfadeSeconds = requested
+        commands += Command.TransitionSettingsChanged
         if (crossfadeSeconds == 0 && !automixEnabled) clearUpcoming()
     }
 
     /** Enables Android's separate Automix setting. */
     fun setAutomixEnabled(enabled: Boolean) {
+        if (automixEnabled == enabled) return
         automixEnabled = enabled
+        if (analysisSource == null) analyzer.focusOn(
+            if (enabled) _state.value.song?.videoId else null,
+            if (enabled) nextSong?.videoId else null,
+        )
+        commands += Command.TransitionSettingsChanged
         if (!enabled && crossfadeSeconds == 0) clearUpcoming()
+    }
+
+    /** 0 = adaptive, 8/16 = fixed phrase overlap when the beat grid is reliable. */
+    fun setAutomixPhraseBars(bars: Int) {
+        val selected = when (bars) { 8, 16 -> bars; else -> 0 }
+        if (automixPhraseBars == selected) return
+        automixPhraseBars = selected
+        // Replan the next handoff without tearing down a mix already in progress.
+        commands += Command.TransitionSettingsChanged
     }
 
     /** Resolves and prepares the next queue item without starting it. */
@@ -665,18 +723,32 @@ class DesktopPlaybackEngine internal constructor(
                 return
             }
         }
+        // Queue metadata/autoplay updates often nominate the same next song. Do not
+        // cancel its decoder (or a live overlap) merely because the UI recomposed.
+        if (song != null && nextSong?.videoId == song.videoId && nextPreparedQuality == audioQuality) {
+            val prepared = upcoming
+            if ((prepared?.song?.videoId == song.videoId &&
+                    prepared.decoder.state !in setOf(DesktopDecodeState.FAILED, DesktopDecodeState.CLOSED)) ||
+                nextResolveJob?.isActive == true || nextGeneration.get() in queuedUpcoming ||
+                awaitingArm.get()?.videoId == song.videoId) return
+        }
         nextGeneration.incrementAndGet()
         nextResolveJob?.cancel()
         clearUpcoming()
-        if (song == null || DesktopListenTogether.state.value.inParty || DesktopSleepTimer.afterTrack.value) return
+        if (song == null || DesktopListenTogether.state.value.inParty || DesktopSleepTimer.afterTrack.value) {
+            if (analysisSource == null) analyzer.focusOn(if (automixEnabled) _state.value.song?.videoId else null, null)
+            return
+        }
         nextSong = song
+        if (analysisSource == null && automixEnabled) analyzer.focusOn(_state.value.song?.videoId, song.videoId)
+        nextPreparedQuality = audioQuality
         // A download plays from its file, here as in [loadInternal] — never from whichever source
         // would have answered for it.
         val local = DesktopDownloadManager.savedFile(song)?.toAbsolutePath()?.toString()?.let { DesktopStream(it) }
         nextLocalStream = local
         // Measured on YouTube Opus (or the file) whatever will end up serving it, so Automix has
         // its analysis without anything being fetched from the source that will play it.
-        if (automixEnabled && !song.isVideoOrigin) {
+        if (analysisSource == null && automixEnabled && !song.isVideoOrigin) {
             analyzer.request(song, local, song.durationText.durationSeconds())
         }
         if (local == null && DesktopMusicSources.mayServeFromAddon(song)) {
@@ -731,6 +803,7 @@ class DesktopPlaybackEngine internal constructor(
                                 "incoming '${song.title}' ready from ${DesktopMusicSources.sourceNameFor(live.stream)}" +
                                     " in ${(System.nanoTime() - askedAt) / 1_000_000}ms",
                             )
+                            queuedUpcoming += generation
                             commands += Command.Upcoming(track, generation)
                             live.pendingSubstitute?.let { upgradeIncoming(song, track.stream, it) }
                         },
@@ -921,6 +994,7 @@ class DesktopPlaybackEngine internal constructor(
 
     /** The plan the running fade was started from, for the filter ride. */
     private var activePlan: TransitionPlan? = null
+    private var activeSmartTransition = false
     private var mixViewKey: String? = null
     private var waveformJob: kotlinx.coroutines.Job? = null
 
@@ -1009,7 +1083,8 @@ class DesktopPlaybackEngine internal constructor(
                 val (blended, blendedCount) = blend(track, endPadding, wanted)
                 val (stretched, stretchedCount) = stretch(blended, blendedCount)
                 play(track, stretched, stretchedCount)
-                publishPosition(track)
+                completeBlendBlock()
+                publishPosition(current ?: track)
                 return
             }
             if (decodeState == DesktopDecodeState.FAILED || decodeState == DesktopDecodeState.CLOSED) {
@@ -1045,7 +1120,29 @@ class DesktopPlaybackEngine internal constructor(
             } else if (!pendingLoop.compareAndSet(null, ready)) ready.session.close()
         }
 
-        val (blended, blendedCount) = blend(track, block, count)
+        // Plan against the next submitted frame, then split the decoder block at the seam.
+        // The 250 ms UI clock and the device's queued latency cannot schedule musical beats.
+        val prefix = maybeStartCrossfade(track, count)
+        val mixBlock: FloatArray
+        val mixCount: Int
+        if (prefix > 0) {
+            mixBlock = block.copyOfRange(prefix, count)
+            mixCount = count - prefix
+            widen(spatial, track, block, prefix)
+            equalise(equalizer, block, prefix)
+            renderProcessed(track, block, prefix)
+        } else {
+            mixBlock = block
+            mixCount = count
+        }
+        val (blended, blendedCount) = blend(track, mixBlock, mixCount)
+        renderProcessed(track, blended, blendedCount)
+        completeBlendBlock()
+        publishPosition(current ?: track)
+    }
+
+    /** Both sides of a split block use the same listener speed and silence processing. */
+    private fun renderProcessed(track: Track, blended: FloatArray, blendedCount: Int) {
         val quiet = silence?.also { it.enabled = skipSilenceEnabled }
         val skippedBefore = quiet?.skippedFrames ?: 0L
         val trimmed = quiet?.process(blended, blendedCount) ?: blended
@@ -1053,7 +1150,6 @@ class DesktopPlaybackEngine internal constructor(
         val skipped = (quiet?.skippedFrames ?: 0L) - skippedBefore
         val (stretched, stretchedCount) = stretch(trimmed, trimmedCount)
         play(track, stretched, stretchedCount, skipped)
-        publishPosition(track)
     }
 
     /**
@@ -1073,9 +1169,15 @@ class DesktopPlaybackEngine internal constructor(
             )
         }
         if (count > 0) track.trace?.mark("pcm")
-        val written = sink.write(samples, count)
+        val written = try {
+            writePcmFully(samples, count, sink.format.channels.coerceAtLeast(1),
+                sink.format.bytesPerSample, sink::write) { framesWritten += it }
+        } catch (failure: IllegalStateException) {
+            paused = true
+            _state.update { it.copy(isPlaying = false, error = "Audio output interrupted: ${failure.message}") }
+            throw failure
+        }
         if (written > 0) track.trace?.submitted(queuedSourceUs())
-        framesWritten += count / sink.format.channels.coerceAtLeast(1)
         if (count > 0) {
             // If a watchdog reopen was in flight but the original worker recovered on its own,
             // keep the healthy stream and make the eventual replacement stale.
@@ -1117,6 +1219,25 @@ class DesktopPlaybackEngine internal constructor(
         if (mixed.size < count) mixed = FloatArray(count)
         val other = readIncoming(incoming, count)
         val otherCount = incomingReadCount
+        if (other == null && incoming.decoder.state == DesktopDecodeState.RUNNING) {
+            // Keep playing the outgoing PCM without consuming the fade or dropping FIFO audio.
+            // The musical phase is no longer guaranteed after a starvation; say so explicitly.
+            if (activeSmartTransition) {
+                val old = activePlan
+                if (old != null) {
+                    val tail = transitionTotal - fadeTotal
+                    fadeRemaining = (fadeRemaining - tail).coerceAtLeast(0)
+                    transitionTotal = fadeTotal
+                    activePlan = old.copy(phaseLock = false, transitionStyle = TransitionStyle.EQUAL_POWER,
+                        echoSeconds = 0.0, bassSwap = false, filterSweep = 0.0,
+                        policyReasons = old.policyReasons + "incoming-underrun")
+                    transitionEcho = null
+                    outgoingFilter.open()
+                    incomingFilter.open()
+                }
+            }
+            return block to count
+        }
         val incomingRate = deckRate(incoming)
         incomingSourceFrames += otherCount.toDouble() / sink.format.channels.coerceAtLeast(1) * incomingRate
         if (other != null) {
@@ -1138,16 +1259,15 @@ class DesktopPlaybackEngine internal constructor(
             if (plan != null) DesktopTransitionRide.gains(plan, styleProgress, transitionGains)
             val out = if (plan != null) transitionGains[0] else kotlin.math.sqrt(1f - styleProgress)
             val into = if (plan != null) transitionGains[1] else kotlin.math.sqrt(styleProgress)
-            // Equal-power gains sum past 1 — up to 1.41 at the midpoint — and two loud masters
-            // peaking together would be clipped hard by the sink. A smooth trim of
-            // 1 / sqrt(out + into) holds that to 1.19 for at most 1.5 dB, and reshapes nothing:
-            // the same trim Android's two players take.
+            // Same equal-power headroom curve as upstream CrossfadeController.headroomFor.
             val outgoingLevel = if (plan != null && plan.echoSeconds > 0.0) {
                 DesktopTransitionRide.echoLevel(plan, progress)
             } else {
                 out
             }
-            val trim = 1f / kotlin.math.sqrt((outgoingLevel + into).coerceAtLeast(1f))
+            val trim = if (activeSmartTransition) {
+                com.music.bitchord.playback.smart.overlapHeadroom(outgoingLevel, into)
+            } else 1f / kotlin.math.sqrt((outgoingLevel + into).coerceAtLeast(1f))
             val stop = minOf(count, index + subBlock)
             val span = stop - index
             while (index < stop) {
@@ -1173,11 +1293,17 @@ class DesktopPlaybackEngine internal constructor(
             }
             fadeRemaining -= span
         }
+        return mixed to count
+    }
+
+    /** Publish the handoff only after the block has actually been accepted by the device. */
+    private fun completeBlendBlock() {
+        if (activePlan == null) return
+        val incoming = upcoming ?: return
         val progress = ((transitionTotal - fadeRemaining).toFloat() / fadeTotal.coerceAtLeast(1))
-        val handoffAt = plan?.let(DesktopTransitionRide::handoffAt) ?: DISPLAY_SWITCH_AT
+        val handoffAt = activePlan?.let(DesktopTransitionRide::handoffAt) ?: DISPLAY_SWITCH_AT
         if (!displaySwitched && progress >= handoffAt && fadeRemaining > 0) switchDisplay(incoming)
         if (fadeRemaining <= 0) promoteUpcoming() else publishBlend(playing = true)
-        return mixed to count
     }
 
     /** Reads the playing deck, preserving a tempo buffer inherited from its incoming handoff. */
@@ -1195,7 +1321,13 @@ class DesktopPlaybackEngine internal constructor(
             return block
         }
         while (tempo.available == 0) {
-            val source = readSource(track) ?: run {
+            val source = readSource(track)
+            if (source == null) {
+                if (track.decoder.state == DesktopDecodeState.EOF && !track.tempoDrained) {
+                    tempo.finish()
+                    track.tempoDrained = true
+                    if (tempo.available > 0) break
+                }
                 currentReadCount = 0
                 return null
             }
@@ -1226,11 +1358,18 @@ class DesktopPlaybackEngine internal constructor(
             sink.format.sampleRate,
         ).also { track.tempo = it }
         while (tempo.available < wanted) {
-            val source = readSource(track) ?: break
+            val source = readSource(track)
+            if (source == null) {
+                if (track.decoder.state == DesktopDecodeState.EOF && !track.tempoDrained) {
+                    tempo.finish()
+                    track.tempoDrained = true
+                }
+                break
+            }
             tempo.speed = track.tempoRate.toFloat()
             tempo.push(source, sourceReadCount)
         }
-        if (tempo.available == 0) {
+        if (tempo.available == 0 || (tempo.available < wanted && track.decoder.state == DesktopDecodeState.RUNNING)) {
             incomingReadCount = 0
             return null
         }
@@ -1436,7 +1575,6 @@ class DesktopPlaybackEngine internal constructor(
     private fun promoteUpcoming() {
         val incoming = upcoming ?: return
         loopAttemptedPair = null
-        val plan = activePlan
         activePlan = null
         transitionEcho = null
         outgoingFilter.open()
@@ -1448,7 +1586,10 @@ class DesktopPlaybackEngine internal constructor(
             val steps = ceil(kotlin.math.abs(incoming.tempoRate - 1.0) / TEMPO_STEP_PER_BEAT).toInt().coerceAtLeast(1)
             incoming.tempoEaseStep = kotlin.math.abs(incoming.tempoRate - 1.0) / steps
             incoming.tempoEaseEveryFrames = (
-                (plan?.beatSeconds ?: 0.0).takeIf { it > 0.0 } ?: EASE_FALLBACK_SECONDS
+                analysisFor(incoming.song.videoId).let { analysis ->
+                    analysis.beatInterval.takeIf { it > 0.0 }
+                        ?: analysis.bpm.takeIf { it > 0.0 }?.let { 60.0 / it }
+                } ?: EASE_FALLBACK_SECONDS
                 ).times(sink.format.sampleRate).toLong().coerceAtLeast(1L)
             incoming.tempoEaseNextFrame = incoming.tempoOutputFrames + incoming.tempoEaseEveryFrames
         }
@@ -1550,8 +1691,8 @@ class DesktopPlaybackEngine internal constructor(
             if (state.song?.videoId == track.song.videoId) state.positionMs * 1_000 else null
         } ?: outgoingHeardUs()
         val sides = listOf(
-            Triple(analyzer.analysisFor(track.song.videoId), outgoingHeardUs, listenerSpeed * track.tempoRate),
-            Triple(analyzer.analysisFor(incoming.song.videoId), incomingHeardUs(incoming), listenerSpeed * incoming.tempoRate),
+            Triple(analysisFor(track.song.videoId), outgoingHeardUs, listenerSpeed * track.tempoRate),
+            Triple(analysisFor(incoming.song.videoId), incomingHeardUs(incoming), listenerSpeed * incoming.tempoRate),
         ).let { if (displaySwitched) it.reversed() else it }
         val side = sides.firstOrNull { (analysis, _, _) -> analysis.beatInterval > 0.0 || analysis.bpm > 0.0 }
         var beatMs = 0f
@@ -1599,7 +1740,7 @@ class DesktopPlaybackEngine internal constructor(
             when (command) {
                 is Command.Select -> {
                     val prepared = upcoming?.takeIf {
-                        command.allowReuse && command.startAtMs == 0L && it.song == command.song &&
+                        command.allowReuse && command.startAtMs == 0L && it.startUs == 0L && it.song == command.song &&
                             it.freshForSelection() &&
                             it.decoder.state !in setOf(DesktopDecodeState.FAILED, DesktopDecodeState.CLOSED)
                     }
@@ -1673,6 +1814,7 @@ class DesktopPlaybackEngine internal constructor(
                     }
                 }
                 is Command.Upcoming -> {
+                    queuedUpcoming.remove(command.generation)
                     if (command.generation != nextGeneration.get()) command.track.decoder.close()
                     else {
                         upcoming?.decoder?.close()
@@ -1699,12 +1841,35 @@ class DesktopPlaybackEngine internal constructor(
                     performSeek(command.millis)
                     if (wasLoop && !hadSwitched) endBlend()
                 }
-                Command.Reconfigure -> reconfigureSink()
+                Command.TransitionSettingsChanged -> {
+                    // An overlap already heard keeps its chosen strategy. Future cues must be
+                    // recalculated when Automix or the independent Crossfade setting changes.
+                    if (fadeRemaining <= 0) upcoming?.let { incoming ->
+                        if (incoming.preparedTransition != null && incoming.startUs > 0) {
+                            incoming.decoder.seek(0)
+                            incoming.startUs = 0
+                            incoming.dropTempo()
+                        }
+                        incoming.preparedTransition = null
+                        incoming.cachedTransition = null
+                    }
+                }
+                Command.Reconfigure -> {
+                    if (fadeRemaining > 0 || upcoming?.preparedTransition != null) performSeek(_state.value.positionMs)
+                    reconfigureSink()
+                }
                 Command.ClearUpcoming -> {
+                    // Once announced, the incoming song is the queue's current item. Keep it
+                    // alive when a queue edit clears what comes after the active handoff.
+                    if (displaySwitched && upcoming != null) promoteUpcoming()
                     upcoming?.decoder?.close()
                     upcoming = null
                     val wasBlending = fadeRemaining > 0
                     fadeRemaining = 0
+                    activePlan = null
+                    transitionEcho = null
+                    outgoingFilter.open()
+                    incomingFilter.open()
                     if (wasBlending) endBlend()
                 }
                 Command.Flush -> {
@@ -1749,6 +1914,7 @@ class DesktopPlaybackEngine internal constructor(
         // decoder it is about to read from.
         if (current !== track) current?.decoder?.close()
         current = track
+        if (analysisSource == null && automixEnabled) analyzer.focusOn(track.song.videoId, nextSong?.videoId)
         track.decoder.prepareForPlayback()
         fadeRemaining = 0
 
@@ -1822,7 +1988,7 @@ class DesktopPlaybackEngine internal constructor(
 
     /** Asks for a track to be analysed, if Automix is on and there is anything to analyse. */
     private fun requestAnalysis(track: Track) {
-        if (!automixEnabled) return
+        if (!automixEnabled || analysisSource != null) return
         val seconds = (track.decoder.durationUs ?: 0L) / 1_000_000.0
         val known = seconds.takeIf { it > 0 }
             ?: (track.song.durationText.durationSeconds())
@@ -1831,11 +1997,15 @@ class DesktopPlaybackEngine internal constructor(
 
     /** Measures the pair around the playhead — the playing track first, then the one after it. */
     private fun requestAnalysisAround(track: Track) {
-        if (!automixEnabled) return
+        if (!automixEnabled || analysisSource != null) return
         val next = upcoming
         // A track held back from read-ahead has no decoder yet, but is measured all the same.
         val held = if (next == null) nextSong else null
-        if (track.song.isVideoOrigin || next?.song?.isVideoOrigin == true || held?.isVideoOrigin == true) return
+        if (track.song.isVideoOrigin || next?.song?.isVideoOrigin == true || held?.isVideoOrigin == true) {
+            analyzer.focusOn(null, null)
+            return
+        }
+        analyzer.focusOn(track.song.videoId, next?.song?.videoId ?: held?.videoId)
         requestAnalysis(track)
         next?.let(::requestAnalysis)
         held?.let { analyzer.request(it, nextLocalStream, it.durationText.durationSeconds()) }
@@ -1846,6 +2016,22 @@ class DesktopPlaybackEngine internal constructor(
         // the blend is finished on the spot and the seek lands on that one.
         if (displaySwitched && upcoming != null) promoteUpcoming()
         val track = current ?: return
+        upcoming?.let { incoming ->
+            if (incoming.preparedTransition != null || fadeRemaining > 0) {
+                incoming.decoder.seek(0)
+                incoming.startUs = 0
+                incoming.dropTempo()
+            }
+            incoming.preparedTransition = null
+            incoming.cachedTransition = null
+        }
+        val wasBlending = fadeRemaining > 0
+        fadeRemaining = 0
+        activePlan = null
+        transitionEcho = null
+        outgoingFilter.open()
+        incomingFilter.open()
+        if (wasBlending) endBlend()
         val landed = track.decoder.seek(millis * 1_000)
         // TEMP seek diagnostics.
         DesktopTrackLog.log("seek performed: ${millis}ms on '${track.song.title}' ${if (landed) "ok" else "FAILED"}")
@@ -1869,6 +2055,7 @@ class DesktopPlaybackEngine internal constructor(
         _state.update {
             it.copy(
                 positionMs = millis,
+                mixing = false,
                 positionSampledAtNanos = System.nanoTime(),
                 seeks = it.seeks + 1,
                 awaitingAudio = true,
@@ -1961,7 +2148,6 @@ class DesktopPlaybackEngine internal constructor(
             )
         }
 
-        maybeStartCrossfade(track, positionMs)
     }
 
     /**
@@ -1981,48 +2167,55 @@ class DesktopPlaybackEngine internal constructor(
 
     /** Both halves of the next transition, for the player's Automix line. */
     private fun analysisStatus(track: Track): SmartAnalysis = SmartAnalysis(
-        current = analyzer.stateFor(track.song.videoId),
-        next = analyzer.stateFor(upcoming?.song?.videoId ?: nextSong?.videoId.orEmpty()),
+        current = if (analysisSource != null) TrackAnalysisState.ANALYSED else analyzer.stateFor(track.song.videoId),
+        next = if (analysisSource != null) TrackAnalysisState.ANALYSED else analyzer.stateFor(upcoming?.song?.videoId ?: nextSong?.videoId.orEmpty()),
     )
 
-    private fun maybeStartCrossfade(track: Track, positionMs: Long) {
+    private fun maybeStartCrossfade(track: Track, count: Int): Int {
+        if (fadeRemaining > 0 || loopRuntime != null) return 0
+        val positionUs = playhead.peek(framesWritten)
+        val positionMs = positionUs / 1_000
+        val duration = (track.decoder.durationUs ?: return 0) / 1_000
+        if (duration <= 0) return 0
         val incoming = upcoming
         if (incoming == null) {
-            // A next track not open yet — held back from read-ahead, or still resolving — is
-            // still planned for on its catalogue length, so the marker shows from the start of the
-            // song rather than only once the incoming deck is open.
-            val held = nextSong
-            val duration = (track.decoder.durationUs ?: 0L) / 1_000
-            if (held == null || duration <= 0) {
-                _state.update { it.copy(transitionWindow = null) }
-                return
-            }
+            val held = nextSong ?: return 0
             val nextMs = (held.durationText.durationSeconds() * 1_000).toLong()
             val plan = transitionPlan(track, held, nextMs, positionMs, duration)
             publishTransitionWindow(track, plan, duration)
             armAddonUpcoming(held, plan, positionMs, duration)
-            return
+            return 0
         }
-        if (fadeRemaining > 0 || loopRuntime != null) return
-        val duration = (track.decoder.durationUs ?: return) / 1_000
-        if (duration <= 0) return
-
-        val plan = transitionPlan(track, incoming.song, (incoming.decoder.durationUs ?: 0L) / 1_000, positionMs, duration)
-        publishTransitionWindow(track, plan, duration)
-
-        if (!plan.shouldStart || plan.blocked) return
-
-        val seconds = plan.fadeSeconds.takeIf { it > 0 } ?: return
-        // A planned transition says where the incoming track should be entered, which is the whole
-        // difference between Automix and a crossfade.
-        if (plan.incomingCueTime > 0) {
+        if (!automixEnabled && crossfadeSeconds <= 0) return 0
+        var plan = incoming.preparedTransition
+        if (plan == null) {
+            if (incoming.cachedTransition == null || positionUs >= incoming.nextTransitionPlanUs) {
+                incoming.cachedTransition = transitionPlan(track, incoming.song,
+                    (incoming.decoder.durationUs ?: 0L) / 1_000, positionMs, duration)
+                incoming.nextTransitionPlanUs = positionUs + 250_000
+            }
+            plan = incoming.cachedTransition ?: return 0
+            publishTransitionWindow(track, plan, duration)
+            if (plan.blocked || plan.fadeSeconds <= 0) return 0
+            if (plan.transitionStart - positionUs / 1_000_000.0 > 3.0) return 0
+            if (automixEnabled) plan = com.music.bitchord.playback.smart.lateTransitionFallback(plan, positionUs / 1_000_000.0)
+            if (plan.fadeSeconds <= 0) return 0
+            // Seek while the outgoing track is still playing, giving both decoder backends
+            // runway to fill their queues. Freeze this pair's plan until seek/skip invalidates it.
             val cueUs = (plan.incomingCueTime * 1_000_000).toLong()
-            incoming.decoder.seek(cueUs)
-            // The track now begins here, and every position reported for it is measured from it.
-            // Left at zero, the scrubber and the lyrics ran the whole cue behind the audio for the
-            // rest of the track — which only a manual seek could put right.
-            incoming.startUs = cueUs
+            if (cueUs != incoming.startUs) {
+                if (!incoming.decoder.seek(cueUs)) return 0
+                incoming.dropTempo()
+                incoming.startUs = cueUs
+            }
+            incoming.preparedTransition = plan
         }
+        val channels = sink.format.channels.coerceAtLeast(1)
+        val prefixFrames = com.music.bitchord.playback.smart.transitionPrefixFrames(
+            plan, positionUs, count / channels, sink.format.sampleRate,
+            playbackSpeed.toDouble() * deckRate(track),
+        ) ?: return 0
+        val seconds = plan.fadeSeconds
         DesktopTrackLog.log(
             "transition into '${incoming.song.title}': ${"%.1f".format(seconds)}s" +
                 ", ${plan.transitionStyle}" +
@@ -2035,6 +2228,7 @@ class DesktopPlaybackEngine internal constructor(
         fadeRemaining = transitionTotal
         incomingSourceFrames = 0.0
         activePlan = plan
+        activeSmartTransition = automixEnabled
         incoming.tempo = if (kotlin.math.abs(plan.incomingPlaybackRate - 1.0) > .0001) {
             DesktopTempoBuffer(sink.format.channels, sink.format.sampleRate).also {
                 it.speed = plan.incomingPlaybackRate.toFloat()
@@ -2046,26 +2240,37 @@ class DesktopPlaybackEngine internal constructor(
         } else null
         outgoingFilter.flush()
         incomingFilter.flush()
+        return prefixFrames * channels
     }
 
     /** The marker on the scrubber, showing where the mix will happen before it happens. */
     private fun prepareLoop(track: Track, positionMs: Long, duration: Long) {
         val incoming = upcoming ?: return
-        if (!automixEnabled || DesktopListenTogether.state.value.inParty || playbackSpeed != 1f ||
+        if (!automixEnabled || automixPhraseBars != 0 || DesktopListenTogether.state.value.inParty || playbackSpeed != 1f ||
             skipSilenceEnabled || fadeRemaining > 0 || loopRuntime != null || sink.format.channels != 2) return
+        // Upstream never splices a loop from a YouTube analysis into an unrelated
+        // add-on master. Local files are analysed from the same bytes they play.
+        fun sameRecording(deck: Track) = deck.stream.isLocalFile || deck.stream.sourceId == "youtube"
+        if (!sameRecording(track) || !sameRecording(incoming)) return
         val pair = track to incoming
-        if (loopAttemptedPair == pair) return
-        val out = analyzer.analysisFor(track.song.videoId)
-        val inn = analyzer.analysisFor(incoming.song.videoId)
+        val out = analysisFor(track.song.videoId)
+        val inn = analysisFor(incoming.song.videoId)
         if (out.headBeats == null || out.tailBeats == null || inn.headBeats == null) return
-        loopAttemptedPair = pair
+        askLoopLyrics(track)
+        askLoopLyrics(incoming)
+        val outLyrics = loopLyrics[track.song.videoId] ?: return
+        val inLyrics = loopLyrics[incoming.song.videoId] ?: return
+        val evidence = "${System.identityHashCode(out)}/${System.identityHashCode(inn)}/${loopLyricsRevision.get()}"
+        if (loopAttemptedPair == pair && loopAttemptedEvidence == evidence) return
         val sampleRate = sink.format.sampleRate
         val incomingDuration = (incoming.decoder.durationUs ?: 0L) / 1_000_000.0
         // A differently cut source cannot safely inherit another recording's loop timestamps.
         if (kotlin.math.abs(out.duration - duration / 1000.0) > .5 || kotlin.math.abs(inn.duration - incomingDuration) > .5) return
+        loopAttemptedPair = pair
+        loopAttemptedEvidence = evidence
         val plan = com.music.bitchord.playback.smart.LoopMix.plan(
-            out, duration / 1000.0, inn, incomingDuration, positionMs / 1000.0 + 8.0,
-            sungOut = loopLyrics[track.song.videoId], sungIn = loopLyrics[incoming.song.videoId],
+            out, duration / 1000.0, inn, incomingDuration, positionMs / 1000.0 + 15.0,
+            sungOut = outLyrics.spans, sungIn = inLyrics.spans,
             outVideo = track.song.isVideoOrigin || track.song.isVideo,
             inVideo = incoming.song.isVideoOrigin || incoming.song.isVideo,
         ) ?: return
@@ -2132,14 +2337,14 @@ class DesktopPlaybackEngine internal constructor(
 
     private fun loopWordsClear(ready: LoopPlayback): Boolean {
         fun clear(id: String, pick: com.music.bitchord.playback.smart.LoopMix.Pick): Boolean =
-            loopLyrics[id].orEmpty().none { it.start < pick.loopEnd + .3 && it.certainUntil > pick.loopStart - .3 }
+            loopLyrics[id]?.spans.orEmpty().none { it.start < pick.loopEnd + .3 && it.certainUntil > pick.loopStart - .3 }
         return clear(ready.outgoing.song.videoId, ready.session.plan.out) && clear(ready.incoming.song.videoId, ready.session.plan.inn)
     }
 
     private fun acceptLoop(track: Track): LoopPlayback? {
         val ready = pendingLoop.getAndSet(null) ?: return null
         if (ready.outgoing !== track || ready.incoming !== upcoming || fadeRemaining > 0 ||
-            !automixEnabled || playbackSpeed != 1f || skipSilenceEnabled || DesktopListenTogether.state.value.inParty ||
+            !automixEnabled || automixPhraseBars != 0 || playbackSpeed != 1f || skipSilenceEnabled || DesktopListenTogether.state.value.inParty ||
             sink.format.sampleRate != ready.session.sampleRate || sink.format.channels != 2 || !loopWordsClear(ready) ||
             playhead.peek(framesWritten) > (ready.session.plan.out.loopStart * 1_000_000).toLong()) {
             ready.session.close()
@@ -2235,7 +2440,7 @@ class DesktopPlaybackEngine internal constructor(
                 waveformJob?.cancel()
                 mixViewKey = key
                 fun deck(song: Song, start: Double, end: Double): com.music.bitchord.data.settings.MixDeck {
-                    val analysis = analyzer.analysisFor(song.videoId)
+                    val analysis = analysisFor(song.videoId)
                     return com.music.bitchord.data.settings.MixDeck(song.title, song.artist, song.thumbnailUrl,
                         analysis.bpm, analysis.key, (song.durationText.durationSeconds() * 1000).toLong(),
                         (start - 2).coerceAtLeast(0.0), end + 2)
@@ -2307,11 +2512,12 @@ class DesktopPlaybackEngine internal constructor(
         durationMs: Long,
     ): TransitionPlan {
         val manualSeconds = crossfadeSeconds
-        val smart = automixEnabled
-        if (!smart && manualSeconds <= 0) return TransitionPlan()
-        return planTransition(
-            analysis = analyzer.analysisFor(track.song.videoId),
-            nextAnalysis = analyzer.analysisFor(next.videoId),
+        val smart = automixEnabled && playbackSpeed == 1f && !skipSilenceEnabled &&
+            kotlin.math.abs(deckRate(track) - 1.0) < .0001
+        if (!smart && manualSeconds <= 0 && !automixEnabled) return TransitionPlan()
+        val plan = planTransition(
+            analysis = analysisFor(track.song.videoId),
+            nextAnalysis = analysisFor(next.videoId),
             currentTrack = track.song.transitionInfo(durationMs),
             nextTrack = next.transitionInfo(nextDurationMs),
             currentTime = positionMs / 1_000.0,
@@ -2319,7 +2525,9 @@ class DesktopPlaybackEngine internal constructor(
             fadeSeconds = if (manualSeconds > 0) manualSeconds.toDouble() else AUTOMIX_FALLBACK_SECONDS.toDouble(),
             mode = if (smart) CrossfadeMode.SMART else CrossfadeMode.STANDARD,
             advanced = smart,
+            phraseBars = if (smart) automixPhraseBars else 0,
         )
+        return plan
     }
 
     private fun closeEverything() {
@@ -2383,6 +2591,7 @@ class DesktopPlaybackEngine internal constructor(
     /** Android's "Skip silence", on the same terms. */
     fun setSkipSilence(enabled: Boolean) {
         skipSilenceEnabled = enabled
+        commands += Command.TransitionSettingsChanged
         if (!enabled) silence?.reset()
     }
 

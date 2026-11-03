@@ -9,6 +9,7 @@ import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** The transition filter, measured rather than assumed. */
@@ -142,7 +143,7 @@ class DesktopTransitionFilterTest {
     }
 
     @Test
-    fun `fallback personalities have distinct fader rides`() {
+    fun `upstream fallback personalities share smooth faders and differ through filters`() {
         fun gains(variant: FilterTransitionVariant): List<Float> {
             val result = FloatArray(2)
             DesktopTransitionRide.gains(
@@ -161,7 +162,8 @@ class DesktopTransitionFilterTest {
         val sweep = gains(FilterTransitionVariant.SWEEP)
         val bass = gains(FilterTransitionVariant.BASS_HANDOFF)
         val echo = gains(FilterTransitionVariant.ECHO_RIDE)
-        assertTrue(sweep != bass && bass != echo && sweep != echo)
+        assertEquals(sweep, bass)
+        assertEquals(sweep, echo)
     }
 
     @Test
@@ -170,6 +172,7 @@ class DesktopTransitionFilterTest {
             transitionStyle = TransitionStyle.DJ_FILTER,
             filterVariant = FilterTransitionVariant.ECHO_RIDE,
             transitionBeats = 8,
+            beatSeconds = 0.5,
             fadeSeconds = 4.0,
             echoSeconds = 0.5,
         )

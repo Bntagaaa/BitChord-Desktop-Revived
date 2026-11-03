@@ -203,7 +203,7 @@ internal class DesktopDecodeAhead(
                 val micros = seekTo
                 if (micros != null) {
                     if (!source.seek(micros)) {
-                        DesktopTrackLog.log("decode-ahead: seek to ${micros / 1_000}ms failed")
+                        error("decode-ahead: seek to ${micros / 1_000}ms failed")
                     }
                     continue
                 }

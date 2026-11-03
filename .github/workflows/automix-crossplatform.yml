@@ -1,0 +1,64 @@
+name: AutoMix cross-platform regression
+on:
+  push:
+    branches: [fix/automix-beat-aware-crossplatform-184]
+  pull_request:
+    branches: [integration/v1.8.4, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-packaging:
+    name: Windows EXE, MSI and portable
+    uses: ./.github/workflows/build-windows-portable.yml
+    with:
+      version: '1.8.4-automix-ci'
+      installers: true
+  linux-packaging:
+    name: Linux AppImage
+    uses: ./.github/workflows/build-test-appimage.yml
+    with:
+      version: '1.8.4-automix-ci'
+      run_tests: true
+      audit_packages: false
+  musical-engine:
+    name: AutoMix engine and JNI (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Verify canonical upstream AutoMix source and model hashes
+        shell: bash
+        run: python tools/automix-validation/verify-upstream.py
+      - name: Musical planner, render clock, envelopes and PCM regression
+        shell: bash
+        run: ./gradlew -p tools/automix-validation --no-daemon test
+      - name: Build real native analyser
+        shell: bash
+        run: |
+          cmake -S desktopApp/native -B desktopApp/build/automix-ci -G Ninja -DCMAKE_CXX_COMPILER=g++ -DCMAKE_BUILD_TYPE=Release
+          cmake --build desktopApp/build/automix-ci -j 3
+      - name: Windows DLL dependency audit and real JNI analysis
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./desktopApp/packaging/tests/windows-automix-check.ps1 -DllPath desktopApp/build/automix-ci/bitchord_analysis.dll -NativeOnly
+      - name: Linux JNI load, BPM, downbeats and resampling
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p desktopApp/build/automix-probe
+          javac -d desktopApp/build/automix-probe desktopApp/packaging/tests/native/TrackFeatures.java
+          java -cp desktopApp/build/automix-probe com.music.bitchord.playback.smart.TrackFeatures "$PWD/desktopApp/build/automix-ci/libbitchord_analysis.so"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: automix-tests-${{ matrix.os }}
+          path: tools/automix-validation/build/reports/tests/

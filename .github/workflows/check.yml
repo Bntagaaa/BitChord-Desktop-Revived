@@ -51,6 +51,9 @@ jobs:
       - name: Build the distributable
         run: ./gradlew :desktopApp:createDistributable "-Pbitchord.version=test-visua"
 
+      - name: Linux packaged AutoMix JNI and model regression
+        run: bash desktopApp/packaging/tests/linux-automix-check.sh
+
       - name: The analyser is in the jar
         run: |
           jar=$(ls desktopApp/build/compose/binaries/main/app/BitChord/lib/app/desktopApp*.jar)
@@ -103,6 +106,10 @@ jobs:
 
       - name: Build the distributable
         run: .\gradlew.bat :desktopApp:createDistributable "-Pbitchord.version=test-visua"
+
+      - name: Windows packaged AutoMix JNI and dependency regression
+        shell: pwsh
+        run: ./desktopApp/packaging/tests/windows-automix-check.ps1
 
       - name: The analyser is in the jar
         shell: bash

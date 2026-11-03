@@ -77,6 +77,12 @@ private const val AUTO_FAST_TRACK_MIN_SECONDS = 6.0
 private const val AUTO_TRANSITION_MAX_SECONDS = 12.0
 private const val AUTO_FALLBACK_SECONDS = 8.0
 
+/**
+ * The Automix window: a mix lives entirely within the last 30 s of the outgoing track and the first
+ * 30 s of the incoming one. See [clampToMixWindow].
+ */
+private const val MIX_WINDOW_SECONDS = 30.0
+
 /** Below this a track would spend too much of itself transitioning to be worth planning. */
 private const val MIN_SMART_DURATION_SECONDS = 45.0
 
@@ -643,7 +649,6 @@ private fun phraseBarPlan(
 }
 
 // ---------------------------------------------------------------------------
-
 // WSOLA-style beat-matched phrase-switch plan (ported from WsolaPlanner.kt)
 // ---------------------------------------------------------------------------
 
@@ -1389,8 +1394,81 @@ private fun analysisReadyForTrack(analysis: TrackAnalysis, track: TransitionTrac
  *   of up to 10% to beat-match, an echo out where the outgoing track leaves
  *   singing, and another exit tried when the planned one sings over the
  *   incoming track. Off leaves every plan exactly as before.
+ * @param phraseBars Apple-style Automix phrase length: `8` or `16` asks for a
+ *   mix whose overlap is exactly that many bars of the outgoing track's own
+ *   4/4 grid, both edges snapped onto phrase boundaries or downbeats. `0` (the
+ *   default) leaves the adaptive overlap above in charge. A pair that cannot
+ *   support a bar-aligned mix of that length — no trusted tempo, or too short
+ *   to fit it — falls back to the ordinary smart plan rather than forcing a
+ *   ragged one.
+ * @param mixWindow Confine the mix to the last and first [MIX_WINDOW_SECONDS] of the pair — see
+ *   [clampToMixWindow]. The desktop asks for it; the phone leaves it off, so its plans are
+ *   unchanged.
  */
 fun planTransition(
+    analysis: TrackAnalysis = TrackAnalysis(),
+    nextAnalysis: TrackAnalysis = TrackAnalysis(),
+    currentTrack: TransitionTrackInfo? = null,
+    nextTrack: TransitionTrackInfo? = null,
+    currentTime: Double = 0.0,
+    duration: Double = 0.0,
+    fadeSeconds: Double = 6.0,
+    minFadeSeconds: Double = 1.0,
+    mode: CrossfadeMode = CrossfadeMode.STANDARD,
+    albumSequential: Boolean = false,
+    advanced: Boolean = false,
+    phraseBars: Int = 0,
+    mixWindow: Boolean = false,
+): TransitionPlan {
+    val plan = planTransitionInner(
+        analysis = analysis,
+        nextAnalysis = nextAnalysis,
+        currentTrack = currentTrack,
+        nextTrack = nextTrack,
+        currentTime = currentTime,
+        duration = duration,
+        fadeSeconds = fadeSeconds,
+        minFadeSeconds = minFadeSeconds,
+        mode = mode,
+        albumSequential = albumSequential,
+        advanced = advanced,
+        phraseBars = phraseBars,
+    )
+    if (!mixWindow) return plan
+    return clampToMixWindow(
+        plan,
+        length = max(duration.orZero(), trackDurationSeconds(currentTrack)),
+        playbackTime = max(0.0, currentTime.orZero()),
+    )
+}
+
+/**
+ * Apple-style Automix window: mixing is confined to the last [MIX_WINDOW_SECONDS] of the outgoing
+ * track and the first [MIX_WINDOW_SECONDS] of the incoming one. The planner's own overlaps are far
+ * shorter than this in practice, so the clamp is a guard that keeps the invariant true no matter how
+ * the anchors are ranked — it never lengthens a mix, only refuses to let one start too early or cue
+ * too deep into the next track.
+ */
+private fun clampToMixWindow(plan: TransitionPlan, length: Double, playbackTime: Double): TransitionPlan {
+    if (plan.blocked || length <= 0.0) return plan
+    var result = plan
+    val earliestStart = (length - MIX_WINDOW_SECONDS).coerceAtLeast(0.0)
+    if (result.transitionStart < earliestStart) {
+        val end = result.transitionEnd.coerceAtLeast(earliestStart)
+        result = result.copy(
+            shouldStart = playbackTime >= earliestStart,
+            transitionStart = earliestStart,
+            transitionEnd = end,
+            fadeSeconds = (end - earliestStart).coerceAtLeast(0.0),
+        )
+    }
+    if (result.incomingCueTime > MIX_WINDOW_SECONDS) {
+        result = result.copy(incomingCueTime = MIX_WINDOW_SECONDS)
+    }
+    return result
+}
+
+private fun planTransitionInner(
     analysis: TrackAnalysis = TrackAnalysis(),
     nextAnalysis: TrackAnalysis = TrackAnalysis(),
     currentTrack: TransitionTrackInfo? = null,
@@ -1547,7 +1625,6 @@ fun planTransition(
             }
         }
     }
-
 
     phraseSwitch(analysis, nextAnalysis, length, nextLength, advanced)
         ?.takeIf { playbackTime < it.transitionEnd }
