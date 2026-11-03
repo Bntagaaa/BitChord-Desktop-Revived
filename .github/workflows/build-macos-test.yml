@@ -50,7 +50,15 @@ jobs:
           cmake --version
           python3 -c 'import os,platform; assert platform.machine() == ("arm64" if os.environ["EXPECTED_ARCH"] == "arm64" else "x86_64")'
           file "$JAVA_HOME/bin/java"
+          lipo "$JAVA_HOME/bin/java" -verify_arch "${EXPECTED_ARCH/x64/x86_64}"
           chmod +x gradlew
+      - name: Write optional integration build configuration
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
+        run: |
+          printf 'LASTFM_API_KEY=%s\n' "$LASTFM_API_KEY" > local.properties
+          printf 'LASTFM_SECRET=%s\n' "$LASTFM_SECRET" >> local.properties
       - name: Create isolated unlocked test keychain
         run: bash desktopApp/packaging/macos/ci-keychain.sh setup
       - name: Compile and run shared and desktop tests
