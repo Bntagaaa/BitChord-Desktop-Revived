@@ -7,6 +7,16 @@ internal object DesktopNativeSmoke {
         check(org.bytedeco.ffmpeg.global.avcodec.avcodec_version() > 0)
         ai.onnxruntime.OrtEnvironment.getEnvironment().use { environment ->
             check(environment.version.isNotBlank())
+            for (asset in listOf("beat_this_final0_q8.onnx", "vocals_umxhq_int8.onnx")) {
+                ai.onnxruntime.OrtSession.SessionOptions().use { options ->
+                    options.setIntraOpNumThreads(1)
+                    options.setInterOpNumThreads(1)
+                    environment.createSession(DesktopAnalysisRuntime.modelPath(asset), options).use { session ->
+                        check(session.inputNames.isNotEmpty())
+                        check(session.outputNames.isNotEmpty())
+                    }
+                }
+            }
         }
         println("PASS: native analyzer, FFmpeg and ONNX JNI loaded")
     }

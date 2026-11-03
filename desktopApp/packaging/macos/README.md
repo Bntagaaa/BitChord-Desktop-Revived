@@ -47,6 +47,10 @@ added to the macOS launcher path.
 
 ## Platform adapters
 
+- ONNX 1.29 ships Apple Silicon macOS natives only. Intel selects 1.22.0,
+  whose published jar contains both Intel JNI and the runtime dylib. Packaged
+  smoke opens both actual AutoMix models to verify compatibility. Windows, Linux
+  and Apple Silicon retain 1.29.
 - Java Sound provides CoreAudio output and mixer enumeration, feeding the same
   FFmpeg/PCM engine. CoreAudio default-device and inventory events reconfigure the
   output; the JDK sleep listener triggers the same recovery after wake.

@@ -121,7 +121,9 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
 
     // Automix runs the same two models the Android build does.
-    implementation("com.microsoft.onnxruntime:onnxruntime:1.29.0")
+    // 1.29 no longer ships osx-x64. 1.22 retains Intel JNI and supports these same models.
+    val onnxVersion = if (targetOs == "macos" && !isArm64) "1.22.0" else "1.29.0"
+    implementation("com.microsoft.onnxruntime:onnxruntime:$onnxVersion")
 
     // Decoding, resampling and demuxing for the audio engine.
     implementation("org.bytedeco:javacpp:$javacppVersion")

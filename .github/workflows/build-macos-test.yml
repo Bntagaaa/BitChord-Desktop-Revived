@@ -118,3 +118,18 @@ jobs:
               for path in pathlib.Path('.').glob('macos-*.log'):
                   out.write('\n### '+path.name+'\n```text\n'+ '\n'.join(path.read_text(errors='replace').splitlines()[-100:])+'\n```\n')
           PY
+
+  windows-regression:
+    name: Windows EXE, MSI and portable regression
+    uses: ./.github/workflows/build-windows-portable.yml
+    with:
+      version: "1.8.4-macos-ci"
+      installers: true
+
+  linux-regression:
+    name: Linux AppImage and native package regression
+    uses: ./.github/workflows/build-test-appimage.yml
+    with:
+      version: "1.8.4-macos-ci"
+      run_tests: true
+      audit_packages: true

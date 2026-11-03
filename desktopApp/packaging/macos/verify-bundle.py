@@ -39,8 +39,12 @@ ort_arch = 'aarch64' if arch == 'arm64' else 'x64'
 required = {
     'analyzer': lambda s: s == 'native/libbitchord_analysis.dylib',
     'media': lambda s: s == 'native/libbitchord_macos.dylib',
-    'ffmpeg': lambda s: classifier in s and 'jniavcodec' in s and s.endswith('.dylib'),
+    **{f'ffmpeg-{module}': (lambda s, module=module: classifier in s and f'jni{module}' in s and s.endswith('.dylib'))
+       for module in ('avcodec', 'avformat', 'avutil', 'swresample')},
+    'javafx-web': lambda s: s.endswith('libjfxwebkit.dylib'),
+    'javafx-media': lambda s: s.endswith('libjfxmedia.dylib'),
     'onnx': lambda s: f'osx-{ort_arch}/' in s and s.endswith('libonnxruntime.dylib'),
+    'onnx-jni': lambda s: f'osx-{ort_arch}/' in s and s.endswith('libonnxruntime4j_jni.dylib'),
     'skiko': lambda s: 'skiko' in s and s.endswith('.dylib'),
     'model': lambda s: s.startswith('models/') and s.endswith('.onnx'),
 }
@@ -49,6 +53,7 @@ with tempfile.TemporaryDirectory() as temp:
     for jar in jars:
         with zipfile.ZipFile(jar) as archive:
             for name in archive.namelist():
+                if ".dSYM/" in name: continue
                 for category, matches in required.items():
                     if matches(name):
                         found.add(category)
