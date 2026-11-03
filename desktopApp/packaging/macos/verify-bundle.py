@@ -47,6 +47,7 @@ jars = list((contents / 'app').glob('*.jar'))
 assert jars, 'Missing app jars'
 classifier = 'macosx-arm64' if arch == 'arm64' else 'macosx-x86_64'
 ort_arch = 'aarch64' if arch == 'arm64' else 'x64'
+skiko_arch = 'arm64' if arch == 'arm64' else 'x64'
 required = {
     'analyzer': lambda s: s == 'native/libbitchord_analysis.dylib',
     'media': lambda s: s == 'native/libbitchord_macos.dylib',
@@ -56,7 +57,8 @@ required = {
     'javafx-media': lambda s: s.endswith('libjfxmedia.dylib'),
     'onnx': lambda s: f'osx-{ort_arch}/' in s and s.endswith('libonnxruntime.dylib'),
     'onnx-jni': lambda s: f'osx-{ort_arch}/' in s and s.endswith('libonnxruntime4j_jni.dylib'),
-    'skiko': lambda s: 'skiko' in s and s.endswith('.dylib'),
+    # Both published macOS Skiko runtime jars contain both CPUs; inspect the loaded resource.
+    'skiko': lambda s: s.endswith(f'libskiko-macos-{skiko_arch}.dylib'),
     'model': lambda s: s.startswith('models/') and s.endswith('.onnx'),
 }
 found = set()
