@@ -160,3 +160,39 @@ jobs:
       version: "1.8.4-macos-ci"
       run_tests: true
       audit_packages: true
+
+  linux-failure-report:
+    name: Report Linux regression failures
+    needs: linux-regression
+    if: ${{ always() && needs.linux-regression.result == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download existing Linux test reports
+        uses: actions/download-artifact@v4
+        with:
+          name: appimage-test-reports
+          path: linux-reports
+      - name: Publish test failures without changing the Linux workflow
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          class Failures(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.in_title=False; self.in_stack=False; self.title=''; self.stack=''
+              def handle_starttag(self, tag, attrs):
+                  if tag == 'h3' and dict(attrs).get('class') == 'failures': self.in_title=True; self.title=''
+                  if tag == 'pre' and self.title: self.in_stack=True; self.stack=''
+              def handle_data(self, data):
+                  if self.in_title: self.title += data
+                  if self.in_stack: self.stack += data
+              def handle_endtag(self, tag):
+                  if tag == 'h3': self.in_title=False
+                  if tag == 'pre' and self.in_stack:
+                      self.in_stack=False
+                      detail=(self.title + ': ' + self.stack[:1800]).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                      print('::error title=Linux test failure::'+detail)
+                      self.title=''
+          for path in Path('linux-reports').rglob('classes/*.html'):
+              parser=Failures(); parser.feed(path.read_text(errors='replace'))
+          PY

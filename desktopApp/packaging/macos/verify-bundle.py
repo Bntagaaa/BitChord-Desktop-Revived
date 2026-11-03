@@ -24,7 +24,7 @@ assert jvm.is_file(), 'Missing bundled Java runtime'
 
 def inspect(path):
     subprocess.run(['file', str(path)], check=True)
-    subprocess.run(['lipo', '-verify_arch', arch, str(path)], check=True)
+    subprocess.run(['lipo', str(path), '-verify_arch', arch], check=True)
     result = subprocess.run(['otool', '-L', str(path)], check=True, capture_output=True, text=True).stdout
     assert '/opt/homebrew/' not in result and '/usr/local/' not in result, result
 
