@@ -353,7 +353,7 @@ internal object DesktopBrowserCookies {
             "Zen" to roaming.resolve("zen/Profiles"),
         )
     } else {
-        LINUX_FIREFOX_ROOTS.map { (name, relative) -> name to home.resolve(relative) }
+        if (DesktopPlatform.isMac) listOf("Firefox" to home.resolve("Library/Application Support/Firefox/Profiles")) else LINUX_FIREFOX_ROOTS.map { (name, relative) -> name to home.resolve(relative) }
     }
 
     private fun chromiumRoots(): List<ChromiumRoot> = if (DesktopPlatform.isWindows) {
@@ -366,7 +366,7 @@ internal object DesktopBrowserCookies {
             ChromiumRoot("Vivaldi", local.resolve("Vivaldi/User Data"), null),
         )
     } else {
-        LINUX_CHROMIUM_ROOTS.map { (name, spec) ->
+        if (DesktopPlatform.isMac) emptyList() else LINUX_CHROMIUM_ROOTS.map { (name, spec) ->
             ChromiumRoot(name, home.resolve(spec.first), spec.second)
         }
     }

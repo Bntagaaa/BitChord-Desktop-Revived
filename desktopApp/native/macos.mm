@@ -1,11 +1,18 @@
 #import <Foundation/Foundation.h>
 #import <MediaPlayer/MediaPlayer.h>
+#import <CoreAudio/CoreAudio.h>
 #include <jni.h>
 
 static JavaVM *vm;
 static jclass receiver;
 static jmethodID onButton;
 static NSMutableArray *targets;
+static bool playingNow;
+static AudioObjectPropertyListenerBlock audioListener;
+static AudioObjectPropertyAddress audioProperties[] = {
+    {kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain},
+    {kAudioHardwarePropertyDevices, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain}
+};
 // AppKit/MediaPlayer must always run on the macOS main thread, never the AWT EDT.
 static void mainSync(dispatch_block_t block) {
     if ([NSThread isMainThread]) block(); else dispatch_sync(dispatch_get_main_queue(), block);
@@ -32,16 +39,19 @@ Java_com_music_bitchord_desktop_DesktopMacMedia_nativeStart(JNIEnv *env, jobject
         MPRemoteCommandCenter *center = MPRemoteCommandCenter.sharedCommandCenter;
         targets = [NSMutableArray array];
         NSArray<MPRemoteCommand *> *commands = @[center.playCommand, center.pauseCommand,
-            center.nextTrackCommand, center.previousTrackCommand];
+            center.nextTrackCommand, center.previousTrackCommand, center.togglePlayPauseCommand];
         for (NSUInteger i = 0; i < commands.count; ++i) {
             MPRemoteCommand *command = commands[i];
             command.enabled = YES;
             id token = [command addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *event) {
-                sendButton((jint)i);
+                sendButton(i == 4 ? (playingNow ? 1 : 0) : (jint)i);
                 return MPRemoteCommandHandlerStatusSuccess;
             }];
             [targets addObject:@[command, token]];
         }
+        audioListener = ^(UInt32 count, const AudioObjectPropertyAddress *addresses) { sendButton(4); };
+        for (const auto &address : audioProperties)
+            AudioObjectAddPropertyListenerBlock(kAudioObjectSystemObject, &address, dispatch_get_main_queue(), audioListener);
     });
     return JNI_TRUE;
 }
@@ -50,6 +60,9 @@ Java_com_music_bitchord_desktop_DesktopMacMedia_nativeStop(JNIEnv *env, jobject)
     mainSync(^{
         for (NSArray *pair in targets) [(MPRemoteCommand *)pair[0] removeTarget:pair[1]];
         targets = nil;
+        for (const auto &address : audioProperties)
+            AudioObjectRemovePropertyListenerBlock(kAudioObjectSystemObject, &address, dispatch_get_main_queue(), audioListener);
+        audioListener = nil;
         MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo = nil;
         MPNowPlayingInfoCenter.defaultCenter.playbackState = MPNowPlayingPlaybackStateStopped;
     });
@@ -68,6 +81,7 @@ Java_com_music_bitchord_desktop_DesktopMacMedia_nativeUpdate(JNIEnv *env, jobjec
     NSString *track = string(env, title), *performer = string(env, artist);
     // Synchronous dispatch bounds ownership and ensures stop cannot be followed by stale updates.
     mainSync(^{
+        playingNow = playing;
         MPNowPlayingInfoCenter *info = MPNowPlayingInfoCenter.defaultCenter;
         info.nowPlayingInfo = @{MPMediaItemPropertyTitle: track, MPMediaItemPropertyArtist: performer,
             MPMediaItemPropertyPlaybackDuration: @((double)duration / 1000.0),

@@ -41,6 +41,14 @@ internal object DesktopBrowserSignIn {
 
     /** The first installed browser we can use for the interactive Windows path. */
     fun preferred(): Browser? {
+        if (DesktopPlatform.isMac) return listOf(
+            "Chrome" to "Google Chrome.app/Contents/MacOS/Google Chrome",
+            "Edge" to "Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "Brave" to "Brave Browser.app/Contents/MacOS/Brave Browser",
+        ).flatMap { (name, relative) ->
+            listOf(Paths.get("/Applications"), Paths.get(System.getProperty("user.home"), "Applications"))
+                .mapNotNull { root -> candidate(name, root.resolve(relative)) }
+        }.firstOrNull()
         if (!DesktopPlatform.isWindows) return null
         val local = environmentPath("LOCALAPPDATA", "AppData/Local")
         val programFiles = System.getenv("ProgramFiles")?.let(Paths::get)
@@ -59,7 +67,7 @@ internal object DesktopBrowserSignIn {
 
     /** Opens [browser] normally for sign-in, then reads the finished session in a headless pass. */
     suspend fun capture(browser: Browser): String = withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val profile = environmentPath("LOCALAPPDATA", "AppData/Local")
+        val profile = (if (DesktopPlatform.isMac) DesktopMacPaths.applicationSupport else environmentPath("LOCALAPPDATA", "AppData/Local"))
             .resolve("BitChord")
             .resolve("Browser Sign In")
             .resolve(browser.name)

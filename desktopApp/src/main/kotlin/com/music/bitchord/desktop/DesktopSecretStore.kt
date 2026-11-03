@@ -9,6 +9,9 @@ import org.freedesktop.dbus.types.Variant
 /** The platform's own password store, for the credentials this app holds. */
 internal object DesktopSecretStore {
 
+    private fun macAccount(attributes: Map<String, String>): String = attributes.toSortedMap().entries
+        .joinToString("&") { (key, value) -> "${key.length}:$key${value.length}:$value" }
+
     /** Plain-text transport. */
     private const val PLAIN = "plain"
 
@@ -33,7 +36,9 @@ internal object DesktopSecretStore {
     }
 
     /** The first secret stored under [attributes], as bytes. */
-    fun lookup(attributes: Map<String, String>): ByteArray? = withService { _, service, session ->
+    fun lookup(attributes: Map<String, String>): ByteArray? = if (DesktopPlatform.isMac) {
+        DesktopMacKeychain.read(macAccount(attributes))?.toByteArray(Charsets.UTF_8)
+    } else withService { _, service, session ->
         val found = service.SearchItems(attributes)
         val items = buildList {
             addAll(found.unlocked)
@@ -47,7 +52,10 @@ internal object DesktopSecretStore {
 
     /** Stores [secret] under [attributes], replacing whatever was there. */
     fun store(label: String, attributes: Map<String, String>, secret: ByteArray): Boolean =
-        withService { connection, service, session ->
+        if (DesktopPlatform.isMac) {
+            DesktopMacKeychain.write(macAccount(attributes), secret.toString(Charsets.UTF_8))
+            true
+        } else withService { connection, service, session ->
             val collection = runCatching { service.ReadAlias("default")?.path }
                 .getOrNull()
                 ?.takeIf { it.isNotBlank() && it != "/" }
@@ -70,7 +78,10 @@ internal object DesktopSecretStore {
         } ?: false
 
     /** Forgets everything stored under [attributes]. */
-    fun remove(attributes: Map<String, String>): Boolean = withService { connection, service, _ ->
+    fun remove(attributes: Map<String, String>): Boolean = if (DesktopPlatform.isMac) {
+        DesktopMacKeychain.remove(macAccount(attributes))
+        true
+    } else withService { connection, service, _ ->
         val found = service.SearchItems(attributes)
         (found.unlocked + found.locked).forEach { path ->
             runCatching {
@@ -85,5 +96,5 @@ internal object DesktopSecretStore {
     } ?: false
 
     /** Whether a store is actually reachable, for the settings screen to say so. */
-    fun isAvailable(): Boolean = withService { _, _, _ -> true } == true
+    fun isAvailable(): Boolean = if (DesktopPlatform.isMac) runCatching { DesktopMacKeychain.read("availability-probe"); true }.getOrDefault(false) else withService { _, _, _ -> true } == true
 }

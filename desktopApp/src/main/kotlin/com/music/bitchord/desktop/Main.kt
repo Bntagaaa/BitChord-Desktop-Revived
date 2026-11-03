@@ -123,6 +123,15 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         resizable = true,
     ) {
         val composeWindow = window
+        val macFullscreen = remember(composeWindow) {
+            if (DesktopPlatform.isMac) runCatching { DesktopMacFullscreen(composeWindow) }
+                .onFailure { DesktopTrackLog.log("macOS native fullscreen unavailable: ${it.message}") }.getOrNull()
+            else null
+        }
+        DisposableEffect(macFullscreen) { onDispose { macFullscreen?.close() } }
+        LaunchedEffect(fullScreen, macFullscreen) {
+            macFullscreen?.apply(fullScreen)
+        }
         // ComposeWindow.placement=Maximized only sets the maximized bit; it does NOT
         // clear the fullscreen bit (unlike placement=Floating). Going directly from
         // Fullscreen -> Maximized therefore leaves KWin fullscreen. Always exit the

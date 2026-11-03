@@ -110,6 +110,7 @@ class DesktopPlaybackEngine internal constructor(
         scope.launch {
             DesktopAudioDevices.changes.collect {
                 if (DesktopPlatform.isWindows) return@collect // its native side moves the stream itself
+                if (DesktopPlatform.isMac) commands += Command.Reconfigure
                 observedOutputDevice.let { chosen ->
                     if (chosen != DesktopAudioDevices.SYSTEM_DEFAULT &&
                         DesktopAudioDevices.mixerFor(chosen) == null

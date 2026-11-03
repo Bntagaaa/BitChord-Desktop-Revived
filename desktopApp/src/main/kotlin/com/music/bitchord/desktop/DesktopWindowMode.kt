@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
  * an app-requested transition. Those stale values must not be adopted as new user intents:
  * otherwise Linux/KWin can restore Fullscreen immediately after a request to exit it.
  */
-internal class DesktopWindowPlacementController(private val isWindows: Boolean) {
+internal class DesktopWindowPlacementController(private val isWindows: Boolean, private val isMac: Boolean = false) {
     private val _placement = MutableStateFlow(WindowPlacement.Floating)
     private val _fullScreen = MutableStateFlow(false)
     private val _maximized = MutableStateFlow(false)
@@ -54,7 +54,7 @@ internal class DesktopWindowPlacementController(private val isWindows: Boolean) 
     fun adopt(observed: WindowPlacement) {
         // Windows uses a separately managed native HWND for fullscreen.
         // OS extended-state changes while that HWND is borderless must not rewrite our mode.
-        if (isWindows && _fullScreen.value) return
+        if ((isWindows || isMac) && _fullScreen.value) return
 
         val expected = awaitingPlacement
         if (expected != null) {
@@ -83,7 +83,11 @@ internal class DesktopWindowPlacementController(private val isWindows: Boolean) 
         _fullScreen.value = on
 
         // Windows native fullscreen never changes WindowPlacement; Main.kt toggles its HWND.
-        if (!isWindows) request(if (on) WindowPlacement.Fullscreen else beforeFullScreen)
+        if (!isWindows && !isMac) request(if (on) WindowPlacement.Fullscreen else beforeFullScreen)
+    }
+
+    fun adoptNativeFullscreen(on: Boolean) {
+        _fullScreen.value = on
     }
 
     private fun request(value: WindowPlacement) {
@@ -125,7 +129,7 @@ internal fun linuxFullscreenRestorationPath(
 
 /** Shared host for the desktop's player, window chrome, and escape handler. */
 internal object DesktopWindowMode {
-    private val controller = DesktopWindowPlacementController(DesktopPlatform.isWindows)
+    private val controller = DesktopWindowPlacementController(DesktopPlatform.isWindows, DesktopPlatform.isMac)
 
     val placement: StateFlow<WindowPlacement> = controller.placement
     val fullScreen: StateFlow<Boolean> = controller.fullScreen
@@ -147,4 +151,5 @@ internal object DesktopWindowMode {
     }
     fun exitOnEscape(): Boolean = controller.exitOnEscape()
     fun adopt(placement: WindowPlacement) = controller.adopt(placement)
+    fun adoptNativeFullscreen(on: Boolean) = controller.adoptNativeFullscreen(on)
 }

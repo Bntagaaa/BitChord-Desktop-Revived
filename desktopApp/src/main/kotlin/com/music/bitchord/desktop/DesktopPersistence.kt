@@ -127,7 +127,9 @@ class DesktopPersistence {
     internal fun sourceConfigs(): List<DesktopSourceConfig> {
         val protected = DesktopPreferenceChunks.read(preferences, KEY_SOURCE_CONFIGS_PROTECTED)
         val legacy = DesktopPreferenceChunks.read(preferences, KEY_SOURCE_CONFIGS)
-        val raw = if (protected != null) {
+        val raw = if (DesktopPlatform.isMac) {
+            DesktopMacKeychain.read(KEY_SOURCE_CONFIGS) ?: legacy
+        } else if (protected != null) {
             runCatching { Base64.getDecoder().decode(protected) }.getOrNull()
                 ?.let(DesktopWindowsCrypto::unprotect)
                 ?.toString(StandardCharsets.UTF_8)
@@ -169,7 +171,7 @@ class DesktopPersistence {
         val normalized = withBuiltIns.map {
             if (it.kind == DesktopSourceKind.YOUTUBE && !it.enabled) it.copy(enabled = true) else it
         }.inSourceOrder()
-        if (stored == null || normalized != stored || (DesktopPlatform.isWindows && protected == null)) {
+        if (stored == null || normalized != stored || ((DesktopPlatform.isWindows && protected == null) || (DesktopPlatform.isMac && legacy != null))) {
             saveSourceConfigs(normalized)
             if (DesktopPlatform.isWindows && stored == null) {
                 DesktopPreferenceChunks.remove(preferences, KEY_MODULE_INDEX_URL)
@@ -187,7 +189,10 @@ class DesktopPersistence {
             }
         }
         val raw = sourceJson.encodeToString(normalized)
-        if (DesktopPlatform.isWindows) {
+        if (DesktopPlatform.isMac) {
+            DesktopMacKeychain.write(KEY_SOURCE_CONFIGS, raw)
+            DesktopPreferenceChunks.remove(preferences, KEY_SOURCE_CONFIGS)
+        } else if (DesktopPlatform.isWindows) {
             val sealed = DesktopWindowsCrypto.protect(raw.toByteArray(StandardCharsets.UTF_8))
                 ?: error("Windows could not protect the configured source credentials")
             DesktopPreferenceChunks.write(
