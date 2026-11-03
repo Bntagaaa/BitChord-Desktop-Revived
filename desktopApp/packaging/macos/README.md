@@ -22,7 +22,7 @@ No extra native blur layer is installed.
 Apple Silicon requires macOS 14 or later; Intel requires macOS 13.3 or later.
 These minima come from the actual bundled ONNX dylib Mach-O headers and are
 encoded in Info.plist. The verifier also checks that inspected libraries do not
-require a newer OS than the bundle declares. CI runs on macOS 15; physical devices
+require a newer OS than the bundle declares. CI uses macOS 26 for Apple Silicon and macOS 15 for Intel; physical devices
 and earlier supported OS versions still need manual verification.
 
 ## Build on each architecture
@@ -39,8 +39,10 @@ BUILD_ARCH=arm64 python3 desktopApp/packaging/macos/verify-bundle.py # Intel: x6
 python3 desktopApp/packaging/macos/smoke-startup.py
 ```
 
-Build Test macOS uses `macos-15` (Apple Silicon) and `macos-15-intel` (Intel),
-verified against actions/runner-images. Both native JDKs are explicitly selected.
+Build Test macOS uses `macos-26` (Apple Silicon) and `macos-15-intel` (Intel),
+verified against actions/runner-images. Apple Silicon moved from macos-15 after
+GitHub canceled that job because no hosted runner acquired it despite repeated
+attempts. Both native JDKs are explicitly selected.
 The feature-branch push trigger enables testing before a PR exists; integration
 pushes, integration PRs and workflow_dispatch also run the matrix.
 
