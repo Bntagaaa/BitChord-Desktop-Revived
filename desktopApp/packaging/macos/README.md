@@ -40,8 +40,8 @@ Each job uploads `BitChord-Revived-macOS-{arm64,x64}` containing identically nam
 DMG and PKG files, plus separate diagnostics. Look under the run's Artifacts area.
 Normal Gradle packages retain the numeric native version in their metadata.
 Verification checks plist, icon, executable, bundled Java, native Mach-O
-architecture and JNI loading. Bundled Java is intentionally retained for these
-smoke tests. Fat dependency jars (ONNX/JNA) may contain foreign-platform resources;
+architecture and JNI loading. JNI smoke runs through the native app launcher and its bundled runtime; no
+external Java command is used. Fat dependency jars (ONNX/JNA) may contain foreign-platform resources;
 only matching macOS resources are loaded and verified. No foreign executable is
 added to the macOS launcher path.
 

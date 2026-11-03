@@ -29,8 +29,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 70
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -106,7 +106,14 @@ jobs:
         if: failure()
         run: |
           python3 - <<'PY'
-          import os,pathlib
+          import os,pathlib,re
+          emitted = 0
+          for path in pathlib.Path('.').glob('macos-*.log'):
+              for line in path.read_text(errors='replace').splitlines():
+                  if emitted < 12 and (line.startswith('e: ') or line.startswith('  Line ') or 'error:' in line.lower()):
+                      escaped = line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                      print('::error title=macOS build diagnostic::' + escaped[:1500])
+                      emitted += 1
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
               for path in pathlib.Path('.').glob('macos-*.log'):
                   out.write('\n### '+path.name+'\n```text\n'+ '\n'.join(path.read_text(errors='replace').splitlines()[-100:])+'\n```\n')

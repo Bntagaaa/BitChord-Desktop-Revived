@@ -2837,7 +2837,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     DesktopPlaybackWrites.flush()
                     playbackEngine.shutdown()
                     DesktopWindowsMedia.stop()
-                DesktopMacMedia.stop()
+                    DesktopMacMedia.stop()
                     exitProcess(0)
                 }
             },

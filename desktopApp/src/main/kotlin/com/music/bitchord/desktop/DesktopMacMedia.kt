@@ -27,6 +27,7 @@ internal object DesktopMacMedia {
             state.positionMs, state.durationMs)
     }
     @JvmStatic fun onButton(button: Int) {
+        if (button == 5 || button == 6) { DesktopSystemTheme.updateMacDark(button == 5); return }
         if (button == 4) { DesktopAudioDevices.systemChanged(); return }
         EventQueue.invokeLater {
             controller?.let { target ->

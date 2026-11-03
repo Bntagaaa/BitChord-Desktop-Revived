@@ -625,10 +625,3 @@ compose.desktop {
     }
 
 }
-
-// Keep the bundled Java launcher for native smoke diagnostics; installers still need no system JRE.
-if (targetOs == "macos") {
-    tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask>().configureEach {
-        stripNativeCommands.set(false)
-    }
-}

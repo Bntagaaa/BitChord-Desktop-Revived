@@ -30,6 +30,10 @@ import kotlinx.coroutines.swing.Swing
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
+    if (System.getenv("BITCHORD_NATIVE_SMOKE") == "1") {
+        DesktopNativeSmoke.main(emptyArray())
+        return
+    }
     DesktopMacApplication.configure()
     DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.PROCESS_ENTRY)
     // Read the per-install welcome marker before services initialize or write preferences.

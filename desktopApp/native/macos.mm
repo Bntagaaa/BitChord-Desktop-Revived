@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <MediaPlayer/MediaPlayer.h>
 #import <CoreAudio/CoreAudio.h>
+#import <AppKit/AppKit.h>
 #include <jni.h>
 
 static JavaVM *vm;
@@ -8,6 +9,7 @@ static jclass receiver;
 static jmethodID onButton;
 static NSMutableArray *targets;
 static bool playingNow;
+static id appearanceObserver;
 static AudioObjectPropertyListenerBlock audioListener;
 static AudioObjectPropertyAddress audioProperties[] = {
     {kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain},
@@ -49,6 +51,14 @@ Java_com_music_bitchord_desktop_DesktopMacMedia_nativeStart(JNIEnv *env, jobject
             }];
             [targets addObject:@[command, token]];
         }
+        void (^publishAppearance)(void) = ^{
+            NSString *match = [NSApp.effectiveAppearance bestMatchFromAppearancesWithNames:@[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
+            sendButton([match isEqualToString:NSAppearanceNameDarkAqua] ? 5 : 6);
+        };
+        appearanceObserver = [NSDistributedNotificationCenter.defaultCenter
+            addObserverForName:@"AppleInterfaceThemeChangedNotification" object:nil queue:NSOperationQueue.mainQueue
+            usingBlock:^(NSNotification *notification) { publishAppearance(); }];
+        publishAppearance();
         audioListener = ^(UInt32 count, const AudioObjectPropertyAddress *addresses) { sendButton(4); };
         for (const auto &address : audioProperties)
             AudioObjectAddPropertyListenerBlock(kAudioObjectSystemObject, &address, dispatch_get_main_queue(), audioListener);
@@ -60,8 +70,18 @@ Java_com_music_bitchord_desktop_DesktopMacMedia_nativeStop(JNIEnv *env, jobject)
     mainSync(^{
         for (NSArray *pair in targets) [(MPRemoteCommand *)pair[0] removeTarget:pair[1]];
         targets = nil;
+        [NSDistributedNotificationCenter.defaultCenter removeObserver:appearanceObserver];
+        appearanceObserver = nil;
         for (const auto &address : audioProperties)
             AudioObjectRemovePropertyListenerBlock(kAudioObjectSystemObject, &address, dispatch_get_main_queue(), audioListener);
+        void (^publishAppearance)(void) = ^{
+            NSString *match = [NSApp.effectiveAppearance bestMatchFromAppearancesWithNames:@[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
+            sendButton([match isEqualToString:NSAppearanceNameDarkAqua] ? 5 : 6);
+        };
+        appearanceObserver = [NSDistributedNotificationCenter.defaultCenter
+            addObserverForName:@"AppleInterfaceThemeChangedNotification" object:nil queue:NSOperationQueue.mainQueue
+            usingBlock:^(NSNotification *notification) { publishAppearance(); }];
+        publishAppearance();
         audioListener = nil;
         MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo = nil;
         MPNowPlayingInfoCenter.defaultCenter.playbackState = MPNowPlayingPlaybackStateStopped;

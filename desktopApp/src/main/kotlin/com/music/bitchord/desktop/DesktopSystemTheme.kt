@@ -6,10 +6,14 @@ import java.util.concurrent.TimeUnit
 
 /** Best-effort native OS appearance; no credentials, installation or network dependency. */
 internal object DesktopSystemTheme {
+    @Volatile private var macDark: Boolean? = null
+    fun updateMacDark(dark: Boolean) { macDark = dark }
+
     fun isDark(): Boolean = when {
         DesktopPlatform.isWindows -> windowsDark()
         DesktopPlatform.isLinux -> linuxDark()
-        DesktopPlatform.isMac -> command("/usr/bin/defaults", "read", "-g", "AppleInterfaceStyle")?.trim().equals("Dark", true)
+        DesktopPlatform.isMac -> macDark ?: command("/usr/bin/defaults", "read", "-g", "AppleInterfaceStyle")
+            ?.trim().equals("Dark", true).also { macDark = it }
         else -> false
     }
 

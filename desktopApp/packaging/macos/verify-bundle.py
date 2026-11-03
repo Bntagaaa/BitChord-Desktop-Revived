@@ -18,9 +18,9 @@ assert plist['CFBundleName'] == 'BitChord', plist
 assert plist['CFBundleVersion'] and plist['CFBundleShortVersionString']
 assert (contents / 'Resources' / plist['CFBundleIconFile']).is_file()
 launcher = contents / 'MacOS' / plist['CFBundleExecutable']
-java = contents / 'runtime/Contents/Home/bin/java'
+jvm = contents / 'runtime/Contents/Home/lib/server/libjvm.dylib'
 assert launcher.is_file() and os.access(launcher, os.X_OK)
-assert java.is_file(), 'Missing bundled Java runtime'
+assert jvm.is_file(), 'Missing bundled Java runtime'
 
 def inspect(path):
     subprocess.run(['file', str(path)], check=True)
@@ -29,7 +29,7 @@ def inspect(path):
     assert '/opt/homebrew/' not in result and '/usr/local/' not in result, result
 
 inspect(launcher)
-inspect(java)
+inspect(jvm)
 for library in (contents / 'runtime').rglob('*.dylib'):
     inspect(library)
 jars = list((contents / 'app').glob('*.jar'))
@@ -58,6 +58,5 @@ with tempfile.TemporaryDirectory() as temp:
                             inspect(destination)
 assert found == set(required), f'Missing native resources: {set(required) - found}'
 # Loads actual FFmpeg, ONNX JNI and the shared analyzer with the packaged runtime.
-subprocess.run([str(java), '-cp', str(contents / 'app' / '*'),
-                'com.music.bitchord.desktop.DesktopNativeSmoke'], check=True, timeout=60)
+subprocess.run([str(launcher)], env={**os.environ, 'BITCHORD_NATIVE_SMOKE': '1'}, check=True, timeout=60)
 print(f'PASS: {arch} bundle metadata, runtime, native resources and JNI loading')
