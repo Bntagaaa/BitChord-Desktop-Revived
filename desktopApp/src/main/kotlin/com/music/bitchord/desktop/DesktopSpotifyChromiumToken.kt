@@ -194,6 +194,7 @@ internal object DesktopSpotifyChromiumToken {
     }
 
     private fun findChromium(): File? {
+        if (DesktopPlatform.isMac) return DesktopBrowserSignIn.preferred()?.executable?.toFile()
         val windows = System.getProperty("os.name").contains("Windows", ignoreCase = true)
         val candidates = if (windows) {
             val roots = listOfNotNull(
