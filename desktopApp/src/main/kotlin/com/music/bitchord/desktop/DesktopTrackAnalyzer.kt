@@ -88,6 +88,12 @@ internal class DesktopTrackAnalyzer(
 
     private val results = ConcurrentHashMap<String, TrackAnalysis>()
     private val running = ConcurrentHashMap.newKeySet<String>()
+    /** Only one drain is scheduled; only current and next are eligible for queued work. */
+    private data class AnalysisJob(val song: Song, val stream: DesktopStream?, val seconds: Double)
+    private val pending = DesktopAutomixWorkQueue<AnalysisJob>()
+    private val schedulerLock = Any()
+    private var drainScheduled = false
+    private val activeTaskId = ThreadLocal<String?>()
 
     /** Tracks the analyser could not measure. */
     private val failed = ConcurrentHashMap.newKeySet<String>()
@@ -98,19 +104,33 @@ internal class DesktopTrackAnalyzer(
     /** Said once, not once a tick. */
     private val warnedNoAnalyser = java.util.concurrent.atomic.AtomicBoolean(false)
 
+    /** Leave logical cores free for real-time playback on modest CPUs. */
+    private fun inferenceThreads(): Int = performance().inferenceThreads.coerceAtMost(
+        (Runtime.getRuntime().availableProcessors() - 2).coerceAtLeast(1),
+    )
+
     private val vocals by lazy {
-        VocalTracker({ DesktopAnalysisRuntime.modelPath(VocalTracker.MODEL_ASSET) }, { performance().inferenceThreads })
+        VocalTracker({ DesktopAnalysisRuntime.modelPath(VocalTracker.MODEL_ASSET) }, { inferenceThreads() })
     }
     private var vocalsUsed = false
     private var beatsUsed = false
     private val released = java.util.concurrent.atomic.AtomicBoolean(false)
-    private fun cancelled() = released.get() || Thread.currentThread().isInterrupted || stopped()
+    private fun cancelled(): Boolean {
+        val active = activeTaskId.get()
+        return released.get() || Thread.currentThread().isInterrupted || stopped() ||
+            (active != null && !pending.isRelevant(active))
+    }
 
     private val beats by lazy {
         BeatTracker(
             modelPath = { DesktopAnalysisRuntime.modelPath(BeatTracker.MODEL_ASSET) },
-            inferenceThreads = { performance().inferenceThreads },
+            inferenceThreads = { inferenceThreads() },
         )
+    }
+
+    /** Replace obsolete work as the playing pair changes. */
+    fun focusOn(currentTrackId: String?, nextTrackId: String?) {
+        pending.focus(currentTrackId, nextTrackId)
     }
 
     /** What is known now, never a computation — the planner asks this every tick. */
@@ -149,9 +169,7 @@ internal class DesktopTrackAnalyzer(
      */
     fun request(song: Song, stream: DesktopStream?, durationSeconds: Double) {
         val trackId = song.videoId
-        if (trackId.isBlank()) return
-        if (durationSeconds <= 0) return
-        if (cancelled()) return
+        if (trackId.isBlank() || durationSeconds <= 0 || cancelled() || !pending.isRelevant(trackId)) return
         if (!DesktopAnalysisRuntime.available) {
             if (warnedNoAnalyser.compareAndSet(false, true)) {
                 DesktopTrackLog.log("automix: this build has no analyser, so nothing will be measured")
@@ -159,70 +177,83 @@ internal class DesktopTrackAnalyzer(
             return
         }
         if (results[trackId]?.isUsable == true || restored(trackId)?.isUsable == true) return
-        // Asked every tick; a track that just failed is not resolved and decoded again each time.
         failedAt[trackId]?.let { if (System.currentTimeMillis() - it < RETRY_AFTER_MS) return }
-        if (!running.add(trackId)) return
-        failed.remove(trackId)
-        val local = stream?.takeIf { it.isLocalFile }
-        DesktopTrackLog.log(
-            "automix: analysing '${song.title}' (${"%.0f".format(durationSeconds)}s)" +
-                if (local != null) " from the file" else " from YouTube Opus",
-        )
-
-        try { worker.execute {
-            try {
-                if (cancelled()) {
-                    running.remove(trackId)
-                    return@execute
+        val job = AnalysisJob(song, stream?.takeIf { it.isLocalFile }, durationSeconds)
+        synchronized(schedulerLock) {
+            if (trackId in running || !pending.offer(trackId, job)) return
+            if (!drainScheduled) {
+                drainScheduled = true
+                try {
+                    worker.execute(::drainRequests)
+                } catch (closed: java.util.concurrent.RejectedExecutionException) {
+                    drainScheduled = false
+                    pending.clear()
+                    if (!released.get()) throw closed
                 }
-                // Android's rule: the lowest rung yields to playback rather than competing for a
-                // core, and the thread count stays the speed knob for the other two.
-                Thread.currentThread().priority =
-                    if (performance().yieldsToPlayback) Thread.MIN_PRIORITY else Thread.NORM_PRIORITY
-                val analysis = runCatching {
-                    val source = local ?: youTubeOpus(song) ?: return@runCatching null
-                    analyse(trackId, source, durationSeconds)
-                }
-                    .onFailure { DesktopTrackLog.log("analysis of '${song.title}' failed: ${it.message}") }
-                    .getOrNull()
-                if (analysis == null && cancelled()) {
-                    // Called off, not failed: it is free to be measured once the party ends.
-                    running.remove(trackId)
-                    return@execute
-                }
-                if (analysis == null) {
-                    failed += trackId
-                    failedAt[trackId] = System.currentTimeMillis()
-                }
-                if (analysis != null && cancelled()) { running.remove(trackId); return@execute }
-                if (analysis != null) {
-                    failedAt.remove(trackId)
-                    // A filesystem/cache failure must not erase usable in-memory evidence or
-                    // leave the track permanently marked as running.
-                    results[trackId] = analysis
-                    if (!analysis.isUsable) {
-                        failed += trackId
-                        failedAt[trackId] = System.currentTimeMillis()
-                    }
-                    runCatching {
-                        if (persistResult != null) persistResult.invoke(trackId, analysis)
-                        else store.save(trackId, analysis)
-                    }.onFailure { DesktopTrackLog.log("automix: could not persist '$trackId': ${it.message}") }
-                    DesktopTrackLog.log(
-                        "analysed '${song.title}': ${"%.1f".format(analysis.bpm)} bpm" +
-                            ", ${analysis.downbeats.size} downbeats" +
-                            ", key ${analysis.key.ifBlank { "unknown" }}",
-                    )
-                    runCatching { onAnalysed(trackId) }
-                        .onFailure { DesktopTrackLog.log("automix: analysis observer failed for '$trackId': ${it.message}") }
-                }
-            } finally {
-                running.remove(trackId)
             }
-        } } catch (closed: java.util.concurrent.RejectedExecutionException) {
-            running.remove(trackId)
-            if (!released.get()) throw closed
         }
+    }
+
+    /** One executor task drains the bounded, current-song-first queue. */
+    private fun drainRequests() {
+        while (!released.get()) {
+            val picked = synchronized(schedulerLock) {
+                pending.poll().also {
+                    if (it == null) drainScheduled = false
+                    else running.add(it.first)
+                }
+            } ?: return
+            activeTaskId.set(picked.first)
+            try {
+                runAnalysis(picked.second)
+            } finally {
+                activeTaskId.remove()
+                running.remove(picked.first)
+            }
+        }
+    }
+
+    private fun runAnalysis(job: AnalysisJob) {
+        if (cancelled()) return
+        val song = job.song
+        val trackId = song.videoId
+        Thread.currentThread().priority =
+            if (performance().yieldsToPlayback || Runtime.getRuntime().availableProcessors() <= 4)
+                Thread.MIN_PRIORITY else Thread.NORM_PRIORITY
+        failed.remove(trackId)
+        DesktopTrackLog.log(
+            "automix: analysing '${song.title}' (${"%.0f".format(job.seconds)}s)" +
+                if (job.stream != null) " from the file" else " from YouTube Opus",
+        )
+        val analysis = runCatching {
+            val source = job.stream ?: youTubeOpus(song) ?: return@runCatching null
+            analyse(trackId, source, job.seconds)
+        }.onFailure {
+            if (!cancelled()) DesktopTrackLog.log("analysis of '${song.title}' failed: ${it.message}")
+        }.getOrNull()
+        if (cancelled()) return
+        if (analysis == null) {
+            failed += trackId
+            failedAt[trackId] = System.currentTimeMillis()
+            return
+        }
+        failedAt.remove(trackId)
+        results[trackId] = analysis
+        if (!analysis.isUsable) {
+            failed += trackId
+            failedAt[trackId] = System.currentTimeMillis()
+        }
+        runCatching {
+            if (persistResult != null) persistResult.invoke(trackId, analysis)
+            else store.save(trackId, analysis)
+        }.onFailure { DesktopTrackLog.log("automix: could not persist '$trackId': ${it.message}") }
+        DesktopTrackLog.log(
+            "analysed '${song.title}': ${"%.1f".format(analysis.bpm)} bpm" +
+                ", ${analysis.downbeats.size} downbeats" +
+                ", key ${analysis.key.ifBlank { "unknown" }}",
+        )
+        runCatching { onAnalysed(trackId) }
+            .onFailure { DesktopTrackLog.log("automix: analysis observer failed for '$trackId': ${it.message}") }
     }
 
     /**
@@ -238,7 +269,12 @@ internal class DesktopTrackAnalyzer(
         if (identity.videoId != song.videoId) {
             DesktopTrackLog.log("automix: measuring '${song.title}' on YouTube's ${identity.videoId}")
         }
-        DesktopStreamClient.resolve(identity).getOrThrow()
+        kotlinx.coroutines.withTimeoutOrNull(20_000L) {
+            DesktopStreamClient.resolve(identity).getOrThrow()
+        } ?: run {
+            DesktopTrackLog.log("automix: YouTube analysis source timed out")
+            null
+        }
     }
 
     private fun analyse(
@@ -486,6 +522,7 @@ internal class DesktopTrackAnalyzer(
 
     fun release() {
         released.set(true)
+        pending.clear()
         worker.shutdownNow()
         // Inference/native reads may finish after an interrupt. Close only after their owner exits.
         Thread({
