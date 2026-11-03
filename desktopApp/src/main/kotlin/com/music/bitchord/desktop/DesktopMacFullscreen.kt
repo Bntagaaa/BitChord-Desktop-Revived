@@ -47,7 +47,9 @@ internal class DesktopMacFullscreen(private val window: Window) : AutoCloseable 
     fun apply(fullscreen: Boolean) {
         check(EventQueue.isDispatchThread())
         desired = fullscreen
-        requested = actual != desired
+        // Keep a queued reversal while AppKit is animating, even if the desired
+        // state still equals the last completed state.
+        requested = transitioning || actual != desired
         reconcile()
     }
 

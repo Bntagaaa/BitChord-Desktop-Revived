@@ -113,7 +113,7 @@ headphone, Bluetooth or real audio device is simulated as success.
       switching, Instant Playback, AutoMix and normal Crossfade separately.
 - [ ] Music videos and existing PiP: open, resize, fullscreen, restore and close.
 - [ ] Spaces fullscreen through app button, green button and Escape; minimize,
-      zoom, resize, Dock reopen and Command-Q; no duplicate player/window.
+      zoom, resize, rapid enter/exit reversals, Dock reopen and Command-Q; no duplicate player/window.
 - [ ] Light, dark, Follow System, Retina/HiDPI, sidebar and Reduce Blur enabled.
 - [ ] Media keys and Control Center remote commands/metadata, background playback.
 - [ ] Built-in, USB and Bluetooth outputs; switch default route, disconnect the
