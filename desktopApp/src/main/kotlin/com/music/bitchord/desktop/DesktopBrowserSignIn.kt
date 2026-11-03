@@ -72,6 +72,8 @@ internal object DesktopBrowserSignIn {
             .resolve("Browser Sign In")
             .resolve(browser.name)
         Files.createDirectories(profile)
+        if (DesktopPlatform.isMac) Files.setPosixFilePermissions(profile,
+            java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"))
         val portFile = profile.resolve(DEVTOOLS_ACTIVE_PORT)
         Files.deleteIfExists(portFile)
 

@@ -113,7 +113,12 @@ jobs:
           import os,pathlib,re,xml.etree.ElementTree as ET
           emitted = 0
           for path in pathlib.Path('.').glob('macos-*.log'):
-              for line in path.read_text(errors='replace').splitlines():
+              lines = path.read_text(errors='replace').splitlines()
+              if '* What went wrong:' in lines:
+                  index = lines.index('* What went wrong:')
+                  detail = ' | '.join(lines[index+1:index+13]).replace('%', '%25')
+                  print('::error title=Gradle failure::' + detail[:2500])
+              for line in lines:
                   if emitted < 12 and (line.startswith('e: ') or line.startswith('  Line ') or line.startswith('CMake Error') or 'error:' in line.lower()):
                       escaped = line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
                       print('::error title=macOS build diagnostic::' + escaped[:1500])
