@@ -215,9 +215,11 @@ class DesktopUpdateReliabilityTest {
         val base = Files.createTempDirectory("updater-locations")
         try {
             val state = base.resolve("state"); val home = base.resolve("home"); val local = base.resolve("local")
-            assertEquals(state.resolve("bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("XDG_STATE_HOME" to state.toString()), home.toString(), false))
-            assertEquals(home.resolve(".local/state/bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("XDG_STATE_HOME" to "relative"), home.toString(), false))
-            assertEquals(local.resolve("bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("LOCALAPPDATA" to local.toString()), home.toString(), true))
+            assertEquals(home.resolve("Library/Logs/bitchord/updater"),
+                DesktopUpdateDiagnostics.directory(mapOf("XDG_STATE_HOME" to state.toString()), home.toString(), false, mac = true))
+            assertEquals(state.resolve("bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("XDG_STATE_HOME" to state.toString()), home.toString(), false, mac = false))
+            assertEquals(home.resolve(".local/state/bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("XDG_STATE_HOME" to "relative"), home.toString(), false, mac = false))
+            assertEquals(local.resolve("bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("LOCALAPPDATA" to local.toString()), home.toString(), true, mac = false))
         } finally { base.toFile().deleteRecursively() }
     }
 }

@@ -10,8 +10,8 @@ import java.time.Instant
 
 /** Updater-owned state only. No environment dumps, account data or application stdout. */
 internal object DesktopUpdateDiagnostics {
-    fun directory(environment: Map<String, String> = System.getenv(), home: String = System.getProperty("user.home"), windows: Boolean = DesktopPlatform.isWindows): Path {
-        if (!windows && DesktopPlatform.isMac) return Path.of(home, "Library", "Logs", "bitchord", "updater")
+    fun directory(environment: Map<String, String> = System.getenv(), home: String = System.getProperty("user.home"), windows: Boolean = DesktopPlatform.isWindows, mac: Boolean = DesktopPlatform.isMac): Path {
+        if (!windows && mac) return Path.of(home, "Library", "Logs", "bitchord", "updater")
         val configured = environment[if (windows) "LOCALAPPDATA" else "XDG_STATE_HOME"]
             ?.takeIf { it.isNotBlank() }?.let { runCatching { Path.of(it) }.getOrNull() }?.takeIf { it.isAbsolute }
         return (configured ?: if (windows) Path.of(home, "AppData", "Local") else Path.of(home, ".local", "state"))
