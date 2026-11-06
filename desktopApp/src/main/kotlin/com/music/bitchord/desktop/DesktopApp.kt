@@ -5889,7 +5889,7 @@ private fun DesktopSidebarItem(
             Box(
                 Modifier.fillMaxWidth().height(42.dp)
                     .clip(RoundedCornerShape(7.dp))
-                    .background(if (selected) DesktopTheme.palette.navAccent.copy(alpha = 0.12f) else Color.Transparent)
+                    .background(if (selected) DesktopTheme.palette.navSelectedSurface else Color.Transparent)
                     .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
                     .clickable(onClick = onClick),
                 contentAlignment = Alignment.Center,
@@ -5911,7 +5911,7 @@ private fun DesktopSidebarItem(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(7.dp))
-            .background(if (selected) DesktopTheme.palette.navAccent.copy(alpha = 0.12f) else Color.Transparent)
+            .background(if (selected) DesktopTheme.palette.navSelectedSurface else Color.Transparent)
             .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
             .clickable(onClick = onClick)
             .padding(horizontal = 9.dp, vertical = 7.dp),
@@ -7960,7 +7960,7 @@ private fun DesktopSettingsScreen(
                         val micaSidebar by DesktopAppearanceSettings.micaSidebar.collectAsState()
                         SettingsToggle(
                             "Use Mica-style sidebar",
-                            "Wallpaper-tinted Windows 11 sidebar without live blur; works independently of Reduce dynamic blur",
+                            "Wallpaper-toned grayscale Windows 11 sidebar without live blur; works independently of Reduce dynamic blur",
                             micaSidebar,
                             DesktopAppearanceSettings::setMicaSidebar,
                         )
