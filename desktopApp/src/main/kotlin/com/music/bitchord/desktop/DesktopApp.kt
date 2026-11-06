@@ -7960,7 +7960,7 @@ private fun DesktopSettingsScreen(
                         val micaSidebar by DesktopAppearanceSettings.micaSidebar.collectAsState()
                         SettingsToggle(
                             "Use Mica-style sidebar",
-                            "Wallpaper-toned grayscale Windows 11 sidebar without live blur; works independently of Reduce dynamic blur",
+                            "Wallpaper-tinted Windows 11 sidebar without live blur; works independently of Reduce dynamic blur",
                             micaSidebar,
                             DesktopAppearanceSettings::setMicaSidebar,
                         )
