@@ -68,11 +68,20 @@ function Show-Updater {
     if ($Headless) { return }
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class BitChordUpdaterWindow {
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr handle, int command);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle);
+}
+'@
     [Windows.Forms.Application]::EnableVisualStyles()
     $script:form = New-Object Windows.Forms.Form
     $form.Text = 'BitChord Updater'
     $form.ClientSize = New-Object Drawing.Size(520, 180)
     $form.StartPosition = 'CenterScreen'; $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false
+    $form.ShowInTaskbar = $true
     $script:label = New-Object Windows.Forms.Label
     $label.Location = New-Object Drawing.Point(20, 20)
     $label.Size = New-Object Drawing.Size(480, 65)
@@ -88,7 +97,14 @@ function Show-Updater {
     $closeButton.Enabled = $false; $closeButton.Add_Click({ $form.Close() })
     $form.Controls.AddRange(@($label, $bar, $logs, $closeButton))
     $form.Add_FormClosing({ param($sender, $eventArgs) if (-not $script:terminal) { $eventArgs.Cancel = $true } })
-    $form.Show(); [Windows.Forms.Application]::DoEvents()
+    $form.Show()
+    # A hidden-console STARTUPINFO can override the FIRST ShowWindow call.
+    # Explicitly show only our form after it exists, never the console.
+    [void][BitChordUpdaterWindow]::ShowWindow($form.Handle, 5)
+    $form.Activate()
+    [Windows.Forms.Application]::DoEvents()
+    if (-not [BitChordUpdaterWindow]::IsWindowVisible($form.Handle)) { throw 'Native updater window could not be shown' }
+    Log "updater-window-visible hwnd=$($form.Handle)"
 }
 
 try {
