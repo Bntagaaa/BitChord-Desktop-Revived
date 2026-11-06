@@ -5741,18 +5741,18 @@ private fun DesktopSidebar(
                     Icon(Icons.Rounded.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                 }
             }
-            DesktopSidebarItem(BitChordIcons.Home, DesktopStrings["home", "Home"], !settingsOpen && destination == DesktopDestination.LISTEN_NOW, collapsed = collapsed) {
+            DesktopSidebarItem(DesktopPrimaryNavigationIcons.Home, DesktopStrings["home", "Home"], !settingsOpen && destination == DesktopDestination.LISTEN_NOW, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LISTEN_NOW)
             }
-            DesktopSidebarItem(BitChordIcons.TabExplore, "New", !settingsOpen && destination == DesktopDestination.NEW, collapsed = collapsed) {
+            DesktopSidebarItem(DesktopPrimaryNavigationIcons.New, "New", !settingsOpen && destination == DesktopDestination.NEW, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.NEW)
             }
-            DesktopSidebarItem(BitChordIcons.Search, "Search",
+            DesktopSidebarItem(DesktopPrimaryNavigationIcons.Search, "Search",
                 !settingsOpen && (destination == DesktopDestination.SEARCH || destination == DesktopDestination.EXPLORE), collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.SEARCH)
             }
-            // Library and Spotify are independent destinations in the default sidebar.
-            DesktopSidebarItem(BitChordIcons.Library, "Library", !settingsOpen && destination == DesktopDestination.LIBRARY, collapsed = collapsed) {
+            // Match the mobile tab bar glyphs; Library and Spotify remain independent destinations.
+            DesktopSidebarItem(DesktopPrimaryNavigationIcons.Library, "Library", !settingsOpen && destination == DesktopDestination.LIBRARY, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LIBRARY)
             }
             Spacer(Modifier.height(6.dp))
@@ -6015,12 +6015,12 @@ private fun DesktopFloatingNavigation(
     settingsOpen: Boolean,
     onDestinationSelected: (DesktopDestination) -> Unit,
 ) {
-    // Mirror the full sidebar when the desktop window becomes compact: Search replaces Explore.
+    // Use the same mobile tab glyphs as the expanded sidebar; Search replaces legacy Explore.
     val tabs = listOf(
-        DesktopDestination.LISTEN_NOW to (BitChordIcons.Home to "Home"),
-        DesktopDestination.NEW to (BitChordIcons.TabExplore to "New"),
-        DesktopDestination.SEARCH to (BitChordIcons.Search to "Search"),
-        DesktopDestination.LIBRARY to (BitChordIcons.Library to "Library"),
+        DesktopDestination.LISTEN_NOW to (DesktopPrimaryNavigationIcons.Home to "Home"),
+        DesktopDestination.NEW to (DesktopPrimaryNavigationIcons.New to "New"),
+        DesktopDestination.SEARCH to (DesktopPrimaryNavigationIcons.Search to "Search"),
+        DesktopDestination.LIBRARY to (DesktopPrimaryNavigationIcons.Library to "Library"),
     )
     val selected: DesktopDestination? = if (settingsOpen) {
         null
