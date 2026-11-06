@@ -1,0 +1,63 @@
+name: Windows Real Updater Upgrade
+
+on:
+  pull_request:
+    branches: ["1.9.1"]
+    paths:
+      - "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdate*.kt"
+      - "desktopApp/src/main/resources/updater/**"
+      - "desktopApp/packaging/tests/windows-real-upgrade.ps1"
+      - ".github/workflows/windows-real-upgrade.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-msi-upgrade:
+    name: Install previous MSI then upgrade with log held open
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install WiX Toolset 3
+        shell: pwsh
+        run: |
+          $url = "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip"
+          Invoke-WebRequest -Uri $url -OutFile wix.zip
+          Expand-Archive wix.zip -DestinationPath "$env:RUNNER_TEMP\wix"
+          "$env:RUNNER_TEMP\wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Provide optional build configuration
+        shell: pwsh
+        run: |
+          "LASTFM_API_KEY=$env:LASTFM_API_KEY" | Set-Content local.properties
+          "LASTFM_SECRET=$env:LASTFM_SECRET" | Add-Content local.properties
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
+      - name: Run updater unit tests
+        shell: pwsh
+        run: .\gradlew.bat :desktopApp:test "-Pbitchord.version=1.9.1" "-Pbitchord.packageBuild=1014"
+      - name: Build actual upgrade target MSI
+        shell: pwsh
+        run: .\gradlew.bat :desktopApp:packageMsi "-Pbitchord.version=1.9.1" "-Pbitchord.packageBuild=1014"
+      - name: Obtain previous official MSI
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases/download/v1.8.3/BitChord-1.8.3-windows-x64.msi" -OutFile "$env:RUNNER_TEMP\previous.msi"
+      - name: Exercise real per-user MSI upgrade and registry checks
+        shell: pwsh
+        run: |
+          $current = (Get-ChildItem desktopApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
+          ./desktopApp/packaging/tests/windows-real-upgrade.ps1 -PreviousMsi "$env:RUNNER_TEMP\previous.msi" -CurrentMsi $current -ExpectedVersion "1.9.1014"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: windows-msi-upgrade-logs
+          path: ${{ runner.temp }}/bitChord-*-msi.log
+          if-no-files-found: ignore
