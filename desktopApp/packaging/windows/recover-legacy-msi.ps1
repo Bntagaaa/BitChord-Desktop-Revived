@@ -51,7 +51,7 @@ try {
 
     $cacheRoot = Join-Path $env:LOCALAPPDATA 'BitChordUpdater\PackageCache\Legacy'
     New-Item -ItemType Directory -Force $cacheRoot | Out-Null
-    $temporary = Join-Path $cacheRoot "$([guid]::NewGuid().ToString('N')).part"
+    $temporary = Join-Path $cacheRoot "$([guid]::NewGuid().ToString('N')).msi"
     $output = [IO.File]::Open($temporary, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
     try {
         $buffer = New-Object byte[] 1048576
@@ -79,9 +79,13 @@ try {
             return ([string]$record.StringData(1)).Trim()
         } finally { $null = $view.Close() }
     }
-    $product = Read-Property 'ProductCode'
-    $upgrade = Read-Property 'UpgradeCode'
-    $version = Read-Property 'ProductVersion'
+    try {
+        $product = Read-Property 'ProductCode'
+        $upgrade = Read-Property 'UpgradeCode'
+        $version = Read-Property 'ProductVersion'
+    } finally {
+        if ($db) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($db); $db = $null }
+    }
     if ($upgrade.Trim('{}') -ine '8f3c1d24-6a2b-4f5e-9c17-2b8d54e0a913') {
         throw 'Embedded MSI is not part of the official BitChord upgrade family.'
     }
