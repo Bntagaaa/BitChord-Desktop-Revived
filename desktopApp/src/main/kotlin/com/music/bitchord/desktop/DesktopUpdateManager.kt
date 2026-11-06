@@ -157,7 +157,12 @@ internal class DesktopUpdateService(
         val ready = state.value
         if (ready.phase != UpdatePhase.READY || ready.file == null || ready.hash == null || !canAutoInstall) return
         begin(ready.copy(phase = UpdatePhase.INSTALLING)) { _ ->
-            val prepared = prepare(installation, ready.file, ready.hash, requireNotNull(ready.release).version)
+            val prepared = try {
+                prepare(installation, ready.file, ready.hash, requireNotNull(ready.release).version)
+            } catch (failure: Throwable) {
+                DesktopUpdateDiagnostics.logPreflightFailure(installation.format, failure)
+                throw failure
+            }
             try {
                 currentCoroutineContext().ensureActive()
                 prepared.launch() // Disk/process work remains off the UI thread.
