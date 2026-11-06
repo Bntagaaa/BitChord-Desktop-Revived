@@ -23,12 +23,24 @@ function Invoke-Msi([string]$Arguments, [string]$Log) {
         throw "msiexec failed with $($p.ExitCode). See $Log"
     }
 }
-function Installed-Version {
-    $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
-    $entry = Get-ChildItem $key -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PSPath } |
-        Where-Object { $_.DisplayName -eq 'BitChord' } | Select-Object -First 1
-    if ($entry) { return $entry.DisplayVersion }
-    return $null
+function Installed-Version([string]$ProductCode) {
+    # Non-interactive msiexec on CI may register as per-machine even if the
+    # application's interactive installer defaults to per-user.
+    $roots = @(
+        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
+        'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
+        'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+    )
+    foreach ($root in $roots) {
+        $entry = Get-ItemProperty -LiteralPath "$root\$ProductCode" -ErrorAction SilentlyContinue
+        if ($entry -and $entry.DisplayVersion) { return [string]$entry.DisplayVersion }
+    }
+    $entries = foreach ($root in $roots) {
+        Get-ItemProperty -Path "$root\*" -ErrorAction SilentlyContinue |
+            Where-Object { $_.PSChildName -eq $ProductCode -or $_.DisplayName -like 'BitChord*' } |
+            Select-Object PSChildName, DisplayName, DisplayVersion
+    }
+    throw "Product $ProductCode not found in Windows uninstall registry. Candidates: $($entries | ConvertTo-Json -Compress)"
 }
 $oldId = Get-MsiProperty $PreviousMsi 'ProductCode'
 $newId = Get-MsiProperty $CurrentMsi 'ProductCode'
@@ -44,14 +56,14 @@ $log = Join-Path $operation 'install.log'
 $held = $null
 try {
     Invoke-Msi "/i `"$PreviousMsi`"" (Join-Path $env:RUNNER_TEMP 'bitChord-old-msi.log')
-    $previousVersion = Installed-Version
+    $previousVersion = Installed-Version $oldId
     if (-not $previousVersion) { throw 'Old BitChord version was not registered under HKCU' }
     # Match the updater's lifetime: installer log stays open while msiexec runs.
     $held = [IO.File]::Open($log, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::Write, [IO.FileShare]::Read)
     $held.WriteByte(65)
     $held.Flush()
     Invoke-Msi "/i `"$CurrentMsi`"" (Join-Path $env:RUNNER_TEMP 'bitChord-new-msi.log')
-    $actual = Installed-Version
+    $actual = Installed-Version $newId
     if ($actual -ne $ExpectedVersion) {
         throw "Upgrade left version '$actual' (old $previousVersion), expected '$ExpectedVersion'"
     }
