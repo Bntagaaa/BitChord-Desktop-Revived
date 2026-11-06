@@ -68,23 +68,38 @@ try {
     [void][JpackageResource]::FreeLibrary($module)
 }
 try {
+    # Close every COM result object, not just the top-level database.
+    # An open MSI view/record can keep the original file locked and make
+    # Move-Item/Remove-Item fail even after the database is released.
     $msi = New-Object -ComObject WindowsInstaller.Installer
-    $db = $msi.OpenDatabase([IO.Path]::GetFullPath($temporary), 0)
-    function Read-Property([string]$name) {
-        $view = $db.OpenView("SELECT Value FROM Property WHERE Property='$name'")
-        try {
-            $null = $view.Execute()
-            $record = $view.Fetch()
-            if (-not $record) { throw "MSI missing $name" }
-            return ([string]$record.StringData(1)).Trim()
-        } finally { $null = $view.Close() }
-    }
+    $db = $null
     try {
+        $db = $msi.OpenDatabase([IO.Path]::GetFullPath($temporary), 0)
+        function Read-Property([string]$name) {
+            $view = $null
+            $record = $null
+            try {
+                $view = $db.OpenView("SELECT Value FROM Property WHERE Property='$name'")
+                $null = $view.Execute()
+                $record = $view.Fetch()
+                if (-not $record) { throw "MSI missing $name" }
+                return ([string]$record.StringData(1)).Trim()
+            } finally {
+                if ($record) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record) }
+                if ($view) {
+                    [void]$view.Close()
+                    [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view)
+                }
+            }
+        }
         $product = Read-Property 'ProductCode'
         $upgrade = Read-Property 'UpgradeCode'
         $version = Read-Property 'ProductVersion'
     } finally {
         if ($db) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($db); $db = $null }
+        if ($msi) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($msi); $msi = $null }
+        [GC]::Collect()
+        [GC]::WaitForPendingFinalizers()
     }
     if ($upgrade.Trim('{}') -ine '8f3c1d24-6a2b-4f5e-9c17-2b8d54e0a913') {
         throw 'Embedded MSI is not part of the official BitChord upgrade family.'
