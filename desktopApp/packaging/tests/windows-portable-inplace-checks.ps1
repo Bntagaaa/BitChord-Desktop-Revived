@@ -95,6 +95,41 @@ try {
         $lockJob | Remove-Job -Force -ErrorAction SilentlyContinue
     }
 
+    # Historical release workflow archives the whole Gradle path rather than
+    # a single BitChord/ directory. The helper must discover the launcher.
+    $nestedSource = Join-Path $testRoot 'nested-bundle'
+    $nestedApp = Join-Path $nestedSource 'desktopApp/build/compose/binaries/main/app/BitChord'
+    Populate-Root $nestedApp 'nested-new'
+    $nestedRoot = Join-Path $testRoot 'NestedCase'
+    $nestedOp = Join-Path $testRoot 'nested-operation'
+    New-Item -ItemType Directory -Force -Path $nestedRoot, $nestedOp | Out-Null
+    Populate-Root $nestedRoot 'nested-old'
+    $nestedZip = Join-Path $nestedOp 'verified-portable.zip'
+    [IO.Compression.ZipFile]::CreateFromDirectory($nestedSource, $nestedZip)
+    $code = Run-Helper $nestedZip $nestedRoot $nestedOp
+    if ($code -ne 0 -or
+        (Get-Content -LiteralPath (Join-Path $nestedRoot 'BitChord.exe') -Raw).Trim() -ne 'nested-new') {
+        throw 'Nested Gradle path portable ZIP was not installed in original directory'
+    }
+    Write-Output 'PASS: nested Gradle-path archive root detected from BitChord.exe'
+
+    # Ambiguous executables must never select a random directory.
+    $ambiguousSource = Join-Path $testRoot 'ambiguous-bundle'
+    Populate-Root (Join-Path $ambiguousSource 'first') 'first-new'
+    Populate-Root (Join-Path $ambiguousSource 'second') 'second-new'
+    $ambiguousRoot = Join-Path $testRoot 'AmbiguousCase'
+    $ambiguousOp = Join-Path $testRoot 'ambiguous-operation'
+    New-Item -ItemType Directory -Force -Path $ambiguousRoot, $ambiguousOp | Out-Null
+    Populate-Root $ambiguousRoot 'unchanged'
+    $ambiguousZip = Join-Path $ambiguousOp 'verified-portable.zip'
+    [IO.Compression.ZipFile]::CreateFromDirectory($ambiguousSource, $ambiguousZip)
+    $code = Run-Helper $ambiguousZip $ambiguousRoot $ambiguousOp
+    if ($code -eq 0 -or
+        (Get-Content -LiteralPath (Join-Path $ambiguousRoot 'BitChord.exe') -Raw).Trim() -ne 'unchanged') {
+        throw 'Ambiguous archive was installed instead of rejected'
+    }
+    Write-Output 'PASS: ambiguous executable roots rejected'
+
     $failureRoot = Join-Path $testRoot 'FailureCase'
     $failureOp = Join-Path $testRoot 'failure-operation'
     New-Item -ItemType Directory -Force -Path $failureRoot, $failureOp | Out-Null
