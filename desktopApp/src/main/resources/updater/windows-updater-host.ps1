@@ -5,8 +5,11 @@ param(
     [ValidateRange(1, 300)][int]$ReadySeconds = 60
 )
 # A separate Windows process owns the entire handoff, both for ZIP and setup.
-# The operation, scripts, payload and logs live OUTSIDE the app being replaced.
+# Use only this engine's built-in modules: pwsh 7 may have supplied a module
+# path that causes Windows PowerShell 5.1 to import incompatible utilities.
 $ErrorActionPreference = 'Stop'
+$originalModulePath = $env:PSModulePath
+$env:PSModulePath = [IO.Path]::Combine($PSHOME, 'Modules')
 $operation = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Request))
 $form = $null
 $label = $null
@@ -57,7 +60,6 @@ function Alive([long]$processId, [long]$startMillis) {
 }
 function Quote([string]$value) {
     if ($value -match '["\x00\r\n]') { throw 'Invalid command argument' }
-    # ProcessStartInfo/Start-Process require an explicit Windows argument string.
     return '"' + ($value -replace '(\\+)$', '$1$1') + '"'
 }
 function Read-Fields([string]$file) {
@@ -112,7 +114,7 @@ try {
     if ($requestData.schema -ne 1 -or $requestData.mode -notin @('portable', 'setup') -or
         $requestData.expected -notmatch '^[a-fA-F0-9]{64}$' -or
         $requestData.token -notmatch '^[a-f0-9]{32}$' -or
-        $requestData.version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$') { throw 'Invalid update request' }
+        $requestData.version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$') { throw 'Invalid update request' }
     $application = [IO.Path]::GetFullPath([string]$requestData.application)
     if (-not [IO.Path]::IsPathRooted([string]$requestData.application) -or
         [IO.Path]::GetFileName($application) -ine 'BitChord.exe') { throw 'Invalid application launcher' }
@@ -122,6 +124,8 @@ try {
     Assert-Regular (Join-Path $appRoot 'app/BitChord.cfg')
     if ($operation.Equals($appRoot, [StringComparison]::OrdinalIgnoreCase) -or
         $operation.StartsWith($appRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Updater must run outside the installation' }
+    if (Test-Path -LiteralPath (Join-Path $operation 'completed')) { throw 'Operation already completed; duplicate update refused' }
+    if (Test-Path -LiteralPath (Join-Path $operation 'launch.requested')) { throw 'Relaunch already requested; duplicate launch refused' }
     $payloadDir = Join-Path $operation 'payload'
     Assert-Regular $payloadDir -Directory
     $scriptFile = Join-Path $payloadDir 'worker.ps1'
@@ -135,13 +139,11 @@ try {
     if ($parseErrors.Count) { throw "Bundled worker has a syntax error: $($parseErrors[0].Message)" }
     if ($requestData.workerSha256 -notmatch '^[a-f0-9]{64}$' -or
         (Get-FileHash -LiteralPath $scriptFile -Algorithm SHA256).Hash -ine $requestData.workerSha256) { throw 'Worker checksum mismatch' }
-    if (Test-Path -LiteralPath (Join-Path $operation 'completed')) { throw 'Operation already completed; duplicate update refused' }
-    if (Test-Path -LiteralPath (Join-Path $operation 'launch.requested')) { throw 'Relaunch already requested; duplicate launch refused' }
     $lease = [IO.File]::Open((Join-Path $operation 'host.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     $sha = [Security.Cryptography.SHA256]::Create()
     try { $key = [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($application.ToLowerInvariant()))).Replace('-', '') }
     finally { $sha.Dispose() }
-    $mutex = New-Object Threading.Mutex($false, ('Local\BitChordUpdater-' + $key))
+    $mutex = [Threading.Mutex]::new($false, ('Local\BitChordUpdater-' + $key))
     try { $ownsMutex = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $ownsMutex = $true }
     if (-not $ownsMutex) { throw 'Another updater is already handling this installation' }
     $hostStart = ([DateTimeOffset](Get-Process -Id $PID).StartTime.ToUniversalTime()).ToUnixTimeMilliseconds()
@@ -202,6 +204,8 @@ try {
         $start.FileName = $application
         $start.WorkingDirectory = $appRoot
         $start.UseShellExecute = $false
+        if ($originalModulePath) { $start.EnvironmentVariables['PSModulePath'] = $originalModulePath }
+        else { $start.EnvironmentVariables.Remove('PSModulePath') }
         $start.EnvironmentVariables['BITCHORD_UPDATE_READY_FILE'] = Join-Path $operation 'window-ready'
         $start.EnvironmentVariables['BITCHORD_UPDATE_TOKEN'] = [string]$requestData.token
         $start.EnvironmentVariables['BITCHORD_UPDATE_EXPECTED_VERSION'] = [string]$requestData.version
@@ -228,8 +232,8 @@ try {
                     }
                 }
             }
-            # Older target versions lack the token handshake. A newly created,
-            # visible window from the verified exact launcher is still observable.
+            # Older target versions lack the token handshake. Observe only a NEW
+            # visible window from the exact version-checked launcher in that case.
             foreach ($visible in @(Get-Process -Name 'BitChord' -ErrorAction SilentlyContinue)) {
                 try {
                     if ($visible.Path -ieq $application -and $visible.MainWindowHandle -ne [IntPtr]::Zero -and
@@ -265,11 +269,15 @@ try {
     # Never discard payloads while a worker or installer might still be using them.
     if ($lease -and (-not $worker -or $worker.HasExited)) {
         $payloadDir = Join-Path $operation 'payload'
-        foreach ($name in @('verified-portable.zip', 'verified-setup.exe')) {
+        foreach ($name in @('verified-portable.zip', 'verified-setup.exe', 'worker.ps1', 'msi-source.ps1',
+            'helper.identity', 'armed', 'status', 'completed', 'failure.detail', 'backup.path')) {
             $path = Join-Path $payloadDir $name
             if (Test-Path -LiteralPath $path -PathType Leaf) {
                 try { Assert-Regular $path; Remove-Item -LiteralPath $path -Force } catch { Log 'payload-cleanup-deferred' }
             }
+        }
+        if (Test-Path -LiteralPath $payloadDir -PathType Container) {
+            try { [IO.Directory]::Delete($payloadDir, $false) } catch { }
         }
         Set-Content -LiteralPath (Join-Path $operation 'completed') -Value $result -Encoding utf8
     }
