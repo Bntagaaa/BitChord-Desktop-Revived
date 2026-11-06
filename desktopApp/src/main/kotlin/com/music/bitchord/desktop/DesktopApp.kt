@@ -3121,8 +3121,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     }
 
     /**
-     * The account's library, re-read whenever the session behind it changes — signing in, switching
-     * channel, signing out.
+     * Fetch the signed-in account's library as soon as its session is restored. The sidebar needs
+     * the Playlists shelf on Home and every other destination, not just after visiting Library.
+     * Account switches, playlist-picker refreshes and explicit retries still reload it.
      */
     LaunchedEffect(activeAccountId, activeProfileId, sessionRevision, destination == DesktopDestination.LIBRARY, overlays.playlistDialog) {
         youtubeSignedIn = DesktopYouTubeAuth.isSignedIn
@@ -3133,13 +3134,13 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
             return@LaunchedEffect
         }
         val accountChanged = loadedAccountId != activeAccountId || loadedProfileId != activeProfileId
-        if (accountChanged) {
-            libraryState = UiState.Loading
-        }
-        if (destination != DesktopDestination.LIBRARY && !overlays.playlistDialog) {
-            return@LaunchedEffect
-        }
-        if (!accountChanged && libraryState is UiState.Success && destination == DesktopDestination.LIBRARY) {
+        if (!DesktopLibraryLoadPolicy.shouldFetch(
+                accountChanged = accountChanged,
+                hasLoadedLibrary = libraryState is UiState.Success,
+                playlistDialogOpen = overlays.playlistDialog,
+                libraryVisible = destination == DesktopDestination.LIBRARY,
+            )
+        ) {
             return@LaunchedEffect
         }
         libraryState = UiState.Loading

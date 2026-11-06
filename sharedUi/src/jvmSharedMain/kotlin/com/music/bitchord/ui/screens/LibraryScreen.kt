@@ -361,6 +361,13 @@ private fun PlaylistShelf(
     )
 }
 
+/** Desktop Library uses smaller playlist artwork than the global 150.dp shelf cards. */
+private val LIBRARY_DESKTOP_PLAYLIST_CARD_WIDTH = 112.dp
+
+/** Only the desktop Library's Playlists row changes size; Android and other shelves stay put. */
+internal fun libraryShelfCardWidth(shelfTitle: String, desktop: Boolean): Dp =
+    if (desktop && shelfTitle == PLAYLISTS) LIBRARY_DESKTOP_PLAYLIST_CARD_WIDTH else SHELF_CARD_WIDTH
+
 /** Preview cap used to decide whether Library needs a Show all link. */
 private const val LIBRARY_PLAYLIST_VISIBLE_CARDS = 4
 /** Other shelves keep their existing compact previews. */
@@ -368,8 +375,8 @@ private const val LIBRARY_ROW_MAX_ITEMS = 5
 
 /**
  * Playlist rows use the same lazy horizontal carousel and mouse-wheel/arrow controls as Home.
- * Cards keep their original fixed width; remaining playlists stay reachable by scrolling;
- * Show all remains available for the full vertical grid. Other shelves keep their preview cap.
+ * On desktop the Library playlist cards are 112.dp (other shelves and Android stay at 150.dp).
+ * Remaining playlists stay reachable by scrolling; Show all still opens the full grid.
  */
 @Composable
 internal fun LibraryGridShelf(
@@ -381,7 +388,9 @@ internal fun LibraryGridShelf(
     pinnedPlaylists: List<String> = emptyList(),
 ) {
     // Keep mobile's existing five-card preview; the four-card carousel is desktop-only.
-    val isPlaylist = shelf.title == PLAYLISTS && LocalDesktopCompactHeadings.current
+    val desktop = LocalDesktopCompactHeadings.current
+    val isPlaylist = shelf.title == PLAYLISTS && desktop
+    val cardWidth = libraryShelfCardWidth(shelf.title, desktop)
     val leadingCount = if (leadingCard != null) 1 else 0
     val previewCount = if (isPlaylist) LIBRARY_PLAYLIST_VISIBLE_CARDS else LIBRARY_ROW_MAX_ITEMS
     val visibleItems = if (isPlaylist) shelf.items
@@ -392,21 +401,20 @@ internal fun LibraryGridShelf(
             subtitle = shelf.subtitle,
             onShowAll = onShowAll.takeIf { shelf.items.size + leadingCount > previewCount },
         )
-        // Preserve BitChord's original 150.dp artwork cards. The playlist row
-        // remains horizontally scrollable with all its items; unlike a fluid
-        // grid, widening the window must never enlarge playlist artwork.
+        // Compact only the desktop Library playlist row, including its new-playlist tile.
+        // Keep fixed sizes and horizontal scrolling instead of stretching with the window.
         ShelfRow(
             contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
             horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            leadingCard?.let { card -> item(key = "leading") { card(SHELF_CARD_WIDTH) } }
+            leadingCard?.let { card -> item(key = "leading") { card(cardWidth) } }
             items(visibleItems) { item ->
                 ShelfCard(
                     item = item,
                     onClick = { onItemClick(item) },
                     onLongPress = { onItemLongPress(item) },
-                    modifier = Modifier.width(SHELF_CARD_WIDTH),
+                    modifier = Modifier.width(cardWidth),
                     isPinned = item.browseId != null && item.browseId in pinnedPlaylists,
                 )
             }
