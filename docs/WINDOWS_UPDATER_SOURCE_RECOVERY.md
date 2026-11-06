@@ -31,15 +31,16 @@ before starting setup. No silent elevation or registry cleanup is performed.
 If Windows requests a missing `main.msi` from a deleted Temp directory:
 
 1. Obtain the **same original BitChord EXE release** used for the installed
-   version, plus the `SHA256SUMS` manifest from its official GitHub release.
+   version, and its official SHA-256 digest (from `SHA256SUMS` if present,
+   otherwise the GitHub release asset's `digest` field).
    The separately built MSI asset may have a different `ProductCode`.
-2. Verify the EXE SHA-256 from the manifest.
+2. Verify the EXE SHA-256 against that official digest.
 3. Run this repository's
    `desktopApp/packaging/windows/recover-legacy-msi.ps1` as the Windows user
    who originally installed BitChord:
 
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\desktopApp\packaging\windows\recover-legacy-msi.ps1 -OriginalSetupExe "C:\path\to\old-setup.exe" -ExpectedSetupSha256 "<64-character-hash-from-SHA256SUMS>"
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\desktopApp\packaging\windows\recover-legacy-msi.ps1 -OriginalSetupExe "C:\path\to\old-setup.exe" -ExpectedSetupSha256 "<64-character-hash-from-release>"
    ```
 
 4. The script reads the legacy EXE's `msi` RT_RCDATA resource **without
