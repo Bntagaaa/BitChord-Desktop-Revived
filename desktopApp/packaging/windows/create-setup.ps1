@@ -10,6 +10,8 @@ if ($msiSize -lt 100 -or $msiSize -gt 4GB) { throw 'Invalid MSI size.' }
 $csc = Join-Path $env:SystemRoot 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 if (-not (Test-Path -LiteralPath $csc)) { throw "Required .NET Framework compiler missing: $csc" }
 $source = Join-Path $PSScriptRoot 'BitChordSetup.cs'
+$repairHelper = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../src/main/resources/updater/windows-msi-source.ps1'))
+if (-not (Test-Path -LiteralPath $repairHelper)) { throw 'Windows MSI source repair helper is missing.' }
 $iconFile = (Resolve-Path -LiteralPath $Icon).Path
 $destination = [IO.Path]::GetFullPath($Output)
 New-Item -ItemType Directory -Force ([IO.Path]::GetDirectoryName($destination)) | Out-Null
@@ -18,7 +20,7 @@ $work = Join-Path $tempRoot "bitchord-setup-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory $work | Out-Null
 try {
     $stub = Join-Path $work 'BitChordSetup.exe'
-    & $csc /nologo /target:winexe "/out:$stub" "/win32icon:$iconFile" /reference:System.Windows.Forms.dll $source
+    & $csc /nologo /target:winexe "/out:$stub" "/win32icon:$iconFile" /reference:System.Windows.Forms.dll "/resource:$repairHelper,BitChord.WindowsMsiSource" $source
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $stub)) { throw 'Failed to compile BitChord setup wrapper.' }
     Copy-Item -LiteralPath $stub -Destination $destination -Force
     $inputStream = [IO.File]::OpenRead($msiFile)
