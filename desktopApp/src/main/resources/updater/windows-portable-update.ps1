@@ -14,6 +14,22 @@ $ErrorActionPreference = 'Stop'
 function Log([string]$message) { Write-Output "$([DateTime]::UtcNow.ToString('o')) stage=$message" }
 function Finish([string]$message, [int]$code) {
     Log $message
+    # Every completed operation (including failed/aborted ones) can discard
+    # its verified private ZIP. The original downloaded ZIP remains in the
+    # download cache until normal download retention removes it.
+    if ($Package -and $Operation) {
+        $staged = Join-Path $Operation 'verified-portable.zip'
+        if ([IO.Path]::GetFullPath($Package) -ieq [IO.Path]::GetFullPath($staged) -and
+            (Test-Path -LiteralPath $staged -PathType Leaf)) {
+            try {
+                $entry = Get-Item -LiteralPath $staged -ErrorAction Stop
+                if (-not ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                    Remove-Item -LiteralPath $staged -Force -ErrorAction Stop
+                    Log 'staged-portable-zip-cleaned'
+                }
+            } catch { Log 'staged-portable-zip-cleanup-deferred' }
+        }
+    }
     Set-Content -LiteralPath (Join-Path $Operation 'status') -Value $message -Encoding utf8
     Set-Content -LiteralPath (Join-Path $Operation 'completed') -Value $message -Encoding utf8
     exit $code
