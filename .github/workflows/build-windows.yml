@@ -72,7 +72,6 @@ jobs:
         run: |
           .\gradlew.bat `
             :desktopApp:packageMsi `
-            :desktopApp:packageExe `
             :desktopApp:createDistributable `
             "-Pbitchord.version=${{ inputs.version }}"
 
@@ -87,13 +86,11 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
 
           $msi = Get-ChildItem "desktopApp/build/compose/binaries/main/msi/*.msi" | Select-Object -First 1
-          $exe = Get-ChildItem "desktopApp/build/compose/binaries/main/exe/*.exe" | Select-Object -First 1
 
           if (-not $msi) { throw "No MSI package found" }
-          if (-not $exe) { throw "No EXE installer found" }
 
           Copy-Item $msi.FullName "dist/BitChord-$v-windows-x64.msi"
-          Copy-Item $exe.FullName "dist/BitChord-$v-windows-x64-setup.exe"
+          ./desktopApp/packaging/windows/create-setup.ps1 -Msi "dist/BitChord-$v-windows-x64.msi" -Output "dist/BitChord-$v-windows-x64-setup.exe"
 
           New-Item -ItemType File -Force desktopApp/build/compose/binaries/main/app/BitChord/.bitchord-portable | Out-Null
           7z a -tzip -mx=5 "dist/BitChord-$v-windows-x64-portable.zip" `
