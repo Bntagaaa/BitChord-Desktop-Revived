@@ -35,24 +35,19 @@ internal object DesktopUpdateDiagnostics {
         }
     }
 
-    /**
-     * After a Windows helper has finished, its private EXE/ZIP is no longer
-     * needed. Retain the small operation logs for diagnosis, not hundreds of
-     * megabytes of installers. Never touch a live or incomplete operation,
-     * symlinks, arbitrary files, or the MSI source PackageCache.
-     */
+    /** Retain small logs, never installer copies; protect both host and worker processes. */
     internal fun compactCompletedWindowsOperations(root: Path = directory()) {
         if (!Files.isDirectory(root, NOFOLLOW_LINKS) || Files.isSymbolicLink(root)) return
         Files.list(root).use { entries ->
             entries.filter { operation ->
                 operation.fileName.toString().startsWith("operation-") &&
-                    Files.isDirectory(operation, NOFOLLOW_LINKS) &&
-                    !Files.isSymbolicLink(operation) &&
-                    Files.isRegularFile(operation.resolve("completed"), NOFOLLOW_LINKS) &&
-                    !active(operation)
+                    Files.isDirectory(operation, NOFOLLOW_LINKS) && !Files.isSymbolicLink(operation) &&
+                    Files.isRegularFile(operation.resolve("completed"), NOFOLLOW_LINKS) && !active(operation)
             }.forEach { operation ->
-                for (name in listOf("verified-setup.exe", "verified-portable.zip")) {
-                    val staged = operation.resolve(name)
+                val payload = operation.resolve("payload")
+                val locations = listOf(operation) + if (!Files.isSymbolicLink(payload) && Files.isDirectory(payload, NOFOLLOW_LINKS)) listOf(payload) else emptyList()
+                for (location in locations) for (name in listOf("verified-setup.exe", "verified-portable.zip")) {
+                    val staged = location.resolve(name)
                     if (!Files.isSymbolicLink(staged) && Files.isRegularFile(staged, NOFOLLOW_LINKS)) {
                         runCatching { Files.deleteIfExists(staged) }
                     }
@@ -78,7 +73,7 @@ internal object DesktopUpdateDiagnostics {
         val operation = if (DesktopPlatform.isLinux) Files.createTempDirectory(root, "operation-", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")))
             else Files.createTempDirectory(root, "operation-")
         // Keep twenty completed operations. Retire abandoned helpers after thirty days only
-        // when their PID/start identity is no longer alive. Never traverse foreign directories.
+        // when both host and delegated worker identities are no longer alive.
         Files.list(root).use { entries ->
             val owned = entries.filter { it != operation && it.fileName.toString().startsWith("operation-") &&
                 !Files.isSymbolicLink(it) && Files.isDirectory(it, NOFOLLOW_LINKS) && !active(it) }
@@ -88,6 +83,13 @@ internal object DesktopUpdateDiagnostics {
                 System.currentTimeMillis() - Files.getLastModifiedTime(it).toMillis() > 30L * 24 * 60 * 60 * 1000 }
             (completed.drop(19) + abandoned).forEach { old ->
                 runCatching {
+                    // Only the fixed, updater-owned payload child is considered.
+                    // Never recursively traverse arbitrary directories or junctions.
+                    val payload = old.resolve("payload")
+                    if (!Files.isSymbolicLink(payload) && Files.isDirectory(payload, NOFOLLOW_LINKS)) {
+                        Files.list(payload).use { files -> files.filter { Files.isRegularFile(it, NOFOLLOW_LINKS) }.forEach(Files::deleteIfExists) }
+                        Files.deleteIfExists(payload)
+                    }
                     Files.list(old).use { files -> files.filter { Files.isRegularFile(it, NOFOLLOW_LINKS) }.forEach(Files::deleteIfExists) }
                     Files.deleteIfExists(old)
                 }
@@ -96,7 +98,13 @@ internal object DesktopUpdateDiagnostics {
         return operation
     }
 
-    private fun active(operation: Path): Boolean = runCatching {
+    private fun active(operation: Path): Boolean = processActive(operation) || runCatching {
+        val payload = operation.resolve("payload")
+        if (Files.isSymbolicLink(payload)) true
+        else Files.isDirectory(payload, NOFOLLOW_LINKS) && processActive(payload)
+    }.getOrDefault(true)
+
+    private fun processActive(operation: Path): Boolean = runCatching {
         val identity = operation.resolve("helper.identity")
         if (!Files.exists(identity, NOFOLLOW_LINKS)) return false
         if (Files.isSymbolicLink(identity) || Files.size(identity) > 1024) return true
@@ -136,6 +144,8 @@ internal object DesktopUpdateProcess {
 
     fun cleanEnvironment(environment: MutableMap<String, String>) {
         listOf("APPIMAGE", "APPDIR", "OWD", "ARGV0", "LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT",
-            "BITCHORD_UPDATE_READY_FILE", "BITCHORD_UPDATE_TOKEN", "BITCHORD_UPDATE_EXPECTED_VERSION").forEach(environment::remove)
+            "BITCHORD_UPDATE_READY_FILE", "BITCHORD_UPDATE_TOKEN", "BITCHORD_UPDATE_EXPECTED_VERSION",
+            "BITCHORD_UPDATE_EXPECTED_LAUNCHER").forEach(environment::remove)
+        if (DesktopPlatform.isWindows) environment.remove("PSModulePath")
     }
 }

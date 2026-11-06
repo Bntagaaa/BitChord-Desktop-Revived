@@ -4,24 +4,17 @@ param(
     [ValidateRange(1, 600)][int]$WaitSeconds = 120,
     [ValidateRange(1, 300)][int]$ReadySeconds = 60
 )
-# A separate Windows process owns the entire handoff, both for ZIP and setup.
-# Use only this engine's built-in modules: pwsh 7 may have supplied a module
-# path that causes Windows PowerShell 5.1 to import incompatible utilities.
+# Independent process: owns shutdown, the format-specific worker, and relaunch.
+# The operation directory must live outside the application being replaced.
 $ErrorActionPreference = 'Stop'
 $originalModulePath = $env:PSModulePath
 $env:PSModulePath = [IO.Path]::Combine($PSHOME, 'Modules')
 $operation = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Request))
-$form = $null
-$label = $null
-$bar = $null
-$closeButton = $null
+$form = $null; $label = $null; $bar = $null; $closeButton = $null
 $script:terminal = $false
-$mutex = $null
-$ownsMutex = $false
-$lease = $null
-$worker = $null
-$resultCode = 1
-$result = 'host-failed-before-handoff'
+$mutex = $null; $ownsMutex = $false; $lease = $null
+$worker = $null; $workerStarted = $false
+$resultCode = 1; $result = 'host-failed-before-handoff'
 
 function Log([string]$message) { Write-Output "$([DateTime]::UtcNow.ToString('o')) stage=$message" }
 function State([string]$stage, [string]$message) {
@@ -54,7 +47,6 @@ function Alive([long]$processId, [long]$startMillis) {
     if ($processId -le 1 -or $startMillis -le 0) { throw 'Invalid original process identity' }
     $p = Get-Process -Id $processId -ErrorAction SilentlyContinue
     if (-not $p) { return $false }
-    # An inaccessible live process is not proof of shutdown: fail closed.
     $started = ([DateTimeOffset]$p.StartTime.ToUniversalTime()).ToUnixTimeMilliseconds()
     return [Math]::Abs($started - $startMillis) -le 10
 }
@@ -80,30 +72,23 @@ function Show-Updater {
     $script:form = New-Object Windows.Forms.Form
     $form.Text = 'BitChord Updater'
     $form.ClientSize = New-Object Drawing.Size(520, 180)
-    $form.StartPosition = 'CenterScreen'
-    $form.FormBorderStyle = 'FixedDialog'
-    $form.MaximizeBox = $false
+    $form.StartPosition = 'CenterScreen'; $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false
     $script:label = New-Object Windows.Forms.Label
     $label.Location = New-Object Drawing.Point(20, 20)
     $label.Size = New-Object Drawing.Size(480, 65)
     $label.Text = 'Preparing Windows update...'
     $script:bar = New-Object Windows.Forms.ProgressBar
     $bar.Location = New-Object Drawing.Point(20, 90)
-    $bar.Size = New-Object Drawing.Size(480, 14)
-    $bar.Style = 'Marquee'
+    $bar.Size = New-Object Drawing.Size(480, 14); $bar.Style = 'Marquee'
     $logs = New-Object Windows.Forms.Button
-    $logs.Text = 'Open logs'
-    $logs.Location = New-Object Drawing.Point(20, 130)
+    $logs.Text = 'Open logs'; $logs.Location = New-Object Drawing.Point(20, 130)
     $logs.Add_Click({ Start-Process -FilePath (Join-Path $env:SystemRoot 'explorer.exe') -ArgumentList (Quote $operation) })
     $script:closeButton = New-Object Windows.Forms.Button
-    $closeButton.Text = 'Close'
-    $closeButton.Location = New-Object Drawing.Point(425, 130)
-    $closeButton.Enabled = $false
-    $closeButton.Add_Click({ $form.Close() })
+    $closeButton.Text = 'Close'; $closeButton.Location = New-Object Drawing.Point(425, 130)
+    $closeButton.Enabled = $false; $closeButton.Add_Click({ $form.Close() })
     $form.Controls.AddRange(@($label, $bar, $logs, $closeButton))
     $form.Add_FormClosing({ param($sender, $eventArgs) if (-not $script:terminal) { $eventArgs.Cancel = $true } })
-    $form.Show()
-    [Windows.Forms.Application]::DoEvents()
+    $form.Show(); [Windows.Forms.Application]::DoEvents()
 }
 
 try {
@@ -112,8 +97,7 @@ try {
     if ((Get-Item -LiteralPath $Request).Length -gt 16384) { throw 'Oversized update request' }
     $requestData = Get-Content -LiteralPath $Request -Raw -Encoding utf8 | ConvertFrom-Json
     if ($requestData.schema -ne 1 -or $requestData.mode -notin @('portable', 'setup') -or
-        $requestData.expected -notmatch '^[a-fA-F0-9]{64}$' -or
-        $requestData.token -notmatch '^[a-f0-9]{32}$' -or
+        $requestData.expected -notmatch '^[a-fA-F0-9]{64}$' -or $requestData.token -notmatch '^[a-f0-9]{32}$' -or
         $requestData.version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$') { throw 'Invalid update request' }
     $application = [IO.Path]::GetFullPath([string]$requestData.application)
     if (-not [IO.Path]::IsPathRooted([string]$requestData.application) -or
@@ -131,8 +115,7 @@ try {
     $scriptFile = Join-Path $payloadDir 'worker.ps1'
     $packageName = if ($requestData.mode -eq 'portable') { 'verified-portable.zip' } else { 'verified-setup.exe' }
     $packageFile = Join-Path $payloadDir $packageName
-    Assert-Regular $scriptFile
-    Assert-Regular $packageFile
+    Assert-Regular $scriptFile; Assert-Regular $packageFile
     if ($requestData.mode -eq 'portable') { Assert-Regular (Join-Path $appRoot '.bitchord-portable') }
     $tokens = $null; $parseErrors = $null
     [Management.Automation.Language.Parser]::ParseFile($scriptFile, [ref]$tokens, [ref]$parseErrors) > $null
@@ -168,31 +151,43 @@ try {
     $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $scriptFile,
         '-ParentPid', [string]$requestData.parentPid, '-ParentStartMillis', [string]$requestData.parentStartMillis,
         '-Expected', [string]$requestData.expected, '-Operation', $payloadDir)
-    if ($requestData.mode -eq 'portable') {
-        $arguments += @('-Package', $packageFile, '-PortableRoot', $appRoot, '-SkipLaunch')
-    } else { $arguments += @('-Installer', $packageFile) }
-    $powershell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
-    $worker = Start-Process -FilePath $powershell -ArgumentList (($arguments | ForEach-Object { Quote $_ }) -join ' ') -WorkingDirectory $operation -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $operation 'worker.log') -RedirectStandardError (Join-Path $operation 'worker-error.log')
-    while (-not $worker.HasExited) { Pause-UI; $worker.Refresh() }
+    if ($requestData.mode -eq 'portable') { $arguments += @('-Package', $packageFile, '-PortableRoot', $appRoot, '-SkipLaunch') }
+    else { $arguments += @('-Installer', $packageFile) }
+    # Own the native process handle directly. WinPS Start-Process -PassThru can
+    # lose ExitCode for a quickly exiting child unless its handle is retained.
+    $workerInfo = New-Object Diagnostics.ProcessStartInfo
+    $workerInfo.FileName = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    $workerInfo.Arguments = ($arguments | ForEach-Object { Quote $_ }) -join ' '
+    $workerInfo.WorkingDirectory = $operation
+    $workerInfo.UseShellExecute = $false; $workerInfo.CreateNoWindow = $true
+    $workerInfo.RedirectStandardOutput = $true; $workerInfo.RedirectStandardError = $true
+    $worker = New-Object Diagnostics.Process
+    $worker.StartInfo = $workerInfo
+    if (-not $worker.Start()) { throw 'Windows worker could not start' }
+    $workerStarted = $true
+    $stdout = $worker.StandardOutput.ReadToEndAsync()
+    $stderr = $worker.StandardError.ReadToEndAsync()
+    while (-not $worker.WaitForExit(100)) { if ($form) { [Windows.Forms.Application]::DoEvents() } }
     $worker.WaitForExit()
+    [IO.File]::WriteAllText((Join-Path $operation 'worker.log'), $stdout.GetAwaiter().GetResult())
+    [IO.File]::WriteAllText((Join-Path $operation 'worker-error.log'), $stderr.GetAwaiter().GetResult())
+    $workerCode = $worker.ExitCode
     $workerStatusPath = Join-Path $payloadDir 'status'
     $workerStatus = if (Test-Path -LiteralPath $workerStatusPath) { (Get-Content -LiteralPath $workerStatusPath -Raw).Trim() } else { 'missing-worker-status' }
-    Log "worker-exited code=$($worker.ExitCode) result=$workerStatus"
+    Log "worker-exited code=$workerCode result=$workerStatus"
     foreach ($name in @('status', 'completed', 'failure.detail', 'backup.path')) {
         $from = Join-Path $payloadDir $name
         if (Test-Path -LiteralPath $from -PathType Leaf) { Copy-Item -LiteralPath $from -Destination (Join-Path $operation ('worker-' + $name)) }
     }
-    if ($worker.ExitCode -ne 0) { throw "Installation failed or was cancelled: $workerStatus" }
+    if ($workerCode -ne 0) { throw "Installation failed or was cancelled: $workerStatus" }
     if ($workerStatus -like '*reboot-required*') {
-        $result = 'reboot-required; no automatic app launch'
-        $resultCode = 2
+        $result = 'reboot-required; no automatic app launch'; $resultCode = 2
         State $result 'Windows needs a reboot to finish the update. BitChord was not relaunched.'
     } else {
         $expectedStatus = if ($requestData.mode -eq 'portable') { 'success-portable-replaced;*' } else { 'installer-reported-success;*' }
         if ($workerStatus -notlike $expectedStatus) { throw "Worker did not confirm replacement: $workerStatus" }
         State 'verifying-installed-version' 'Checking the installed version before restarting...'
-        Assert-NoReparseAncestors $application
-        Assert-Regular $application
+        Assert-NoReparseAncestors $application; Assert-Regular $application
         $cfg = Join-Path $appRoot 'app/BitChord.cfg'
         Assert-Regular $cfg
         if ((Get-Item -LiteralPath $cfg).Length -gt 1048576) { throw 'Invalid launcher config size' }
@@ -201,9 +196,7 @@ try {
         $launchGuard = [IO.File]::Open((Join-Path $operation 'launch.requested'), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
         $launchGuard.Dispose()
         $start = New-Object Diagnostics.ProcessStartInfo
-        $start.FileName = $application
-        $start.WorkingDirectory = $appRoot
-        $start.UseShellExecute = $false
+        $start.FileName = $application; $start.WorkingDirectory = $appRoot; $start.UseShellExecute = $false
         if ($originalModulePath) { $start.EnvironmentVariables['PSModulePath'] = $originalModulePath }
         else { $start.EnvironmentVariables.Remove('PSModulePath') }
         $start.EnvironmentVariables['BITCHORD_UPDATE_READY_FILE'] = Join-Path $operation 'window-ready'
@@ -226,39 +219,31 @@ try {
                     (Alive ([long]$fields['pid']) ([long]$fields['start_millis']))) {
                     $ack = Get-Process -Id ([int]$fields['pid'])
                     if ($ack.Path -ieq $application -or $ack.Path -ieq (Join-Path $appRoot 'runtime/bin/java.exe') -or $ack.Path -ieq (Join-Path $appRoot 'runtime/bin/javaw.exe')) {
-                        $confirmed = $true
-                        $result = 'success-gui-confirmed'
-                        break
+                        $confirmed = $true; $result = 'success-gui-confirmed'; break
                     }
                 }
             }
-            # Older target versions lack the token handshake. Observe only a NEW
-            # visible window from the exact version-checked launcher in that case.
+            # Older target versions lack the handshake: observe only a NEW
+            # visible window from the exact version-checked launcher instead.
             foreach ($visible in @(Get-Process -Name 'BitChord' -ErrorAction SilentlyContinue)) {
                 try {
                     if ($visible.Path -ieq $application -and $visible.MainWindowHandle -ne [IntPtr]::Zero -and
                         ([DateTimeOffset]$visible.StartTime.ToUniversalTime()).ToUnixTimeMilliseconds() -ge ($launchedAt - 1000)) {
-                        $confirmed = $true
-                        $result = 'success-window-observed'
-                        break
+                        $confirmed = $true; $result = 'success-window-observed'; break
                     }
                 } catch { }
             }
             if ($confirmed) { break }
             Pause-UI
         }
-        if ($confirmed) {
-            $resultCode = 0
-            State $result 'BitChord is updated and running.'
-        } else {
-            $resultCode = 2
-            $result = 'relaunch-requested-unconfirmed; no second launch or rollback'
+        if ($confirmed) { $resultCode = 0; State $result 'BitChord is updated and running.' }
+        else {
+            $resultCode = 2; $result = 'relaunch-requested-unconfirmed; no second launch or rollback'
             State $result 'The update is installed and launch was requested, but startup was not confirmed. Check logs; no duplicate app was opened.'
         }
     }
 } catch {
-    $result = 'windows-updater-failed'
-    $resultCode = 1
+    $result = 'windows-updater-failed'; $resultCode = 1
     $detail = $_.Exception.Message
     Log "host-failed reason=$detail"
     if ($lease) {
@@ -266,8 +251,7 @@ try {
         State $result ("Update stopped: " + $detail)
     }
 } finally {
-    # Never discard payloads while a worker or installer might still be using them.
-    if ($lease -and (-not $worker -or $worker.HasExited)) {
+    if ($lease -and (-not $workerStarted -or $worker.HasExited)) {
         $payloadDir = Join-Path $operation 'payload'
         foreach ($name in @('verified-portable.zip', 'verified-setup.exe', 'worker.ps1', 'msi-source.ps1',
             'helper.identity', 'armed', 'status', 'completed', 'failure.detail', 'backup.path')) {
@@ -283,8 +267,7 @@ try {
     }
     $script:terminal = $true
     if ($form) {
-        $bar.Style = 'Continuous'
-        $closeButton.Enabled = $true
+        $bar.Style = 'Continuous'; $closeButton.Enabled = $true
         if ($resultCode -eq 0) { $form.Close() }
         while (-not $form.IsDisposed) { Pause-UI }
         $form.Dispose()

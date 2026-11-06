@@ -5,8 +5,8 @@ import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 internal enum class UpdateFormat(val suffix: String?, val guidance: String) {
-    WINDOWS_SETUP("-windows-x64-setup.exe", "Closes BitChord and opens the verified Windows setup wizard. Complete or cancel the wizard, then open BitChord manually. Windows may ask for permission."),
-    WINDOWS_PORTABLE("-windows-x64-portable.zip", "Closes BitChord, safely replaces the files in this same portable folder, keeps the original folder as a backup, and launches the updated app. ZIP verification and available disk space are checked first."),
+    WINDOWS_SETUP("-windows-x64-setup.exe", "BitChord Updater opens in a separate window, waits for BitChord to close, runs the verified setup and automatically reopens the updated app. Complete the setup wizard and any Windows permission prompt. A required Windows reboot postpones relaunch."),
+    WINDOWS_PORTABLE("-windows-x64-portable.zip", "BitChord Updater opens in a separate window, waits for BitChord to close, replaces this portable folder with the verified ZIP and automatically reopens the updated app. The original folder is kept as a backup."),
     APPIMAGE("-linux-x86_64.AppImage", "Replaces this AppImage after exit and keeps the previous file as a backup."),
     DEB("-linux-amd64.deb", "Open the verified package with your system package installer. Authorization is handled by your package manager."),
     RPM("-linux-x86_64.rpm", "Open the verified package with your system package installer. Authorization is handled by your package manager."),

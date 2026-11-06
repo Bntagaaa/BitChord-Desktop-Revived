@@ -77,8 +77,7 @@ internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: suspend 
                     if (service.canAutoInstall) service.install(onExit)
                     else service.showDownload()
                 }) { Text(if (!service.canAutoInstall) "Show verified download" else when (service.installation.format) {
-                    UpdateFormat.WINDOWS_SETUP -> "Close and open setup"
-                    UpdateFormat.WINDOWS_PORTABLE -> "Replace in Same Folder"
+                    UpdateFormat.WINDOWS_SETUP, UpdateFormat.WINDOWS_PORTABLE -> "Update and Restart"
                     else -> "Restart to Update"
                 }) }
                 release.asset == null -> TextButton(onClick = { DesktopExternalLinks.open(release.url) }) { Text("View release") }
