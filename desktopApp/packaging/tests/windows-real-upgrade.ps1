@@ -1,11 +1,14 @@
 param(
-    [Parameter(Mandatory=$true)][string]$PreviousMsi,
+    [Parameter(Mandatory=$true)][string]$PreviousExe,
+    [Parameter(Mandatory=$true)][string]$PreviousSha256,
+    [Parameter(Mandatory=$true)][string]$CurrentExe,
     [Parameter(Mandatory=$true)][string]$CurrentMsi,
     [Parameter(Mandatory=$true)][string]$ExpectedVersion
 )
 $ErrorActionPreference = 'Stop'
-# Run on a disposable Windows CI runner. The real MSI upgrade must coexist with
-# the same open updater log handle that caused Error 1306 in the field.
+# CI runs on a clean disposable Windows user. Exercise the REAL former EXE,
+# repair its disappeared %TEMP%\main.msi source from the verified EXE resource,
+# then install the NEW persistent-source EXE with a live updater log.
 function Get-MsiProperty([string]$File, [string]$Name) {
     $installer = New-Object -ComObject WindowsInstaller.Installer
     $database = $installer.OpenDatabase([IO.Path]::GetFullPath($File), 0)
@@ -13,64 +16,67 @@ function Get-MsiProperty([string]$File, [string]$Name) {
     try {
         $null = $view.Execute()
         $record = $view.Fetch()
-        if (-not $record) { throw "MSI property $Name missing" }
+        if (-not $record) { throw "Required MSI property $Name missing" }
         return ([string]$record.StringData(1)).Trim()
     } finally { $null = $view.Close() }
 }
-function Invoke-Msi([string]$Arguments, [string]$Log) {
-    $p = Start-Process msiexec.exe -ArgumentList "$Arguments /qn /norestart /l*v `"$Log`"" -PassThru -Wait
-    if ($p.ExitCode -notin @(0,3010)) {
-        throw "msiexec failed with $($p.ExitCode). See $Log"
-    }
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class BitChordInstalled {
+    [DllImport("msi.dll", CharSet=CharSet.Unicode, EntryPoint="MsiQueryProductStateW")]
+    public static extern int State(string product);
 }
-function Installed-Version([string]$ProductCode) {
-    # Non-interactive msiexec on CI may register as per-machine even if the
-    # application's interactive installer defaults to per-user.
-    $roots = @(
-        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
-        'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
-        'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
-    )
-    foreach ($root in $roots) {
-        $entry = Get-ItemProperty -LiteralPath "$root\$ProductCode" -ErrorAction SilentlyContinue
-        if ($entry -and $entry.DisplayVersion) { return [string]$entry.DisplayVersion }
-    }
-    $entries = foreach ($root in $roots) {
-        Get-ItemProperty -Path "$root\*" -ErrorAction SilentlyContinue |
-            Where-Object { $_.PSChildName -eq $ProductCode -or $_.DisplayName -like 'BitChord*' } |
-            Select-Object PSChildName, DisplayName, DisplayVersion
-    }
-    throw "Product $ProductCode not found in Windows uninstall registry. Candidates: $($entries | ConvertTo-Json -Compress)"
-}
-$oldId = Get-MsiProperty $PreviousMsi 'ProductCode'
-$newId = Get-MsiProperty $CurrentMsi 'ProductCode'
-$expectedNative = Get-MsiProperty $CurrentMsi 'ProductVersion'
-if ($expectedNative -ne $ExpectedVersion) { throw "Expected native $ExpectedVersion, found $expectedNative" }
-if ($oldId -eq $newId) { throw 'Upgrade test needs distinct MSI ProductCodes' }
-$root = Join-Path $env:LOCALAPPDATA 'BitChordUpdater\operations'
-$installRoot = Join-Path $env:LOCALAPPDATA 'BitChord'
-New-Item -ItemType Directory -Force $root | Out-Null
-$operation = Join-Path $root 'operation-ci-upgrade'
+'@
+
+$version = Get-MsiProperty $CurrentMsi 'ProductVersion'
+$newCode = Get-MsiProperty $CurrentMsi 'ProductCode'
+if ($version -ne $ExpectedVersion) { throw "Expected native version $ExpectedVersion, found $version" }
+$opRoot = Join-Path $env:LOCALAPPDATA 'BitChordUpdater\operations'
+New-Item -ItemType Directory -Force $opRoot | Out-Null
+$operation = Join-Path $opRoot 'operation-ci-upgrade'
 New-Item -ItemType Directory -Force $operation | Out-Null
 $log = Join-Path $operation 'install.log'
 $held = $null
+$oldCode = $null
 try {
-    Invoke-Msi "/i `"$PreviousMsi`"" (Join-Path $env:RUNNER_TEMP 'bitChord-old-msi.log')
-    $previousVersion = Installed-Version $oldId
-    if (-not $previousVersion) { throw 'Old BitChord version was not registered under HKCU' }
-    # Match the updater's lifetime: installer log stays open while msiexec runs.
-    $held = [IO.File]::Open($log, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::Write, [IO.FileShare]::Read)
-    $held.WriteByte(65)
-    $held.Flush()
-    Invoke-Msi "/i `"$CurrentMsi`"" (Join-Path $env:RUNNER_TEMP 'bitChord-new-msi.log')
-    $actual = Installed-Version $newId
-    if ($actual -ne $ExpectedVersion) {
-        throw "Upgrade left version '$actual' (old $previousVersion), expected '$ExpectedVersion'"
+    $oldSetup = Start-Process -FilePath $PreviousExe -ArgumentList '/qn /norestart' -PassThru -Wait
+    if ($oldSetup.ExitCode -notin @(0,3010)) { throw "Original jpackage EXE failed to install: $($oldSetup.ExitCode)" }
+    $recoveryOutput = @(& "$PSScriptRoot/../windows/recover-legacy-msi.ps1" -OriginalSetupExe $PreviousExe -ExpectedSetupSha256 $PreviousSha256)
+    $recovery = ($recoveryOutput | Where-Object { $_ -like 'Recovered original BitChord MSI source:*' } | Select-Object -Last 1)
+    if (-not $recovery -or $recovery -notmatch 'product=(\{[A-Fa-f0-9-]+\}) file=(.+)$') {
+        throw "Source recovery did not verify an installed MSI: $($recoveryOutput -join '; ')"
     }
-    if (-not (Test-Path (Join-Path $installRoot 'BitChord.exe'))) { throw 'Updated launcher missing' }
-    Write-Output "Real MSI upgrade passed: $previousVersion -> $actual with updater log open outside install root"
+    $oldCode = $Matches[1]
+    $source = $Matches[2]
+    if ([BitChordInstalled]::State($oldCode) -ne 5) { throw 'Original EXE product was not installed.' }
+    if (-not (Test-Path -LiteralPath $source)) { throw 'Recovered original MSI is missing.' }
+    $legacyInstall = Join-Path $env:LOCALAPPDATA 'BitChord'
+    if ($source.StartsWith($legacyInstall + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'MSI source was written into installation directory.'
+    }
+    # The helper log stays open while the MSI upgrades; outside BitChord root.
+    $held = [IO.File]::Open($log, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+    $held.WriteByte(65); $held.Flush()
+    $newSetup = Start-Process -FilePath $CurrentExe -ArgumentList '--quiet' -PassThru -Wait
+    if ($newSetup.ExitCode -notin @(0,3010)) { throw "New setup EXE failed to upgrade: $($newSetup.ExitCode)" }
+    if ([BitChordInstalled]::State($newCode) -ne 5) { throw 'New MSI ProductCode was not installed.' }
+    if ([BitChordInstalled]::State($oldCode) -eq 5) { throw 'Old MSI ProductCode remains installed after upgrade.' }
+    $checksum = (Get-FileHash -LiteralPath $CurrentMsi -Algorithm SHA256).Hash.ToLowerInvariant()
+    $newCache = Join-Path $env:LOCALAPPDATA "BitChordUpdater\PackageCache\$checksum\main.msi"
+    if (-not (Test-Path -LiteralPath $newCache)) { throw 'New setup failed to retain permanent source MSI.' }
+    if ((Get-FileHash -LiteralPath $newCache -Algorithm SHA256).Hash.ToLowerInvariant() -ne $checksum) {
+        throw 'New setup cached MSI differs from the shipped MSI.'
+    }
+    Write-Output "Legacy EXE -> recovered MSI -> stable-source EXE upgrade passed (native $version)"
 } finally {
     if ($held) { $held.Dispose() }
-    $cleanup = Start-Process msiexec.exe -ArgumentList "/x $newId /qn /norestart" -Wait -PassThru
-    Write-Output "Cleanup Windows Installer exit code: $($cleanup.ExitCode)"
+    if ([BitChordInstalled]::State($newCode) -eq 5) {
+        $cleanup = Start-Process msiexec.exe -ArgumentList "/x $newCode /qn /norestart" -PassThru -Wait
+        Write-Output "New MSI cleanup exit code: $($cleanup.ExitCode)"
+    }
+    if ($oldCode -and [BitChordInstalled]::State($oldCode) -eq 5) {
+        $cleanup = Start-Process msiexec.exe -ArgumentList "/x $oldCode /qn /norestart" -PassThru -Wait
+        Write-Output "Old MSI cleanup exit code: $($cleanup.ExitCode)"
+    }
 }
