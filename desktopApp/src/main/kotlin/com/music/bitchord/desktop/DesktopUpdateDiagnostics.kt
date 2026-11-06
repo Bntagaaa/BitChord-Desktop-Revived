@@ -35,6 +35,32 @@ internal object DesktopUpdateDiagnostics {
         }
     }
 
+    /**
+     * After a Windows helper has finished, its private EXE/ZIP is no longer
+     * needed. Retain the small operation logs for diagnosis, not hundreds of
+     * megabytes of installers. Never touch a live or incomplete operation,
+     * symlinks, arbitrary files, or the MSI source PackageCache.
+     */
+    internal fun compactCompletedWindowsOperations(root: Path = directory()) {
+        if (!Files.isDirectory(root, NOFOLLOW_LINKS) || Files.isSymbolicLink(root)) return
+        Files.list(root).use { entries ->
+            entries.filter { operation ->
+                operation.fileName.toString().startsWith("operation-") &&
+                    Files.isDirectory(operation, NOFOLLOW_LINKS) &&
+                    !Files.isSymbolicLink(operation) &&
+                    Files.isRegularFile(operation.resolve("completed"), NOFOLLOW_LINKS) &&
+                    !active(operation)
+            }.forEach { operation ->
+                for (name in listOf("verified-setup.exe", "verified-portable.zip")) {
+                    val staged = operation.resolve(name)
+                    if (!Files.isSymbolicLink(staged) && Files.isRegularFile(staged, NOFOLLOW_LINKS)) {
+                        runCatching { Files.deleteIfExists(staged) }
+                    }
+                }
+            }
+        }
+    }
+
     fun createOperation(root: Path = directory()): Path {
         if (DesktopPlatform.isWindows) {
             val local = System.getenv("LOCALAPPDATA")?.let { runCatching { Path.of(it) }.getOrNull() }
@@ -48,6 +74,7 @@ internal object DesktopUpdateDiagnostics {
             ensureOutsideWindowsInstall(root, local)
         }
         require(!Files.isSymbolicLink(root) && Files.isDirectory(root, NOFOLLOW_LINKS)) { "Updater state directory is not a regular directory." }
+        if (DesktopPlatform.isWindows) compactCompletedWindowsOperations(root)
         val operation = if (DesktopPlatform.isLinux) Files.createTempDirectory(root, "operation-", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")))
             else Files.createTempDirectory(root, "operation-")
         // Keep twenty completed operations. Retire abandoned helpers after thirty days only
