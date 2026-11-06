@@ -6,8 +6,8 @@ on:
     paths:
       - "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdate*.kt"
       - "desktopApp/src/main/resources/updater/**"
-      - "desktopApp/packaging/tests/windows-real-upgrade.ps1"
       - "desktopApp/packaging/windows/**"
+      - "desktopApp/packaging/tests/windows-real-upgrade.ps1"
       - ".github/workflows/windows-real-upgrade.yml"
   workflow_dispatch:
 
@@ -15,8 +15,8 @@ permissions:
   contents: read
 
 jobs:
-  real-msi-upgrade:
-    name: Install original EXE, recover old MSI, upgrade using persistent-source EXE
+  real-exe-upgrade:
+    name: Original EXE -> correct Temp MSI source -> new EXE upgrade
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -26,6 +26,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
+
       - name: Install WiX Toolset 3
         shell: pwsh
         run: |
@@ -33,57 +34,55 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile wix.zip
           Expand-Archive wix.zip -DestinationPath "$env:RUNNER_TEMP\wix"
           "$env:RUNNER_TEMP\wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Provide optional build configuration
+
+      - name: Configure local build properties
         shell: pwsh
-        run: |
-          "LASTFM_API_KEY=$env:LASTFM_API_KEY" | Set-Content local.properties
-          "LASTFM_SECRET=$env:LASTFM_SECRET" | Add-Content local.properties
         env:
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
-      - name: Run updater unit tests
+        run: |
+          "LASTFM_API_KEY=$env:LASTFM_API_KEY" | Set-Content local.properties
+          "LASTFM_SECRET=$env:LASTFM_SECRET" | Add-Content local.properties
+
+      - name: Test updater Kotlin code
         shell: pwsh
         run: .\gradlew.bat :desktopApp:test "-Pbitchord.version=1.9.1" "-Pbitchord.packageBuild=1014"
-      - name: Build actual upgrade target MSI and new setup EXE
+
+      - name: Build native MSI and wrap exact bytes in new EXE
         shell: pwsh
         run: |
           .\gradlew.bat :desktopApp:packageMsi "-Pbitchord.version=1.9.1" "-Pbitchord.packageBuild=1014"
           $msi = (Get-ChildItem desktopApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
           ./desktopApp/packaging/windows/create-setup.ps1 -Msi $msi -Output "$env:RUNNER_TEMP\current-setup.exe"
-      - name: Download original published EXE and official GitHub asset digest
+
+      - name: Download original published EXE and verify official asset digest
         shell: pwsh
         run: |
           $file = "BitChord-1.8.3-windows-x64-setup.exe"
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/Bntagaaa/BitChord-Desktop-Revived/releases/tags/v1.8.3" -Headers @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'BitChord-updater-CI' }
+          $url = "https://api.github.com/repos/Bntagaaa/BitChord-Desktop-Revived/releases/tags/v1.8.3"
+          $headers = @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'BitChord-Upgrade-Test' }
+          $release = Invoke-RestMethod -Uri $url -Headers $headers
           $assets = @($release.assets | Where-Object { $_.name -eq $file -and $_.state -eq 'uploaded' })
-          if ($assets.Count -ne 1 -or $assets[0].digest -notmatch '^sha256:([a-f0-9]{64})
-      - name: Real original EXE -> restored source -> new EXE upgrade
-        shell: pwsh
-        run: |
-          $current = (Get-ChildItem desktopApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
-          ./desktopApp/packaging/tests/windows-real-upgrade.ps1 -PreviousExe "$env:RUNNER_TEMP\previous-setup.exe" -PreviousSha256 $env:PREV_SETUP_SHA256 -CurrentExe "$env:RUNNER_TEMP\current-setup.exe" -CurrentMsi $current -ExpectedVersion "1.9.1014"
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: windows-msi-upgrade-logs
-          path: ${{ runner.temp }}/bitChord-*-msi.log
-          if-no-files-found: ignore
-) {
-            throw 'Official previous setup asset SHA-256 digest is unavailable'
+          if ($assets.Count -ne 1) { throw 'Expected exactly one original BitChord setup EXE' }
+          $digestText = [string]$assets[0].digest
+          if (-not ($digestText -match '^sha256:([A-Fa-f0-9]{64})$')) {
+            throw 'Official old EXE digest unavailable'
           }
           $expected = $Matches[1]
           Invoke-WebRequest -Uri $assets[0].browser_download_url -OutFile "$env:RUNNER_TEMP\previous-setup.exe"
           $actual = (Get-FileHash -LiteralPath "$env:RUNNER_TEMP\previous-setup.exe" -Algorithm SHA256).Hash
-          if ($actual -ine $expected) { throw 'Original EXE does not match official GitHub release digest' }
+          if ($actual -ine $expected) { throw 'Original EXE SHA-256 does not match GitHub release' }
           "PREV_SETUP_SHA256=$expected" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Real original EXE -> restored source -> new EXE upgrade
+
+      - name: Install legacy EXE then automatically select correct Temp MSI source
         shell: pwsh
         run: |
-          $current = (Get-ChildItem desktopApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
-          ./desktopApp/packaging/tests/windows-real-upgrade.ps1 -PreviousExe "$env:RUNNER_TEMP\previous-setup.exe" -PreviousSha256 $env:PREV_SETUP_SHA256 -CurrentExe "$env:RUNNER_TEMP\current-setup.exe" -CurrentMsi $current -ExpectedVersion "1.9.1014"
+          $msi = (Get-ChildItem desktopApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
+          ./desktopApp/packaging/tests/windows-real-upgrade.ps1 -PreviousExe "$env:RUNNER_TEMP\previous-setup.exe" -PreviousSha256 $env:PREV_SETUP_SHA256 -CurrentExe "$env:RUNNER_TEMP\current-setup.exe" -CurrentMsi $msi -ExpectedVersion "1.9.1014"
+
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: windows-msi-upgrade-logs
+          name: real-exe-upgrade-logs
           path: ${{ runner.temp }}/bitChord-*-msi.log
           if-no-files-found: ignore
