@@ -33,8 +33,8 @@ function Run-Helper([string]$archive, [string]$target, [string]$op, [switch]$Sim
         '-Expected', $hash, '-Operation', $op, '-PortableRoot', $target,
         '-WaitSeconds', '20', '-SkipLaunch')
     if ($SimulateFailure) { $args += '-SimulateSwapFailure' }
-    & (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') @args
-    return $LASTEXITCODE
+    & (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') @args | Out-Host
+    return [int]$LASTEXITCODE
 }
 try {
     Populate-Root $portable 'old'
