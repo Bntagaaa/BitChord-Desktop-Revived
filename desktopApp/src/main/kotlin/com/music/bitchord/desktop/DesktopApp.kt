@@ -5242,7 +5242,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             }
                         }
                         destination == DesktopDestination.LOCAL_MUSIC -> DesktopLocalMusicPage(
-                            songs = localSongs,
+                            songs = remember(localSongs, downloads) {
+                                DesktopLocalMusic.withDownloadedArtwork(localSongs, downloads)
+                            },
                             loading = localMusicLoading,
                             onSongClick = { playSong(it, source = DesktopQueueSource(DesktopStrings["local_music", "Local Music"], PlaybackSourceType.BROWSE)) },
                             contentPadding = contentPadding,
