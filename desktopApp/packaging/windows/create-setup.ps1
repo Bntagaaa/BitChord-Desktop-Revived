@@ -13,7 +13,8 @@ $source = Join-Path $PSScriptRoot 'BitChordSetup.cs'
 $iconFile = (Resolve-Path -LiteralPath $Icon).Path
 $destination = [IO.Path]::GetFullPath($Output)
 New-Item -ItemType Directory -Force ([IO.Path]::GetDirectoryName($destination)) | Out-Null
-$work = Join-Path $env:RUNNER_TEMP "bitchord-setup-$([guid]::NewGuid().ToString('N'))"
+$tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
+$work = Join-Path $tempRoot "bitchord-setup-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory $work | Out-Null
 try {
     $stub = Join-Path $work 'BitChordSetup.exe'
