@@ -10,6 +10,26 @@ $ErrorActionPreference = 'Stop'
 function Log([string]$Message) { Write-Output "$([DateTime]::UtcNow.ToString('o')) stage=$Message" }
 function Finish([string]$Message, [int]$Code) {
     Log $Message
+    # The installer has exited (or never started): release our own read
+    # handle before deleting the private staged EXE. Never remove the
+    # permanent PackageCache/main.msi Windows Installer may still require.
+    if ($script:stream) {
+        $script:stream.Dispose()
+        $script:stream = $null
+    }
+    if ($Installer -and $Operation) {
+        $staged = Join-Path $Operation 'verified-setup.exe'
+        if ([IO.Path]::GetFullPath($Installer) -ieq [IO.Path]::GetFullPath($staged) -and
+            (Test-Path -LiteralPath $staged -PathType Leaf)) {
+            try {
+                $entry = Get-Item -LiteralPath $staged -ErrorAction Stop
+                if (-not ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                    Remove-Item -LiteralPath $staged -Force -ErrorAction Stop
+                    Log 'staged-setup-cleaned'
+                }
+            } catch { Log 'staged-setup-cleanup-deferred' }
+        }
+    }
     Set-Content -LiteralPath (Join-Path $Operation 'status') -Value $Message -Encoding utf8
     Set-Content -LiteralPath (Join-Path $Operation 'completed') -Value $Message -Encoding utf8
     exit $Code
