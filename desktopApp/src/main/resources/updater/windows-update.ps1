@@ -49,6 +49,16 @@ try {
     if ($disk.AvailableFreeSpace -lt $required) {
         Finish "insufficient-disk-space required_bytes=$required available_bytes=$($disk.AvailableFreeSpace); installer not executed" 1
     }
+    # A previous jpackage setup may have registered %TEMP%/<old-random-folder>/main.msi.
+    # Find a source with the installed ProductCode, not an arbitrary current MSI.
+    $sourceRepair = Join-Path $Operation 'msi-source.ps1'
+    if (Test-Path -LiteralPath $sourceRepair -PathType Leaf) {
+        try {
+            & $sourceRepair | ForEach-Object { Log ([string]$_) }
+        } catch {
+            Log ("msi-source-repair-skipped error={0}" -f $_.Exception.GetType().Name)
+        }
+    }
     Log 'checksum-verified; opening interactive Windows setup'
     # Ordinary interactive wizard/UAC. No silent elevation or unproven automatic GUI relaunch.
     $setup = Start-Process -FilePath $Installer -WorkingDirectory $Operation -PassThru -Wait
