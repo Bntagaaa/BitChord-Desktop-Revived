@@ -1,6 +1,5 @@
 package com.music.bitchord.desktop
 
-import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
@@ -102,7 +101,7 @@ class DesktopLocalArtworkTest {
             block(music, cache)
         } finally {
             Files.walk(root).use { paths ->
-                paths.sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists)
+                paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
             }
         }
     }
