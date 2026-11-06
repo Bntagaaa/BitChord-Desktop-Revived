@@ -4,9 +4,12 @@ if (-not $IsWindows -and $PSVersionTable.PSEdition -eq 'Core') { throw 'These ex
 New-Item -ItemType Directory -Force $Output | Out-Null
 $helper = Join-Path $PSScriptRoot '../../src/main/resources/updater/windows-update.ps1'
 $helper = [IO.Path]::GetFullPath($helper)
-$tokens = $null; $errors = $null
-[Management.Automation.Language.Parser]::ParseFile($helper, [ref]$tokens, [ref]$errors) > $null
-if ($errors.Count) { throw ($errors | Out-String) }
+$sourceRepair = Join-Path $PSScriptRoot '../../src/main/resources/updater/windows-msi-source.ps1'
+foreach ($script in @($helper, $sourceRepair)) {
+    $tokens = $null; $errors = $null
+    [Management.Automation.Language.Parser]::ParseFile([IO.Path]::GetFullPath($script), [ref]$tokens, [ref]$errors) > $null
+    if ($errors.Count) { throw "PowerShell parser failed for $script : $($errors | Out-String)" }
+}
 $csc = Join-Path $env:SystemRoot 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path $csc)) { throw 'The fixture needs the Windows .NET Framework C# compiler' }
 $source = Join-Path $Output 'Fixture.cs'
