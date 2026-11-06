@@ -107,6 +107,7 @@ internal class DesktopUpdateService(
         if (release.asset == null) return
         begin(DesktopUpdateState(UpdatePhase.DOWNLOADING, release)) { request ->
             cleanCache()
+            DesktopUpdateDiskSpace.checkBeforeDownload(installation, directory, requireNotNull(release.asset).size)
             var lastProgress = 0L
             val file = downloader.download(release, directory) { received, total ->
                 val now = System.nanoTime()
@@ -118,6 +119,7 @@ internal class DesktopUpdateService(
             currentCoroutineContext().ensureActive()
             val hash = DesktopUpdateDownloader.sha256(file)
             currentCoroutineContext().ensureActive()
+            cleanCache(keep = file.parent)
             publish(request, DesktopUpdateState(UpdatePhase.READY, release, file = file, hash = hash))
         }
     }
@@ -162,14 +164,14 @@ internal class DesktopUpdateService(
         }
     }
 
-    private fun cleanCache() {
+    private fun cleanCache(keep: Path? = null) {
         Files.createDirectories(directory)
         require(!Files.isSymbolicLink(directory)) { "Update cache cannot be a symbolic link." }
         // Never traverse unrelated files or delete a different active operation's partial file.
-        // Jobs are joined before this executes; retain three recent download directories.
+        // Jobs are joined before this executes; retain only one verified download directory.
         Files.list(directory).use { files ->
             files.filter { it.fileName.toString().startsWith("download-") && !Files.isSymbolicLink(it) && Files.isDirectory(it, NOFOLLOW_LINKS) }
-                .sorted(compareByDescending<Path> { Files.getLastModifiedTime(it).toMillis() }).skip(3).forEach { old ->
+                .sorted(compareByDescending<Path> { if (it == keep) Long.MAX_VALUE else Files.getLastModifiedTime(it).toMillis() }).skip(1).forEach { old ->
                     runCatching {
                         Files.list(old).use { contents -> contents.filter { Files.isRegularFile(it, NOFOLLOW_LINKS) }.forEach(Files::deleteIfExists) }
                         Files.deleteIfExists(old)
