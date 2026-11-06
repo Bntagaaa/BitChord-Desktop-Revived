@@ -46,6 +46,27 @@ function Is-Reparse([string]$path) {
     $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
     return ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
 }
+function Move-DirectoryWithRetry([string]$from, [string]$to, [string]$label) {
+    # On real machines Explorer, Defender or audio/native subprocesses can
+    # briefly keep an old path open AFTER the parent BitChord PID exits.
+    # CI's synthetic folder swap does not reproduce these transient locks.
+    for ($attempt = 1; $attempt -le 30; $attempt++) {
+        if (Test-Path -LiteralPath $to) { throw "Directory target already exists: $label" }
+        if (-not (Test-Path -LiteralPath $from -PathType Container)) { throw "Directory source disappeared: $label" }
+        try {
+            [IO.Directory]::Move($from, $to)
+            if ($attempt -gt 1) { Log "$label succeeded after $attempt attempts" }
+            return
+        } catch [System.IO.IOException] {
+            if ($attempt -eq 30) { throw }
+            if ($attempt -eq 1) { Log "$label blocked by IOException; retrying briefly" }
+        } catch [System.UnauthorizedAccessException] {
+            if ($attempt -eq 30) { throw }
+            if ($attempt -eq 1) { Log "$label blocked by UnauthorizedAccessException; retrying briefly" }
+        }
+        Start-Sleep -Milliseconds 300
+    }
+}
 
 $staging = $null
 $backup = $null
@@ -158,10 +179,10 @@ try {
     }
     # Only rename complete folders on the same volume, never recursively
     # overwrite a running executable or delete unknown user-added files.
-    [IO.Directory]::Move($root, $backup)
+    Move-DirectoryWithRetry $root $backup 'backup-old-portable'
     $oldMoved = $true
     if ($SimulateSwapFailure) { throw 'simulated-swap-failure' }
-    [IO.Directory]::Move($candidate, $root)
+    Move-DirectoryWithRetry $candidate $root 'replace-new-portable'
     $installed = $true
     Set-Content -LiteralPath (Join-Path $operationPath 'backup.path') -Value $backup -Encoding utf8
     Log "portable-replaced in-place root=$root backup=$backup"
@@ -174,10 +195,13 @@ try {
     }
 } catch {
     $reason = $_.Exception.Message
+    Log "portable-exception type=$($_.Exception.GetType().Name) reason=$reason"
+    try { Set-Content -LiteralPath (Join-Path $Operation 'failure.detail') -Value "$($_.Exception.GetType().Name): $reason" -Encoding utf8 }
+    catch { }
     if ($oldMoved -and -not $installed) {
         if (-not (Test-Path -LiteralPath $root) -and (Test-Path -LiteralPath $backup)) {
             try {
-                [IO.Directory]::Move($backup, $root)
+                Move-DirectoryWithRetry $backup $root 'rollback-old-portable'
                 Log 'portable-rollback-restored-original'
                 Finish 'portable-replacement-failed; original folder restored' 1
             } catch {
