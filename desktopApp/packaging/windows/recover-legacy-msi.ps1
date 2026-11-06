@@ -125,7 +125,7 @@ try {
     foreach ($context in @(1, 2, 4)) { # USERUNMANAGED, USERMANAGED, MACHINE
         $rc = [MsiSource]::Add($product, $null, [uint32]$context, 1, ($cache.TrimEnd('\') + '\'), 1)
         if ($rc -eq 0) {
-            $rcName = [MsiSource]::Set($product, $null, [uint32]$context, 1, 'PackageName', 'main.msi')
+            $rcName = [MsiSource]::Set($product, $null, [uint32]$context, 0, 'PackageName', 'main.msi')
             if ($rcName -ne 0) { throw "Windows Installer PackageName registration failed with code $rcName" }
             $added = $true
             break
