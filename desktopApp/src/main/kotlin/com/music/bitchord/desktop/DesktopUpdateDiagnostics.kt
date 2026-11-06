@@ -14,11 +14,39 @@ internal object DesktopUpdateDiagnostics {
         val configured = environment[if (windows) "LOCALAPPDATA" else "XDG_STATE_HOME"]
             ?.takeIf { it.isNotBlank() }?.let { runCatching { Path.of(it) }.getOrNull() }?.takeIf { it.isAbsolute }
         return (configured ?: if (windows) Path.of(home, "AppData", "Local") else Path.of(home, ".local", "state"))
-            .resolve("bitchord").resolve("updater")
+            .let { base -> if (windows) base.resolve("BitChordUpdater").resolve("operations") else base.resolve("bitchord").resolve("updater") }
+    }
+
+    /** A case-insensitive MSI installation root must never contain a live updater log. */
+    internal fun ensureOutsideWindowsInstall(root: Path, localAppData: Path) {
+        val installation = localAppData.toAbsolutePath().normalize().resolve("BitChord")
+        val candidate = root.toAbsolutePath().normalize()
+        fun under(path: Path, parent: Path): Boolean {
+            val parts = (0 until path.nameCount).map { path.getName(it).toString() }
+            val prefixes = (0 until parent.nameCount).map { parent.getName(it).toString() }
+            return parts.size >= prefixes.size && prefixes.indices.all { parts[it].equals(prefixes[it], ignoreCase = true) } &&
+                path.root.toString().equals(parent.root.toString(), ignoreCase = true)
+        }
+        require(!under(candidate, installation)) { "Updater operation directory must not be inside the BitChord installation." }
+        if (Files.exists(root)) {
+            val resolved = root.toRealPath()
+            val installed = if (Files.exists(installation)) installation.toRealPath() else installation
+            require(!under(resolved, installed)) { "Updater operation directory resolves inside the BitChord installation." }
+        }
     }
 
     fun createOperation(root: Path = directory()): Path {
+        if (DesktopPlatform.isWindows) {
+            val local = System.getenv("LOCALAPPDATA")?.let { runCatching { Path.of(it) }.getOrNull() }
+                ?.takeIf { it.isAbsolute } ?: Path.of(System.getProperty("user.home"), "AppData", "Local")
+            ensureOutsideWindowsInstall(root, local)
+        }
         Files.createDirectories(root)
+        if (DesktopPlatform.isWindows) {
+            val local = System.getenv("LOCALAPPDATA")?.let { runCatching { Path.of(it) }.getOrNull() }
+                ?.takeIf { it.isAbsolute } ?: Path.of(System.getProperty("user.home"), "AppData", "Local")
+            ensureOutsideWindowsInstall(root, local)
+        }
         require(!Files.isSymbolicLink(root) && Files.isDirectory(root, NOFOLLOW_LINKS)) { "Updater state directory is not a regular directory." }
         val operation = if (DesktopPlatform.isLinux) Files.createTempDirectory(root, "operation-", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")))
             else Files.createTempDirectory(root, "operation-")
