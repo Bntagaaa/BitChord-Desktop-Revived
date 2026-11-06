@@ -18,17 +18,41 @@ internal object DesktopUpdateDiskSpace {
     }
 
     fun checkBeforeDownload(installation: UpdateInstallation, downloadDirectory: Path, packageBytes: Long) {
-        if (installation.format != UpdateFormat.WINDOWS_SETUP) return
-        Files.createDirectories(downloadDirectory)
-        checkSpace(downloadDirectory, requiredBytes(packageBytes, beforeDownload = true))
-        // Downloads and helper staging can be on different volumes.
-        checkSpace(DesktopUpdateDiagnostics.directory().parent, requiredBytes(packageBytes, beforeDownload = false))
+        when (installation.format) {
+            UpdateFormat.WINDOWS_SETUP -> {
+                Files.createDirectories(downloadDirectory)
+                checkSpace(downloadDirectory, requiredBytes(packageBytes, beforeDownload = true))
+                checkSpace(DesktopUpdateDiagnostics.directory().parent, requiredBytes(packageBytes, beforeDownload = false))
+            }
+            UpdateFormat.WINDOWS_PORTABLE -> {
+                require(packageBytes > 0 && packageBytes <= 4L * GIB) { "Invalid portable ZIP size." }
+                Files.createDirectories(downloadDirectory)
+                checkSpace(downloadDirectory, packageBytes + 256L * 1024 * 1024)
+                // The source ZIP is copied into an operation folder while the
+                // new folder is extracted beside the old portable directory.
+                checkSpace(DesktopUpdateDiagnostics.directory().parent, packageBytes + 256L * 1024 * 1024)
+                installation.portableRoot?.parent?.let {
+                    checkSpace(it, packageBytes * 3 + 512L * 1024 * 1024)
+                }
+            }
+            else -> Unit
+        }
     }
 
     fun checkBeforeSetup(installation: UpdateInstallation, source: Path) {
-        if (installation.format != UpdateFormat.WINDOWS_SETUP) return
-        val size = Files.size(source)
-        checkSpace(DesktopUpdateDiagnostics.directory().parent, requiredBytes(size, beforeDownload = false))
+        when (installation.format) {
+            UpdateFormat.WINDOWS_SETUP -> checkSpace(DesktopUpdateDiagnostics.directory().parent,
+                requiredBytes(Files.size(source), beforeDownload = false))
+            UpdateFormat.WINDOWS_PORTABLE -> {
+                val packageBytes = Files.size(source)
+                require(packageBytes > 0 && packageBytes <= 4L * GIB) { "Invalid portable ZIP size." }
+                checkSpace(DesktopUpdateDiagnostics.directory().parent, packageBytes + 256L * 1024 * 1024)
+                installation.portableRoot?.parent?.let {
+                    checkSpace(it, packageBytes * 3 + 512L * 1024 * 1024)
+                }
+            }
+            else -> Unit
+        }
     }
 
     private fun checkSpace(path: Path, required: Long) {
