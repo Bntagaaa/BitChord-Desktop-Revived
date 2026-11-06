@@ -67,7 +67,7 @@ function Repair-LegacyTempSource {
         $SearchRoots = @($env:TEMP, (Join-Path $env:LOCALAPPDATA 'Temp'), $CacheRoot)
     }
     $paths = New-Object System.Collections.Generic.List[string]
-    $visited = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $visited = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($root in $SearchRoots) {
         if ([string]::IsNullOrWhiteSpace($root) -or -not [IO.Path]::IsPathRooted($root)) { continue }
         $rootItem = Get-Item -LiteralPath $root -ErrorAction SilentlyContinue
@@ -108,7 +108,7 @@ function Repair-LegacyTempSource {
             throw 'Unexpected existing MSI in the permanent package cache'
         }
     } else {
-        $temporary = Join-Path $destinationDir ("source-" + [guid]::NewGuid().ToString('N') + '.part')
+        $temporary = Join-Path $destinationDir ("source-" + [guid]::NewGuid().ToString('N') + '.msi')
         try {
             Copy-Item -LiteralPath $selected.File -Destination $temporary
             if ((Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash -ine $sourceHash) {
