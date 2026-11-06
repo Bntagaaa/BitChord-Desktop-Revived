@@ -136,7 +136,7 @@ try {
         foreach ($entry in $zip.Entries) {
             $name = $entry.FullName
             if ([string]::IsNullOrWhiteSpace($name) -or
-                $name -match '[\\:]' -or $name -match '(^|/)\.\.?(/|$)' -or
+                $name.StartsWith('/') -or $name -match '[\\:]' -or $name -match '(^|/)\.\.?(/|$)' -or
                 $name -match '[\x00-\x1f]' -or -not $names.Add($name)) {
                 throw "Unsafe or duplicate ZIP entry: $name"
             }
@@ -149,10 +149,29 @@ try {
             [void]$found.Add($name)
         }
     } finally { $zip.Dispose() }
-    # Release, Windows build and test build may archive different parent
-    # directories. Discover the unique application root from the executable,
-    # marker and runtime config instead of assuming a BitChord/ prefix.
-    $roots = @($found | Where-Object { $_ -match '(^|/)BitChord\\.exe [IO.DriveInfo]::new([IO.Path]::GetPathRoot($root))
+    # ZIPs from CI, release and older builds have different enclosing
+    # directories. Locate the unique launcher, plus its marker and config.
+    # Do not trust the outermost ZIP folder name.
+    $roots = @(
+        $found | Where-Object { $_ -match '(^|/)BitChord\.exe$' } |
+            ForEach-Object { $_.Substring(0, $_.Length - 'BitChord.exe'.Length) } |
+            Where-Object {
+                $found.Contains($_ + '.bitchord-portable') -and
+                $found.Contains($_ + 'app/BitChord.cfg')
+            } | Select-Object -Unique
+    )
+    if ($roots.Count -ne 1) {
+        throw 'Portable ZIP must contain exactly one BitChord.exe with marker and app config'
+    }
+    $archiveRoot = [string]$roots[0]
+    foreach ($entryName in $found) {
+        if (-not $entryName.StartsWith($archiveRoot, [StringComparison]::OrdinalIgnoreCase) -and
+            -not $archiveRoot.StartsWith($entryName.TrimEnd('/') + '/', [StringComparison]::OrdinalIgnoreCase)) {
+            throw "ZIP contains files outside the portable application: $entryName"
+        }
+    }
+    Log "portable-archive-root=$archiveRoot"
+    $disk = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($root))
     if ($disk.AvailableFreeSpace -lt ($expandedBytes + 256MB)) {
         Finish "insufficient-disk-space for portable extraction; required=$($expandedBytes + 256MB) available=$($disk.AvailableFreeSpace)" 1
     }
