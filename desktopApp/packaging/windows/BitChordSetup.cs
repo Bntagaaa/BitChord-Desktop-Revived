@@ -9,6 +9,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Forms;
+using System.Reflection;
 
 internal static class BitChordSetup {
     private const string Magic = "BCHMSI01";
@@ -28,6 +29,11 @@ internal static class BitChordSetup {
                 return 0;
             }
 
+            // This is inside the NEW setup EXE, so it also runs when the old
+            // installed BitChord updater cannot yet contain the latest helper.
+            // Resolve stale jpackage Temp/main.msi source records before msiexec.
+            TryRepairLegacySource();
+
             // /i offers the normal Windows Installer wizard. The old application
             // must be closed by our updater before launching this setup.
             var start = new ProcessStartInfo {
@@ -46,6 +52,67 @@ internal static class BitChordSetup {
                 "BitChord Setup", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
+    }
+
+    private static void TryRepairLegacySource() {
+        string operationRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "BitChordUpdater", "operations");
+        string directory = null;
+        try {
+            Directory.CreateDirectory(operationRoot);
+            directory = Path.Combine(operationRoot, "source-preflight-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            string helper = Path.Combine(directory, "msi-source.ps1");
+            using (Stream resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("BitChord.WindowsMsiSource")) {
+                if (resource == null) throw new InvalidDataException("Bundled MSI source helper missing.");
+                using (FileStream copy = new FileStream(helper, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
+                    resource.CopyTo(copy);
+                    copy.Flush(true);
+                }
+            }
+            string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            string powershell = Path.Combine(windows, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+            var start = new ProcessStartInfo {
+                FileName = powershell,
+                Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" + helper + "\"",
+                WorkingDirectory = directory,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            using (Process check = Process.Start(start)) {
+                if (check == null) throw new IOException("Cannot launch MSI source check.");
+                // This helper only scans bounded Temp directories. Never hold up
+                // interactive setup forever if Windows Installer COM is stuck.
+                if (!check.WaitForExit(90000)) {
+                    check.Kill();
+                    check.WaitForExit();
+                    LogSourceRepair(operationRoot, "source-repair-timeout; continue with setup");
+                    return;
+                }
+                string output = check.StandardOutput.ReadToEnd().Trim();
+                string error = check.StandardError.ReadToEnd().Trim();
+                LogSourceRepair(operationRoot, "source-repair exit_code=" + check.ExitCode +
+                    " result=" + output + " error=" + error);
+            }
+        } catch (Exception ex) {
+            // Automatic matching is optional: if no exact old MSI remains,
+            // let Windows display its normal source selection UI.
+            try { LogSourceRepair(operationRoot, "source-repair-skipped error=" + ex.GetType().Name); }
+            catch { }
+        } finally {
+            if (directory != null) {
+                try { Directory.Delete(directory, true); }
+                catch { }
+            }
+        }
+    }
+
+    private static void LogSourceRepair(string root, string message) {
+        File.AppendAllText(Path.Combine(root, "setup-source-repair.log"),
+            DateTime.UtcNow.ToString("o") + " " + message + Environment.NewLine);
     }
 
     private static string CacheEmbeddedMsi() {
