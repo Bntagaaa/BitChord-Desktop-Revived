@@ -1,0 +1,38 @@
+name: Windows Setup Payload Smoke
+
+on:
+  pull_request:
+    branches: ["1.9.1"]
+    paths:
+      - "desktopApp/packaging/windows/BitChordSetup.cs"
+      - "desktopApp/packaging/windows/create-setup.ps1"
+      - ".github/workflows/windows-setup-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wrapper:
+    runs-on: windows-latest
+    name: Compile setup EXE and verify persistent payload
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify sample payload
+        shell: pwsh
+        run: |
+          $fixture = Join-Path $env:RUNNER_TEMP 'bitChord-fixture.msi'
+          $exe = Join-Path $env:RUNNER_TEMP 'bitChord-fixture-setup.exe'
+          $bytes = New-Object byte[] 4096
+          [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+          [IO.File]::WriteAllBytes($fixture, $bytes)
+          ./desktopApp/packaging/windows/create-setup.ps1 -Msi $fixture -Output $exe
+          $process = Start-Process -FilePath $exe -ArgumentList '--verify-payload' -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Setup payload verifier failed: $($process.ExitCode)" }
+          $digest = (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash.ToLowerInvariant()
+          $source = Join-Path $env:LOCALAPPDATA "BitChordUpdater\PackageCache\$digest\main.msi"
+          if (-not (Test-Path -LiteralPath $source)) { throw "Installer source not persisted: $source" }
+          if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant() -ne $digest) {
+            throw 'Persisted payload differs from original'
+          }
+          Write-Output "Wrapper smoke passed. Exact payload retained at $source"
