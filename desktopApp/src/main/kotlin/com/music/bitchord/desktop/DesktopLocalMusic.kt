@@ -14,6 +14,45 @@ import kotlin.io.path.nameWithoutExtension
 object DesktopLocalMusic {
     private val supportedExtensions = setOf("aac", "flac", "m4a", "mp3", "ogg", "wav", "webm")
 
+    /**
+     * Desktop downloads keep their original online thumbnail in the persisted Song
+     * record, but DesktopDownloadManager saves only the audio bytes to disk.
+     * Consequently scanning that same saved file as Local Music cannot recover
+     * album art unless its container happens to carry embedded PICTURE/APIC/covr.
+     *
+     * Reuse the Downloads artwork when the normalized *file path* is identical.
+     * Never guess by filename/title/artist: unrelated tracks can have identical
+     * names. Embedded/local folder artwork still wins over online artwork.
+     *
+     * Called with the current in-memory Downloads state so a newly downloaded
+     * track obtains its artwork even if the filesystem watcher ran before the
+     * download record was saved to preferences.
+     */
+    internal fun withDownloadedArtwork(localSongs: List<Song>, downloads: List<Song>): List<Song> {
+        if (localSongs.isEmpty() || downloads.isEmpty()) return localSongs
+
+        fun normalizedPath(path: String?): Path? = path
+            ?.takeIf(String::isNotBlank)
+            ?.let { runCatching { Paths.get(it).toAbsolutePath().normalize() }.getOrNull() }
+
+        val artworkByPath = downloads.mapNotNull { record ->
+            val artwork = record.thumbnailUrl?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+            val path = normalizedPath(record.localPath)
+                ?: record.localUri?.let { uri ->
+                    runCatching { Paths.get(java.net.URI(uri)).toAbsolutePath().normalize() }.getOrNull()
+                }
+                ?: return@mapNotNull null
+            path to artwork
+        }.toMap()
+        if (artworkByPath.isEmpty()) return localSongs
+
+        return localSongs.map { song ->
+            if (!song.thumbnailUrl.isNullOrBlank()) return@map song
+            val path = normalizedPath(song.localPath) ?: return@map song
+            artworkByPath[path]?.let { song.copy(thumbnailUrl = it) } ?: song
+        }
+    }
+
     fun scan(): List<Song> {
         val filterNonMusic = DesktopPersistence().boolean(KEY_FILTER_NON_MUSIC_AUDIO, false)
         return roots()
