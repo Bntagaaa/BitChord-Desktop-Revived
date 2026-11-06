@@ -57,6 +57,13 @@ internal class DesktopPreparedUpdate(
 internal object DesktopUpdateInstaller {
     fun canInstall(installation: UpdateInstallation): Boolean = when (installation.format) {
         UpdateFormat.WINDOWS_SETUP -> true // Interactive installer handoff, not an unattended upgrade.
+        UpdateFormat.WINDOWS_PORTABLE -> installation.portableRoot?.let { root ->
+            root.isAbsolute && !Files.isSymbolicLink(root) && Files.isDirectory(root, NOFOLLOW_LINKS) &&
+                !Files.isSymbolicLink(root.parent) && Files.isWritable(root.parent) &&
+                Files.isRegularFile(root.resolve(".bitchord-portable"), NOFOLLOW_LINKS) &&
+                Files.isRegularFile(root.resolve("BitChord.exe"), NOFOLLOW_LINKS) &&
+                Files.isRegularFile(root.resolve("app/BitChord.cfg"), NOFOLLOW_LINKS)
+        } == true
         UpdateFormat.APPIMAGE -> installation.appImage?.let {
             it.isAbsolute && !Files.isSymbolicLink(it) && Files.isRegularFile(it, NOFOLLOW_LINKS) &&
                 Files.isWritable(it) && Files.isWritable(it.parent) && setsid() != null
@@ -91,6 +98,30 @@ internal object DesktopUpdateInstaller {
                     "-ParentPid", ProcessHandle.current().pid().toString(), "-Installer", installer.toString(),
                     "-Expected", verifiedHash.lowercase(), "-Operation", operation.toString(),
                     "-ParentStartMillis", (ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli()).toString()), listOf(installer))
+            }
+            if (installation.format == UpdateFormat.WINDOWS_PORTABLE) {
+                // The helper lives outside the portable folder, so it survives
+                // the directory rename after the old Java process has exited.
+                val portableRoot = requireNotNull(installation.portableRoot).toAbsolutePath().normalize()
+                val zipped = operation.resolve("verified-portable.zip")
+                Files.copy(file, zipped)
+                temporary.add(zipped)
+                require(DesktopUpdateDownloader.sha256(zipped).equals(verifiedHash, true)) {
+                    "Copied portable package changed. Download it again."
+                }
+                val helper = operation.resolve("portable-install.ps1")
+                copyHelper("windows-portable-update.ps1", helper)
+                val windows = Path.of(System.getenv("SystemRoot") ?: "C:\\Windows")
+                DesktopUpdateDiagnostics.log(operation,
+                    "stage=portable-staged current=$portableRoot package=$zipped target=$targetVersion")
+                return DesktopPreparedUpdate(operation, listOf(
+                    windows.resolve("System32/WindowsPowerShell/v1.0/powershell.exe").toString(),
+                    "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper.toString(),
+                    "-ParentPid", ProcessHandle.current().pid().toString(),
+                    "-ParentStartMillis", ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli().toString(),
+                    "-Package", zipped.toString(), "-Expected", verifiedHash.lowercase(),
+                    "-Operation", operation.toString(), "-PortableRoot", portableRoot.toString()
+                ), temporary)
             }
             val current = requireNotNull(installation.appImage).normalize()
             require('\n' !in current.toString() && '\r' !in current.toString()) { "Use manual replacement for a path containing line breaks." }
@@ -129,6 +160,8 @@ internal object DesktopUpdateInstaller {
             UpdateFormat.APPIMAGE -> bytes.size >= 11 && bytes.take(4) == listOf(0x7f.toByte(), 69.toByte(), 76.toByte(), 70.toByte()) &&
                 bytes[8] == 65.toByte() && bytes[9] == 73.toByte() && bytes[10] == 2.toByte()
             UpdateFormat.WINDOWS_SETUP -> bytes.size >= 2 && bytes[0] == 77.toByte() && bytes[1] == 90.toByte()
+            UpdateFormat.WINDOWS_PORTABLE -> bytes.size >= 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4b.toByte() &&
+                bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()
             else -> false
         }
     }.getOrDefault(false)
