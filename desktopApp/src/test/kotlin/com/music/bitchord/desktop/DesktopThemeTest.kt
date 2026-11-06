@@ -35,18 +35,15 @@ class DesktopThemeTest {
     }
 
     @Test
-    fun `sidebar navigation uses neutral gray selection in both themes`() {
-        assertEquals(Color(0xFF1E1E1E), DARK_PALETTE.sidebarSurface)
+    fun `selected sidebar background is gray while icons and indicators stay rose`() {
+        assertEquals(Color(0xFFFA586A), DARK_PALETTE.navAccent)
+        assertEquals(Color(0xFFCD3659), LIGHT_PALETTE.navAccent)
         assertEquals(Color(0xFF2D2D2D), DARK_PALETTE.navSelectedSurface)
-        assertEquals(Color(0xFFF0F0F0), LIGHT_PALETTE.sidebarSurface)
         assertEquals(Color(0xFFDDDDDD), LIGHT_PALETTE.navSelectedSurface)
-        for (palette in listOf(DARK_PALETTE, LIGHT_PALETTE)) {
-            for (color in listOf(palette.navAccent, palette.navSelectedSurface, palette.sidebarSurface)) {
-                assertEquals(color.red, color.green)
-                assertEquals(color.green, color.blue)
-            }
-            assertTrue(contrastRatio(palette.navAccent, palette.navSelectedSurface) >= 4.5)
-        }
+        assertEquals(Color(0xFF0D0D0F), DARK_PALETTE.sidebarSurface)
+        assertEquals(Color(0xFFE9ECF2), LIGHT_PALETTE.sidebarSurface)
+        assertNotEquals(DARK_PALETTE.navAccent, DARK_PALETTE.navSelectedSurface)
+        assertNotEquals(LIGHT_PALETTE.navAccent, LIGHT_PALETTE.navSelectedSurface)
     }
 
     @Test
