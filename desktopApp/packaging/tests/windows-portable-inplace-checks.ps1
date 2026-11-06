@@ -43,6 +43,7 @@ try {
     [IO.Compression.ZipFile]::CreateFromDirectory($source, $zipPath)
     $code = Run-Helper $zipPath $portable $operation
     if ($code -ne 0) { throw "Portable in-place helper failed with exit $code" }
+    if (Test-Path -LiteralPath $zipPath) { throw 'Verified ZIP remained in completed updater operation' }
     if ((Get-Content -LiteralPath (Join-Path $portable 'BitChord.exe') -Raw).Trim() -ne 'new') {
         throw 'New portable executable was not installed at original folder path'
     }
@@ -61,13 +62,14 @@ try {
     New-Item -ItemType Directory -Force -Path $failureRoot, $failureOp | Out-Null
     Populate-Root $failureRoot 'original'
     $failureZip = Join-Path $failureOp 'verified-portable.zip'
-    Copy-Item -LiteralPath $zipPath -Destination $failureZip
+    [IO.Compression.ZipFile]::CreateFromDirectory($source, $failureZip)
     $code = Run-Helper $failureZip $failureRoot $failureOp -SimulateFailure
     if ($code -ne 1 -or
         (Get-Content -LiteralPath (Join-Path $failureRoot 'BitChord.exe') -Raw).Trim() -ne 'original') {
         throw 'Simulated failure did not roll back to the original portable folder'
     }
-    Write-Output 'PASS: failed folder swap restored original folder'
+    if (Test-Path -LiteralPath $failureZip) { throw 'Verified ZIP remained after failed swap' }
+    Write-Output 'PASS: failed folder swap restored original folder and cleaned staged ZIP'
 
     $unsafeRoot = Join-Path $testRoot 'UnsafeCase'
     $unsafeOp = Join-Path $testRoot 'unsafe-operation'
@@ -84,7 +86,8 @@ try {
         (Test-Path -LiteralPath (Join-Path $testRoot 'escape.txt'))) {
         throw 'Unsafe ZIP path affected existing portable folder'
     }
-    Write-Output 'PASS: ZIP traversal rejected before changing the portable folder'
+    if (Test-Path -LiteralPath $unsafeZip) { throw 'Unsafe ZIP remained in completed operation' }
+    Write-Output 'PASS: ZIP traversal rejected without touching original and staged ZIP cleaned'
 } finally {
     Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
