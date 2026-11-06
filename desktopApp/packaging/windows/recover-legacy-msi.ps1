@@ -13,7 +13,7 @@ if ($actual -ine $ExpectedSetupSha256) { throw 'Original setup SHA-256 mismatch;
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-internal static class JpackageResource {
+public static class JpackageResource {
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, EntryPoint="LoadLibraryExW", SetLastError=true)]
     public static extern IntPtr LoadLibraryEx(string path, IntPtr reserved, uint flags);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, EntryPoint="FindResourceW", SetLastError=true)]
@@ -27,7 +27,7 @@ internal static class JpackageResource {
     [DllImport("kernel32.dll")]
     public static extern bool FreeLibrary(IntPtr module);
 }
-internal static class MsiSource {
+public static class MsiSource {
     [DllImport("msi.dll", CharSet=CharSet.Unicode, EntryPoint="MsiQueryProductStateW")]
     public static extern int State(string product);
     [DllImport("msi.dll", CharSet=CharSet.Unicode, EntryPoint="MsiSourceListAddSourceExW")]
