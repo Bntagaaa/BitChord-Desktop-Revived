@@ -165,6 +165,12 @@ internal class DesktopUpdateService(
     }
 
     private fun cleanCache(keep: Path? = null) {
+        // Recover space from prior completed EXE/Portable operations on the
+        // next app startup/check, even when no new install is attempted.
+        if (DesktopPlatform.isWindows) {
+            runCatching { DesktopUpdateDiagnostics.compactCompletedWindowsOperations() }
+                .onFailure { DesktopTrackLog.log("updater: completed payload cleanup deferred: ${it.javaClass.simpleName}") }
+        }
         Files.createDirectories(directory)
         require(!Files.isSymbolicLink(directory)) { "Update cache cannot be a symbolic link." }
         // Never traverse unrelated files or delete a different active operation's partial file.
