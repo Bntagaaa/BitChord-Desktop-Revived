@@ -210,9 +210,9 @@ jobs:
       - name: Tests
         run: .\gradlew.bat :shared:jvmTest :desktopApp:test "-Pbitchord.version=${{ steps.version.outputs.value }}"
 
-      - name: Build msi, exe and the app image
+      - name: Build MSI and application image
         run: |
-          .\gradlew.bat :desktopApp:packageMsi :desktopApp:packageExe :desktopApp:createDistributable "-Pbitchord.version=${{ steps.version.outputs.value }}"
+          .\gradlew.bat :desktopApp:packageMsi :desktopApp:createDistributable "-Pbitchord.version=${{ steps.version.outputs.value }}"
 
       - name: Verify Automix native runtime and packaged models
         shell: pwsh
@@ -233,7 +233,7 @@ jobs:
           $v = "${{ steps.version.outputs.value }}"
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item desktopApp/build/compose/binaries/main/msi/*.msi "dist/BitChord-$v-windows-x64.msi"
-          Copy-Item desktopApp/build/compose/binaries/main/exe/*.exe "dist/BitChord-$v-windows-x64-setup.exe"
+          ./desktopApp/packaging/windows/create-setup.ps1 -Msi "dist/BitChord-$v-windows-x64.msi" -Output "dist/BitChord-$v-windows-x64-setup.exe"
           New-Item -ItemType File -Force desktopApp/build/compose/binaries/main/app/BitChord/.bitchord-portable | Out-Null
           7z a -tzip -mx=5 "dist/BitChord-$v-windows-x64-portable.zip" `
             "desktopApp/build/compose/binaries/main/app/BitChord/*" | Out-Null
