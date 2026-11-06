@@ -22,7 +22,7 @@ private interface DesktopWallpaperUser32 : StdCallLibrary {
 }
 
 /**
- * A lightweight, wallpaper-toned grayscale Mica-style surface for the Compose navigation rail.
+ * A lightweight, wallpaper-tinted Mica-style surface for the Compose navigation rail.
  *
  * Native DWM Mica targets an HWND, not a single child composable. BitChord deliberately keeps
  * its decorated Compose window opaque for correct Windows caption, Snap, and resize behavior.
@@ -72,13 +72,9 @@ internal object DesktopSidebarMica {
     /** An opaque color with restrained wallpaper influence and legible foreground contrast. */
     fun surface(wallpaper: Color?, dark: Boolean, fallback: Color): Color {
         if (wallpaper == null) return fallback
-        val neutral = if (dark) Color(0xFF1E1E1E) else Color(0xFFF0F0F0)
-        // Keep the wallpaper's brightness influence without inheriting its red/blue hue.
-        // Both the solid fallback and the Mica-style surface must remain neutral gray.
-        val gray = (wallpaper.red * 0.2126f + wallpaper.green * 0.7152f +
-            wallpaper.blue * 0.0722f).coerceIn(0f, 1f)
-        val wallpaperGray = Color(gray, gray, gray, 1f)
-        return lerp(neutral, wallpaperGray, if (dark) 0.055f else 0.060f).copy(alpha = 1f)
+        val neutral = if (dark) Color(0xFF171719) else Color(0xFFE9ECF2)
+        // Never copy the wallpaper itself: a strong tint would reduce text contrast.
+        return lerp(neutral, wallpaper, if (dark) 0.065f else 0.060f).copy(alpha = 1f)
     }
 
     private fun transparencyAllowed(): Boolean {
