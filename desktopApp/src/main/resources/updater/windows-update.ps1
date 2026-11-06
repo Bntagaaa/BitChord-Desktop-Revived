@@ -42,6 +42,13 @@ try {
     if ((Get-FileHash -InputStream $stream -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Expected.ToLowerInvariant()) {
         Finish 'checksum-mismatch; installer not executed' 1
     }
+    # Recheck free space immediately before opening the wizard (download may have
+    # completed long before this handoff). Leave room for extracted MSI and rollback.
+    $disk = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($Installer))
+    $required = 2GB + 3 * $item.Length
+    if ($disk.AvailableFreeSpace -lt $required) {
+        Finish "insufficient-disk-space required_bytes=$required available_bytes=$($disk.AvailableFreeSpace); installer not executed" 1
+    }
     Log 'checksum-verified; opening interactive Windows setup'
     # Ordinary interactive wizard/UAC. No silent elevation or unproven automatic GUI relaunch.
     $setup = Start-Process -FilePath $Installer -WorkingDirectory $Operation -PassThru -Wait
