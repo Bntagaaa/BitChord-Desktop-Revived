@@ -1,3 +1,4 @@
+param([string]$RealArchive = '')
 $ErrorActionPreference = 'Stop'
 # Real filesystem integration test on Windows, using a synthetic package with
 # the same BitChord/ launcher, marker and app-config layout as the release ZIP.
@@ -125,6 +126,31 @@ try {
     }
     if (Test-Path -LiteralPath $unsafeZip) { throw 'Unsafe ZIP remained in completed operation' }
     Write-Output 'PASS: ZIP traversal rejected without touching original and staged ZIP cleaned'
+
+    if ($RealArchive) {
+        $realPackage = [IO.Path]::GetFullPath($RealArchive)
+        if (-not (Test-Path -LiteralPath $realPackage -PathType Leaf)) {
+            throw "Built portable ZIP does not exist: $realPackage"
+        }
+        $realRoot = Join-Path $testRoot 'RealPortableCase'
+        $realOp = Join-Path $testRoot 'real-operation'
+        New-Item -ItemType Directory -Force -Path $realRoot, $realOp | Out-Null
+        Populate-Root $realRoot 'old-real'
+        $realZip = Join-Path $realOp 'verified-portable.zip'
+        Copy-Item -LiteralPath $realPackage -Destination $realZip
+        $code = Run-Helper $realZip $realRoot $realOp
+        if ($code -ne 0) {
+            $diagnostic = Get-Content -LiteralPath (Join-Path $realOp 'status') -Raw -ErrorAction SilentlyContinue
+            throw "Real packaged portable ZIP failed in-place swap (exit $code, status=$diagnostic)"
+        }
+        foreach ($required in @('BitChord.exe', '.bitchord-portable', 'app/BitChord.cfg')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $realRoot $required) -PathType Leaf)) {
+                throw "Real packaged portable update omitted $required"
+            }
+        }
+        if (Test-Path -LiteralPath $realZip) { throw 'Real packaged ZIP not removed from finished staging' }
+        Write-Output 'PASS: actual build portable ZIP installed at same directory and verified'
+    }
 } finally {
     Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
