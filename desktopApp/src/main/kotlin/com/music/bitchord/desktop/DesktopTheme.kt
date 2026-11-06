@@ -111,17 +111,17 @@ internal val DARK_PALETTE = DesktopThemePalette(
     floatingPlayerSurface = Color(0xFF202124),
     subtleFill = Color(0x14FFFFFF),
     stripedRow = Color(0x0AFFFFFF),
-    navAccent = Color(0xFFD6D6D6),
+    navAccent = Color(0xFFFA586A),
     navSelectedSurface = Color(0xFF2D2D2D),
-    sidebarSurface = Color(0xFF1E1E1E),
+    sidebarSurface = Color(0xFF0D0D0F),
     chromeSurface = Color(0xFF0D0D0F),
     lyricsSurface = Color(0xFF202020),
     replaySurface = Color(0xFF202020),
 )
 
 /**
- * Neutral daylight surfaces and charcoal controls with grayscale navigation accents.
- * Strong text/icon contrast also works when blur is disabled.
+ * Neutral, slightly warm daylight surfaces and charcoal controls, with BitChord's rose navigation
+ * identity retained. Strong text/icon contrast also works when blur is disabled.
  */
 internal val LIGHT_PALETTE = DesktopThemePalette(
     background = Color(0xFFF7F8FB),
@@ -147,9 +147,9 @@ internal val LIGHT_PALETTE = DesktopThemePalette(
     floatingPlayerSurface = Color(0xFFE5E9F0),
     subtleFill = Color(0x111D2636),
     stripedRow = Color(0x0D1D2636),
-    navAccent = Color(0xFF525252),
+    navAccent = Color(0xFFCD3659),
     navSelectedSurface = Color(0xFFDDDDDD),
-    sidebarSurface = Color(0xFFF0F0F0),
+    sidebarSurface = Color(0xFFE9ECF2),
     chromeSurface = Color(0xFFF0F2F6),
     lyricsSurface = Color(0xFFEDF0F6),
     replaySurface = Color(0xFFF5F6FA),
