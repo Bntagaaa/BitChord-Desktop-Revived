@@ -7,6 +7,7 @@ on:
       - "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdate*.kt"
       - "desktopApp/src/main/resources/updater/**"
       - "desktopApp/packaging/tests/windows-real-upgrade.ps1"
+      - "desktopApp/packaging/windows/**"
       - ".github/workflows/windows-real-upgrade.yml"
   workflow_dispatch:
 
@@ -15,7 +16,7 @@ permissions:
 
 jobs:
   real-msi-upgrade:
-    name: Install previous MSI then upgrade with log held open
+    name: Install original EXE, recover old MSI, upgrade using persistent-source EXE
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -43,18 +44,27 @@ jobs:
       - name: Run updater unit tests
         shell: pwsh
         run: .\gradlew.bat :desktopApp:test "-Pbitchord.version=1.9.1" "-Pbitchord.packageBuild=1014"
-      - name: Build actual upgrade target MSI
-        shell: pwsh
-        run: .\gradlew.bat :desktopApp:packageMsi "-Pbitchord.version=1.9.1" "-Pbitchord.packageBuild=1014"
-      - name: Obtain previous official MSI
+      - name: Build actual upgrade target MSI and new setup EXE
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases/download/v1.8.3/BitChord-1.8.3-windows-x64.msi" -OutFile "$env:RUNNER_TEMP\previous.msi"
-      - name: Exercise real per-user MSI upgrade and registry checks
+          .\gradlew.bat :desktopApp:packageMsi "-Pbitchord.version=1.9.1" "-Pbitchord.packageBuild=1014"
+          $msi = (Get-ChildItem desktopApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
+          ./desktopApp/packaging/windows/create-setup.ps1 -Msi $msi -Output "$env:RUNNER_TEMP\current-setup.exe"
+      - name: Download original published EXE and SHA-256 manifest
+        shell: pwsh
+        run: |
+          $base = "https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases/download/v1.8.3"
+          $file = "BitChord-1.8.3-windows-x64-setup.exe"
+          Invoke-WebRequest -Uri "$base/$file" -OutFile "$env:RUNNER_TEMP\previous-setup.exe"
+          $manifest = (Invoke-WebRequest -Uri "$base/SHA256SUMS").Content
+          $line = $manifest -split "`r?`n" | Where-Object { $_.Trim().EndsWith($file) } | Select-Object -First 1
+          if ($line -notmatch '^([A-Fa-f0-9]{64})\s+[ *]?' ) { throw "Old EXE SHA-256 missing from release manifest" }
+          "PREV_SETUP_SHA256=$($Matches[1])" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Real original EXE -> restored source -> new EXE upgrade
         shell: pwsh
         run: |
           $current = (Get-ChildItem desktopApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
-          ./desktopApp/packaging/tests/windows-real-upgrade.ps1 -PreviousMsi "$env:RUNNER_TEMP\previous.msi" -CurrentMsi $current -ExpectedVersion "1.9.1014"
+          ./desktopApp/packaging/tests/windows-real-upgrade.ps1 -PreviousExe "$env:RUNNER_TEMP\previous-setup.exe" -PreviousSha256 $env:PREV_SETUP_SHA256 -CurrentExe "$env:RUNNER_TEMP\current-setup.exe" -CurrentMsi $current -ExpectedVersion "1.9.1014"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
