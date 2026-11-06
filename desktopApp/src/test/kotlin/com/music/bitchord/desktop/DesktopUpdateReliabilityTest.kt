@@ -163,6 +163,35 @@ class DesktopUpdateReliabilityTest {
         for (uri in listOf("http://github.com/$repo/releases/download/v1/package", "https://github.com/foreign/repo/releases/download/v1/package", "https://attacker.example/asset", "https://user:secret@objects.githubusercontent.com/asset", "https://objects.githubusercontent.com:8443/asset", "https://github.com/$repo/releases/download/v1/package#fragment"))
             assertFalse(allowedUpdateDownloadUri(java.net.URI(uri)))
     }
+    @Test fun completedWindowsOperationsDropLargePayloadsButKeepLogsAndActiveOperations() {
+        val root = Files.createTempDirectory("updater-compact")
+        try {
+            val done = Files.createDirectory(root.resolve("operation-finished"))
+            Files.writeString(done.resolve("completed"), "installer-reported-success")
+            val setup = Files.write(done.resolve("verified-setup.exe"), bytes)
+            val zip = Files.write(done.resolve("verified-portable.zip"), bytes)
+            val log = Files.writeString(done.resolve("install.log"), "diagnostic detail")
+            val pending = Files.createDirectory(root.resolve("operation-pending"))
+            val uncompleted = Files.write(pending.resolve("verified-portable.zip"), bytes)
+            val live = Files.createDirectory(root.resolve("operation-live"))
+            Files.writeString(live.resolve("completed"), "done")
+            val identity = if (DesktopPlatform.isLinux)
+                "pid=${ProcessHandle.current().pid()}\nstart_ticks=${DesktopUpdateProcess.linuxStartTicks()}\n"
+                else "pid=${ProcessHandle.current().pid()}\nstart_millis=${ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli()}\n"
+            Files.writeString(live.resolve("helper.identity"), identity)
+            val held = Files.write(live.resolve("verified-setup.exe"), bytes)
+            val unrelated = Files.write(root.resolve("leave-me.exe"), bytes)
+            DesktopUpdateDiagnostics.compactCompletedWindowsOperations(root)
+            assertFalse(Files.exists(setup))
+            assertFalse(Files.exists(zip))
+            assertEquals("diagnostic detail", Files.readString(log))
+            assertTrue(Files.exists(done.resolve("completed")))
+            assertTrue(Files.exists(uncompleted), "Never delete a package from an unfinished operation")
+            assertTrue(Files.exists(held), "Never delete an active helper's package")
+            assertTrue(Files.exists(unrelated), "Never touch unrelated files")
+        } finally { root.toFile().deleteRecursively() }
+    }
+
     @Test fun diagnosticsRetireOnlyCompletedOrAbandonedOperations() {
         val root = Files.createTempDirectory("updater-log-retention")
         try {
