@@ -119,12 +119,12 @@ jobs:
         env:
           BUILD_VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          .\gradlew.bat :desktopApp:packageExe :desktopApp:packageMsi "-Pbitchord.version=$env:BUILD_VERSION"
+          .\gradlew.bat :desktopApp:packageMsi "-Pbitchord.version=$env:BUILD_VERSION"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          Copy-Item desktopApp/build/compose/binaries/main/exe/*.exe "dist/BitChord-$env:BUILD_VERSION-windows-x64-setup.exe"
           Copy-Item desktopApp/build/compose/binaries/main/msi/*.msi "dist/BitChord-$env:BUILD_VERSION-windows-x64.msi"
+          ./desktopApp/packaging/windows/create-setup.ps1 -Msi "dist/BitChord-$env:BUILD_VERSION-windows-x64.msi" -Output "dist/BitChord-$env:BUILD_VERSION-windows-x64-setup.exe"
           ./desktopApp/packaging/tests/windows-updater-checks.ps1 -Artifacts dist -Version $env:BUILD_VERSION
-          "Unit/helper fixture tests and real artifact metadata passed; actual BitChord installer upgrade not exercised." >> $env:GITHUB_STEP_SUMMARY
+          "Updater helper and published MSI vs setup EXE payload consistency passed; real upgrade tested in separate workflow." >> $env:GITHUB_STEP_SUMMARY
 
       - name: Upload updater diagnostics
         if: ${{ always() && inputs.installers }}
