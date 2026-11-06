@@ -30,9 +30,18 @@ internal object DesktopLocalArtwork {
 
     /** Where the files live, created on first use. */
     private val directory: Path by lazy {
-        val base = System.getenv("XDG_CACHE_HOME")?.takeIf(String::isNotBlank)
-            ?: "${System.getProperty("user.home")}/.cache"
-        Path.of(base, "bitchord", "local-artwork").also {
+        val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+        val base = if (isWindows) {
+            // Windows' per-user writable cache directory; no XDG assumptions.
+            val localAppData = System.getenv("LOCALAPPDATA")?.takeIf(String::isNotBlank)
+                ?: System.getProperty("user.home") + "/AppData/Local"
+            Path.of(localAppData, "BitChord")
+        } else {
+            val xdgCache = System.getenv("XDG_CACHE_HOME")?.takeIf(String::isNotBlank)
+                ?: System.getProperty("user.home") + "/.cache"
+            Path.of(xdgCache, "bitchord")
+        }
+        base.resolve("local-artwork").also {
             runCatching { Files.createDirectories(it) }
         }
     }
@@ -136,63 +145,49 @@ internal object DesktopLocalArtwork {
     private fun extractFlac(path: Path): ByteArray? = runCatching {
         RandomAccessFile(path.toFile(), "r").use { raf ->
             val magic = ByteArray(4)
-            if (raf.read(magic) != 4) return@runCatching null
+            raf.readFully(magic)
             if (magic.decodeToString() != "fLaC") return@runCatching null
 
-            while (true) {
-                val flagByte = raf.read()
-                if (flagByte == -1) return@runCatching null
-                val isLast = flagByte and 0x80 != 0
-                val type = flagByte and 0x7F
-                val lenBytes = ByteArray(3)
-                if (raf.read(lenBytes) != 3) return@runCatching null
-                val length = ((lenBytes[0].toInt() and 0xFF) shl 16) or
-                    ((lenBytes[1].toInt() and 0xFF) shl 8) or
-                    (lenBytes[2].toInt() and 0xFF)
+            while (raf.filePointer + 4 <= raf.length()) {
+                val flagsAndType = raf.readUnsignedByte()
+                val isLast = flagsAndType and 0x80 != 0
+                val blockType = flagsAndType and 0x7F
+                val length = (raf.readUnsignedByte() shl 16) or
+                    (raf.readUnsignedByte() shl 8) or raf.readUnsignedByte()
+                val blockEnd = raf.filePointer + length.toLong()
+                if (blockEnd > raf.length()) break
 
-                if (type == TYPE_PICTURE) {
-                    return@runCatching readFlacPicture(raf)
+                if (blockType == TYPE_PICTURE) {
+                    val picture = runCatching { readFlacPicture(raf, length) }.getOrNull()
+                    // The first picture is not necessarily the front cover.
+                    // Skip unsupported image types and try later picture blocks.
+                    if (picture != null && imageExtension(picture) != null) {
+                        return@runCatching picture
+                    }
                 }
-
-                // Skip this block's payload.
-                val skipped = raf.skipBytes(length)
-                if (skipped < length) {
-                    // File is truncated.
-                    return@runCatching null
-                }
+                raf.seek(blockEnd)
                 if (isLast) break
             }
             null
         }
     }.getOrNull()
 
-    /**
-     * Reads a FLAC `PICTURE` block payload and returns the raw image bytes.
-     *
-     * Layout: picture-type (4B BE), MIME length (4B BE), MIME string,
-     * description length (4B BE), description string, width (4B), height (4B),
-     * colour depth (4B), colours (4B), data length (4B BE), data.
-     */
-    private fun readFlacPicture(raf: RandomAccessFile): ByteArray? {
-        fun readBe(): Int {
-            val b = ByteArray(4)
-            if (raf.read(b) != 4) return -1
-            return ((b[0].toInt() and 0xFF) shl 24) or
-                ((b[1].toInt() and 0xFF) shl 16) or
-                ((b[2].toInt() and 0xFF) shl 8) or
-                (b[3].toInt() and 0xFF)
-        }
-
-        readBe() // picture type — don't care which, just take the first one
-        val mimeLen = readBe(); if (mimeLen < 0 || mimeLen > 256) return null
-        raf.skipBytes(mimeLen)
-        val descLen = readBe(); if (descLen < 0 || descLen > 4096) return null
-        raf.skipBytes(descLen)
-        raf.skipBytes(16) // width, height, colour depth, colours
-        val dataLen = readBe(); if (dataLen <= 0 || dataLen > 20 * 1024 * 1024) return null
-        val data = ByteArray(dataLen)
-        raf.readFully(data)
-        return data
+    /** Read a FLAC PICTURE within its declared block bounds, never into audio. */
+    private fun readFlacPicture(raf: RandomAccessFile, blockLength: Int): ByteArray? {
+        val end = raf.filePointer + blockLength.toLong()
+        if (blockLength < 32) return null
+        raf.readInt() // picture type
+        val mimeLength = raf.readInt()
+        if (mimeLength !in 0..256 || raf.filePointer + mimeLength + 4L > end) return null
+        raf.seek(raf.filePointer + mimeLength)
+        val descriptionLength = raf.readInt()
+        if (descriptionLength !in 0..4096 || raf.filePointer + descriptionLength + 20L > end) return null
+        raf.seek(raf.filePointer + descriptionLength + 16L) // dimensions and colour info
+        val size = raf.readInt()
+        if (size !in 1..MAX_IMAGE_BYTES || size > end - raf.filePointer) return null
+        val image = ByteArray(size)
+        raf.readFully(image)
+        return image
     }
 
     /**
@@ -323,19 +318,29 @@ internal object DesktopLocalArtwork {
         if (pos >= end) return null
         pos++
 
-        // Skip description (null-terminated; for UTF-16 this is double-null,
-        // but the image data that follows is recognisable either way — a stray
-        // null byte at the front of a JPEG or PNG is harmless to the decoder).
+        // UTF-16 descriptions are NUL-terminated in two-byte units.
+        // Searching byte-by-byte incorrectly stops on the last character's
+        // trailing zero and leaves a stray 0x00 before JPEG/PNG magic.
         val encoding = tag[start].toInt() and 0xFF
         if (encoding == 1 || encoding == 2) {
-            // UTF-16: look for double-null terminator.
+            if (pos + 1 < end &&
+                ((tag[pos] == 0xFF.toByte() && tag[pos + 1] == 0xFE.toByte()) ||
+                    (tag[pos] == 0xFE.toByte() && tag[pos + 1] == 0xFF.toByte()))
+            ) pos += 2 // optional BOM for ID3v2 UTF-16
+            var finished = false
             while (pos + 1 < end) {
-                if (tag[pos].toInt() == 0 && tag[pos + 1].toInt() == 0) { pos += 2; break }
-                pos++
+                if (tag[pos].toInt() == 0 && tag[pos + 1].toInt() == 0) {
+                    pos += 2
+                    finished = true
+                    break
+                }
+                pos += 2
             }
+            if (!finished) return null
         } else {
             while (pos < end && tag[pos].toInt() != 0) pos++
-            if (pos < end) pos++ // past null
+            if (pos >= end) return null
+            pos++
         }
 
         if (pos >= end) return null
