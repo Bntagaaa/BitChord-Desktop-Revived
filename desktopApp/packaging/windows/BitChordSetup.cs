@@ -84,7 +84,7 @@ internal static class BitChordSetup {
                         int count = source.Read(buffer, 0, (int)Math.Min(remaining, buffer.Length));
                         if (count <= 0) throw new EndOfStreamException("Truncated setup MSI.");
                         output.Write(buffer, 0, count);
-                        sha.TransformBlock(buffer, 0, count, null, 0);
+                        sha.TransformBlock(buffer, 0, count, buffer, 0);
                         remaining -= count;
                     }
                     sha.TransformFinalBlock(new byte[0], 0, 0);
