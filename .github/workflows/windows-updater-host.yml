@@ -9,6 +9,7 @@ on:
       - 'desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdate*.kt'
       - 'desktopApp/src/main/kotlin/com/music/bitchord/desktop/Main.kt'
       - 'desktopApp/packaging/tests/windows-updater-host-checks.ps1'
+      - 'desktopApp/packaging/tests/windows-updater-window-checks.ps1'
       - '.github/workflows/windows-updater-host.yml'
   workflow_dispatch:
 
@@ -29,6 +30,9 @@ jobs:
       - name: Test real Windows host and workers with fixture executables
         shell: pwsh
         run: ./desktopApp/packaging/tests/windows-updater-host-checks.ps1
+      - name: Test visible native updater window and safe failure
+        shell: pwsh
+        run: ./desktopApp/packaging/tests/windows-updater-window-checks.ps1
       - name: Preserve host and worker diagnostics
         if: always()
         uses: actions/upload-artifact@v4
