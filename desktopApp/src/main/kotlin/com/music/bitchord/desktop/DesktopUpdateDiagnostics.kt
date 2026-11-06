@@ -108,6 +108,20 @@ internal object DesktopUpdateDiagnostics {
             .map { it.toEpochMilli().toString() == fields["start_millis"] }.orElse(false)
     }.getOrDefault(true)
 
+    /** Preparation may fail before an operation directory exists (e.g. low disk). */
+    fun logPreflightFailure(format: UpdateFormat, error: Throwable) {
+        if (!DesktopPlatform.isWindows) return
+        runCatching {
+            val root = directory()
+            val local = root.parent?.parent ?: return@runCatching
+            ensureOutsideWindowsInstall(root, local)
+            Files.createDirectories(root)
+            val reason = (error.message ?: error.javaClass.simpleName).replace('\n', ' ').replace('\r', ' ').take(600)
+            Files.writeString(root.resolve("preflight-errors.log"),
+                "${Instant.now()} format=$format type=${error.javaClass.simpleName} reason=$reason\n", CREATE, APPEND)
+        }
+    }
+
     fun log(operation: Path, message: String) {
         runCatching { Files.writeString(operation.resolve("install.log"), "${Instant.now()} $message\n", CREATE, APPEND) }
     }
