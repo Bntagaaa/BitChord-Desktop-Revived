@@ -35,6 +35,18 @@ class DesktopSidebarMicaTest {
     }
 
     @Test
+    fun `colorful wallpaper cannot tint the sidebar red or blue`() {
+        for (wallpaper in listOf(Color.Red, Color.Green, Color.Blue)) {
+            for (dark in listOf(true, false)) {
+                val fallback = if (dark) DARK_PALETTE.sidebarSurface else LIGHT_PALETTE.sidebarSurface
+                val surface = DesktopSidebarMica.surface(wallpaper, dark, fallback)
+                assertEquals(surface.red, surface.green)
+                assertEquals(surface.green, surface.blue)
+            }
+        }
+    }
+
+    @Test
     fun `wallpaper extremes stay within readable light and dark surface ranges`() {
         for (wallpaper in listOf(Color.Black, Color.White, Color.Red, Color.Blue)) {
             val dark = DesktopSidebarMica.surface(wallpaper, true, DARK_PALETTE.sidebarSurface)
