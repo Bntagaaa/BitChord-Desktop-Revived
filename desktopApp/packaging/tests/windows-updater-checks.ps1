@@ -60,6 +60,12 @@ foreach ($case in @('parent-exit', 'checksum-mismatch', 'parent-timeout', 'insta
             if ($case -ne 'installer-failure' -and $started) { throw "Unverified/premature installer execution: $case" }
         }
         if (-not (Test-Path (Join-Path $operation 'completed'))) { throw 'Persistent terminal status is missing' }
+        if (Test-Path -LiteralPath $installer) {
+            throw "Completed helper left a large staged setup executable behind: $case"
+        }
+        if (-not (Test-Path -LiteralPath (Join-Path $operation 'install.log'))) {
+            throw 'The cleanup deleted the diagnostic log instead of just the installer'
+        }
         $results += [pscustomobject]@{ case = $case; helperExit = $process.ExitCode; started = $started }
     } finally { if (-not $parent.HasExited) { Stop-Process -Id $parent.Id } }
 }
