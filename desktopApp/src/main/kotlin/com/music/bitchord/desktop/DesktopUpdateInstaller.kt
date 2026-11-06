@@ -58,8 +58,9 @@ internal object DesktopUpdateInstaller {
     fun canInstall(installation: UpdateInstallation): Boolean = when (installation.format) {
         UpdateFormat.WINDOWS_SETUP -> true // Interactive installer handoff, not an unattended upgrade.
         UpdateFormat.WINDOWS_PORTABLE -> installation.portableRoot?.let { root ->
-            root.isAbsolute && !Files.isSymbolicLink(root) && Files.isDirectory(root, NOFOLLOW_LINKS) &&
-                !Files.isSymbolicLink(root.parent) && Files.isWritable(root.parent) &&
+            root.isAbsolute && root.parent != null && !Files.isSymbolicLink(root) &&
+                Files.isDirectory(root, NOFOLLOW_LINKS) && !Files.isSymbolicLink(root.parent) &&
+                Files.isWritable(root.parent) &&
                 Files.isRegularFile(root.resolve(".bitchord-portable"), NOFOLLOW_LINKS) &&
                 Files.isRegularFile(root.resolve("BitChord.exe"), NOFOLLOW_LINKS) &&
                 Files.isRegularFile(root.resolve("app/BitChord.cfg"), NOFOLLOW_LINKS)
