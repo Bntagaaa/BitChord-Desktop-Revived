@@ -71,6 +71,7 @@ internal object DesktopUpdateInstaller {
         require(file.fileName.toString().endsWith(requireNotNull(installation.format.suffix))) { "Package does not match this installation." }
         require(DesktopUpdateDownloader.sha256(file).equals(verifiedHash, true)) { "Verified package changed. Download again." }
         require(validExecutable(file, installation.format)) { "The verified file is not the expected executable package." }
+        DesktopUpdateDiskSpace.checkBeforeSetup(installation, file)
         val operation = DesktopUpdateDiagnostics.createOperation()
         val temporary = mutableListOf<Path>()
         try {
