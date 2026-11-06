@@ -113,6 +113,13 @@ jobs:
           if (-not (Test-Path $zipPath)) { throw "Portable ZIP not created" }
           Get-Item $zipPath | Select-Object Name, Length
 
+      - name: Exercise real portable ZIP in-place update helper
+        shell: pwsh
+        run: |
+          $artifact = @(Get-ChildItem dist/BitChord-*-windows-x64-portable.zip | Select-Object -First 1)
+          if ($artifact.Count -ne 1) { throw 'Portable ZIP artifact was not produced' }
+          ./desktopApp/packaging/tests/windows-portable-inplace-checks.ps1 -RealArchive $artifact[0].FullName
+
       - name: Build EXE and MSI for updater audit
         if: ${{ inputs.installers }}
         shell: pwsh
