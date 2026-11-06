@@ -136,7 +136,6 @@ try {
         foreach ($entry in $zip.Entries) {
             $name = $entry.FullName
             if ([string]::IsNullOrWhiteSpace($name) -or
-                -not $name.StartsWith('BitChord/', [StringComparison]::Ordinal) -or
                 $name -match '[\\:]' -or $name -match '(^|/)\.\.?(/|$)' -or
                 $name -match '[\x00-\x1f]' -or -not $names.Add($name)) {
                 throw "Unsafe or duplicate ZIP entry: $name"
@@ -150,9 +149,91 @@ try {
             [void]$found.Add($name)
         }
     } finally { $zip.Dispose() }
-    foreach ($required in @('BitChord/BitChord.exe', 'BitChord/.bitchord-portable', 'BitChord/app/BitChord.cfg')) {
-        if (-not $found.Contains($required)) { throw "Portable ZIP lacks $required" }
+    # Release, Windows build and test build may archive different parent
+    # directories. Discover the unique application root from the executable,
+    # marker and runtime config instead of assuming a BitChord/ prefix.
+    $roots = @($found | Where-Object { $_ -match '(^|/)BitChord\\.exe [IO.DriveInfo]::new([IO.Path]::GetPathRoot($root))
+    if ($disk.AvailableFreeSpace -lt ($expandedBytes + 256MB)) {
+        Finish "insufficient-disk-space for portable extraction; required=$($expandedBytes + 256MB) available=$($disk.AvailableFreeSpace)" 1
     }
+    if ($expandedBytes -le 0) { throw 'Portable ZIP contains no files' }
+
+    $id = [guid]::NewGuid().ToString('N')
+    $name = [IO.Path]::GetFileName($root)
+    $staging = Join-Path $parent (".$name.update-staging-$id")
+    $backup = Join-Path $parent ("$name.previous-$id")
+    if ((Test-Path -LiteralPath $staging) -or (Test-Path -LiteralPath $backup)) {
+        throw 'Update staging or backup already exists'
+    }
+    [void][IO.Directory]::CreateDirectory($staging)
+    [IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $staging)
+    $candidate = Join-Path $staging ($archiveRoot.Replace('/', [IO.Path]::DirectorySeparatorChar))
+    foreach ($required in @('BitChord.exe', '.bitchord-portable', 'app\BitChord.cfg')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $candidate $required) -PathType Leaf)) {
+            throw "Extracted portable ZIP lacks $required"
+        }
+    }
+    if (Test-Path -LiteralPath (Join-Path $operationPath 'abort')) {
+        Finish 'aborted-before-folder-swap; portable folder unchanged' 1
+    }
+    # Only rename complete folders on the same volume, never recursively
+    # overwrite a running executable or delete unknown user-added files.
+    Move-DirectoryWithRetry $root $backup 'backup-old-portable'
+    $oldMoved = $true
+    if ($SimulateSwapFailure) { throw 'simulated-swap-failure' }
+    Move-DirectoryWithRetry $candidate $root 'replace-new-portable'
+    $installed = $true
+    Set-Content -LiteralPath (Join-Path $operationPath 'backup.path') -Value $backup -Encoding utf8
+    Log "portable-replaced in-place root=$root backup=$backup"
+    if ($SkipLaunch) { Finish 'success-portable-replaced; backup retained' 0 }
+    try {
+        Start-Process -FilePath (Join-Path $root 'BitChord.exe') -WorkingDirectory $root
+        Finish 'success-portable-replaced; relaunch requested; backup retained' 0
+    } catch {
+        Finish 'portable-replaced; relaunch failed; manually open BitChord.exe; backup retained' 1
+    }
+} catch {
+    $reason = $_.Exception.Message
+    Log "portable-exception type=$($_.Exception.GetType().Name) reason=$reason"
+    try { Set-Content -LiteralPath (Join-Path $Operation 'failure.detail') -Value "$($_.Exception.GetType().Name): $reason" -Encoding utf8 }
+    catch { }
+    if ($oldMoved -and -not $installed) {
+        if (-not (Test-Path -LiteralPath $root) -and (Test-Path -LiteralPath $backup)) {
+            try {
+                Move-DirectoryWithRetry $backup $root 'rollback-old-portable'
+                Log 'portable-rollback-restored-original'
+                Finish 'portable-replacement-failed; original folder restored' 1
+            } catch {
+                Finish 'portable-rollback-failed; original folder remains in backup; manual recovery required' 1
+            }
+        }
+        Finish 'portable-replacement-failed; original backup retained; manual recovery required' 1
+    }
+    Log "portable-update-failed error=$reason"
+    Finish 'portable-update-failed; original folder unchanged' 1
+} finally {
+    if ($staging -and (Test-Path -LiteralPath $staging)) {
+        try { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction Stop }
+        catch { Log 'portable-staging-cleanup-deferred' }
+    }
+}
+ } |
+        ForEach-Object { $_.Substring(0, $_.Length - 'BitChord.exe'.Length) } |
+        Where-Object {
+            $found.Contains($_ + '.bitchord-portable') -and
+            $found.Contains($_ + 'app/BitChord.cfg')
+        } | Select-Object -Unique)
+    if ($roots.Count -ne 1 -or [string]::IsNullOrWhiteSpace($roots[0])) {
+        throw 'Portable ZIP must contain exactly one BitChord.exe with marker and app config'
+    }
+    $archiveRoot = [string]$roots[0]
+    foreach ($entryName in $found) {
+        if (-not $entryName.StartsWith($archiveRoot, [StringComparison]::OrdinalIgnoreCase) -and
+            -not $archiveRoot.StartsWith($entryName.TrimEnd('/') + '/', [StringComparison]::OrdinalIgnoreCase)) {
+            throw "ZIP contains files outside the portable application: $entryName"
+        }
+    }
+    Log "portable-archive-root=$archiveRoot"
     $disk = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($root))
     if ($disk.AvailableFreeSpace -lt ($expandedBytes + 256MB)) {
         Finish "insufficient-disk-space for portable extraction; required=$($expandedBytes + 256MB) available=$($disk.AvailableFreeSpace)" 1
