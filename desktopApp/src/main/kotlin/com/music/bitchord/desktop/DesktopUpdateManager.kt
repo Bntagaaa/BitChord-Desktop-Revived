@@ -50,7 +50,15 @@ internal class DesktopUpdateService(
         check(force = true)
     }
 
-    fun startup() { if (autoCheck.value) check(force = false) }
+    fun startup() {
+        // Cleanup is independent of whether automatic update checking is
+        // enabled or throttled by the six-hour check interval.
+        if (DesktopPlatform.isWindows) scope.launch(Dispatchers.IO) {
+            runCatching { DesktopUpdateDiagnostics.compactCompletedWindowsOperations() }
+                .onFailure { DesktopTrackLog.log("updater: startup payload cleanup deferred: ${it.javaClass.simpleName}") }
+        }
+        if (autoCheck.value) check(force = false)
+    }
 
     /** Serialize filesystem work across cancellation, and fence all publications by operation. */
     @Synchronized private fun begin(initial: DesktopUpdateState, work: suspend (Long) -> Unit) {
