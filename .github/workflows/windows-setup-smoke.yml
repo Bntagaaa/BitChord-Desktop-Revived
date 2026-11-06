@@ -6,6 +6,8 @@ on:
     paths:
       - "desktopApp/packaging/windows/BitChordSetup.cs"
       - "desktopApp/packaging/windows/create-setup.ps1"
+      - "desktopApp/src/main/resources/updater/windows-msi-source.ps1"
+      - "desktopApp/src/main/resources/updater/windows-update.ps1"
       - ".github/workflows/windows-setup-smoke.yml"
   workflow_dispatch:
 
@@ -18,6 +20,23 @@ jobs:
     name: Compile setup EXE and verify persistent payload
     steps:
       - uses: actions/checkout@v4
+      - name: Parse and execute legacy Temp-source fallback without an MSI
+        shell: pwsh
+        run: |
+          $helpers = @(
+            'desktopApp/src/main/resources/updater/windows-update.ps1',
+            'desktopApp/src/main/resources/updater/windows-msi-source.ps1',
+            'desktopApp/packaging/windows/recover-legacy-msi.ps1'
+          )
+          foreach ($helper in $helpers) {
+            $tokens = $null; $parseErrors = $null
+            [Management.Automation.Language.Parser]::ParseFile($helper, [ref]$tokens, [ref]$parseErrors) > $null
+            if ($parseErrors.Count -gt 0) { throw "PowerShell parse error in $helper : $($parseErrors | Out-String)" }
+          }
+          $empty = Join-Path $env:RUNNER_TEMP 'bitchord-empty-source'
+          New-Item -ItemType Directory -Force -Path $empty | Out-Null
+          $out = @(& './desktopApp/src/main/resources/updater/windows-msi-source.ps1' -SearchRoots @($empty) -CacheRoot (Join-Path $env:RUNNER_TEMP 'bitchord-source-smoke-cache'))
+          if ($out -notcontains 'msi-source-repair-skipped no-main-msi-found') { throw "Empty source directory unexpectedly changed MSI registration: $($out -join '; ')" }
       - name: Build and verify sample payload
         shell: pwsh
         run: |
