@@ -41,6 +41,14 @@ internal object DesktopLocalArtwork {
     private val FOLDER_COVER_NAMES = listOf("cover", "folder", "front", "album", "artwork")
     private val IMAGE_EXTENSIONS = listOf("jpg", "jpeg", "png")
 
+    /** Used by the filesystem watcher as well as artwork discovery. */
+    internal fun isFolderCoverFilename(filename: String): Boolean {
+        val normalized = filename.lowercase(Locale.ROOT)
+        return FOLDER_COVER_NAMES.any { name ->
+            IMAGE_EXTENSIONS.any { extension -> normalized == name + "." + extension }
+        }
+    }
+
     /** Bump when extraction changes so PR #103's old negative markers are ignored. */
     private const val CACHE_VERSION = "2"
     private const val MAX_IMAGE_BYTES = 20 * 1024 * 1024
