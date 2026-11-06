@@ -57,6 +57,43 @@ try {
     }
     Write-Output "PASS: same portable path replaced, rollback folder retained: $backup"
 
+    # An open file handle with no FILE_SHARE_DELETE is representative of an
+    # antivirus/Explorer/native child transiently locking portable binaries.
+    $lockedRoot = Join-Path $testRoot 'LockedCase'
+    $lockedOp = Join-Path $testRoot 'locked-operation'
+    New-Item -ItemType Directory -Force -Path $lockedRoot, $lockedOp | Out-Null
+    Populate-Root $lockedRoot 'locked-old'
+    $lockedZip = Join-Path $lockedOp 'verified-portable.zip'
+    [IO.Compression.ZipFile]::CreateFromDirectory($source, $lockedZip)
+    $lockReady = Join-Path $testRoot 'lock-ready.txt'
+    $lockJob = Start-Job -ScriptBlock {
+        param($oldFile, $marker)
+        $hold = [IO.File]::Open($oldFile, [IO.FileMode]::Open,
+            [IO.FileAccess]::Read, [IO.FileShare]::Read)
+        try {
+            Set-Content -LiteralPath $marker -Value 'locked'
+            Start-Sleep -Seconds 7
+        } finally { $hold.Dispose() }
+    } -ArgumentList (Join-Path $lockedRoot 'BitChord.exe'), $lockReady
+    try {
+        $started = [DateTime]::UtcNow
+        while (-not (Test-Path -LiteralPath $lockReady)) {
+            if ($lockJob.State -eq 'Failed') { throw 'Fixture failed to hold executable lock' }
+            if (([DateTime]::UtcNow - $started).TotalSeconds -gt 10) { throw 'Lock fixture did not start' }
+            Start-Sleep -Milliseconds 100
+        }
+        $code = Run-Helper $lockedZip $lockedRoot $lockedOp
+        if ($code -ne 0 -or
+            (Get-Content -LiteralPath (Join-Path $lockedRoot 'BitChord.exe') -Raw).Trim() -ne 'new') {
+            throw 'Portable in-place update failed to retry a transient file lock'
+        }
+        if (Test-Path -LiteralPath $lockedZip) { throw 'Locked case retained staged ZIP' }
+        Write-Output 'PASS: transient Win32 file lock cleared, update completed in original folder'
+    } finally {
+        $null = $lockJob | Wait-Job -Timeout 15
+        $lockJob | Remove-Job -Force -ErrorAction SilentlyContinue
+    }
+
     $failureRoot = Join-Path $testRoot 'FailureCase'
     $failureOp = Join-Path $testRoot 'failure-operation'
     New-Item -ItemType Directory -Force -Path $failureRoot, $failureOp | Out-Null
