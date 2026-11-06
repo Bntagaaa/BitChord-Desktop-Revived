@@ -211,13 +211,29 @@ class DesktopUpdateReliabilityTest {
             assertFalse(Files.exists(other))
         } finally { operation.toFile().deleteRecursively() }
     }
+    @Test fun windowsUpdaterRejectsCaseInsensitiveInstallRootAndAcceptsSibling() {
+        val base = Files.createTempDirectory("bitchord-install-location")
+        try {
+            val local = base.resolve("Local")
+            Files.createDirectories(local)
+            assertFailsWith<IllegalArgumentException> { DesktopUpdateDiagnostics.ensureOutsideWindowsInstall(local.resolve("bitchord/updater"), local) }
+            assertFailsWith<IllegalArgumentException> { DesktopUpdateDiagnostics.ensureOutsideWindowsInstall(local.resolve("BITCHORD"), local) }
+            DesktopUpdateDiagnostics.ensureOutsideWindowsInstall(local.resolve("BitChordUpdater/operations"), local)
+        } finally { base.toFile().deleteRecursively() }
+    }
+    @Test fun windowsUpdateDiskBudgetAccountsForDownloadedAndStagedPackages() {
+        val size = 340_000_000L
+        assertEquals(size * 5 + 2L * 1024 * 1024 * 1024, DesktopUpdateDiskSpace.requiredBytes(size, true))
+        assertEquals(size * 4 + 2L * 1024 * 1024 * 1024, DesktopUpdateDiskSpace.requiredBytes(size, false))
+        assertFailsWith<IllegalArgumentException> { DesktopUpdateDiskSpace.requiredBytes(0, true) }
+    }
     @Test fun diagnosticDirectoryRespectsAbsoluteXdgStateAndWindowsLocalAppData() {
         val base = Files.createTempDirectory("updater-locations")
         try {
             val state = base.resolve("state"); val home = base.resolve("home"); val local = base.resolve("local")
             assertEquals(state.resolve("bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("XDG_STATE_HOME" to state.toString()), home.toString(), false))
             assertEquals(home.resolve(".local/state/bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("XDG_STATE_HOME" to "relative"), home.toString(), false))
-            assertEquals(local.resolve("bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("LOCALAPPDATA" to local.toString()), home.toString(), true))
+            assertEquals(local.resolve("BitChordUpdater/operations"), DesktopUpdateDiagnostics.directory(mapOf("LOCALAPPDATA" to local.toString()), home.toString(), true))
         } finally { base.toFile().deleteRecursively() }
     }
 }
