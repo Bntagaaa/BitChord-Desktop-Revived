@@ -114,10 +114,9 @@ function Repair-LegacyTempSource {
             if ((Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash -ine $sourceHash) {
                 throw 'Legacy MSI changed during copying'
             }
-            $verified = Read-BitChordMsi $temporary $installer
-            if (-not $verified -or $verified.Product -ine $selected.Product) {
-                throw 'Copied MSI does not match installed BitChord'
-            }
+            # The second SHA-256 is sufficient: bytes are identical to the
+            # original MSI whose installed ProductCode was already verified.
+            # Do not open a second COM MSI database here and hold a move lock.
             Move-Item -LiteralPath $temporary -Destination $destination
         } finally {
             Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
