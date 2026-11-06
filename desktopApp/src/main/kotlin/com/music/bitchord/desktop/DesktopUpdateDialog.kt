@@ -76,7 +76,11 @@ internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: suspend 
                 state.phase == UpdatePhase.READY -> Button(onClick = {
                     if (service.canAutoInstall) service.install(onExit)
                     else service.showDownload()
-                }) { Text(if (service.canAutoInstall) if (service.installation.format == UpdateFormat.WINDOWS_SETUP) "Close and open setup" else "Restart to Update" else "Show verified download") }
+                }) { Text(if (!service.canAutoInstall) "Show verified download" else when (service.installation.format) {
+                    UpdateFormat.WINDOWS_SETUP -> "Close and open setup"
+                    UpdateFormat.WINDOWS_PORTABLE -> "Replace in Same Folder"
+                    else -> "Restart to Update"
+                }) }
                 release.asset == null -> TextButton(onClick = { DesktopExternalLinks.open(release.url) }) { Text("View release") }
                 !busy -> Button(onClick = service::download) { Text(if (state.phase in setOf(UpdatePhase.FAILED, UpdatePhase.CANCELLED)) "Retry download" else "Download update") }
             }
