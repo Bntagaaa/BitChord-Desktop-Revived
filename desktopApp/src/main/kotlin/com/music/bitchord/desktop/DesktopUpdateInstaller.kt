@@ -83,6 +83,8 @@ internal object DesktopUpdateInstaller {
                 require(DesktopUpdateDownloader.sha256(installer).equals(verifiedHash, true))
                 val helper = operation.resolve("install.ps1")
                 copyHelper("windows-update.ps1", helper)
+                // Restore a matching legacy MSI source when jpackage recorded an obsolete Temp folder.
+                copyHelper("windows-msi-source.ps1", operation.resolve("msi-source.ps1"))
                 val windows = Path.of(System.getenv("SystemRoot") ?: "C:\\Windows")
                 return DesktopPreparedUpdate(operation, listOf(windows.resolve("System32/WindowsPowerShell/v1.0/powershell.exe").toString(),
                     "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper.toString(),
