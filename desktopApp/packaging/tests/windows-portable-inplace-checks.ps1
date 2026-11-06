@@ -88,3 +88,7 @@ try {
 } finally {
     Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+# Negative test deliberately returned a nonzero helper exit code. Do not let
+# PowerShell's inherited LASTEXITCODE make a successful CI script look failed.
+exit 0
