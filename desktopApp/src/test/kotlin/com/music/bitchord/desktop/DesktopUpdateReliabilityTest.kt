@@ -211,6 +211,35 @@ class DesktopUpdateReliabilityTest {
             assertFalse(Files.exists(other))
         } finally { operation.toFile().deleteRecursively() }
     }
+    @Test fun windowsPortableInPlaceUpdateRequiresMarkerLauncherAndCfg() {
+        val base = Files.createTempDirectory("bitchord-portable-guard")
+        val root = Files.createDirectory(base.resolve("BitChord"))
+        try {
+            val launcher = Files.writeString(root.resolve("BitChord.exe"), "fixture")
+            val portable = UpdateInstallation(UpdateFormat.WINDOWS_PORTABLE, portableRoot = root)
+            assertFalse(DesktopUpdateInstaller.canInstall(portable), "Do not replace a folder without its portable marker")
+            Files.writeString(root.resolve(".bitchord-portable"), "")
+            assertEquals(root, UpdateInstallation.portableRootDirectory(launcher))
+            assertFalse(DesktopUpdateInstaller.canInstall(portable), "Incomplete portable folder cannot update in place")
+            Files.createDirectories(root.resolve("app"))
+            Files.writeString(root.resolve("app/BitChord.cfg"), "fixture")
+            assertTrue(DesktopUpdateInstaller.canInstall(portable))
+            assertFalse(DesktopUpdateInstaller.canInstall(UpdateInstallation(UpdateFormat.WINDOWS_PORTABLE)),
+                "Do not assume the portable root when only a distribution flag is available")
+            assertFalse(DesktopUpdateInstaller.canInstall(portable.copy(portableRoot = base.resolve("other"))))
+        } finally { base.toFile().deleteRecursively() }
+    }
+
+    @Test fun windowsPortableUpdateRequiresZipHeaderNotExeOrText() {
+        val root = Files.createTempDirectory("bitchord-zip-header")
+        try {
+            val good = Files.write(root.resolve("package.zip"), byteArrayOf(0x50, 0x4b, 0x03, 0x04, 0, 0))
+            val bad = Files.write(root.resolve("other.zip"), byteArrayOf(0x4d, 0x5a, 0, 0))
+            assertTrue(DesktopUpdateInstaller.validExecutable(good, UpdateFormat.WINDOWS_PORTABLE))
+            assertFalse(DesktopUpdateInstaller.validExecutable(bad, UpdateFormat.WINDOWS_PORTABLE))
+        } finally { root.toFile().deleteRecursively() }
+    }
+
     @Test fun windowsUpdaterRejectsCaseInsensitiveInstallRootAndAcceptsSibling() {
         val base = Files.createTempDirectory("bitchord-install-location")
         try {
