@@ -1288,4 +1288,10 @@
     <string name="spotify_library_subtitle">आपकी Spotify प्लेलिस्ट</string>
     <string name="spotify_sign_in">Spotify से साइन इन करें</string>
     <string name="spotify_track_unavailable">वह गाना YouTube Music पर नहीं मिला</string>
+    <string name="font">फ़ॉन्ट</string>
+    <string name="font_default">डिफ़ॉल्ट</string>
+    <string name="font_legacy">पुराना</string>
+    <string name="font_default_subtitle">SF Pro Display · Apple Music जैसा वज़न</string>
+    <string name="font_legacy_subtitle">SF Pro Display · मूल मोटा वज़न</string>
+    <string name="font_footer">पुराना विकल्प वह मोटा और सटा हुआ फ़ॉन्ट वापस लाता है जो ऐप Apple Music से मिलाए जाने से पहले इस्तेमाल करता था।</string>
 </resources>

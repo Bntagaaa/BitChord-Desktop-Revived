@@ -1288,4 +1288,10 @@
     <string name="spotify_library_subtitle">Deine Spotify-Playlists</string>
     <string name="spotify_sign_in">Bei Spotify anmelden</string>
     <string name="spotify_track_unavailable">Diesen Titel gab es nicht auf YouTube Music</string>
+    <string name="font">Schriftart</string>
+    <string name="font_default">Standard</string>
+    <string name="font_legacy">Klassisch</string>
+    <string name="font_default_subtitle">SF Pro Display · Schriftschnitte wie bei Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Ursprüngliche kräftige Schriftschnitte</string>
+    <string name="font_footer">„Klassisch“ bringt die kräftigere, engere Schrift zurück, die die App verwendete, bevor sie an Apple Music angepasst wurde.</string>
 </resources>

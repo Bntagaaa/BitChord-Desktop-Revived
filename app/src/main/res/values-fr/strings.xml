@@ -1289,4 +1289,10 @@
     <string name="spotify_library_subtitle">Vos playlists Spotify</string>
     <string name="spotify_sign_in">Se connecter avec Spotify</string>
     <string name="spotify_track_unavailable">Impossible de trouver ce titre sur YouTube Music</string>
+    <string name="font">Police</string>
+    <string name="font_default">Par défaut</string>
+    <string name="font_legacy">Classique</string>
+    <string name="font_default_subtitle">SF Pro Display · Graisses d\'Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Graisses épaisses d\'origine</string>
+    <string name="font_footer">Classique rétablit la typographie plus épaisse et plus serrée que l\'app utilisait avant de s\'aligner sur Apple Music.</string>
 </resources>

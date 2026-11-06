@@ -68,6 +68,7 @@ import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SurroundSound
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Waves
@@ -146,6 +147,7 @@ import com.music.bitchord.data.sources.DeviceCodecs
 import com.music.bitchord.data.settings.AudioQuality
 import com.music.bitchord.data.settings.DownloadQuality
 import com.music.bitchord.data.settings.ThemeMode
+import com.music.bitchord.data.settings.AppFont
 import com.music.bitchord.data.stats.Backup
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.ui.player.fullBleedArtworkAvailable
@@ -209,6 +211,7 @@ fun SettingsScreen(
     val lyricsSources by AppSettings.lyricsSources.collectAsStateWithLifecycle()
     val translationLanguage by AppSettings.translationLanguage.collectAsStateWithLifecycle()
     val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
+    val appFont by AppSettings.appFont.collectAsStateWithLifecycle()
     val sessionId by AppSettings.audioSessionId.collectAsStateWithLifecycle()
     val outputPcmMode by AppSettings.outputPcmMode.collectAsStateWithLifecycle()
     val preferUsbDac by AppSettings.preferUsbDac.collectAsStateWithLifecycle()
@@ -747,6 +750,31 @@ fun SettingsScreen(
                     options = ThemeMode.entries.map { it.localizedLabel() },
                     selectedIndex = ThemeMode.entries.indexOf(theme),
                     onSelect = { AppSettings.setThemeMode(ThemeMode.entries[it]) },
+                    modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
+                )
+            }
+            val fontTitle = stringResource(R.string.font)
+            row(fontTitle, "typeface", "SF Pro Display", "legacy", "font weight") {
+                SettingsRow(
+                    icon = Icons.Rounded.TextFields,
+                    title = fontTitle,
+                    subtitle = stringResource(
+                        if (appFont == AppFont.DEFAULT) R.string.font_default_subtitle
+                        else R.string.font_legacy_subtitle,
+                    ),
+                )
+                SegmentedControl(
+                    options = AppFont.entries.map { font ->
+                        stringResource(if (font == AppFont.DEFAULT) R.string.font_default else R.string.font_legacy)
+                    },
+                    selectedIndex = AppFont.entries.indexOf(appFont),
+                    onSelect = { AppSettings.setAppFont(AppFont.entries[it]) },
+                    modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 8.dp),
+                )
+                Text(
+                    stringResource(R.string.font_footer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
                 )
             }

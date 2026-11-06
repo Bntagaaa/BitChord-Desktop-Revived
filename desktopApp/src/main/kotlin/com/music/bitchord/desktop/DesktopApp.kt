@@ -485,31 +485,42 @@ internal fun desktopColorScheme() =
     )
 
 @Composable
-internal fun desktopTypography(): Typography {
+internal fun desktopTypography(mode: DesktopFontMode = DesktopFontSettings.mode): Typography {
+    // Match mobile's two SF Pro Display profiles with the existing bundled OTF cuts:
+    // Default draws each requested weight one cut lighter; Legacy preserves the old mapping.
+    fun resourceFor(cut: FontWeight) = when (cut) {
+        FontWeight.W400 -> Res.font.sf_pro_display_regular
+        FontWeight.W500 -> Res.font.sf_pro_display_medium
+        FontWeight.W600 -> Res.font.sf_pro_display_semibold
+        FontWeight.W700 -> Res.font.sf_pro_display_bold
+        FontWeight.W800 -> Res.font.sf_pro_display_heavy
+        else -> error("Unsupported SF Pro Display cut: $cut")
+    }
     val sfProDisplay = FontFamily(
-        composeFont(Res.font.sf_pro_display_regular, FontWeight.W400),
-        composeFont(Res.font.sf_pro_display_medium, FontWeight.W500),
-        composeFont(Res.font.sf_pro_display_semibold, FontWeight.W600),
-        composeFont(Res.font.sf_pro_display_bold, FontWeight.W700),
-        composeFont(Res.font.sf_pro_display_heavy, FontWeight.W800),
+        composeFont(resourceFor(mode.physicalCut(FontWeight.W400)), FontWeight.W400),
+        composeFont(resourceFor(mode.physicalCut(FontWeight.W500)), FontWeight.W500),
+        composeFont(resourceFor(mode.physicalCut(FontWeight.W600)), FontWeight.W600),
+        composeFont(resourceFor(mode.physicalCut(FontWeight.W700)), FontWeight.W700),
+        composeFont(resourceFor(mode.physicalCut(FontWeight.W800)), FontWeight.W800),
     )
+    val tracking = mode.tracking()
     val defaults = Typography()
     return defaults.copy(
-        displayLarge = defaults.displayLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W800, fontSize = 34.sp, letterSpacing = (-0.8).sp),
+        displayLarge = defaults.displayLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W800, fontSize = 34.sp, letterSpacing = tracking.displayLarge),
         displayMedium = defaults.displayMedium.copy(fontFamily = sfProDisplay),
         displaySmall = defaults.displaySmall.copy(fontFamily = sfProDisplay),
-        headlineLarge = defaults.headlineLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W800, fontSize = 30.sp, letterSpacing = (-0.7).sp),
-        headlineMedium = defaults.headlineMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W700, fontSize = 22.sp, letterSpacing = (-0.4).sp),
+        headlineLarge = defaults.headlineLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W800, fontSize = 30.sp, letterSpacing = tracking.headlineLarge),
+        headlineMedium = defaults.headlineMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W700, fontSize = 22.sp, letterSpacing = tracking.headlineMedium),
         headlineSmall = defaults.headlineSmall.copy(fontFamily = sfProDisplay),
-        titleLarge = defaults.titleLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W700, fontSize = 20.sp, letterSpacing = (-0.3).sp),
-        titleMedium = defaults.titleMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 16.sp, letterSpacing = (-0.2).sp),
+        titleLarge = defaults.titleLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W700, fontSize = 20.sp, letterSpacing = tracking.titleLarge),
+        titleMedium = defaults.titleMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 16.sp, letterSpacing = tracking.titleMedium),
         titleSmall = defaults.titleSmall.copy(fontFamily = sfProDisplay),
-        bodyLarge = defaults.bodyLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W400, fontSize = 16.sp),
-        bodyMedium = defaults.bodyMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W400, fontSize = 14.sp),
+        bodyLarge = defaults.bodyLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W400, fontSize = 16.sp, letterSpacing = tracking.bodyLarge),
+        bodyMedium = defaults.bodyMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W400, fontSize = 14.sp, letterSpacing = tracking.bodyMedium),
         bodySmall = defaults.bodySmall.copy(fontFamily = sfProDisplay),
         labelLarge = defaults.labelLarge.copy(fontFamily = sfProDisplay),
-        labelMedium = defaults.labelMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 12.sp),
-        labelSmall = defaults.labelSmall.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 11.sp),
+        labelMedium = defaults.labelMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 12.sp, letterSpacing = tracking.labelMedium),
+        labelSmall = defaults.labelSmall.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 11.sp, letterSpacing = tracking.labelSmall),
     )
 }
 
@@ -3653,7 +3664,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
 
     MaterialTheme(
         colorScheme = desktopColorScheme(),
-        typography = desktopTypography(),
+        typography = desktopTypography(DesktopFontSettings.mode),
     ) {
         CompositionLocalProvider(
             LocalContentColor provides DesktopForeground,
@@ -7870,6 +7881,40 @@ private fun DesktopSettingsScreen(
                                         onClick = { DesktopTheme.selectMode(option) },
                                         colors = desktopChipColors(),
                                         label = { Text(option.label) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    val fontTitle = DesktopStrings["font", "Font"]
+                    val fontSubtitle = DesktopStrings[
+                        if (DesktopFontSettings.mode == DesktopFontMode.DEFAULT) "font_default_subtitle"
+                        else "font_legacy_subtitle",
+                        if (DesktopFontSettings.mode == DesktopFontMode.DEFAULT) {
+                            "SF Pro Display · Apple Music weights"
+                        } else {
+                            "SF Pro Display · Original heavy weights"
+                        },
+                    ]
+                    if (settingsRowVisible(fontTitle, "SF Pro Display typeface Default Legacy $fontSubtitle")) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(fontTitle, fontWeight = FontWeight.Medium)
+                                Text(fontSubtitle, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                DesktopFontMode.entries.forEach { option ->
+                                    FilterChip(
+                                        selected = DesktopFontSettings.mode == option,
+                                        onClick = { DesktopFontSettings.selectMode(option) },
+                                        colors = desktopChipColors(),
+                                        label = {
+                                            Text(DesktopStrings[if (option == DesktopFontMode.DEFAULT) "font_default" else "font_legacy", option.label])
+                                        },
                                     )
                                 }
                             }

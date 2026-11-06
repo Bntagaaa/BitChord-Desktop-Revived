@@ -1328,4 +1328,10 @@
     <string name="spotify_library_subtitle">Twoje playlisty Spotify</string>
     <string name="spotify_sign_in">Zaloguj się przez Spotify</string>
     <string name="spotify_track_unavailable">Nie znaleziono tego utworu w YouTube Music</string>
+    <string name="font">Czcionka</string>
+    <string name="font_default">Domyślna</string>
+    <string name="font_legacy">Klasyczna</string>
+    <string name="font_default_subtitle">SF Pro Display · Grubości z Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Oryginalne grube odmiany</string>
+    <string name="font_footer">Klasyczna przywraca grubszą i ciaśniejszą czcionkę, której aplikacja używała przed dopasowaniem do Apple Music.</string>
 </resources>

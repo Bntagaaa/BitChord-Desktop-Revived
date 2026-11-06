@@ -1265,4 +1265,10 @@
     <string name="spotify_library_subtitle">Playlist Spotify Anda</string>
     <string name="spotify_sign_in">Masuk dengan Spotify</string>
     <string name="spotify_track_unavailable">Lagu itu tidak ditemukan di YouTube Music</string>
+    <string name="font">Font</string>
+    <string name="font_default">Default</string>
+    <string name="font_legacy">Lama</string>
+    <string name="font_default_subtitle">SF Pro Display · Ketebalan Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Ketebalan tebal asli</string>
+    <string name="font_footer">Lama mengembalikan huruf yang lebih tebal dan rapat yang dipakai aplikasi sebelum disamakan dengan Apple Music.</string>
 </resources>
