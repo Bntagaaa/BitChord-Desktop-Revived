@@ -27,7 +27,9 @@ internal class DesktopPreparedUpdate(
             .redirectOutput(ProcessBuilder.Redirect.appendTo(operation.resolve("install.log").toFile())).redirectErrorStream(true)
         DesktopUpdateProcess.cleanEnvironment(builder.environment())
         process = builder.start()
-        repeat(100) {
+        // Windows now initializes a separate updater window and re-verifies the
+        // package BEFORE authorizing shutdown. Slow disks need more than 5 s.
+        repeat(if (DesktopPlatform.isWindows) 900 else 100) {
             currentCoroutineContext().ensureActive()
             check(process!!.isAlive) { "Update helper did not start. See updater logs: $operation" }
             if (Files.isRegularFile(operation.resolve("armed"), NOFOLLOW_LINKS)) {
@@ -41,7 +43,6 @@ internal class DesktopPreparedUpdate(
 
     /** The normal application exit is now committed; never called on a failed save/shutdown. */
     fun handoff() { handedOff = true }
-
     fun abort() { handedOff = false; close() }
 
     override fun close() {
@@ -56,7 +57,7 @@ internal class DesktopPreparedUpdate(
 /** Bundled helpers, private persistent state, and same-filesystem staging. No user-data edits. */
 internal object DesktopUpdateInstaller {
     fun canInstall(installation: UpdateInstallation): Boolean = when (installation.format) {
-        UpdateFormat.WINDOWS_SETUP -> true // Interactive installer handoff, not an unattended upgrade.
+        UpdateFormat.WINDOWS_SETUP -> true
         UpdateFormat.WINDOWS_PORTABLE -> installation.portableRoot?.let { root ->
             root.isAbsolute && root.parent != null && !Files.isSymbolicLink(root) &&
                 Files.isDirectory(root, NOFOLLOW_LINKS) && !Files.isSymbolicLink(root.parent) &&
@@ -84,48 +85,8 @@ internal object DesktopUpdateInstaller {
         val temporary = mutableListOf<Path>()
         try {
             DesktopUpdateDiagnostics.log(operation, "stage=preparing installed_version=${DesktopUpdateChecker.currentVersion} target_version=$targetVersion format=${installation.format} parent_pid=${ProcessHandle.current().pid()}")
-            if (installation.format == UpdateFormat.WINDOWS_SETUP) {
-                // Copy into our private operation directory, not a mutable shared cache location.
-                val installer = operation.resolve("verified-setup.exe")
-                Files.copy(file, installer)
-                require(DesktopUpdateDownloader.sha256(installer).equals(verifiedHash, true))
-                val helper = operation.resolve("install.ps1")
-                copyHelper("windows-update.ps1", helper)
-                // Restore a matching legacy MSI source when jpackage recorded an obsolete Temp folder.
-                copyHelper("windows-msi-source.ps1", operation.resolve("msi-source.ps1"))
-                val windows = Path.of(System.getenv("SystemRoot") ?: "C:\\Windows")
-                return DesktopPreparedUpdate(operation, listOf(windows.resolve("System32/WindowsPowerShell/v1.0/powershell.exe").toString(),
-                    "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper.toString(),
-                    "-ParentPid", ProcessHandle.current().pid().toString(), "-Installer", installer.toString(),
-                    "-Expected", verifiedHash.lowercase(), "-Operation", operation.toString(),
-                    "-ParentStartMillis", (ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli()).toString()), listOf(installer))
-            }
-            if (installation.format == UpdateFormat.WINDOWS_PORTABLE) {
-                // The helper lives outside the portable folder, so it survives
-                // the directory rename after the old Java process has exited.
-                val portableRoot = requireNotNull(installation.portableRoot).toAbsolutePath().normalize()
-                val zipped = operation.resolve("verified-portable.zip")
-                Files.copy(file, zipped)
-                temporary.add(zipped)
-                require(DesktopUpdateDownloader.sha256(zipped).equals(verifiedHash, true)) {
-                    "Copied portable package changed. Download it again."
-                }
-                val helper = operation.resolve("portable-install.ps1")
-                copyHelper("windows-portable-update.ps1", helper)
-                val windows = Path.of(System.getenv("SystemRoot") ?: "C:\\Windows")
-                val launcher = portableLauncherIdentity(portableRoot)
-                DesktopUpdateDiagnostics.log(operation,
-                    "stage=portable-staged current=$portableRoot package=$zipped target=$targetVersion launcher_pid=${launcher?.pid ?: 0}")
-                return DesktopPreparedUpdate(operation, listOf(
-                    windows.resolve("System32/WindowsPowerShell/v1.0/powershell.exe").toString(),
-                    "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper.toString(),
-                    "-ParentPid", ProcessHandle.current().pid().toString(),
-                    "-ParentStartMillis", ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli().toString(),
-                    "-LauncherPid", (launcher?.pid ?: 0).toString(),
-                    "-LauncherStartMillis", (launcher?.startMillis ?: 0).toString(),
-                    "-Package", zipped.toString(), "-Expected", verifiedHash.lowercase(),
-                    "-Operation", operation.toString(), "-PortableRoot", portableRoot.toString()
-                ), temporary)
+            if (installation.format in setOf(UpdateFormat.WINDOWS_SETUP, UpdateFormat.WINDOWS_PORTABLE)) {
+                return DesktopWindowsUpdate.prepare(installation, file, verifiedHash, targetVersion, operation, temporary)
             }
             val current = requireNotNull(installation.appImage).normalize()
             require('\n' !in current.toString() && '\r' !in current.toString()) { "Use manual replacement for a path containing line breaks." }
@@ -169,31 +130,6 @@ internal object DesktopUpdateInstaller {
             else -> false
         }
     }.getOrDefault(false)
-
-    private data class ProcessIdentity(val pid: Long, val startMillis: Long)
-
-    /**
-     * jpackage's Windows launcher can keep a small parent BitChord.exe alive
-     * around the JVM process. That parent still maps the launcher from the
-     * portable directory, so renaming the directory after waiting only for the
-     * JVM PID fails with ERROR_SHARING_VIOLATION on real machines.
-     */
-    private fun portableLauncherIdentity(portableRoot: Path): ProcessIdentity? {
-        val launcher = portableRoot.resolve("BitChord.exe").toAbsolutePath().normalize().toString()
-        var ancestor = ProcessHandle.current().parent().orElse(null)
-        while (ancestor != null) {
-            val command = ancestor.info().command().orElse(null)
-            val start = ancestor.info().startInstant().orElse(null)
-            if (command != null && start != null &&
-                runCatching { Path.of(command).toAbsolutePath().normalize().toString().equals(launcher, ignoreCase = true) }
-                    .getOrDefault(false)
-            ) {
-                return ProcessIdentity(ancestor.pid(), start.toEpochMilli())
-            }
-            ancestor = ancestor.parent().orElse(null)
-        }
-        return null
-    }
 
     private fun setsid(): String? = listOf("/usr/bin/setsid", "/bin/setsid").firstOrNull { Files.isExecutable(Path.of(it)) }
     private fun copyHelper(name: String, target: Path) {

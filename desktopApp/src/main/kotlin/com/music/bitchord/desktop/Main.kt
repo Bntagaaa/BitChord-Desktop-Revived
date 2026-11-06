@@ -208,10 +208,10 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
             onDispose { if (DesktopPlatform.isWindows) DesktopWindowsFullscreen.apply(composeWindow, false) }
         }
 
-        // The AppImage updater must never treat merely spawning the JVM as a healthy restart.
+        // Neither Windows nor AppImage should treat spawning a process as a healthy restart.
         // A real, mapped Compose window acknowledges the launch using a unique local marker.
         LaunchedEffect(composeWindow) {
-            if (DesktopPlatform.isLinux && System.getenv("BITCHORD_UPDATE_READY_FILE") != null) {
+            if ((DesktopPlatform.isLinux || DesktopPlatform.isWindows) && System.getenv("BITCHORD_UPDATE_READY_FILE") != null) {
                 DesktopWindowVisibility.raise()
                 state.isMinimized = false
                 // A mapped window plus a second frame callback, rather than JVM process entry.
