@@ -49,30 +49,20 @@ try {
     if ([BitChordInstallStateTest]::Get($oldCode) -ne 5) { throw 'Old setup EXE product is not installed.' }
     if (-not (Test-Path -LiteralPath $oldMsi -PathType Leaf)) { throw 'Missing original extracted MSI.' }
 
-    # Simulate a stale/wrong Temp folder being selected by Windows Installer.
-    # The newer MSI has a different ProductCode, so it MUST NOT be accepted
-    # as an original MSI source even if its filename is also main.msi.
-    $tempFixture = Join-Path $env:TEMP ('bitchord-wrong-temp-' + [guid]::NewGuid().ToString('N'))
-    $correct = Join-Path $tempFixture 'correct.tmp'
-    $wrong = Join-Path $tempFixture 'wrong.tmp'
+    # Reproduce stale MSI source registration and two random .tmp folders:
+    # one contains the matching old ProductCode, one the unrelated new MSI.
+    # The NEW setup.exe must run its embedded repair script automatically.
+    $oldHash = (Get-FileHash -LiteralPath $oldMsi -Algorithm SHA256).Hash.ToLowerInvariant()
+    $correct = Join-Path $env:TEMP ('bitchord-correct-' + [guid]::NewGuid().ToString('N') + '.tmp')
+    $wrong = Join-Path $env:TEMP ('bitchord-wrong-' + [guid]::NewGuid().ToString('N') + '.tmp')
     New-Item -ItemType Directory -Force -Path $correct, $wrong | Out-Null
     Copy-Item -LiteralPath $oldMsi -Destination (Join-Path $correct 'main.msi')
     Copy-Item -LiteralPath $CurrentMsi -Destination (Join-Path $wrong 'main.msi')
-    $testCache = Join-Path $env:LOCALAPPDATA 'BitChordUpdater\TempSourceRegression'
-    $repair = @(& "$PSScriptRoot/../../src/main/resources/updater/windows-msi-source.ps1" -SearchRoots @($tempFixture) -CacheRoot $testCache)
-    $repaired = @($repair | Where-Object { $_ -like 'msi-source-repaired*' }) | Select-Object -Last 1
-    if (-not $repaired) { throw "Could not repair the matching Temp folder: $($repair -join '; ')" }
-    if ($repaired -notmatch ('product=' + [regex]::Escape($oldCode))) {
-        throw 'Repair selected the wrong MSI ProductCode'
-    }
-    if ($repaired -match 'cache=(.+)$') {
-        $fixedFile = $Matches[1]
-    } else { throw 'Repair did not return its persistent MSI path' }
-    if (-not (Test-Path -LiteralPath $fixedFile -PathType Leaf) -or
-        (Get-MsiProperty $fixedFile 'ProductCode') -ine $oldCode) {
-        throw 'Repaired MSI source is not the original installed package'
-    }
-    Write-Output "Correct matching Temp folder recovered; wrong version was rejected."
+    # The legacy installer source list still refers to its previous location.
+    # Remove the temporary recovery copy in this disposable CI user only.
+    Remove-Item -LiteralPath $oldMsi -Force
+    if (Test-Path -LiteralPath $oldMsi) { throw 'Could not reproduce missing previous MSI source' }
+    Write-Output "Setup test: old MSI is in $correct, not the registered old source; wrong MSI is in $wrong."
 
     # Keep the log open exactly as the external BitChord updater would.
     $held = [IO.File]::Open((Join-Path $operation 'install.log'),
@@ -81,6 +71,17 @@ try {
     $held.Flush()
     $next = Start-Process -FilePath $CurrentExe -ArgumentList '--quiet' -Wait -PassThru
     if ($next.ExitCode -notin @(0, 3010)) { throw "New persistent-source setup.exe failed: $($next.ExitCode)" }
+    $repairLog = Join-Path $env:LOCALAPPDATA 'BitChordUpdater\operations\setup-source-repair.log'
+    $logText = if (Test-Path -LiteralPath $repairLog) { Get-Content -LiteralPath $repairLog -Raw } else { '' }
+    if ($logText -notmatch ('msi-source-repaired product=' + [regex]::Escape($oldCode))) {
+        throw "New EXE did not automatically repair the matching old MSI source. Log: $logText"
+    }
+    if ((Get-FileHash -LiteralPath $oldMsi -Algorithm SHA256).Hash -ine $oldHash) {
+        throw 'Original MSI source was not restored from the correct Temp folder'
+    }
+    if ((Get-MsiProperty $oldMsi 'ProductCode') -ine $oldCode) {
+        throw 'Setup restored an MSI with the wrong ProductCode'
+    }
     if ([BitChordInstallStateTest]::Get($newCode) -ne 5) { throw 'New MSI ProductCode is not installed.' }
     if ([BitChordInstallStateTest]::Get($oldCode) -eq 5) { throw 'Old MSI remains installed after upgrade.' }
 
