@@ -24,7 +24,8 @@ function Populate-Root([string]$root, [string]$version) {
     Set-Content -LiteralPath (Join-Path $root '.bitchord-portable') -Value 'portable'
     Set-Content -LiteralPath (Join-Path $root 'app/BitChord.cfg') -Value "version=$version"
 }
-function Run-Helper([string]$archive, [string]$target, [string]$op, [switch]$SimulateFailure) {
+function Run-Helper([string]$archive, [string]$target, [string]$op, [switch]$SimulateFailure,
+    [Diagnostics.Process]$Launcher = $null) {
     $child = Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') -ArgumentList '-NoProfile -Command "Start-Sleep -Seconds 2"' -PassThru
     $start = ([DateTimeOffset]$child.StartTime.ToUniversalTime()).ToUnixTimeMilliseconds()
     $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
@@ -33,6 +34,10 @@ function Run-Helper([string]$archive, [string]$target, [string]$op, [switch]$Sim
         '-ParentStartMillis', [string]$start, '-Package', $archive,
         '-Expected', $hash, '-Operation', $op, '-PortableRoot', $target,
         '-WaitSeconds', '20', '-SkipLaunch')
+    if ($Launcher) {
+        $launcherStart = ([DateTimeOffset]$Launcher.StartTime.ToUniversalTime()).ToUnixTimeMilliseconds()
+        $args += @('-LauncherPid', [string]$Launcher.Id, '-LauncherStartMillis', [string]$launcherStart)
+    }
     if ($SimulateFailure) { $args += '-SimulateSwapFailure' }
     & (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') @args | Out-Host
     return [int]$LASTEXITCODE
@@ -57,6 +62,48 @@ try {
         throw 'Old application directory and user-added files were not preserved in backup'
     }
     Write-Output "PASS: same portable path replaced, rollback folder retained: $backup"
+
+    # A real jpackage app has a small BitChord.exe launcher parent around the
+    # JVM process. The launcher can keep BitChord.exe mapped after the JVM PID
+    # exits. This lock deliberately outlives the helper's old rename retry
+    # window, proving that the explicit launcher identity is awaited.
+    $launcherRoot = Join-Path $testRoot 'LauncherCase'
+    $launcherOp = Join-Path $testRoot 'launcher-operation'
+    New-Item -ItemType Directory -Force -Path $launcherRoot, $launcherOp | Out-Null
+    Populate-Root $launcherRoot 'launcher-old'
+    $launcherZip = Join-Path $launcherOp 'verified-portable.zip'
+    [IO.Compression.ZipFile]::CreateFromDirectory($source, $launcherZip)
+    $launcherReady = Join-Path $testRoot 'launcher-ready.txt'
+    $launcherScript = Join-Path $testRoot 'hold-launcher-lock.ps1'
+    @'
+param([string]$OldFile, [string]$Marker)
+$hold = [IO.File]::Open($OldFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+try {
+    Set-Content -LiteralPath $Marker -Value 'locked'
+    Start-Sleep -Seconds 15
+} finally { $hold.Dispose() }
+'@ | Set-Content -LiteralPath $launcherScript -Encoding utf8
+    $launcher = Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') -ArgumentList @(
+        '-NoProfile', '-File', $launcherScript, '-OldFile', (Join-Path $launcherRoot 'BitChord.exe'),
+        '-Marker', $launcherReady) -PassThru
+    try {
+        $started = [DateTime]::UtcNow
+        while (-not (Test-Path -LiteralPath $launcherReady)) {
+            if ($launcher.HasExited) { throw 'Launcher lock fixture exited before becoming ready' }
+            if (([DateTime]::UtcNow - $started).TotalSeconds -gt 10) { throw 'Launcher lock fixture did not start' }
+            Start-Sleep -Milliseconds 100
+        }
+        $code = Run-Helper $launcherZip $launcherRoot $launcherOp -Launcher $launcher
+        if ($code -ne 0 -or
+            (Get-Content -LiteralPath (Join-Path $launcherRoot 'BitChord.exe') -Raw).Trim() -ne 'new') {
+            throw 'Portable helper did not wait for the jpackage launcher identity'
+        }
+        Write-Output 'PASS: jpackage launcher parent exited before portable folder replacement'
+    } finally {
+        if (-not $launcher.HasExited) { $launcher.Kill() }
+        $launcher.WaitForExit()
+        $launcher.Dispose()
+    }
 
     # An open file handle with no FILE_SHARE_DELETE is representative of an
     # antivirus/Explorer/native child transiently locking portable binaries.

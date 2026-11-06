@@ -1,6 +1,8 @@
 param(
     [Parameter(Mandatory=$true)][long]$ParentPid,
     [Parameter(Mandatory=$true)][long]$ParentStartMillis,
+    [long]$LauncherPid = 0,
+    [long]$LauncherStartMillis = 0,
     [Parameter(Mandatory=$true)][string]$Package,
     [Parameter(Mandatory=$true)][string]$Expected,
     [Parameter(Mandatory=$true)][string]$Operation,
@@ -34,14 +36,17 @@ function Finish([string]$message, [int]$code) {
     Set-Content -LiteralPath (Join-Path $Operation 'completed') -Value $message -Encoding utf8
     exit $code
 }
-function Is-OriginalAlive {
-    $process = Get-Process -Id $ParentPid -ErrorAction SilentlyContinue
+function Is-ProcessIdentityAlive([long]$ProcessId, [long]$StartMillis) {
+    if ($ProcessId -le 1 -or $StartMillis -le 0) { return $false }
+    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
     if (-not $process) { return $false }
     try {
         $started = ([DateTimeOffset]$process.StartTime.ToUniversalTime()).ToUnixTimeMilliseconds()
-        return [Math]::Abs($started - $ParentStartMillis) -le 10
+        return [Math]::Abs($started - $StartMillis) -le 10
     } catch { return $false }
 }
+function Is-OriginalAlive { return Is-ProcessIdentityAlive $ParentPid $ParentStartMillis }
+function Is-LauncherAlive { return Is-ProcessIdentityAlive $LauncherPid $LauncherStartMillis }
 function Is-Reparse([string]$path) {
     $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
     return ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
@@ -75,6 +80,11 @@ $installed = $false
 try {
     if ($ParentPid -le 1 -or $ParentStartMillis -le 0 -or $WaitSeconds -lt 1 -or
         $Expected -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid operation identity' }
+    if (($LauncherPid -eq 0) -ne ($LauncherStartMillis -eq 0) -or
+        $LauncherPid -lt 0 -or $LauncherStartMillis -lt 0 -or
+        ($LauncherPid -gt 0 -and $LauncherPid -eq $ParentPid)) {
+        throw 'Invalid launcher identity'
+    }
     $operationPath = [IO.Path]::GetFullPath($Operation)
     $archivePath = [IO.Path]::GetFullPath($Package)
     $root = [IO.Path]::GetFullPath($PortableRoot).TrimEnd('\')
@@ -104,10 +114,10 @@ try {
     Set-Content -LiteralPath (Join-Path $operationPath 'helper.identity') -Value "pid=$PID" -Encoding ascii
     Add-Content -LiteralPath (Join-Path $operationPath 'helper.identity') -Value "start_millis=$helperStart" -Encoding ascii
     Set-Content -LiteralPath (Join-Path $operationPath 'armed') -Value 'armed' -Encoding ascii
-    Log "portable-helper-armed pid=$PID parent_pid=$ParentPid root=$root"
+    Log "portable-helper-armed pid=$PID parent_pid=$ParentPid launcher_pid=$LauncherPid root=$root"
 
     $deadline = [DateTime]::UtcNow.AddSeconds($WaitSeconds)
-    while (Is-OriginalAlive) {
+    while ((Is-OriginalAlive) -or (Is-LauncherAlive)) {
         if (Test-Path -LiteralPath (Join-Path $operationPath 'abort')) {
             Finish 'aborted-before-shutdown; portable folder unchanged' 1
         }

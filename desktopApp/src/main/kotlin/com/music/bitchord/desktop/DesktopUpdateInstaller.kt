@@ -113,13 +113,16 @@ internal object DesktopUpdateInstaller {
                 val helper = operation.resolve("portable-install.ps1")
                 copyHelper("windows-portable-update.ps1", helper)
                 val windows = Path.of(System.getenv("SystemRoot") ?: "C:\\Windows")
+                val launcher = portableLauncherIdentity(portableRoot)
                 DesktopUpdateDiagnostics.log(operation,
-                    "stage=portable-staged current=$portableRoot package=$zipped target=$targetVersion")
+                    "stage=portable-staged current=$portableRoot package=$zipped target=$targetVersion launcher_pid=${launcher?.pid ?: 0}")
                 return DesktopPreparedUpdate(operation, listOf(
                     windows.resolve("System32/WindowsPowerShell/v1.0/powershell.exe").toString(),
                     "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper.toString(),
                     "-ParentPid", ProcessHandle.current().pid().toString(),
                     "-ParentStartMillis", ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli().toString(),
+                    "-LauncherPid", (launcher?.pid ?: 0).toString(),
+                    "-LauncherStartMillis", (launcher?.startMillis ?: 0).toString(),
                     "-Package", zipped.toString(), "-Expected", verifiedHash.lowercase(),
                     "-Operation", operation.toString(), "-PortableRoot", portableRoot.toString()
                 ), temporary)
@@ -166,6 +169,31 @@ internal object DesktopUpdateInstaller {
             else -> false
         }
     }.getOrDefault(false)
+
+    private data class ProcessIdentity(val pid: Long, val startMillis: Long)
+
+    /**
+     * jpackage's Windows launcher can keep a small parent BitChord.exe alive
+     * around the JVM process. That parent still maps the launcher from the
+     * portable directory, so renaming the directory after waiting only for the
+     * JVM PID fails with ERROR_SHARING_VIOLATION on real machines.
+     */
+    private fun portableLauncherIdentity(portableRoot: Path): ProcessIdentity? {
+        val launcher = portableRoot.resolve("BitChord.exe").toAbsolutePath().normalize().toString()
+        var ancestor = ProcessHandle.current().parent().orElse(null)
+        while (ancestor != null) {
+            val command = ancestor.info().command().orElse(null)
+            val start = ancestor.info().startInstant().orElse(null)
+            if (command != null && start != null &&
+                runCatching { Path.of(command).toAbsolutePath().normalize().toString().equals(launcher, ignoreCase = true) }
+                    .getOrDefault(false)
+            ) {
+                return ProcessIdentity(ancestor.pid(), start.toEpochMilli())
+            }
+            ancestor = ancestor.parent().orElse(null)
+        }
+        return null
+    }
 
     private fun setsid(): String? = listOf("/usr/bin/setsid", "/bin/setsid").firstOrNull { Files.isExecutable(Path.of(it)) }
     private fun copyHelper(name: String, target: Path) {
