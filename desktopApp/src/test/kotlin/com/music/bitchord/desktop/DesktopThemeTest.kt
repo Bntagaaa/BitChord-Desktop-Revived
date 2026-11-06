@@ -35,6 +35,21 @@ class DesktopThemeTest {
     }
 
     @Test
+    fun `sidebar navigation uses neutral gray selection in both themes`() {
+        assertEquals(Color(0xFF1E1E1E), DARK_PALETTE.sidebarSurface)
+        assertEquals(Color(0xFF2D2D2D), DARK_PALETTE.navSelectedSurface)
+        assertEquals(Color(0xFFF0F0F0), LIGHT_PALETTE.sidebarSurface)
+        assertEquals(Color(0xFFDDDDDD), LIGHT_PALETTE.navSelectedSurface)
+        for (palette in listOf(DARK_PALETTE, LIGHT_PALETTE)) {
+            for (color in listOf(palette.navAccent, palette.navSelectedSurface, palette.sidebarSurface)) {
+                assertEquals(color.red, color.green)
+                assertEquals(color.green, color.blue)
+            }
+            assertTrue(contrastRatio(palette.navAccent, palette.navSelectedSurface) >= 4.5)
+        }
+    }
+
+    @Test
     fun `light palette has distinct surfaces and accessible body text`() {
         assertNotEquals(DARK_PALETTE.background, LIGHT_PALETTE.background)
         assertNotEquals(LIGHT_PALETTE.background, LIGHT_PALETTE.surface)
