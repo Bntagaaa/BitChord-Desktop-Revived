@@ -64,7 +64,7 @@ internal object DesktopTheme {
         mode = value
     }
 
-    fun setPitchBlack(enabled: Boolean) {
+    fun updatePitchBlack(enabled: Boolean) {
         if (pitchBlack == enabled) return
         DesktopPersistence().saveBoolean(KEY_PITCH_BLACK, enabled)
         pitchBlack = enabled
