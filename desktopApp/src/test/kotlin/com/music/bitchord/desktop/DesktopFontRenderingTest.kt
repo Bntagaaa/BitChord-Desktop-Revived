@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontListFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontSynthesis
 import org.jetbrains.compose.resources.Font as composeFont
 import java.awt.image.BufferedImage
 import java.io.File
@@ -32,11 +33,61 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** Real native glyph tests: a correct enum or Font.weight value alone is not render evidence. */
 @OptIn(ExperimentalTestApi::class)
 class DesktopFontRenderingTest {
     private val weights = listOf(FontWeight.W400, FontWeight.W500, FontWeight.W600, FontWeight.W700, FontWeight.W800)
+
+    @Test
+    fun lyricsExtraBoldUsesTheUpstreamBoldOutlinesAndSwitchesLive() =
+        runDesktopComposeUiTest(width = 720, height = 180) {
+            val mode = mutableStateOf(DesktopFontMode.DEFAULT)
+            var ready = false
+            var applied: DesktopFontMode? = null
+            setContent {
+                MaterialTheme(typography = desktopTypography(mode.value)) {
+                    val reference = composeFont(sfProCutResource(FontWeight.W700), FontWeight.W700)
+                    val family = MaterialTheme.typography.bodyLarge.fontFamily
+                    SideEffect {
+                        ready = isFamilyLoaded(family) &&
+                            reference is androidx.compose.ui.text.platform.LoadedFont
+                        applied = mode.value
+                    }
+                    // Same style as the shared LyricsPanel, including its explicit W800 override.
+                    val style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, lineHeight = 41.sp,
+                        letterSpacing = 0.sp,
+                    )
+                    Column(Modifier.background(Color.White)) {
+                        Text("Dan lihatlah dunia", style = style, color = Color.Black,
+                            modifier = Modifier.size(700.dp, 60.dp).testTag("lyrics"))
+                        Text("Dan lihatlah dunia", style = style.copy(
+                            fontFamily = FontFamily(reference), fontWeight = FontWeight.W700,
+                            fontSynthesis = FontSynthesis.None,
+                        ), color = Color.Black, modifier = Modifier.size(700.dp, 60.dp).testTag("upstream-bold"))
+                    }
+                }
+            }
+            waitUntil(timeoutMillis = 15_000) { ready && applied == DesktopFontMode.DEFAULT }
+            waitForIdle()
+            val modern = pixels(onNodeWithTag("lyrics").captureToImage())
+            assertSamePixels(pixels(onNodeWithTag("upstream-bold").captureToImage()), modern,
+                "Default lyrics must draw the real Bold cut without Skia emboldening it")
+            save(onRoot().captureToImage(), "lyrics-default-versus-bold.png")
+            runOnIdle { mode.value = DesktopFontMode.LEGACY }
+            waitUntil(timeoutMillis = 15_000) { ready && applied == DesktopFontMode.LEGACY }
+            waitForIdle()
+            val legacy = pixels(onNodeWithTag("lyrics").captureToImage())
+            assertTrue(ink(modern) < ink(legacy), "Default lyrics must be visibly thinner than Legacy")
+            save(onRoot().captureToImage(), "lyrics-legacy-versus-bold.png")
+            runOnIdle { mode.value = DesktopFontMode.DEFAULT }
+            waitUntil(timeoutMillis = 15_000) { ready && applied == DesktopFontMode.DEFAULT }
+            waitForIdle()
+            assertSamePixels(modern, pixels(onNodeWithTag("lyrics").captureToImage()),
+                "Returning to Default must immediately restore the thinner lyrics")
+        }
 
     @Test
     fun changingProfileRepaintsExplicitWeightsAndRestoresTheOriginalGlyphs() =
@@ -101,7 +152,7 @@ class DesktopFontRenderingTest {
             waitForIdle()
             save(onRoot().captureToImage(), "font-logical-versus-physical.png")
             for (logical in weights) {
-                assertContentEquals(
+                assertSamePixels(
                     pixels(onNodeWithTag("physical-${logical.weight}").captureToImage()),
                     pixels(onNodeWithTag("logical-${logical.weight}").captureToImage()),
                     "W${logical.weight} does not draw the expected real SF Pro cut",
@@ -167,6 +218,14 @@ class DesktopFontRenderingTest {
         val map = image.toPixelMap()
         return IntArray(image.width * image.height) { map[it % image.width, it / image.width].toArgb() }
     }
+
+    private fun assertSamePixels(expected: IntArray, actual: IntArray, message: String) {
+        // Do not dump hundreds of thousands of pixel values into failed CI logs.
+        assertEquals(expected.size, actual.size, message)
+        assertTrue(expected.contentEquals(actual), message)
+    }
+
+    private fun ink(pixels: IntArray): Long = pixels.sumOf { (255 - (it and 0xff)).toLong() }
 
     private fun save(image: ImageBitmap, name: String) {
         val target = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_ARGB)
