@@ -616,6 +616,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var libraryShowAll by remember { mutableStateOf<HomeShelf?>(null) }
     /** Where the one back button in the top bar goes: every place visited, oldest first. */
     val navHistory = remember { mutableStateListOf<DesktopNavEntry>() }
+    val recentPageUsage = remember { mutableStateListOf(DesktopDestination.LISTEN_NOW) }
     /** Set while [goBack] puts a place back, so that move is not itself recorded as a visit. */
     val navRestoring = remember { booleanArrayOf(false) }
     /** Opens a song's menu at the pointer; set by the pages' menu host once it is in place. */
@@ -2943,6 +2944,43 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         }
     }
 
+    // Page composables are already disposed on navigation; under RSS pressure trim
+    // their retained feed data. History, playback and the active page are untouched.
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            delay(5_000L)
+            val rss = withContext(Dispatchers.IO) { DesktopPageMemoryPolicy.processResidentBytes() }
+            if (rss == null || rss < DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES) continue
+            val evict = DesktopPageMemoryPolicy.oldestEvictable(recentPageUsage, destination) ?: continue
+            when (evict) {
+                DesktopDestination.LISTEN_NOW -> {
+                    homeJob?.cancel()
+                    homeJob = null
+                    homeState = UiState.Loading
+                    homeContinuation = null
+                    homeSeenTitles.clear()
+                    topPicks = null
+                    topPicksLoading = false
+                    homeIdentity = null
+                    homeRenderedLogged = false
+                }
+                DesktopDestination.NEW -> newState = UiState.Loading
+                DesktopDestination.SEARCH, DesktopDestination.EXPLORE -> {
+                    searchJob?.cancel()
+                    searchJob = null
+                    searchSession.reset()
+                    searchSuggestions = emptyList()
+                    searchTypeahead = emptyList()
+                    exploreState = UiState.Loading
+                    moodGenreShelves = UiState.Loading
+                }
+                else -> Unit
+            }
+            recentPageUsage.remove(evict)
+            DesktopTrackLog.log("memory: evicted inactive page ${evict.id} at ${rss / 1_048_576L} MiB RSS")
+        }
+    }
+
     // Category buttons carry no artwork of their own, so a few are resolved at a time from the
     // shelves they open.
     LaunchedEffect(exploreState) {
@@ -3169,6 +3207,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
             }
             // The newest copy of the same place, so an album that has paged in more tracks comes
             // back with them.
+            recentPageUsage.remove(now.destination)
+            recentPageUsage.add(now.destination)
             last = now
         }
     }
