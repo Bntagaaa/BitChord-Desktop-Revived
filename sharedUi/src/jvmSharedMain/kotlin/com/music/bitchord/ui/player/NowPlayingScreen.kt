@@ -1773,8 +1773,24 @@ fun NowPlayingScreen(
         label = "playerTint",
     )
     CompositionLocalProvider(LocalPlayerTint provides playerTint) {
-        val videoLyricsPane: @Composable () -> Unit = {
+        val landscapeTrackCredits: @Composable () -> Unit = {
+            LandscapeCredits(
+                song = song,
+                signedIn = signedIn,
+                likeStatus = likeStatus,
+                showRevertCue = showRevertCue,
+                onToggleLike = onToggleLike,
+                onOpenMenu = onOpenMenu,
+                onOpenAlbum = onOpenAlbum,
+                onOpenArtist = onOpenArtist,
+            )
+        }
+        val landscapeLyricsPane: @Composable (Boolean) -> Unit = { compact ->
             LandscapeLyricsPane(
+                compact = compact,
+                caption = if (hideSongStatus) null else playbackOriginText(song, playedBy),
+                onOpenCaption = openPlaybackOrigin,
+                credits = landscapeTrackCredits,
                 hasLyrics = lyricsTranslation.displayedLyrics.isNotEmpty(),
                 placeholder = if (lyricsUnavailable) {
                     stringResource(Res.string.lyrics_not_available)
@@ -2099,18 +2115,7 @@ fun NowPlayingScreen(
                             compact = compact,
                             caption = if (hideSongStatus) null else playbackOriginText(song, playedBy),
                             onOpenCaption = openPlaybackOrigin,
-                            credits = {
-                                LandscapeCredits(
-                                    song = song,
-                                    signedIn = signedIn,
-                                    likeStatus = likeStatus,
-                                    showRevertCue = showRevertCue,
-                                    onToggleLike = onToggleLike,
-                                    onOpenMenu = onOpenMenu,
-                                    onOpenAlbum = onOpenAlbum,
-                                    onOpenArtist = onOpenArtist,
-                                )
-                            },
+                            credits = landscapeTrackCredits,
                             lyricStrip = if (syncedLyricsEnabled) {
                                 {
                                     CurrentLyricStrip(
@@ -2174,7 +2179,7 @@ fun NowPlayingScreen(
                             },
                         )
                     },
-                    lyricsPane = videoLyricsPane,
+                    lyricsPane = landscapeLyricsPane,
                     queuePane = {
                         InlineQueue(
                             queue = queue,
