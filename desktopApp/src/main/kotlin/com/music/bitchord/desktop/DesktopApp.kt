@@ -6190,7 +6190,8 @@ private fun DesktopMiniPlayer(
                 Image(
                     painter = painterResource(Res.drawable.bitchord_no_music),
                     contentDescription = "BitChord",
-                    modifier = Modifier.align(Alignment.Center).size(72.dp),
+                    // Keep the logo smaller than the normal 52.dp dock height (36.dp buttons + 16.dp padding).
+                    modifier = Modifier.align(Alignment.Center).size(48.dp),
                 )
             }
             Box(
