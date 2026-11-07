@@ -68,6 +68,15 @@ function Check-Case([string]$name, [string]$mode, [int]$expectedCode, [string]$e
     $payload = Join-Path $op 'payload'
     New-Item -ItemType Directory -Force -Path $payload | Out-Null
     Populate $app '1.8.7' -Portable:($mode -eq 'portable')
+    # The Portable backup must be preserved on an unconfirmed relaunch,
+    # including files placed in the original folder by the user.
+    if ($mode -eq 'portable') {
+        [IO.File]::WriteAllText((Join-Path $app 'user-added.txt'), 'preserve-until-confirmed')
+    }
+    # A matching-looking sibling NOT created by this operation must survive.
+    $unrelated = Join-Path $case ('Application with spaces.previous-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path $unrelated | Out-Null
+    [IO.File]::WriteAllText((Join-Path $unrelated 'sentinel.txt'), 'unrelated')
     $target = '1.9.1'
     if ($mode -eq 'portable') {
         $bundle = Join-Path $case 'archive'
@@ -129,6 +138,28 @@ function Check-Case([string]$name, [string]$mode, [int]$expectedCode, [string]$e
             & $powershell @args | Out-Host
             if ((Get-Content $countFile -Raw).Trim() -ne '1') { throw 'Duplicate host caused a second relaunch' }
         } elseif (Test-Path $countFile) { throw "Failure/cancel/reboot case relaunched the app: $name" }
+        if (-not (Test-Path -LiteralPath (Join-Path $unrelated 'sentinel.txt'))) {
+            throw "Updater deleted an unrelated folder: $name"
+        }
+        if ($mode -eq 'portable' -and (Test-Path -LiteralPath (Join-Path $op 'worker-backup.path'))) {
+            $backup = (Get-Content -LiteralPath (Join-Path $op 'worker-backup.path') -Raw).Trim()
+            if ($expectedStatus -like 'success*') {
+                if (Test-Path -LiteralPath $backup) { throw "Confirmed Portable app retained old backup: $name" }
+                if ((Get-Content -LiteralPath (Join-Path $op 'backup.cleanup') -Raw).Trim() -ne 'deleted-after-gui-confirmed') {
+                    throw "Missing verified Portable backup cleanup receipt: $name"
+                }
+            } else {
+                if (-not (Test-Path -LiteralPath (Join-Path $backup 'user-added.txt'))) {
+                    throw "Unconfirmed app startup removed old backup or user file: $name"
+                }
+                if (Test-Path -LiteralPath (Join-Path $op 'backup.cleanup')) {
+                    throw "Backup cleanup ran without startup confirmation: $name"
+                }
+            }
+        }
+        if ($mode -eq 'setup' -and (Test-Path -LiteralPath (Join-Path $op 'backup.cleanup'))) {
+            throw "Setup mode unexpectedly attempted Portable backup cleanup: $name"
+        }
         if (Test-Path -LiteralPath $package) { throw "Large staged payload leaked: $name" }
         if (-not (Test-Path (Join-Path $op 'completed'))) { throw 'Host completion marker missing' }
         Write-Output "PASS $name : $status"
