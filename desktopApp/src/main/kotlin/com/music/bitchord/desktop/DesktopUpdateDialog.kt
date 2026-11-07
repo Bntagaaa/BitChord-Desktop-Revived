@@ -24,17 +24,10 @@ import java.time.format.DateTimeFormatter
 @Composable
 internal fun DesktopUpdateSettings(service: DesktopUpdateService) {
     val state by service.state.collectAsState()
-    val channel by service.channel.collectAsState()
     val auto by service.autoCheck.collectAsState()
     val checked by service.lastCheck.collectAsState()
     Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Current version: ${DesktopUpdateChecker.currentVersion}")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DesktopUpdateChecker.Channel.entries.forEach { option ->
-                FilterChip(selected = channel == option, enabled = state.phase != UpdatePhase.INSTALLING, onClick = { service.setChannel(option) },
-                    label = { Text(if (option == DesktopUpdateChecker.Channel.STABLE) "Stable" else "Preview") })
-            }
-        }
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Text("Automatically check for updates", Modifier.weight(1f))
             Switch(auto, service::setAuto)
@@ -70,45 +63,47 @@ internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: suspend 
     val manual = service.installation.format in setOf(UpdateFormat.DEB, UpdateFormat.RPM, UpdateFormat.ARCH, UpdateFormat.UNKNOWN)
     val dismiss = { if (!installing) service.later() }
 
-    DesktopDialogPanel(onDismiss = dismiss, maxWidth = 520, popup = true, dismissOnEscape = true) {
+    DesktopDialogPanel(onDismiss = dismiss, maxWidth = 480, popup = true, dismissOnEscape = true) {
         Column(
-            Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 15.dp),
+            Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 17.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Image(
                 painter = painterResource(if (DesktopTheme.isLight) Res.drawable.logo else Res.drawable.bitchord_logo_original),
                 contentDescription = "BitChord",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(width = 96.dp, height = 66.dp),
+                modifier = Modifier.size(width = 80.dp, height = 54.dp),
             )
             Spacer(Modifier.height(6.dp))
             Text(
                 "A new version of BitChord is available",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = DesktopForeground,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                "${DesktopUpdateChecker.currentVersion} → ${release.version} · ${if (release.preview) "Preview" else "Stable"}",
-                style = MaterialTheme.typography.bodySmall,
-                color = DesktopSecondary,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(11.dp))
             Text(
                 if (manual) service.installation.format.guidance else "Update now to enjoy the latest improvements.",
                 style = MaterialTheme.typography.bodySmall,
                 color = DesktopSecondary,
                 textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(11.dp))
+            Spacer(Modifier.height(9.dp))
             Text(
-                state.error ?: updateStatus(state),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (state.phase == UpdatePhase.FAILED) DesktopDestructive else DesktopForeground,
+                "Version ${release.version} is available.",
+                style = MaterialTheme.typography.labelSmall,
+                color = DesktopForeground,
                 textAlign = TextAlign.Center,
             )
+            if (state.phase != UpdatePhase.AVAILABLE) {
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    state.error ?: updateStatus(state),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state.phase == UpdatePhase.FAILED) DesktopDestructive else DesktopSecondary,
+                    textAlign = TextAlign.Center,
+                )
+            }
             if (busy) {
                 Spacer(Modifier.height(12.dp))
                 if (state.total > 0) {
@@ -130,22 +125,14 @@ internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: suspend 
         }
         DesktopCardRule()
         Column(
-            Modifier.fillMaxWidth().heightIn(max = 340.dp)
+            Modifier.fillMaxWidth().heightIn(max = 330.dp)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text("What's new", style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold, color = DesktopForeground)
-            if (release.notes.isBlank()) {
-                Text("No release notes provided.", style = MaterialTheme.typography.bodySmall, color = DesktopSecondary)
-            } else {
-                DesktopReleaseNotes(release.notes, modifier = Modifier.fillMaxWidth())
-            }
-            TextButton(
-                onClick = { DesktopExternalLinks.open(release.url) },
-                contentPadding = PaddingValues(0.dp),
-            ) { Text("Release notes on GitHub", color = DesktopAccent) }
+            DesktopReleaseWhatsNew(release.notes, modifier = Modifier.fillMaxWidth())
         }
         DesktopCardRule()
         Column(
@@ -160,7 +147,7 @@ internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: suspend 
                     },
                     modifier = Modifier.fillMaxWidth().height(49.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DesktopAccent, contentColor = DesktopOnAccent),
+                    colors = ButtonDefaults.buttonColors(containerColor = DesktopForeground, contentColor = DesktopBackground),
                 ) {
                     Text(if (!service.canAutoInstall) "Show verified download" else when (service.installation.format) {
                         UpdateFormat.WINDOWS_SETUP, UpdateFormat.WINDOWS_PORTABLE -> "Update and Restart"
@@ -171,13 +158,13 @@ internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: suspend 
                     onClick = { DesktopExternalLinks.open(release.url) },
                     modifier = Modifier.fillMaxWidth().height(49.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DesktopAccent, contentColor = DesktopOnAccent),
+                    colors = ButtonDefaults.buttonColors(containerColor = DesktopForeground, contentColor = DesktopBackground),
                 ) { Text("View release") }
                 !busy -> Button(
                     onClick = service::download,
                     modifier = Modifier.fillMaxWidth().height(49.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DesktopAccent, contentColor = DesktopOnAccent),
+                    colors = ButtonDefaults.buttonColors(containerColor = DesktopForeground, contentColor = DesktopBackground),
                 ) { Text(if (state.phase in setOf(UpdatePhase.FAILED, UpdatePhase.CANCELLED)) "Retry download" else "Download update") }
             }
             if (!installing) {
