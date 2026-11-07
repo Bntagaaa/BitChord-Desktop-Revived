@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit
 internal enum class UpdateFormat(val suffix: String?, val guidance: String) {
     WINDOWS_SETUP("-windows-x64-setup.exe", "BitChord Updater opens in a separate window, waits for BitChord to close, runs the verified setup and automatically reopens the updated app. Complete the setup wizard and any Windows permission prompt. A required Windows reboot postpones relaunch."),
     WINDOWS_PORTABLE("-windows-x64-portable.zip", "BitChord Updater opens in a separate window, waits for BitChord to close, replaces this portable folder with the verified ZIP and automatically reopens the updated app. The original folder is kept as a backup."),
-    APPIMAGE("-linux-x86_64.AppImage", "Replaces this AppImage after exit and keeps the previous file as a backup."),
+    APPIMAGE("-linux-x86_64.AppImage", "A separate Linux updater replaces this AppImage after BitChord closes and reopens the updated app. Its backup is deleted only after the new window is confirmed; an unconfirmed startup keeps the backup. Progress is shown when Zenity or KDialog is available."),
     DEB("-linux-amd64.deb", "Open the verified package with your system package installer. Authorization is handled by your package manager."),
     RPM("-linux-x86_64.rpm", "Open the verified package with your system package installer. Authorization is handled by your package manager."),
     ARCH(null, "Update through pacman or your AUR helper. BitChord will not replace package-managed files."),

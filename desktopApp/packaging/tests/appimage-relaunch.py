@@ -28,6 +28,7 @@ for pattern in ['usr/lib/app/desktopApp*.jar', 'usr/lib/app/BitChord.cfg']:
 jar, = (extract / 'squashfs-root/usr/lib/app').glob('desktopApp*.jar')
 with zipfile.ZipFile(jar) as archive:
     helper_bytes = archive.read('updater/appimage-update.sh')
+    ui_bytes = archive.read('updater/linux-updater-ui.sh')
 config = (extract / 'squashfs-root/usr/lib/app/BitChord.cfg').read_text()
 version, = [line.split('=', 2)[-1] for line in config.splitlines() if line.startswith('java-options=-Dbitchord.version=')]
 
@@ -133,7 +134,9 @@ for mode in args.cases:
     (case / 'home').mkdir()
     operation = case / ('bitchord-update-helper-fixture' if mode == 'legacy' else 'state-operation'); operation.mkdir(mode=0o700)
     ready = operation / ('window-ready-00000000-0000-4000-8000-000000000000' if mode == 'legacy' else 'window-ready')
-    current = installation / 'BitChord Test.AppImage'; staged = installation / 'staged.AppImage'; backup = installation / 'previous.AppImage'
+    token = os.urandom(16).hex()
+    current = installation / 'BitChord Test.AppImage'; staged = installation / 'staged.AppImage'
+    backup = installation / ('previous.AppImage' if mode == 'legacy' else current.name + '.previous-' + token)
     shutil.copy2(old_image, current); shutil.copy2(image, staged)
     if mode == 'crash':
         with staged.open('r+b') as stream: stream.seek(18); stream.write(b'\xff\xff')  # Real package with an unlaunchable ELF machine header.
@@ -141,9 +144,10 @@ for mode in args.cases:
     (case / 'home/user-data-sentinel').write_text('preserve settings, queue and downloads')
     sentinel = (case / 'home/user-data-sentinel').read_bytes()
     old_hash = digest(current); new_hash = digest(staged)
-    token = os.urandom(16).hex(); (operation / 'request.token').write_text(token)
+    (operation / 'request.token').write_text(token)
     helper = operation / 'bundled-helper.sh'
     helper.write_bytes(Path(__file__).with_name('fixtures').joinpath('appimage-update-7eaa.sh').read_bytes() if mode == 'legacy' else helper_bytes)
+    if mode != 'legacy': (operation / 'linux-updater-ui.sh').write_bytes(ui_bytes)
     env = os.environ.copy()
     env.update(HOME=str(case / 'home'), APPIMAGE_EXTRACT_AND_RUN='1', XDG_STATE_HOME=str(case / 'state'), XDG_CACHE_HOME=str(case / 'cache'),
                JAVA_TOOL_OPTIONS=f'-Duser.home={case}/home -Djava.util.prefs.userRoot={case}/prefs')
@@ -189,7 +193,8 @@ for mode in args.cases:
         elif mode in ('success', 'hangup'):
             assert code == 0, (operation / 'install.log').read_text()
             assert f'pid={new_pid}\n' in marker.read_text() and f'token={token}\n' in marker.read_text()
-            assert digest(current) == new_hash and digest(backup) == old_hash and not staged.exists()
+            assert digest(current) == new_hash and not backup.exists() and not staged.exists()
+            assert (operation / 'backup.cleanup').read_text().strip() == 'deleted-after-gui-confirmed'
         elif mode == 'missing':
             assert code == 2 and not marker.exists(), (operation / 'install.log').read_text()
             assert digest(current) == new_hash and digest(backup) == old_hash

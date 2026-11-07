@@ -107,6 +107,7 @@ internal object DesktopUpdateInstaller {
             val backup = current.resolveSibling(current.fileName.toString() + ".previous-" + token)
             val helper = operation.resolve("install.sh")
             copyHelper("appimage-update.sh", helper)
+            copyHelper("linux-updater-ui.sh", operation.resolve("linux-updater-ui.sh"))
             DesktopUpdateDiagnostics.log(operation, "stage=verified current=$current staged=$staged backup=$backup sha256=${verifiedHash.lowercase()}")
             return DesktopPreparedUpdate(operation, listOf(requireNotNull(setsid()), "/bin/sh", helper.toString(),
                 ProcessHandle.current().pid().toString(), current.toString(), staged.toString(), backup.toString(), verifiedHash.lowercase(),
