@@ -290,15 +290,19 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
                 DesktopWindowBackdrop.apply()
                 DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.WINDOW_CREATED)
             } else {
-                // Preserve the established Linux sizing path, including its startup correction.
+                // Linux AWT/JVM already reports window dimensions in scaled logical units.
+                // Applying the graphics transform again doubles HiDPI/fractional scaling
+                // under X11/XWayland (notably GNOME on Wayland). Keep macOS unchanged.
                 val transform = composeWindow.graphicsConfiguration.defaultTransform
+                val scaleX = if (DesktopPlatform.isLinux) 1.0 else transform.scaleX
+                val scaleY = if (DesktopPlatform.isLinux) 1.0 else transform.scaleY
                 composeWindow.minimumSize = Dimension(
-                    (MIN_WINDOW_WIDTH_DP * transform.scaleX).roundToInt(),
-                    (MIN_WINDOW_HEIGHT_DP * transform.scaleY).roundToInt(),
+                    (MIN_WINDOW_WIDTH_DP * scaleX).roundToInt(),
+                    (MIN_WINDOW_HEIGHT_DP * scaleY).roundToInt(),
                 )
                 composeWindow.size = Dimension(
-                    (openingSize.width.value * transform.scaleX).roundToInt(),
-                    (openingSize.height.value * transform.scaleY).roundToInt(),
+                    (openingSize.width.value * scaleX).roundToInt(),
+                    (openingSize.height.value * scaleY).roundToInt(),
                 )
                 DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.WINDOW_CREATED)
             }
