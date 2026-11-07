@@ -10,6 +10,26 @@ $ErrorActionPreference = 'Stop'
 function Log([string]$Message) { Write-Output "$([DateTime]::UtcNow.ToString('o')) stage=$Message" }
 function Finish([string]$Message, [int]$Code) {
     Log $Message
+    # The installer has exited (or never started): release our own read
+    # handle before deleting the private staged EXE. Never remove the
+    # permanent PackageCache/main.msi Windows Installer may still require.
+    if ($script:stream) {
+        $script:stream.Dispose()
+        $script:stream = $null
+    }
+    if ($Installer -and $Operation) {
+        $staged = Join-Path $Operation 'verified-setup.exe'
+        if ([IO.Path]::GetFullPath($Installer) -ieq [IO.Path]::GetFullPath($staged) -and
+            (Test-Path -LiteralPath $staged -PathType Leaf)) {
+            try {
+                $entry = Get-Item -LiteralPath $staged -ErrorAction Stop
+                if (-not ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                    Remove-Item -LiteralPath $staged -Force -ErrorAction Stop
+                    Log 'staged-setup-cleaned'
+                }
+            } catch { Log 'staged-setup-cleanup-deferred' }
+        }
+    }
     Set-Content -LiteralPath (Join-Path $Operation 'status') -Value $Message -Encoding utf8
     Set-Content -LiteralPath (Join-Path $Operation 'completed') -Value $Message -Encoding utf8
     exit $Code
@@ -41,6 +61,23 @@ try {
     $stream = [IO.File]::Open($Installer, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
     if ((Get-FileHash -InputStream $stream -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Expected.ToLowerInvariant()) {
         Finish 'checksum-mismatch; installer not executed' 1
+    }
+    # Recheck free space immediately before opening the wizard (download may have
+    # completed long before this handoff). Leave room for extracted MSI and rollback.
+    $disk = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($Installer))
+    $required = 2GB + 3 * $item.Length
+    if ($disk.AvailableFreeSpace -lt $required) {
+        Finish "insufficient-disk-space required_bytes=$required available_bytes=$($disk.AvailableFreeSpace); installer not executed" 1
+    }
+    # A previous jpackage setup may have registered %TEMP%/<old-random-folder>/main.msi.
+    # Find a source with the installed ProductCode, not an arbitrary current MSI.
+    $sourceRepair = Join-Path $Operation 'msi-source.ps1'
+    if (Test-Path -LiteralPath $sourceRepair -PathType Leaf) {
+        try {
+            & $sourceRepair | ForEach-Object { Log ([string]$_) }
+        } catch {
+            Log ("msi-source-repair-skipped error={0}" -f $_.Exception.GetType().Name)
+        }
     }
     Log 'checksum-verified; opening interactive Windows setup'
     # Ordinary interactive wizard/UAC. No silent elevation or unproven automatic GUI relaunch.

@@ -210,9 +210,9 @@ jobs:
       - name: Tests
         run: .\gradlew.bat :shared:jvmTest :desktopApp:test "-Pbitchord.version=${{ steps.version.outputs.value }}"
 
-      - name: Build msi, exe and the app image
+      - name: Build MSI and application image
         run: |
-          .\gradlew.bat :desktopApp:packageMsi :desktopApp:packageExe :desktopApp:createDistributable "-Pbitchord.version=${{ steps.version.outputs.value }}"
+          .\gradlew.bat :desktopApp:packageMsi :desktopApp:createDistributable "-Pbitchord.version=${{ steps.version.outputs.value }}"
 
       - name: Verify Automix native runtime and packaged models
         shell: pwsh
@@ -233,10 +233,21 @@ jobs:
           $v = "${{ steps.version.outputs.value }}"
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item desktopApp/build/compose/binaries/main/msi/*.msi "dist/BitChord-$v-windows-x64.msi"
-          Copy-Item desktopApp/build/compose/binaries/main/exe/*.exe "dist/BitChord-$v-windows-x64-setup.exe"
-          New-Item -ItemType File -Force desktopApp/build/compose/binaries/main/app/BitChord/.bitchord-portable | Out-Null
-          7z a -tzip -mx=5 "dist/BitChord-$v-windows-x64-portable.zip" `
-            "desktopApp/build/compose/binaries/main/app/BitChord/*" | Out-Null
+          ./desktopApp/packaging/windows/create-setup.ps1 -Msi "dist/BitChord-$v-windows-x64.msi" -Output "dist/BitChord-$v-windows-x64-setup.exe"
+          $appRoot = (Resolve-Path "desktopApp/build/compose/binaries/main/app").Path
+          $portableRoot = Join-Path $appRoot "BitChord"
+          if (-not (Test-Path -LiteralPath (Join-Path $portableRoot "BitChord.exe"))) {
+            throw "Portable launcher is missing"
+          }
+          New-Item -ItemType File -Force (Join-Path $portableRoot ".bitchord-portable") | Out-Null
+          $zipPath = Join-Path (Resolve-Path "dist").Path "BitChord-$v-windows-x64-portable.zip"
+          Push-Location $appRoot
+          try {
+            & 7z a -tzip -mx=5 $zipPath "BitChord"
+            if ($LASTEXITCODE -ne 0) { throw "Portable ZIP creation failed" }
+          } finally { Pop-Location }
+          # Test the exact archive being published, not a synthetic ZIP.
+          ./desktopApp/packaging/tests/windows-portable-inplace-checks.ps1 -RealArchive $zipPath
           Get-ChildItem dist | Format-Table Name, Length
 
       - name: Validate Windows updater helper and actual artifacts

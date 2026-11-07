@@ -66,6 +66,20 @@ class DesktopUpdateReliabilityTest {
             assertFalse(Files.walk(dir).use { it.anyMatch { path -> path.toString().endsWith(".part") } })
         } finally { dir.toFile().deleteRecursively() }
     }
+    @Test fun oldPreviewPreferenceIsIgnoredByDefault() {
+        val persistence = DesktopPersistence()
+        val saved = persistence.string("updates_channel", "STABLE")
+        persistence.saveString("updates_channel", "PREVIEW")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val service = DesktopUpdateService(UpdateInstallation(UpdateFormat.UNKNOWN), persistence = persistence, scope = scope)
+            assertEquals(DesktopUpdateChecker.Channel.STABLE, service.channel.value)
+        } finally {
+            persistence.saveString("updates_channel", saved)
+            scope.cancel()
+        }
+    }
+
     @Test fun changingChannelWaitsForCancelledWorkAndRejectsStalePublication() = runBlocking {
         val dir = Files.createTempDirectory("updater-generation")
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -163,6 +177,35 @@ class DesktopUpdateReliabilityTest {
         for (uri in listOf("http://github.com/$repo/releases/download/v1/package", "https://github.com/foreign/repo/releases/download/v1/package", "https://attacker.example/asset", "https://user:secret@objects.githubusercontent.com/asset", "https://objects.githubusercontent.com:8443/asset", "https://github.com/$repo/releases/download/v1/package#fragment"))
             assertFalse(allowedUpdateDownloadUri(java.net.URI(uri)))
     }
+    @Test fun completedWindowsOperationsDropLargePayloadsButKeepLogsAndActiveOperations() {
+        val root = Files.createTempDirectory("updater-compact")
+        try {
+            val done = Files.createDirectory(root.resolve("operation-finished"))
+            Files.writeString(done.resolve("completed"), "installer-reported-success")
+            val setup = Files.write(done.resolve("verified-setup.exe"), bytes)
+            val zip = Files.write(done.resolve("verified-portable.zip"), bytes)
+            val log = Files.writeString(done.resolve("install.log"), "diagnostic detail")
+            val pending = Files.createDirectory(root.resolve("operation-pending"))
+            val uncompleted = Files.write(pending.resolve("verified-portable.zip"), bytes)
+            val live = Files.createDirectory(root.resolve("operation-live"))
+            Files.writeString(live.resolve("completed"), "done")
+            val identity = if (DesktopPlatform.isLinux)
+                "pid=${ProcessHandle.current().pid()}\nstart_ticks=${DesktopUpdateProcess.linuxStartTicks()}\n"
+                else "pid=${ProcessHandle.current().pid()}\nstart_millis=${ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli()}\n"
+            Files.writeString(live.resolve("helper.identity"), identity)
+            val held = Files.write(live.resolve("verified-setup.exe"), bytes)
+            val unrelated = Files.write(root.resolve("leave-me.exe"), bytes)
+            DesktopUpdateDiagnostics.compactCompletedWindowsOperations(root)
+            assertFalse(Files.exists(setup))
+            assertFalse(Files.exists(zip))
+            assertEquals("diagnostic detail", Files.readString(log))
+            assertTrue(Files.exists(done.resolve("completed")))
+            assertTrue(Files.exists(uncompleted), "Never delete a package from an unfinished operation")
+            assertTrue(Files.exists(held), "Never delete an active helper's package")
+            assertTrue(Files.exists(unrelated), "Never touch unrelated files")
+        } finally { root.toFile().deleteRecursively() }
+    }
+
     @Test fun diagnosticsRetireOnlyCompletedOrAbandonedOperations() {
         val root = Files.createTempDirectory("updater-log-retention")
         try {
@@ -211,13 +254,58 @@ class DesktopUpdateReliabilityTest {
             assertFalse(Files.exists(other))
         } finally { operation.toFile().deleteRecursively() }
     }
+    @Test fun windowsPortableInPlaceUpdateRequiresMarkerLauncherAndCfg() {
+        val base = Files.createTempDirectory("bitchord-portable-guard")
+        val root = Files.createDirectory(base.resolve("BitChord"))
+        try {
+            val launcher = Files.writeString(root.resolve("BitChord.exe"), "fixture")
+            val portable = UpdateInstallation(UpdateFormat.WINDOWS_PORTABLE, portableRoot = root)
+            assertFalse(DesktopUpdateInstaller.canInstall(portable), "Do not replace a folder without its portable marker")
+            Files.writeString(root.resolve(".bitchord-portable"), "")
+            assertEquals(root, UpdateInstallation.portableRootDirectory(launcher))
+            assertFalse(DesktopUpdateInstaller.canInstall(portable), "Incomplete portable folder cannot update in place")
+            Files.createDirectories(root.resolve("app"))
+            Files.writeString(root.resolve("app/BitChord.cfg"), "fixture")
+            assertTrue(DesktopUpdateInstaller.canInstall(portable))
+            assertFalse(DesktopUpdateInstaller.canInstall(UpdateInstallation(UpdateFormat.WINDOWS_PORTABLE)),
+                "Do not assume the portable root when only a distribution flag is available")
+            assertFalse(DesktopUpdateInstaller.canInstall(portable.copy(portableRoot = base.resolve("other"))))
+        } finally { base.toFile().deleteRecursively() }
+    }
+
+    @Test fun windowsPortableUpdateRequiresZipHeaderNotExeOrText() {
+        val root = Files.createTempDirectory("bitchord-zip-header")
+        try {
+            val good = Files.write(root.resolve("package.zip"), byteArrayOf(0x50, 0x4b, 0x03, 0x04, 0, 0))
+            val bad = Files.write(root.resolve("other.zip"), byteArrayOf(0x4d, 0x5a, 0, 0))
+            assertTrue(DesktopUpdateInstaller.validExecutable(good, UpdateFormat.WINDOWS_PORTABLE))
+            assertFalse(DesktopUpdateInstaller.validExecutable(bad, UpdateFormat.WINDOWS_PORTABLE))
+        } finally { root.toFile().deleteRecursively() }
+    }
+
+    @Test fun windowsUpdaterRejectsCaseInsensitiveInstallRootAndAcceptsSibling() {
+        val base = Files.createTempDirectory("bitchord-install-location")
+        try {
+            val local = base.resolve("Local")
+            Files.createDirectories(local)
+            assertFailsWith<IllegalArgumentException> { DesktopUpdateDiagnostics.ensureOutsideWindowsInstall(local.resolve("bitchord/updater"), local) }
+            assertFailsWith<IllegalArgumentException> { DesktopUpdateDiagnostics.ensureOutsideWindowsInstall(local.resolve("BITCHORD"), local) }
+            DesktopUpdateDiagnostics.ensureOutsideWindowsInstall(local.resolve("BitChordUpdater/operations"), local)
+        } finally { base.toFile().deleteRecursively() }
+    }
+    @Test fun windowsUpdateDiskBudgetAccountsForDownloadedAndStagedPackages() {
+        val size = 340_000_000L
+        assertEquals(size * 5 + 2L * 1024 * 1024 * 1024, DesktopUpdateDiskSpace.requiredBytes(size, true))
+        assertEquals(size * 4 + 2L * 1024 * 1024 * 1024, DesktopUpdateDiskSpace.requiredBytes(size, false))
+        assertFailsWith<IllegalArgumentException> { DesktopUpdateDiskSpace.requiredBytes(0, true) }
+    }
     @Test fun diagnosticDirectoryRespectsAbsoluteXdgStateAndWindowsLocalAppData() {
         val base = Files.createTempDirectory("updater-locations")
         try {
             val state = base.resolve("state"); val home = base.resolve("home"); val local = base.resolve("local")
             assertEquals(state.resolve("bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("XDG_STATE_HOME" to state.toString()), home.toString(), false))
             assertEquals(home.resolve(".local/state/bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("XDG_STATE_HOME" to "relative"), home.toString(), false))
-            assertEquals(local.resolve("bitchord/updater"), DesktopUpdateDiagnostics.directory(mapOf("LOCALAPPDATA" to local.toString()), home.toString(), true))
+            assertEquals(local.resolve("BitChordUpdater/operations"), DesktopUpdateDiagnostics.directory(mapOf("LOCALAPPDATA" to local.toString()), home.toString(), true))
         } finally { base.toFile().deleteRecursively() }
     }
 }

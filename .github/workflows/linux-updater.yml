@@ -1,0 +1,43 @@
+name: Linux Standalone Updater
+
+on:
+  pull_request:
+    branches: ['1.9.1']
+    paths:
+      - 'desktopApp/src/main/resources/updater/appimage-update.sh'
+      - 'desktopApp/src/main/resources/updater/linux-updater-ui.sh'
+      - 'desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdate*.kt'
+      - 'desktopApp/packaging/tests/linux-updater-checks.py'
+      - '.github/workflows/linux-updater.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-host:
+    name: AppImage lifecycle, cleanup and KDE/GNOME progress
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native Linux UI test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends zenity kdialog qdbus-qt5 xvfb xauth x11-utils dbus-x11 shellcheck
+      - name: Check bundled shell scripts
+        run: |
+          sh -n desktopApp/src/main/resources/updater/appimage-update.sh
+          sh -n desktopApp/src/main/resources/updater/linux-updater-ui.sh
+          shellcheck -S error desktopApp/src/main/resources/updater/appimage-update.sh desktopApp/src/main/resources/updater/linux-updater-ui.sh
+      - name: Test process lifecycle and actual native updater windows
+        run: |
+          set -o pipefail
+          mkdir -p linux-updater-results
+          dbus-run-session -- xvfb-run -a python3 desktopApp/packaging/tests/linux-updater-checks.py --ui 2>&1 | tee linux-updater-results/results.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-updater-results
+          path: linux-updater-results/
+          if-no-files-found: ignore

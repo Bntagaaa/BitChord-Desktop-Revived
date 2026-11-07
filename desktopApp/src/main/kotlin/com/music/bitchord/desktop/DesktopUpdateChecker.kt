@@ -8,6 +8,7 @@ import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import kotlinx.serialization.json.*
+import kotlinx.coroutines.delay
 
 /** Official release discovery shared by startup, Settings and downloads. */
 internal object DesktopUpdateChecker {
@@ -29,15 +30,31 @@ internal object DesktopUpdateChecker {
     data class Release(val version: String, val url: String, val notes: String, val preview: Boolean,
         val asset: Asset?, val manifest: Asset?)
 
+    internal fun retryableReleaseStatus(status: Int): Boolean = status in setOf(502, 503, 504)
+
     suspend fun discover(channel: Channel, installation: UpdateInstallation): Release? {
         check(DesktopUpdateVersion.parse(currentVersion) != null) { "This development version cannot be compared automatically. Use the official release page." }
-        val response = http.get("https://api.github.com/repos/$REPOSITORY/releases?per_page=100") {
-            header("Accept", "application/vnd.github+json")
-            header("User-Agent", "BitChord-Desktop-Revived-updater")
+        repeat(3) { attempt ->
+            val response = http.get("https://api.github.com/repos/$REPOSITORY/releases?per_page=100") {
+                header("Accept", "application/vnd.github+json")
+                header("User-Agent", "BitChord-Desktop-Revived-updater")
+            }
+            val status = response.status.value
+            check(status !in setOf(403, 429) || response.headers["X-RateLimit-Remaining"] != "0") {
+                "GitHub update rate limit reached. Try again after the limit resets."
+            }
+            if (response.status.isSuccess()) {
+                return selectRelease(response.bodyAsText(), channel, installation, currentVersion)
+            }
+            if (attempt == 2 || !retryableReleaseStatus(status)) {
+                error("Update service returned HTTP $status. Try again later.")
+            }
+            // A 502/503/504 may be a transient upstream gateway failure.
+            // Drain the small error response before reopening the connection.
+            response.bodyAsText()
+            delay(1_000L * (attempt + 1))
         }
-        check(response.status.value !in setOf(403, 429) || response.headers["X-RateLimit-Remaining"] != "0") { "GitHub update rate limit reached. Try again after the limit resets." }
-        check(response.status.isSuccess()) { "Update service returned HTTP ${response.status.value}. Try again later." }
-        return selectRelease(response.bodyAsText(), channel, installation, currentVersion)
+        error("Update service is unavailable. Try again later.")
     }
 
     internal fun selectRelease(body: String, channel: Channel, installation: UpdateInstallation, current: String): Release? {

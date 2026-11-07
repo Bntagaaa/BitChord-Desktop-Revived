@@ -12,9 +12,9 @@ internal class UpdaterHelperFixture : AutoCloseable {
     val operation: Path = Files.createDirectory(directory.resolve("operation"))
     val current: Path = directory.resolve("current.AppImage")
     val staged: Path = directory.resolve("staged.AppImage")
-    val backup: Path = directory.resolve("previous.AppImage")
     val ready: Path = operation.resolve("window-ready")
     val token = "a".repeat(32)
+    val backup: Path = current.resolveSibling(current.fileName.toString() + ".previous-" + token)
     val original = "#!/bin/sh\nprintf old > \"\$0.old-launched\"\nexit 0\n"
     private val helper = directory.resolve("helper.sh")
     private var process: Process? = null
@@ -103,6 +103,8 @@ class DesktopUpdateHelperTest {
         UpdaterHelperFixture().use { f ->
             f.candidate("sleep 0.2\n${f.acknowledge}\nsleep 20")
             assertEquals(0, f.run()); assertTrue(Files.isExecutable(f.current))
+            assertFalse(Files.exists(f.backup), "Confirmed GUI must retire this operation's backup")
+            assertEquals("deleted-after-gui-confirmed", Files.readString(f.operation.resolve("backup.cleanup")).trim())
         }
     }
     @Test fun staleMarkerCannotAcknowledgeAnotherOperation() {

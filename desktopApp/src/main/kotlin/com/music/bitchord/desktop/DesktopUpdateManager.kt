@@ -29,7 +29,8 @@ internal class DesktopUpdateService(
     val state = MutableStateFlow(DesktopUpdateState())
     val dialog = MutableStateFlow(false)
     val autoCheck = MutableStateFlow(persistence.boolean("updates_auto", true))
-    val channel = MutableStateFlow(runCatching { DesktopUpdateChecker.Channel.valueOf(persistence.string("updates_channel", "STABLE")) }.getOrDefault(DesktopUpdateChecker.Channel.STABLE))
+    // Stable is the only user-facing channel. Ignore any persisted Preview choice from older builds.
+    val channel = MutableStateFlow(DesktopUpdateChecker.Channel.STABLE)
     val lastCheck = MutableStateFlow(persistence.string("updates_last_success").toLongOrNull() ?: 0)
     private var job: Job? = null
     private var generation = 0L
@@ -50,7 +51,15 @@ internal class DesktopUpdateService(
         check(force = true)
     }
 
-    fun startup() { if (autoCheck.value) check(force = false) }
+    fun startup() {
+        // Cleanup is independent of whether automatic update checking is
+        // enabled or throttled by the six-hour check interval.
+        if (DesktopPlatform.isWindows) scope.launch(Dispatchers.IO) {
+            runCatching { DesktopUpdateDiagnostics.compactCompletedWindowsOperations() }
+                .onFailure { DesktopTrackLog.log("updater: startup payload cleanup deferred: ${it.javaClass.simpleName}") }
+        }
+        if (autoCheck.value) check(force = false)
+    }
 
     /** Serialize filesystem work across cancellation, and fence all publications by operation. */
     @Synchronized private fun begin(initial: DesktopUpdateState, work: suspend (Long) -> Unit) {
@@ -107,6 +116,7 @@ internal class DesktopUpdateService(
         if (release.asset == null) return
         begin(DesktopUpdateState(UpdatePhase.DOWNLOADING, release)) { request ->
             cleanCache()
+            DesktopUpdateDiskSpace.checkBeforeDownload(installation, directory, requireNotNull(release.asset).size)
             var lastProgress = 0L
             val file = downloader.download(release, directory) { received, total ->
                 val now = System.nanoTime()
@@ -118,6 +128,7 @@ internal class DesktopUpdateService(
             currentCoroutineContext().ensureActive()
             val hash = DesktopUpdateDownloader.sha256(file)
             currentCoroutineContext().ensureActive()
+            cleanCache(keep = file.parent)
             publish(request, DesktopUpdateState(UpdatePhase.READY, release, file = file, hash = hash))
         }
     }
@@ -147,7 +158,12 @@ internal class DesktopUpdateService(
         val ready = state.value
         if (ready.phase != UpdatePhase.READY || ready.file == null || ready.hash == null || !canAutoInstall) return
         begin(ready.copy(phase = UpdatePhase.INSTALLING)) { _ ->
-            val prepared = prepare(installation, ready.file, ready.hash, requireNotNull(ready.release).version)
+            val prepared = try {
+                prepare(installation, ready.file, ready.hash, requireNotNull(ready.release).version)
+            } catch (failure: Throwable) {
+                DesktopUpdateDiagnostics.logPreflightFailure(installation.format, failure)
+                throw failure
+            }
             try {
                 currentCoroutineContext().ensureActive()
                 prepared.launch() // Disk/process work remains off the UI thread.
@@ -162,14 +178,20 @@ internal class DesktopUpdateService(
         }
     }
 
-    private fun cleanCache() {
+    private fun cleanCache(keep: Path? = null) {
+        // Recover space from prior completed EXE/Portable operations on the
+        // next app startup/check, even when no new install is attempted.
+        if (DesktopPlatform.isWindows) {
+            runCatching { DesktopUpdateDiagnostics.compactCompletedWindowsOperations() }
+                .onFailure { DesktopTrackLog.log("updater: completed payload cleanup deferred: ${it.javaClass.simpleName}") }
+        }
         Files.createDirectories(directory)
         require(!Files.isSymbolicLink(directory)) { "Update cache cannot be a symbolic link." }
         // Never traverse unrelated files or delete a different active operation's partial file.
-        // Jobs are joined before this executes; retain three recent download directories.
+        // Jobs are joined before this executes; retain only one verified download directory.
         Files.list(directory).use { files ->
             files.filter { it.fileName.toString().startsWith("download-") && !Files.isSymbolicLink(it) && Files.isDirectory(it, NOFOLLOW_LINKS) }
-                .sorted(compareByDescending<Path> { Files.getLastModifiedTime(it).toMillis() }).skip(3).forEach { old ->
+                .sorted(compareByDescending<Path> { if (it == keep) Long.MAX_VALUE else Files.getLastModifiedTime(it).toMillis() }).skip(1).forEach { old ->
                     runCatching {
                         Files.list(old).use { contents -> contents.filter { Files.isRegularFile(it, NOFOLLOW_LINKS) }.forEach(Files::deleteIfExists) }
                         Files.deleteIfExists(old)

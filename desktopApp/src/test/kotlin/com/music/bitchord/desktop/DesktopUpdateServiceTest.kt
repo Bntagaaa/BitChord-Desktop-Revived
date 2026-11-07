@@ -83,10 +83,15 @@ class DesktopUpdateServiceTest {
     @Test fun appImageHelperConfirmsWindowBeforeSuccess() {
         if (!DesktopPlatform.isLinux) return
         UpdaterHelperFixture().use { fixture ->
-            fixture.candidate(fixture.acknowledge + "\nsleep 20\n")
+            val unrelated = Files.writeString(fixture.directory.resolve("other.previous-unrelated"), "preserve")
+            fixture.candidate("test -f \"${fixture.backup}\" || exit 8\n" + fixture.acknowledge + "\nsleep 20\n")
+            val expected = DesktopUpdateDownloader.sha256(fixture.staged)
             assertEquals(0, fixture.run())
             assertTrue(Files.exists(fixture.ready))
-            assertTrue(Files.exists(fixture.backup))
+            assertEquals(expected, DesktopUpdateDownloader.sha256(fixture.current))
+            assertFalse(Files.exists(fixture.backup), "Confirmed startup must retire this operation's backup")
+            assertEquals("deleted-after-gui-confirmed", Files.readString(fixture.operation.resolve("backup.cleanup")).trim())
+            assertEquals("preserve", Files.readString(unrelated))
             assertFalse(Files.exists(fixture.staged))
         }
     }

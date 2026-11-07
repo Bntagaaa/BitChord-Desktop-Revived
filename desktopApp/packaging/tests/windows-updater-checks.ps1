@@ -4,9 +4,12 @@ if (-not $IsWindows -and $PSVersionTable.PSEdition -eq 'Core') { throw 'These ex
 New-Item -ItemType Directory -Force $Output | Out-Null
 $helper = Join-Path $PSScriptRoot '../../src/main/resources/updater/windows-update.ps1'
 $helper = [IO.Path]::GetFullPath($helper)
-$tokens = $null; $errors = $null
-[Management.Automation.Language.Parser]::ParseFile($helper, [ref]$tokens, [ref]$errors) > $null
-if ($errors.Count) { throw ($errors | Out-String) }
+$sourceRepair = Join-Path $PSScriptRoot '../../src/main/resources/updater/windows-msi-source.ps1'
+foreach ($script in @($helper, $sourceRepair)) {
+    $tokens = $null; $errors = $null
+    [Management.Automation.Language.Parser]::ParseFile([IO.Path]::GetFullPath($script), [ref]$tokens, [ref]$errors) > $null
+    if ($errors.Count) { throw "PowerShell parser failed for $script : $($errors | Out-String)" }
+}
 $csc = Join-Path $env:SystemRoot 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path $csc)) { throw 'The fixture needs the Windows .NET Framework C# compiler' }
 $source = Join-Path $Output 'Fixture.cs'
@@ -57,6 +60,12 @@ foreach ($case in @('parent-exit', 'checksum-mismatch', 'parent-timeout', 'insta
             if ($case -ne 'installer-failure' -and $started) { throw "Unverified/premature installer execution: $case" }
         }
         if (-not (Test-Path (Join-Path $operation 'completed'))) { throw 'Persistent terminal status is missing' }
+        if (Test-Path -LiteralPath $installer) {
+            throw "Completed helper left a large staged setup executable behind: $case"
+        }
+        if (-not (Test-Path -LiteralPath (Join-Path $operation 'install.log'))) {
+            throw 'The cleanup deleted the diagnostic log instead of just the installer'
+        }
         $results += [pscustomobject]@{ case = $case; helperExit = $process.ExitCode; started = $started }
     } finally { if (-not $parent.HasExited) { Stop-Process -Id $parent.Id } }
 }
@@ -87,8 +96,16 @@ if ($Artifacts) {
     if ($nativeVersion -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid MSI version '$nativeVersion' for requested build '$Version'" }
     if ([int]$nativeVersion.Split('.')[2] -gt 65535) { throw 'MSI build exceeds its supported range' }
     if ($upgrade.Trim('{}') -ine '8f3c1d24-6a2b-4f5e-9c17-2b8d54e0a913' -or -not $product) { throw 'MSI upgrade/product identity changed' }
-    $exeVersion = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion
-    if ($exeVersion -notmatch ('^' + [Regex]::Escape($nativeVersion) + '(?:\.0)?$')) { throw 'EXE and MSI version metadata disagree' }
+    # setup.exe is now a persistent-source launcher with the *exact same* MSI
+    # appended. Validate its extraction result, rather than EXE version fields.
+    $wrapped = Start-Process -FilePath ([IO.Path]::GetFullPath($exe)) -ArgumentList '--verify-payload' -PassThru -Wait
+    if ($wrapped.ExitCode -ne 0) { throw "Setup EXE could not extract its MSI (exit $($wrapped.ExitCode))" }
+    $digest = (Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash.ToLowerInvariant()
+    $cached = Join-Path $env:LOCALAPPDATA "BitChordUpdater\PackageCache\$digest\main.msi"
+    if (-not (Test-Path -LiteralPath $cached)) { throw "Setup did not persist MSI outside install root: $cached" }
+    if ((Get-FileHash -LiteralPath $cached -Algorithm SHA256).Hash.ToLowerInvariant() -ne $digest) {
+        throw "Setup embedded MSI differs from published MSI"
+    }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [IO.Compression.ZipFile]::OpenRead([IO.Path]::GetFullPath($zip))
     try {
@@ -102,7 +119,7 @@ if ($Artifacts) {
         try { $text = $reader.ReadToEnd() } finally { $reader.Dispose() }
         if (-not $text.Contains("-Dbitchord.version=$Version")) { throw 'Portable app version was not injected' }
     } finally { $archive.Dispose() }
-    $results += [pscustomobject]@{ case = 'actual-artifact-metadata'; nativeVersion = $nativeVersion; upgradeCode = $upgrade; productCode = $product; exeVersion = $exeVersion }
+    $results += [pscustomobject]@{ case = 'actual-artifact-metadata'; nativeVersion = $nativeVersion; upgradeCode = $upgrade; productCode = $product; setupCache = $cached; setupPayloadSHA256 = $digest }
 }
 $results | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Output 'results.json')
 Write-Output 'Windows helper fixtures and requested artifact inspections passed. No real BitChord installation/upgrade was performed.'

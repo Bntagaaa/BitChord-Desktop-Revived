@@ -3,6 +3,14 @@ package com.music.bitchord.desktop
 import kotlin.test.*
 
 class DesktopUpdateCheckerTest {
+    @Test fun retriesOnlyTransientGithubGatewayErrors() {
+        for (status in listOf(502, 503, 504)) {
+            assertTrue(DesktopUpdateChecker.retryableReleaseStatus(status))
+        }
+        for (status in listOf(200, 301, 400, 401, 403, 404, 408, 422, 429, 500)) {
+            assertFalse(DesktopUpdateChecker.retryableReleaseStatus(status))
+        }
+    }
     @Test fun stableAndPrereleaseOrdering() {
         val newer = DesktopUpdateChecker::isNewer
         for ((a,b) in listOf("1.9.0" to "1.8.99", "1.8.3" to "1.8.3-rc.9", "1.8.3-beta10" to "1.8.3-beta2", "1.8.3-beta.2" to "1.8.3-alpha.9", "1.8.3-rc.1" to "1.8.3-beta.9")) assertTrue(newer(a,b), "$a > $b")

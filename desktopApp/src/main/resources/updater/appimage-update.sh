@@ -24,9 +24,13 @@ umask 077
 installed=0
 owns_lock=0
 launched=0
+backup_identity=
+staged_identity=
 lock="$current.update-lock"
 
 log() { printf '%s stage=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1"; }
+# Status is for the independent optional UI; only the worker owns the result.
+progress() { log "$1"; printf '%s\n' "$1" > "$operation/status"; }
 finish() {
     log "$1"
     printf '%s\n' "$1" > "$operation/status"
@@ -34,6 +38,15 @@ finish() {
     exit "$2"
 }
 cleanup() {
+    # Remove only this operation's unchanged staging copy on abort/failure.
+    # Never glob downloads, backups, or another installation's files.
+    if [ "$owns_lock" -eq 1 ] && [ -n "$staged_identity" ]; then
+        case "$(basename -- "$staged")" in .bitchord-update-*.AppImage)
+            if regular "$staged" && [ "$(stat -c '%u:%d:%i' -- "$staged" 2>/dev/null || :)" = "$staged_identity" ]; then
+                rm -- "$staged" || log 'staged-cleanup-deferred'
+            fi ;;
+        esac
+    fi
     if [ "$owns_lock" -eq 1 ]; then rm -f -- "$lock/owner"; rmdir -- "$lock" 2>/dev/null || true; fi
 }
 trap cleanup 0
@@ -87,8 +100,55 @@ verified_ready() {
     [ "$(session_of "$gui_pid")" = "$launched" ] || return 1
     log "gui-ready pid=$gui_pid start_ticks=$gui_start version=$version"
 }
+# Delete a single exact operation-owned file, never glob backups or recursively
+# remove directories. Keep it on any validation error; GUI success stays success.
+cleanup_confirmed_backup() {
+    if [ "$backup" != "$current.previous-$token" ] || [ -z "$backup_identity" ]; then
+        log 'backup-cleanup-deferred; unexpected backup path'
+        printf 'retained-unsafe-path\n' > "$operation/backup.cleanup"
+        return
+    fi
+    if ! regular "$backup" || [ "$(stat -c %u -- "$backup" 2>/dev/null || :)" != "$(id -u)" ] ||
+        [ "$(stat -c '%u:%d:%i' -- "$backup" 2>/dev/null || :)" != "$backup_identity" ] ||
+        [ "$(checksum "$backup" 2>/dev/null || :)" != "$original_hash" ] ||
+        ! regular "$current" || [ "$(checksum "$current" 2>/dev/null || :)" != "$expected" ]; then
+        log 'backup-cleanup-deferred; installation or backup changed'
+        printf 'retained-file-changed\n' > "$operation/backup.cleanup"
+        return
+    fi
+    # Hashing a large image may take a while. Recheck the new window's exact
+    # process identity and session immediately before removing the old file.
+    if ! verified_ready; then
+        log 'backup-cleanup-deferred; new GUI no longer confirmed'
+        printf 'retained-gui-unconfirmed\n' > "$operation/backup.cleanup"
+        return
+    fi
+    if rm -- "$backup"; then
+        printf 'deleted-after-gui-confirmed\n' > "$operation/backup.cleanup"
+        log 'backup-cleaned-after-gui-confirmed'
+    else
+        printf 'retained-cleanup-deferred\n' > "$operation/backup.cleanup"
+        log 'backup-cleanup-deferred; remove failed'
+    fi
+}
+confirmed_success() {
+    progress 'cleaning-up-previous-version'
+    cleanup_confirmed_backup
+    finish 'success-gui-confirmed' 0
+}
+start_progress_window() {
+    ui="$operation/linux-updater-ui.sh"
+    if regular "$ui"; then
+        # UI is optional and never owns files, kills a process, or acknowledges
+        # the GUI. Losing/closing it must not interrupt an atomic replacement.
+        /bin/sh "$ui" "$operation" "$$" "$(identity "$$")" </dev/null \
+            >"$operation/ui.log" 2>&1 &
+        log "progress-observer-started pid=$!"
+    fi
+}
 recover() {
     reason=$1
+    progress 'recovering-previous-version'
     log "$reason"
     if candidate_alive; then finish 'recovery-pending-live-candidate; keeping current and backup; no second launch' 2; fi
     if [ "$installed" -eq 1 ]; then
@@ -110,17 +170,32 @@ recover() {
     finish 'failed; previous installation preserved' 1
 }
 
+# The app creates a private operation directory and all paths are absolute.
+case "$current:$staged:$backup:$operation" in *'
+'*) exit 1 ;; esac
+for path in "$current" "$staged" "$backup" "$operation"; do
+    case "$path" in /*) ;; *) exit 1 ;; esac
+done
+[ -d "$operation" ] && [ ! -L "$operation" ] &&
+    [ "$(stat -c %u -- "$operation")" = "$(id -u)" ] || exit 1
+# Re-running a completed request must never replace files or relaunch twice.
+[ ! -e "$operation/completed" ] && [ ! -L "$operation/completed" ] || exit 1
 case "$pid:$parent_start:$token:$expected:$original_hash" in *[!0-9a-f:]*|:*) finish 'invalid-operation-arguments' 1 ;; esac
 [ "$pid" -gt 1 ] && [ "${#token}" -eq 32 ] && [ "${#expected}" -eq 64 ] && [ "${#original_hash}" -eq 64 ] || finish 'invalid-operation-identity' 1
 [ "$ready" = "$operation/window-ready" ] && [ "$(cat "$operation/request.token")" = "$token" ] || finish 'invalid-readiness-operation' 1
 [ ! -e "$ready" ] && [ ! -L "$ready" ] || finish 'stale-readiness-marker; no files changed' 1
 regular "$current" && regular "$staged" && [ -x "$staged" ] || finish 'invalid-package-path; no files changed' 1
+[ "$backup" = "$current.previous-$token" ] || finish 'invalid-backup-path; no files changed' 1
+[ "$(dirname -- "$current")" = "$(dirname -- "$staged")" ] || finish 'cross-directory-staging; no files changed' 1
 [ ! -e "$backup" ] && [ ! -L "$backup" ] || finish 'backup-already-exists; no files changed' 1
 mkdir -- "$lock" 2>/dev/null || finish 'another-helper-or-stale-lock; no files changed' 1
 owns_lock=1
+staged_identity=$(stat -c '%u:%d:%i' -- "$staged")
 printf 'pid=%s\nstart_ticks=%s\n' "$$" "$(identity "$$")" > "$lock/owner"
 cp -- "$lock/owner" "$operation/helper.identity"
 log "helper-started pid=$$ parent_pid=$pid parent_start=$parent_start current=$current staged=$staged backup=$backup target=$version"
+progress 'waiting-for-app-exit'
+start_progress_window
 printf 'armed\n' > "$operation/armed"
 count=0
 while alive "$pid" "$parent_start"; do
@@ -131,13 +206,17 @@ while alive "$pid" "$parent_start"; do
 done
 [ ! -e "$operation/abort" ] || finish 'aborted-before-replacement; no files changed' 1
 log 'old-process-exited'
+progress 'verifying-package'
 regular "$staged" && [ "$(checksum "$staged")" = "$expected" ] || recover 'checksum-mismatch; no replacement'
 regular "$current" && [ "$(checksum "$current")" = "$original_hash" ] || finish 'current-file-changed; no replacement' 1
 # GNU cp -n never follows/overwrites an existing backup; verify its result before replacement.
 cp -pn -- "$current" "$backup" || recover 'backup-creation-failed'
 regular "$backup" && [ "$(checksum "$backup")" = "$original_hash" ] || recover 'backup-verification-failed'
 sync -f -- "$backup" || recover 'backup-sync-failed'
+backup_identity=$(stat -c '%u:%d:%i' -- "$backup")
+printf '%s\n' "$backup" > "$operation/backup.path"
 log "backup-verified path=$backup"
+progress 'replacing-appimage'
 if ! mv -fT -- "$staged" "$current"; then recover 'replacement-failed'; fi
 installed=1
 log "replacement-complete path=$current sha256=$expected"
@@ -145,10 +224,11 @@ BITCHORD_UPDATE_READY_FILE="$ready" BITCHORD_UPDATE_TOKEN="$token" BITCHORD_UPDA
     setsid "$current" </dev/null >/dev/null 2>&1 &
 launched=$!
 log "candidate-started runtime_pid=$launched session=$launched"
+progress 'waiting-for-updated-window'
 count=0
 dead=0
 while [ "$count" -lt "$startup_polls" ]; do
-    if verified_ready; then finish 'success-gui-confirmed' 0; fi
+    if verified_ready; then confirmed_success; fi
     if candidate_alive; then dead=0; else
         dead=$((dead + 1))
         if [ "$dead" -ge 3 ]; then wait "$launched" 2>/dev/null || true; recover 'candidate-exited-before-gui-ready'; fi
@@ -156,7 +236,7 @@ while [ "$count" -lt "$startup_polls" ]; do
     sleep "$pause"
     count=$((count + 1))
 done
-if verified_ready; then finish 'success-gui-confirmed' 0; fi
+if verified_ready; then confirmed_success; fi
 if candidate_alive; then
     finish 'gui-confirmation-pending; candidate still running; no kill, rollback, or duplicate launch; backup retained' 2
 fi
