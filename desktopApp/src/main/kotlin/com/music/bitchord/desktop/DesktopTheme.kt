@@ -87,7 +87,7 @@ internal data class DesktopThemePalette(
 )
 
 internal val DARK_PALETTE = DesktopThemePalette(
-    background = Color(0xFF202020),
+    background = Color(0xFF0D0D0F),
     surface = Color(0xFF0D0D0F),
     surfaceRaised = Color(0xFF1C1C1E),
     glass = Color(0x661C1C1E),
@@ -111,7 +111,7 @@ internal val DARK_PALETTE = DesktopThemePalette(
     subtleFill = Color(0x14FFFFFF),
     stripedRow = Color(0x0AFFFFFF),
     navAccent = Color(0xFFFA586A),
-    sidebarSurface = Color(0xFF0D0D0F),
+    sidebarSurface = Color(0xFF202020),
     chromeSurface = Color(0xFF0D0D0F),
     lyricsSurface = Color(0xFF202020),
     replaySurface = Color(0xFF202020),
