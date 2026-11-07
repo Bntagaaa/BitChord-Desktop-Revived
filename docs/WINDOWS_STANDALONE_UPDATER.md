@@ -22,6 +22,10 @@ Sequence:
 
 The existing worker verifies the ZIP again, finds the unique BitChord.exe/marker/config application root, extracts beside the old directory, keeps the original folder as a backup and restores it if the replacement rename fails. The host passes SkipLaunch: only the host may reopen the app, so two independent helpers cannot create duplicate windows.
 
+**Automatic Portable backup cleanup:** After the host positively confirms the updated BitChord window is running, it validates the exact backup path written by the successful worker (sibling of the original installation, with an updater-generated 32-hex suffix), checks the original executable/marker/config and refuses any reparse point or symlink anywhere in the backup. Only then is the entire previous Portable folder deleted, and `backup.cleanup` records the result. An unconfirmed launch, failed update, version mismatch, or reboot-required result retains the backup. Cleanup errors are logged and do not turn a successful app launch into an update failure.
+
+**User files warning:** The retained old Portable folder can include files added manually by the user. Once a new BitChord window is confirmed, those files are also deleted along with the old application folder. Move personal files out of the Portable application folder before updating; music libraries outside the app directory are unaffected.
+
 ## Installed EXE/MSI path
 
 The existing verified setup wrapper/Windows Installer mechanism is retained, including its normal wizard and UAC prompt when applicable. The updater does not overwrite MSI-owned files as though they were Portable files. After setup returns, the host rejects cancellation/failure and checks the target version in the original launcher's app/BitChord.cfg before restarting it.
@@ -36,7 +40,7 @@ For older target versions without the Windows handshake, the host may confirm a 
 
 ## Disk use
 
-Staged EXE/ZIP files are removed after the delegated worker exits, on success and on failure. Diagnostic logs are preserved. Startup cleanup can remove leftover nested payload copies only when neither host nor delegated worker is active. It never removes the Windows Installer PackageCache or Portable backup directories containing possible user files.
+Staged EXE/ZIP files are removed after the delegated worker exits, on success and on failure. Diagnostic logs are preserved. Startup cleanup can remove leftover nested payload copies only when neither host nor delegated worker is active. Only the verified post-GUI Portable success path deletes that operation's previous-version folder; startup/background cleanup never removes unconfirmed Portable backups or the Windows Installer PackageCache. Installed EXE/MSI mode has no updater-owned Portable backup to delete.
 
 ## PowerShell compatibility
 
@@ -44,7 +48,7 @@ The host pins module discovery to its own Windows PowerShell modules. Inherited 
 
 ## Tests and limitations
 
-windows-updater-host-checks.ps1 exercises the production host and both production workers on Windows using small native fixture executables. It covers Portable/setup success and exactly-one relaunch, setup cancellation, reboot-required, unchanged installed version, checksum failure, shutdown timeout, and unconfirmed startup. These protocol tests are not a substitute for real MSI upgrade testing or manual BitChord GUI verification.
+windows-updater-host-checks.ps1 exercises the production host and both production workers on Windows using small native fixture executables. It covers Portable/setup success and exactly-one relaunch, Portable backup deletion only after confirmed startup, preserved old/user-added files when startup is unconfirmed, unrelated sibling backup protection, setup cancellation, reboot-required, unchanged installed version, checksum failure, shutdown timeout, and unconfirmed startup. These protocol tests are not a substitute for real MSI upgrade testing or manual BitChord GUI verification.
 
 DesktopWindowsUpdateTest checks JSON staging, exact launcher capture, bundled resources, payload cleanup on cancelled preparation, and Windows readiness identity. DesktopWindowsUpdateCleanupTest protects a live delegated worker even if its parent host exited. The separate Windows Standalone Updater workflow publishes the host/worker diagnostics on failure.
 
