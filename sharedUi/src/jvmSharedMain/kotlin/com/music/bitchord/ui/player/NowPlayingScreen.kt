@@ -1785,9 +1785,11 @@ fun NowPlayingScreen(
                 onOpenArtist = onOpenArtist,
             )
         }
-        val landscapeLyricsPane: @Composable (Boolean) -> Unit = { compact ->
+        val landscapeLyricsPane: @Composable (Boolean, Dp) -> Unit = { compact, headerInset ->
             LandscapeLyricsPane(
                 compact = compact,
+                trackKey = song.videoId,
+                headerTopInset = headerInset,
                 caption = if (hideSongStatus) null else playbackOriginText(song, playedBy),
                 onOpenCaption = openPlaybackOrigin,
                 credits = landscapeTrackCredits,
@@ -2113,6 +2115,7 @@ fun NowPlayingScreen(
                     mainPane = { compact ->
                         LandscapeMainPane(
                             compact = compact,
+                            trackKey = song.videoId,
                             caption = if (hideSongStatus) null else playbackOriginText(song, playedBy),
                             onOpenCaption = openPlaybackOrigin,
                             credits = landscapeTrackCredits,
