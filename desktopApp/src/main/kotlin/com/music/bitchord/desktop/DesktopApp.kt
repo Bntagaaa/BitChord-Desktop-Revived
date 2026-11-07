@@ -3482,8 +3482,66 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         partySyncHolder[0]?.onLocalIntent()
     }
 
+    /** One importer for the Spotify page and the Library shortcut. */
+    suspend fun importSpotifyPlaylist(
+        input: String,
+        toAccount: Boolean,
+        report: (String) -> Unit,
+    ): String {
+                val playlistId = SpotifyImporter.extractPlaylistId(input)
+                    ?: error("Enter a valid Spotify playlist URL.")
+                if (toAccount && !DesktopYouTubeAuth.isSignedIn) {
+                    error("Sign in to YouTube Music first, or save the playlist locally.")
+                }
+                report("Loading Spotify playlist…")
+                val (title, tracks) = SpotifyImporter.fetchPlaylistTracks(playlistId)
+                report("Matching 0 of ${tracks.size} songs…")
+                val (matched, missing) = SpotifyImporter.resolveToSongs(tracks) { done, total ->
+                    report("Matching $done of $total songs…")
+                }
+                if (matched.isEmpty()) {
+                    error("No matching songs found on YouTube Music. Nothing was imported.")
+                }
+                if (toAccount) {
+                    report("Creating playlist on YouTube Music…")
+                    val newId = DesktopSearchClient.createPlaylist(
+                        title, PlaylistPrivacy.PRIVATE,
+                    ).getOrThrow()
+                    // Bounded batches avoid oversized Innertube mutations.
+                    // Report partial progress rather than saying the import fully succeeded
+                    // if YouTube Music rejects an add request.
+                    var saved = 0
+                    try {
+                        for (chunk in matched.map { it.videoId }.chunked(50)) {
+                            DesktopSearchClient.addToPlaylist(newId, chunk).getOrThrow()
+                            saved += chunk.size
+                            report("Saved $saved of ${matched.size} songs…")
+                        }
+                    } catch (failure: Exception) {
+                        libraryStale = true
+                        error("Created '$title' but only saved $saved of ${matched.size} songs. " +
+                            "Check your YouTube Music library before retrying. ${failure.message.orEmpty()}")
+                    }
+                    editPlaylistShelf { items ->
+                        listOf(
+                            ShelfItem(title = title, subtitle = "$saved songs",
+                                thumbnailUrl = matched.firstOrNull()?.thumbnailUrl,
+                                videoId = null, browseId = "VL$newId"),
+                        ) + items.filterNot { it.browseId == "VL$newId" }
+                    }
+                    libraryStale = true
+                } else {
+                    playlists = playlists + DesktopPlaylist(title = title, songs = matched)
+                    persistence.savePlaylists(playlists)
+                }
+                "Imported ${matched.size} of ${tracks.size} songs into " +
+                    (if (toAccount) "YouTube Music" else "a local playlist") +
+                    (if (missing.isNotEmpty()) ". ${missing.size} songs could not be matched." else ".")
+
+    }
+
     val shortcutBlockedByModal = showFirstLaunchWelcome ||
-        overlays.accounts || overlays.signIn || overlays.playlistDialog ||
+        overlays.accounts || overlays.signIn || overlays.playlistDialog || overlays.spotifyImport ||
         playlistTarget != null || overlays.rename || overlays.delete || overlays.downloadManager ||
         overlays.lastfmLogin || overlays.listenBrainzToken || overlays.discordToken ||
         overlays.listenTogether || overlays.audioOutput || overlays.pipeline || playerMenuOpen
@@ -4356,6 +4414,12 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             },
                         )
                     }
+                    if (overlays.spotifyImport) {
+                        DesktopSpotifyImportDialog(
+                            onImport = ::importSpotifyPlaylist,
+                            onDismiss = { overlays.spotifyImport = false },
+                        )
+                    }
                     if (overlays.playlistDialog || playlistTarget != null) {
                         DesktopPlaylistDialog(
                             song = playlistTarget,
@@ -5147,57 +5211,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                     ),
                                 )
                             },
-                            onImport = { input, toAccount, report ->
-                                val playlistId = SpotifyImporter.extractPlaylistId(input)
-                                    ?: error("Enter a valid Spotify playlist URL.")
-                                if (toAccount && !DesktopYouTubeAuth.isSignedIn) {
-                                    error("Sign in to YouTube Music first, or save the playlist locally.")
-                                }
-                                report("Loading Spotify playlist…")
-                                val (title, tracks) = SpotifyImporter.fetchPlaylistTracks(playlistId)
-                                report("Matching 0 of ${tracks.size} songs…")
-                                val (matched, missing) = SpotifyImporter.resolveToSongs(tracks) { done, total ->
-                                    report("Matching $done of $total songs…")
-                                }
-                                if (matched.isEmpty()) {
-                                    error("No matching songs found on YouTube Music. Nothing was imported.")
-                                }
-                                if (toAccount) {
-                                    report("Creating playlist on YouTube Music…")
-                                    val newId = DesktopSearchClient.createPlaylist(
-                                        title, PlaylistPrivacy.PRIVATE,
-                                    ).getOrThrow()
-                                    // Bounded batches avoid oversized Innertube mutations.
-                                    // Report partial progress rather than saying the import fully succeeded
-                                    // if YouTube Music rejects an add request.
-                                    var saved = 0
-                                    try {
-                                        for (chunk in matched.map { it.videoId }.chunked(50)) {
-                                            DesktopSearchClient.addToPlaylist(newId, chunk).getOrThrow()
-                                            saved += chunk.size
-                                            report("Saved $saved of ${matched.size} songs…")
-                                        }
-                                    } catch (failure: Exception) {
-                                        libraryStale = true
-                                        error("Created '$title' but only saved $saved of ${matched.size} songs. " +
-                                            "Check your YouTube Music library before retrying. ${failure.message.orEmpty()}")
-                                    }
-                                    editPlaylistShelf { items ->
-                                        listOf(
-                                            ShelfItem(title = title, subtitle = "$saved songs",
-                                                thumbnailUrl = matched.firstOrNull()?.thumbnailUrl,
-                                                videoId = null, browseId = "VL$newId"),
-                                        ) + items.filterNot { it.browseId == "VL$newId" }
-                                    }
-                                    libraryStale = true
-                                } else {
-                                    playlists = playlists + DesktopPlaylist(title = title, songs = matched)
-                                    persistence.savePlaylists(playlists)
-                                }
-                                "Imported ${matched.size} of ${tracks.size} songs into " +
-                                    (if (toAccount) "YouTube Music" else "a local playlist") +
-                                    (if (missing.isNotEmpty()) ". ${missing.size} songs could not be matched." else ".")
-                            },
+                            onImport = ::importSpotifyPlaylist,
                         )
                         destination == DesktopDestination.LIBRARY && libraryShowAll != null -> Column(Modifier.fillMaxSize()) {
                             // The phone keeps the grid's sort beside it, in the bar above; here it sits
@@ -5215,6 +5229,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                 modifier = Modifier.weight(1f),
                                 onNewPlaylist = { overlays.playlistDialog = true }
                                     .takeIf { libraryShowAll?.title == PLAYLISTS_SHELF },
+                                onImportSpotifyPlaylist = { overlays.spotifyImport = true }
+                                    .takeIf { libraryShowAll?.title == PLAYLISTS_SHELF },
                             )
                         }
                         destination == DesktopDestination.LIBRARY -> LibraryScreen(
@@ -5224,6 +5240,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             onShelfItemClick = ::openLibraryItem,
                             onShelfItemLongPress = { item -> if (item.videoId != null) openMenu(item.toSong()) },
                             onNewPlaylist = { overlays.playlistDialog = true },
+                            onImportSpotifyPlaylist = { overlays.spotifyImport = true },
                             onShowAll = { shelf -> libraryShowAll = shelf },
                             replay = {
                                 // The phone's wallet of Replay cards, or nothing until there is
