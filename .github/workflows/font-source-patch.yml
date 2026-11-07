@@ -1,0 +1,86 @@
+name: Prepare typography source patch
+
+# Temporary authoring aid while the local editing workspace is unavailable.
+# Produces an unreferenced Git blob only. It never commits, pushes or merges a branch.
+# Removed after the reviewed blob is committed through the repository connector.
+on:
+  pull_request:
+    branches: ['1.9.1']
+    types: [synchronize]
+    paths: ['.github/workflows/font-source-patch.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: >-
+      github.event.pull_request.number == 108 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/library-sidebar-startup-compact-cards'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Prepare and publish the guarded DesktopApp source blob
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import urllib.request
+
+          path = Path('desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopApp.kt')
+          expected = 'd363da68e72661a1cf3c80eda9ea594f865818f7'
+          actual = subprocess.check_output(['git', 'hash-object', str(path)], text=True).strip()
+          if actual != expected:
+              raise SystemExit('DesktopApp changed; refusing to patch an unreviewed source: ' + actual)
+          source = path.read_text(encoding='utf-8')
+          start_marker = '@Composable\ninternal fun desktopTypography(mode: DesktopFontMode = DesktopFontSettings.mode): Typography {'
+          end_marker = '\nprivate enum class DesktopDestination('
+          if source.count(start_marker) != 1:
+              raise SystemExit('Expected one typography entrypoint')
+          start = source.index(start_marker)
+          end = source.index(end_marker, start)
+          old = source[start:end]
+          if old.count('composeFont(') != 5 or 'return defaults.copy(' not in old:
+              raise SystemExit('Unexpected typography implementation')
+          replacement = (
+              '@Composable\n'
+              'internal fun desktopTypography(mode: DesktopFontMode = DesktopFontSettings.mode): Typography =\n'
+              '    desktopSfProTypography(mode)\n'
+          )
+          updated = source[:start] + replacement + source[end:]
+          for marker in ('DesktopLibraryLoadPolicy.shouldFetch(', 'DesktopPrimaryNavigationIcons.Library',
+                         'DesktopTheme.palette.navSelectedSurface', 'DesktopFontSettings.selectMode(option)'):
+              if updated.count(marker) != source.count(marker):
+                  raise SystemExit('Unrelated PR feature changed: ' + marker)
+          path.write_text(updated, encoding='utf-8')
+          subprocess.run(['git', 'diff', '--check'], check=True)
+          subprocess.run(['git', 'diff', '--', str(path)], check=True)
+          data = path.read_bytes()
+          expected_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+          payload = json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode()
+          request = urllib.request.Request(
+              'https://api.github.com/repos/Bntagaaa/BitChord-Desktop-Revived/git/blobs',
+              data=payload,
+              headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                       'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json',
+                       'X-GitHub-Api-Version': '2022-11-28'},
+              method='POST',
+          )
+          with urllib.request.urlopen(request, timeout=60) as response:
+              result = json.load(response)
+          if result['sha'] != expected_blob:
+              raise SystemExit('Published source hash mismatch')
+          print('PATCHED_DESKTOP_APP_BLOB=' + result['sha'])
+          print('Original source=' + actual + '; replacement bytes=' + str(len(data)))
+          PY
