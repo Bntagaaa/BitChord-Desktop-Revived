@@ -78,7 +78,9 @@ internal object DesktopLocalMusicWatcher {
                 if (key != null) {
                     val interesting = key.pollEvents().any { event ->
                         val changed = event.context() as? Path ?: return@any false
-                        changed.toString().substringAfterLast('.', "").lowercase() in AUDIO_EXTENSIONS
+                        val filename = changed.fileName.toString()
+                        filename.substringAfterLast('.', "").lowercase() in AUDIO_EXTENSIONS ||
+                            DesktopLocalArtwork.isFolderCoverFilename(filename)
                     }
                     key.reset()
                     if (interesting) pendingSince = System.currentTimeMillis()
