@@ -5197,6 +5197,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                 "Imported ${matched.size} of ${tracks.size} songs into " +
                                     (if (toAccount) "YouTube Music" else "a local playlist") +
                                     (if (missing.isNotEmpty()) ". ${missing.size} songs could not be matched." else ".")
+                            },
                         )
                         destination == DesktopDestination.LIBRARY && libraryShowAll != null -> Column(Modifier.fillMaxSize()) {
                             // The phone keeps the grid's sort beside it, in the bar above; here it sits
