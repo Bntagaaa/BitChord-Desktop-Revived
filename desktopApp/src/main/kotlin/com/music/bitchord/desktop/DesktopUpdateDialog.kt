@@ -72,9 +72,9 @@ internal fun DesktopUpdateDialog(service: DesktopUpdateService, onExit: suspend 
                 painter = painterResource(if (DesktopTheme.isLight) Res.drawable.logo else Res.drawable.bitchord_logo_original),
                 contentDescription = "BitChord",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(width = 80.dp, height = 54.dp),
+                modifier = Modifier.size(width = 64.dp, height = 42.dp),
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
                 "A new version of BitChord is available",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
