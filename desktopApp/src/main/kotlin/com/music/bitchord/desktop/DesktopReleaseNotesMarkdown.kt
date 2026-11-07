@@ -149,7 +149,7 @@ private fun ReleaseMarkdownBlock(node: Node) {
 private fun markdownImages(node: Node): List<Pair<String, String>> = buildList {
     fun walk(current: Node) {
         when (current) {
-            is MarkdownImageNode -> add(current.destination to current.title.ifBlank { imageAlt(current) })
+            is MarkdownImageNode -> add(current.destination to current.title.orEmpty().ifBlank { imageAlt(current) })
             is HtmlInline -> Jsoup.parseBodyFragment(current.literal).select("img[src]").forEach {
                 add(it.attr("src") to it.attr("alt"))
             }
