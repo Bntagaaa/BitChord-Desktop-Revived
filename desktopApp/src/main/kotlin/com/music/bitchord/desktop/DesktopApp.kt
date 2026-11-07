@@ -7894,7 +7894,7 @@ private fun DesktopSettingsScreen(
                         "Pitch black background",
                         "Dark mode only: near-black pages and charcoal navigation. Turn off for the original dark colors.",
                         DesktopTheme.pitchBlack,
-                        DesktopTheme::setPitchBlack,
+                        DesktopTheme::updatePitchBlack,
                     )
                     val iconTitle = DesktopStrings["d_app_icon", "App icon"]
                     val iconSubtitle = DesktopStrings[
