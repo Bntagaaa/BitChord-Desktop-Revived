@@ -26,9 +26,13 @@ class DesktopThemeTest {
     }
 
     @Test
-    fun `dark palette preserves the previous desktop defaults`() {
-        assertEquals(Color(0xFF202020), DARK_PALETTE.background)
-        assertEquals(Color(0xFF0D0D0F), DARK_PALETTE.surface)
+    fun `dark palette reverses the navigation rail and content background`() {
+        assertEquals(Color(0xFF0D0D0F), DARK_PALETTE.background)
+        assertEquals(Color(0xFF202020), DARK_PALETTE.sidebarSurface)
+        assertEquals(DARK_PALETTE.background, DARK_PALETTE.surface)
+        assertEquals(DARK_PALETTE.background, DARK_PALETTE.chromeSurface)
+        assertTrue(contrastRatio(DARK_PALETTE.secondary, DARK_PALETTE.sidebarSurface) >= 4.5)
+        assertEquals(Color(0xFFFA586A), DARK_PALETTE.navAccent)
         assertEquals(Color.White, DARK_PALETTE.foreground)
         assertEquals(Color.White, DARK_PALETTE.accent)
         assertEquals(Color.Black, DARK_PALETTE.onAccent)
