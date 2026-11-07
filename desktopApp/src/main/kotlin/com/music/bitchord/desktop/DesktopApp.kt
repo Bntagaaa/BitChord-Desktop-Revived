@@ -293,6 +293,7 @@ import bitchord.desktopapp.generated.resources.player_transport_repeat
 import bitchord.desktopapp.generated.resources.player_transport_repeat_one
 import bitchord.desktopapp.generated.resources.player_transport_shuffle
 import bitchord.desktopapp.generated.resources.player_transport_up_next
+import bitchord.desktopapp.generated.resources.bintang_music_black_about
 import bitchord.desktopapp.generated.resources.sf_pro_display_bold
 import bitchord.desktopapp.generated.resources.sf_pro_display_heavy
 import bitchord.desktopapp.generated.resources.sf_pro_display_medium
@@ -8281,7 +8282,15 @@ private fun DesktopSettingsFooter(onLicenses: () -> Unit) {
     ) {
         Text(
             text = "BitChord $version",
-            style = MaterialTheme.typography.headlineLarge,
+            style = MaterialTheme.typography.headlineLarge.copy(
+                fontFamily = if (version == "1.9.1") {
+                    FontFamily(composeFont(Res.font.bintang_music_black_about, FontWeight.Black))
+                } else {
+                    MaterialTheme.typography.headlineLarge.fontFamily
+                },
+                fontSize = 34.sp,
+                letterSpacing = 0.sp,
+            ),
             fontWeight = FontWeight.Black,
             color = DesktopForeground,
             textAlign = TextAlign.Center,
