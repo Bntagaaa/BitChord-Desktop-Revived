@@ -38,15 +38,23 @@ class DesktopThemeTest {
     }
 
     @Test
-    fun `pitch black is opt in and only changes dark content and sidebar`() {
-        assertEquals(DARK_PALETTE, DesktopTheme.resolvePalette(dark = true, pitchBlack = false))
-        assertEquals(PITCH_BLACK_PALETTE, DesktopTheme.resolvePalette(dark = true, pitchBlack = true))
-        assertEquals(LIGHT_PALETTE, DesktopTheme.resolvePalette(dark = false, pitchBlack = false))
-        assertEquals(LIGHT_PALETTE, DesktopTheme.resolvePalette(dark = false, pitchBlack = true))
-        assertEquals(Color(0xFF0D0D0F), PITCH_BLACK_PALETTE.background)
-        assertEquals(Color(0xFF202020), PITCH_BLACK_PALETTE.sidebarSurface)
-        assertEquals(DARK_PALETTE.surface, PITCH_BLACK_PALETTE.surface)
-        assertEquals(DARK_PALETTE.chromeSurface, PITCH_BLACK_PALETTE.chromeSurface)
+    fun `pitch black is available only when Dark is explicitly selected`() {
+        assertTrue(DesktopTheme.supportsPitchBlack(DesktopThemeMode.DARK))
+        assertEquals(false, DesktopTheme.supportsPitchBlack(DesktopThemeMode.LIGHT))
+        assertEquals(false, DesktopTheme.supportsPitchBlack(DesktopThemeMode.SYSTEM))
+    }
+
+    @Test
+    fun `pitch black makes both dark backgrounds fully black without swapping`() {
+        assertEquals(DARK_PALETTE, DesktopTheme.resolvePalette(DesktopThemeMode.DARK, false, false))
+        assertEquals(PITCH_BLACK_PALETTE, DesktopTheme.resolvePalette(DesktopThemeMode.DARK, false, true))
+        assertEquals(LIGHT_PALETTE, DesktopTheme.resolvePalette(DesktopThemeMode.LIGHT, true, true))
+        assertEquals(DARK_PALETTE, DesktopTheme.resolvePalette(DesktopThemeMode.SYSTEM, true, true))
+        assertEquals(LIGHT_PALETTE, DesktopTheme.resolvePalette(DesktopThemeMode.SYSTEM, false, true))
+        assertEquals(Color.Black, PITCH_BLACK_PALETTE.background)
+        assertEquals(Color.Black, PITCH_BLACK_PALETTE.sidebarSurface)
+        assertEquals(Color.Black, PITCH_BLACK_PALETTE.surface)
+        assertEquals(Color.Black, PITCH_BLACK_PALETTE.chromeSurface)
         assertEquals(DARK_PALETTE.navAccent, PITCH_BLACK_PALETTE.navAccent)
         assertEquals(DARK_PALETTE.floatingPlayerSurface, PITCH_BLACK_PALETTE.floatingPlayerSurface)
         assertTrue(contrastRatio(PITCH_BLACK_PALETTE.secondary, PITCH_BLACK_PALETTE.sidebarSurface) >= 4.5)

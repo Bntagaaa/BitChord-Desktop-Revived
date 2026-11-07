@@ -7890,12 +7890,15 @@ private fun DesktopSettingsScreen(
                             }
                         }
                     }
-                    SettingsToggle(
-                        "Pitch black background",
-                        "Dark mode only: near-black pages and charcoal navigation. Turn off for the original dark colors.",
-                        DesktopTheme.pitchBlack,
-                        DesktopTheme::updatePitchBlack,
-                    )
+                    // Show only after the user explicitly chooses Dark, not System or Light.
+                    if (DesktopTheme.supportsPitchBlack(DesktopTheme.mode)) {
+                        SettingsToggle(
+                            "Pitch black background",
+                            "Make both the content area and sidebar true black.",
+                            DesktopTheme.pitchBlack,
+                            DesktopTheme::updatePitchBlack,
+                        )
+                    }
                     val iconTitle = DesktopStrings["d_app_icon", "App icon"]
                     val iconSubtitle = DesktopStrings[
                         "d_app_icon_subtitle",

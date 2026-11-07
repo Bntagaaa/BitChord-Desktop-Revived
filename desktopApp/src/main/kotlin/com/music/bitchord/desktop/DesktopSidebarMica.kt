@@ -71,10 +71,10 @@ internal object DesktopSidebarMica {
 
     /** An opaque color with restrained wallpaper influence and legible foreground contrast. */
     fun surface(wallpaper: Color?, dark: Boolean, fallback: Color): Color {
-        if (wallpaper == null) return fallback
-        // Tint the themed sidebar surface, not a fixed dark gray: the navigation rail must
-        // remain lighter than the page even when wallpaper-tinted Mica is enabled on Windows.
-        // Keep the dark tint subtle so secondary nav icons remain readable on bright wallpapers.
+        // Explicit pitch black must stay black, even with wallpaper-tinted Mica on Windows.
+        if (wallpaper == null || (dark && fallback == Color.Black)) return fallback
+        // Keep the existing themed fallback and a restrained wallpaper influence so navigation
+        // remains readable in normal dark and light appearance.
         return lerp(fallback, wallpaper, if (dark) 0.030f else 0.060f).copy(alpha = 1f)
     }
 

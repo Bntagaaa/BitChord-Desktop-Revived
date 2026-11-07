@@ -39,11 +39,18 @@ internal object DesktopTheme {
     /** Effective theme. Use this for *all* UI decisions, never mode == LIGHT/DARK. */
     val isDark: Boolean get() = resolveDark(mode, systemDark)
     val isLight: Boolean get() = !isDark
-    val palette: DesktopThemePalette get() = resolvePalette(isDark, pitchBlack)
+    val palette: DesktopThemePalette get() = resolvePalette(mode, systemDark, pitchBlack)
 
-    internal fun resolvePalette(dark: Boolean, pitchBlack: Boolean): DesktopThemePalette = when {
-        !dark -> LIGHT_PALETTE
-        pitchBlack -> PITCH_BLACK_PALETTE
+    /** Pitch black is an explicit Dark-mode option, not a hidden System-mode override. */
+    internal fun supportsPitchBlack(choice: DesktopThemeMode): Boolean = choice == DesktopThemeMode.DARK
+
+    internal fun resolvePalette(
+        choice: DesktopThemeMode,
+        osDark: Boolean,
+        pitchBlack: Boolean,
+    ): DesktopThemePalette = when {
+        !resolveDark(choice, osDark) -> LIGHT_PALETTE
+        supportsPitchBlack(choice) && pitchBlack -> PITCH_BLACK_PALETTE
         else -> DARK_PALETTE
     }
 
@@ -134,10 +141,12 @@ internal val DARK_PALETTE = DesktopThemePalette(
     replaySurface = Color(0xFF202020),
 )
 
-/** Opt-in near-black content and charcoal navigation; other dark tokens are unchanged. */
+/** Opt-in true black across both main content and navigation, without swapping their colors. */
 internal val PITCH_BLACK_PALETTE = DARK_PALETTE.copy(
-    background = Color(0xFF0D0D0F),
-    sidebarSurface = Color(0xFF202020),
+    background = Color.Black,
+    surface = Color.Black,
+    sidebarSurface = Color.Black,
+    chromeSurface = Color.Black,
 )
 
 /**
