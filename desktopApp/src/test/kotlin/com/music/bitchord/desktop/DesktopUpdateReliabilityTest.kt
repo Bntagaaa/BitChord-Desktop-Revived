@@ -66,6 +66,20 @@ class DesktopUpdateReliabilityTest {
             assertFalse(Files.walk(dir).use { it.anyMatch { path -> path.toString().endsWith(".part") } })
         } finally { dir.toFile().deleteRecursively() }
     }
+    @Test fun oldPreviewPreferenceIsIgnoredByDefault() {
+        val persistence = DesktopPersistence()
+        val saved = persistence.string("updates_channel", "STABLE")
+        persistence.saveString("updates_channel", "PREVIEW")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val service = DesktopUpdateService(UpdateInstallation(UpdateFormat.UNKNOWN), persistence = persistence, scope = scope)
+            assertEquals(DesktopUpdateChecker.Channel.STABLE, service.channel.value)
+        } finally {
+            persistence.saveString("updates_channel", saved)
+            scope.cancel()
+        }
+    }
+
     @Test fun changingChannelWaitsForCancelledWorkAndRejectsStalePublication() = runBlocking {
         val dir = Files.createTempDirectory("updater-generation")
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
