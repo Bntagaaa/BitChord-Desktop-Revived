@@ -6110,9 +6110,12 @@ private fun DesktopMiniPlayer(
         tonalElevation = 0.dp,
     ) {
         Box(Modifier.fillMaxWidth()) {
+            // Both playing and empty states share the original dock height:
+            // 42.dp artwork + 8.dp vertical padding on each side = 58.dp.
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .height(58.dp)
                     .clickable(enabled = song != null, onClick = onExpand)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -6190,7 +6193,7 @@ private fun DesktopMiniPlayer(
                 Image(
                     painter = painterResource(Res.drawable.bitchord_no_music),
                     contentDescription = "BitChord",
-                    // Keep the logo smaller than the normal 52.dp dock height (36.dp buttons + 16.dp padding).
+                    // Keep the 48.dp logo inside the fixed 58.dp dock rather than resizing the player.
                     modifier = Modifier.align(Alignment.Center).size(48.dp),
                 )
             }
@@ -7887,6 +7890,12 @@ private fun DesktopSettingsScreen(
                             }
                         }
                     }
+                    SettingsToggle(
+                        "Pitch black background",
+                        "Dark mode only: near-black pages and charcoal navigation. Turn off for the original dark colors.",
+                        DesktopTheme.pitchBlack,
+                        DesktopTheme::setPitchBlack,
+                    )
                     val iconTitle = DesktopStrings["d_app_icon", "App icon"]
                     val iconSubtitle = DesktopStrings[
                         "d_app_icon_subtitle",

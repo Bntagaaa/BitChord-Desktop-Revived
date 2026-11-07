@@ -23,6 +23,7 @@ internal enum class DesktopThemeMode(val label: String) {
  */
 internal object DesktopTheme {
     private const val KEY = "desktop_theme_mode"
+    private const val KEY_PITCH_BLACK = "desktop_pitch_black"
 
     var mode: DesktopThemeMode by mutableStateOf(
         DesktopThemeMode.fromStored(DesktopPersistence().string(KEY, DesktopThemeMode.SYSTEM.name)),
@@ -31,10 +32,20 @@ internal object DesktopTheme {
 
     private var systemDark: Boolean by mutableStateOf(DesktopSystemTheme.isDark())
 
+    /** Saved independently of the system/light/dark choice; defaults to classic dark. */
+    var pitchBlack: Boolean by mutableStateOf(DesktopPersistence().boolean(KEY_PITCH_BLACK, false))
+        private set
+
     /** Effective theme. Use this for *all* UI decisions, never mode == LIGHT/DARK. */
     val isDark: Boolean get() = resolveDark(mode, systemDark)
     val isLight: Boolean get() = !isDark
-    val palette: DesktopThemePalette get() = if (isDark) DARK_PALETTE else LIGHT_PALETTE
+    val palette: DesktopThemePalette get() = resolvePalette(isDark, pitchBlack)
+
+    internal fun resolvePalette(dark: Boolean, pitchBlack: Boolean): DesktopThemePalette = when {
+        !dark -> LIGHT_PALETTE
+        pitchBlack -> PITCH_BLACK_PALETTE
+        else -> DARK_PALETTE
+    }
 
     internal fun resolveDark(choice: DesktopThemeMode, osDark: Boolean): Boolean = when (choice) {
         DesktopThemeMode.SYSTEM -> osDark
@@ -51,6 +62,12 @@ internal object DesktopTheme {
         if (mode == value) return
         DesktopPersistence().saveString(KEY, value.name)
         mode = value
+    }
+
+    fun setPitchBlack(enabled: Boolean) {
+        if (pitchBlack == enabled) return
+        DesktopPersistence().saveBoolean(KEY_PITCH_BLACK, enabled)
+        pitchBlack = enabled
     }
 }
 
@@ -87,7 +104,7 @@ internal data class DesktopThemePalette(
 )
 
 internal val DARK_PALETTE = DesktopThemePalette(
-    background = Color(0xFF0D0D0F),
+    background = Color(0xFF202020),
     surface = Color(0xFF0D0D0F),
     surfaceRaised = Color(0xFF1C1C1E),
     glass = Color(0x661C1C1E),
@@ -111,10 +128,16 @@ internal val DARK_PALETTE = DesktopThemePalette(
     subtleFill = Color(0x14FFFFFF),
     stripedRow = Color(0x0AFFFFFF),
     navAccent = Color(0xFFFA586A),
-    sidebarSurface = Color(0xFF202020),
+    sidebarSurface = Color(0xFF0D0D0F),
     chromeSurface = Color(0xFF0D0D0F),
     lyricsSurface = Color(0xFF202020),
     replaySurface = Color(0xFF202020),
+)
+
+/** Opt-in near-black content and charcoal navigation; other dark tokens are unchanged. */
+internal val PITCH_BLACK_PALETTE = DARK_PALETTE.copy(
+    background = Color(0xFF0D0D0F),
+    sidebarSurface = Color(0xFF202020),
 )
 
 /**

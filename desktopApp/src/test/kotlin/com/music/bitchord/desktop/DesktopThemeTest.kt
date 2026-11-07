@@ -26,16 +26,30 @@ class DesktopThemeTest {
     }
 
     @Test
-    fun `dark palette reverses the navigation rail and content background`() {
-        assertEquals(Color(0xFF0D0D0F), DARK_PALETTE.background)
-        assertEquals(Color(0xFF202020), DARK_PALETTE.sidebarSurface)
-        assertEquals(DARK_PALETTE.background, DARK_PALETTE.surface)
-        assertEquals(DARK_PALETTE.background, DARK_PALETTE.chromeSurface)
-        assertTrue(contrastRatio(DARK_PALETTE.secondary, DARK_PALETTE.sidebarSurface) >= 4.5)
+    fun `dark mode defaults to the original desktop colors`() {
+        assertEquals(Color(0xFF202020), DARK_PALETTE.background)
+        assertEquals(Color(0xFF0D0D0F), DARK_PALETTE.sidebarSurface)
+        assertEquals(Color(0xFF0D0D0F), DARK_PALETTE.surface)
+        assertEquals(Color(0xFF0D0D0F), DARK_PALETTE.chromeSurface)
         assertEquals(Color(0xFFFA586A), DARK_PALETTE.navAccent)
         assertEquals(Color.White, DARK_PALETTE.foreground)
         assertEquals(Color.White, DARK_PALETTE.accent)
         assertEquals(Color.Black, DARK_PALETTE.onAccent)
+    }
+
+    @Test
+    fun `pitch black is opt in and only changes dark content and sidebar`() {
+        assertEquals(DARK_PALETTE, DesktopTheme.resolvePalette(dark = true, pitchBlack = false))
+        assertEquals(PITCH_BLACK_PALETTE, DesktopTheme.resolvePalette(dark = true, pitchBlack = true))
+        assertEquals(LIGHT_PALETTE, DesktopTheme.resolvePalette(dark = false, pitchBlack = false))
+        assertEquals(LIGHT_PALETTE, DesktopTheme.resolvePalette(dark = false, pitchBlack = true))
+        assertEquals(Color(0xFF0D0D0F), PITCH_BLACK_PALETTE.background)
+        assertEquals(Color(0xFF202020), PITCH_BLACK_PALETTE.sidebarSurface)
+        assertEquals(DARK_PALETTE.surface, PITCH_BLACK_PALETTE.surface)
+        assertEquals(DARK_PALETTE.chromeSurface, PITCH_BLACK_PALETTE.chromeSurface)
+        assertEquals(DARK_PALETTE.navAccent, PITCH_BLACK_PALETTE.navAccent)
+        assertEquals(DARK_PALETTE.floatingPlayerSurface, PITCH_BLACK_PALETTE.floatingPlayerSurface)
+        assertTrue(contrastRatio(PITCH_BLACK_PALETTE.secondary, PITCH_BLACK_PALETTE.sidebarSurface) >= 4.5)
     }
 
     @Test
