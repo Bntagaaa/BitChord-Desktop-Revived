@@ -182,14 +182,7 @@ internal fun DesktopSpotifyLibraryPage(
     onOpenPlaylist: (SpotifyPlaylist) -> Unit,
     onImport: suspend (String, Boolean, (String) -> Unit) -> String,
 ) {
-    val importScope = rememberCoroutineScope()
     var showImport by remember { mutableStateOf(false) }
-    var importUrl by remember { mutableStateOf("") }
-    var importToAccount by remember { mutableStateOf(false) }
-    var importBusy by remember { mutableStateOf(false) }
-    var importProgress by remember { mutableStateOf("") }
-    var importError by remember { mutableStateOf<String?>(null) }
-    var importResult by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
@@ -264,8 +257,30 @@ internal fun DesktopSpotifyLibraryPage(
             }
         }
         if (showImport) {
+            DesktopSpotifyImportDialog(onImport = onImport, onDismiss = { showImport = false })
+        }
+    }
+}
+
+/**
+ * Shared import dialog for Spotify and Library entry points. It owns a single import
+ * session and prevents dismissal while an account/local playlist is being written.
+ */
+@Composable
+internal fun DesktopSpotifyImportDialog(
+    onImport: suspend (String, Boolean, (String) -> Unit) -> String,
+    onDismiss: () -> Unit,
+) {
+    val importScope = rememberCoroutineScope()
+    var showImport by remember { mutableStateOf(false) }
+    var importUrl by remember { mutableStateOf("") }
+    var importToAccount by remember { mutableStateOf(false) }
+    var importBusy by remember { mutableStateOf(false) }
+    var importProgress by remember { mutableStateOf("") }
+    var importError by remember { mutableStateOf<String?>(null) }
+    var importResult by remember { mutableStateOf<String?>(null) }
             AlertDialog(
-                onDismissRequest = { if (!importBusy) showImport = false },
+                onDismissRequest = { if (!importBusy) onDismiss() },
                 title = { Text("Import Spotify playlist") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -322,11 +337,9 @@ internal fun DesktopSpotifyLibraryPage(
                     ) { Text("Import") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { if (!importBusy) showImport = false }, enabled = !importBusy) {
+                    TextButton(onClick = { if (!importBusy) onDismiss() }, enabled = !importBusy) {
                         Text("Close")
                     }
                 },
             )
-        }
-    }
 }
