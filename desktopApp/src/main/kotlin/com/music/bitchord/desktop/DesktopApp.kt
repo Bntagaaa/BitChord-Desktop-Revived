@@ -2157,26 +2157,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     DisposableEffect(playbackEngine) {
         onDispose { DesktopMusicVideo.stop(); playbackEngine.release() }
     }
-    updater?.let { service ->
-        DesktopUpdateDialog(service) {
-            val ownQueue = if (DesktopListenTogether.state.value.inParty) null else liveQueue.songs.toList() to liveQueue.index
-            val savedHistory = history.toList()
-            desktopUpdateShutdown.finish {
-                ownQueue?.let { (songs, index) ->
-                    persistence.saveQueue(songs)
-                    persistence.saveString("queue_index", index.toString())
-                }
-                persistence.saveHistory(savedHistory)
-                persistence.preferences.flush()
-                DesktopMusicVideo.stop()
-                playbackEngine.shutdown() // Existing bounded 2-second audio-thread join.
-                DesktopWindowsMedia.stop()
-            }
-            exitProcess(0)
-        }
-    }
-
-
     /** Opens an artist's page, from a card, a search row or the player's credit. */
     fun openArtist(browseId: String, name: String) {
         val target = DesktopArtistTarget(browseId, name)
@@ -4505,6 +4485,29 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             },
                         )
                     }
+                    // The update dialog is a scene-level DesktopDialogPanel
+                    // (unlike the previous native AlertDialog), so it must be
+                    // composed LAST in the DesktopFrame overlay. Composing it
+                    // before DesktopFrame lets the page receive the pointer
+                    // events and makes View update appear unresponsive.
+                        updater?.let { service ->
+                            DesktopUpdateDialog(service) {
+                                val ownQueue = if (DesktopListenTogether.state.value.inParty) null else liveQueue.songs.toList() to liveQueue.index
+                                val savedHistory = history.toList()
+                                desktopUpdateShutdown.finish {
+                                    ownQueue?.let { (songs, index) ->
+                                        persistence.saveQueue(songs)
+                                        persistence.saveString("queue_index", index.toString())
+                                    }
+                                    persistence.saveHistory(savedHistory)
+                                    persistence.preferences.flush()
+                                    DesktopMusicVideo.stop()
+                                    playbackEngine.shutdown() // Existing bounded 2-second audio-thread join.
+                                    DesktopWindowsMedia.stop()
+                                }
+                                exitProcess(0)
+                            }
+                        }
                 },
             ) { contentPadding ->
                 // Desktop pages start at the same top edge as Library. Only preserve space for the
