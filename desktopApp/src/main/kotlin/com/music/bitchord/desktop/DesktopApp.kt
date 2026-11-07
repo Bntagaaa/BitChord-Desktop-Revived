@@ -487,7 +487,7 @@ internal fun desktopColorScheme() =
 internal fun desktopTypography(mode: DesktopFontMode = DesktopFontSettings.mode): Typography =
     desktopSfProTypography(mode)
 
-private enum class DesktopDestination(val id: String, val label: String) {
+internal enum class DesktopDestination(val id: String, val label: String) {
     LISTEN_NOW("listen-now", "Home"),
     NEW("new", "New"),
     EXPLORE("explore", "Explore"),
@@ -624,6 +624,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     val homeSeenTitles = remember { HashSet<String>() }
     var homeGeneration by remember { mutableStateOf(0) }
     var homeIdentity by remember { mutableStateOf<String?>(null) }
+    var homeEvicted by remember { mutableStateOf(false) }
     var homeJob by remember { mutableStateOf<Job?>(null) }
     var homeRenderedLogged by remember { mutableStateOf(false) }
     var exploreState by remember { mutableStateOf<UiState<List<MoodGenreSection>>>(UiState.Loading) }
@@ -2831,6 +2832,14 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         loadHome()
     }
 
+    // A trimmed Home feed fetches afresh on the next visit without resetting Back history.
+    LaunchedEffect(destination) {
+        if (destination == DesktopDestination.LISTEN_NOW && homeEvicted) {
+            homeEvicted = false
+            loadHome()
+        }
+    }
+
     // The feed is the account's: signing in, out or across to another channel is a different Home,
     // and Recently Played only exists with an account behind it.
     LaunchedEffect(youtubeSignedIn, activeAccountId) {
@@ -2962,6 +2971,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     topPicks = null
                     topPicksLoading = false
                     homeIdentity = null
+                    homeEvicted = true
+                    homeGeneration++ // Invalidate late callbacks from previous feed requests.
                     homeRenderedLogged = false
                 }
                 DesktopDestination.NEW -> newState = UiState.Loading
