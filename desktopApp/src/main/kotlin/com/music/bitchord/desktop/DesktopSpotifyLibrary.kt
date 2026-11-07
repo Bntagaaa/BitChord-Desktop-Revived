@@ -272,7 +272,6 @@ internal fun DesktopSpotifyImportDialog(
     onDismiss: () -> Unit,
 ) {
     val importScope = rememberCoroutineScope()
-    var showImport by remember { mutableStateOf(false) }
     var importUrl by remember { mutableStateOf("") }
     var importToAccount by remember { mutableStateOf(false) }
     var importBusy by remember { mutableStateOf(false) }
