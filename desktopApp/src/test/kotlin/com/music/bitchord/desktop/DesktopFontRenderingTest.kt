@@ -43,22 +43,22 @@ class DesktopFontRenderingTest {
         runDesktopComposeUiTest(width = 720, height = 360) {
             val mode = mutableStateOf(DesktopFontMode.LEGACY)
             var applied: DesktopFontMode? = null
-            var loaded = false
+            var ready = false
             setContent {
                 MaterialTheme(typography = desktopTypography(mode.value)) {
                     val family = MaterialTheme.typography.bodyLarge.fontFamily
-                    SideEffect { applied = mode.value; loaded = loaded(family) }
+                    SideEffect { applied = mode.value; ready = isFamilyLoaded(family) }
                     Column(Modifier.background(Color.White)) {
                         weights.forEach { weight -> Probe("font-${weight.weight}", weight) }
                     }
                 }
             }
-            waitUntil(15_000) { loaded && applied == DesktopFontMode.LEGACY }
+            waitUntil(timeoutMillis = 15_000) { ready && applied == DesktopFontMode.LEGACY }
             waitForIdle()
             val legacy = weights.associateWith { pixels(onNodeWithTag("font-${it.weight}").captureToImage()) }
             save(onRoot().captureToImage(), "font-legacy.png")
             runOnIdle { mode.value = DesktopFontMode.DEFAULT }
-            waitUntil(15_000) { loaded && applied == DesktopFontMode.DEFAULT }
+            waitUntil(timeoutMillis = 15_000) { ready && applied == DesktopFontMode.DEFAULT }
             waitForIdle()
             val modern = weights.associateWith { pixels(onNodeWithTag("font-${it.weight}").captureToImage()) }
             save(onRoot().captureToImage(), "font-default.png")
@@ -69,7 +69,7 @@ class DesktopFontRenderingTest {
                     "Changing Default/Legacy did not repaint W${weight.weight}")
             }
             runOnIdle { mode.value = DesktopFontMode.LEGACY }
-            waitUntil(15_000) { loaded && applied == DesktopFontMode.LEGACY }
+            waitUntil(timeoutMillis = 15_000) { ready && applied == DesktopFontMode.LEGACY }
             waitForIdle()
             for (weight in weights) {
                 assertContentEquals(legacy.getValue(weight),
@@ -86,7 +86,7 @@ class DesktopFontRenderingTest {
             setContent {
                 MaterialTheme(typography = desktopTypography(DesktopFontMode.DEFAULT)) {
                     val family = MaterialTheme.typography.bodyLarge.fontFamily
-                    SideEffect { ready = loaded(family) }
+                    SideEffect { ready = isFamilyLoaded(family) }
                     Column(Modifier.background(Color.White)) {
                         weights.forEach { logical ->
                             val physical = DesktopFontMode.DEFAULT.physicalCut(logical)
@@ -97,7 +97,7 @@ class DesktopFontRenderingTest {
                     }
                 }
             }
-            waitUntil(15_000) { ready }
+            waitUntil(timeoutMillis = 15_000) { ready }
             waitForIdle()
             save(onRoot().captureToImage(), "font-logical-versus-physical.png")
             for (logical in weights) {
@@ -116,12 +116,13 @@ class DesktopFontRenderingTest {
             var applied: DesktopFontMode? = null
             var ready = false
             try {
-                runOnIdle { DesktopFontSettings.selectMode(DesktopFontMode.LEGACY) }
+                // No Compose root exists yet; do not wait for an idle composition before setContent.
+                DesktopFontSettings.selectMode(DesktopFontMode.LEGACY)
                 setContent {
                     Column(Modifier.background(Color.White)) {
                         MaterialTheme(typography = desktopTypography()) {
                             val family = MaterialTheme.typography.bodyLarge.fontFamily
-                            SideEffect { applied = DesktopFontSettings.mode; ready = loaded(family) }
+                            SideEffect { applied = DesktopFontSettings.mode; ready = isFamilyLoaded(family) }
                             Probe("main-consumer", FontWeight.W700)
                         }
                         // PiP has its own MaterialTheme; it must not retain the first loaded profile.
@@ -130,22 +131,22 @@ class DesktopFontRenderingTest {
                         }
                     }
                 }
-                waitUntil(15_000) { ready && applied == DesktopFontMode.LEGACY }
+                waitUntil(timeoutMillis = 15_000) { ready && applied == DesktopFontMode.LEGACY }
                 waitForIdle()
                 val before = pixels(onNodeWithTag("main-consumer").captureToImage())
                 runOnIdle { DesktopFontSettings.selectMode(DesktopFontMode.DEFAULT) }
-                waitUntil(15_000) { ready && applied == DesktopFontMode.DEFAULT }
+                waitUntil(timeoutMillis = 15_000) { ready && applied == DesktopFontMode.DEFAULT }
                 waitForIdle()
                 val after = pixels(onNodeWithTag("main-consumer").captureToImage())
                 assertFalse(before.contentEquals(after), "Settings change did not reach the root typography")
                 assertContentEquals(after, pixels(onNodeWithTag("independent-consumer").captureToImage()))
                 assertEquals("DEFAULT", DesktopPersistence().string(DesktopFontSettings.KEY))
             } finally {
-                runOnIdle { DesktopFontSettings.selectMode(previous) }
+                DesktopFontSettings.selectMode(previous)
             }
         }
 
-    private fun loaded(family: FontFamily?): Boolean =
+    private fun isFamilyLoaded(family: FontFamily?): Boolean =
         (family as? FontListFontFamily)?.fonts?.map { it.weight.weight } == listOf(400, 500, 600, 700, 800)
 
     @Composable
