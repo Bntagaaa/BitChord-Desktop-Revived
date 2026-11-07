@@ -1205,4 +1205,10 @@
     <string name="spotify_library_subtitle">Danh sách phát Spotify của bạn</string>
     <string name="spotify_sign_in">Đăng nhập bằng Spotify</string>
     <string name="spotify_track_unavailable">Không tìm thấy bài hát đó trên YouTube Music</string>
+    <string name="font">Phông chữ</string>
+    <string name="font_default">Mặc định</string>
+    <string name="font_legacy">Cổ điển</string>
+    <string name="font_default_subtitle">SF Pro Display · Độ đậm của Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Độ đậm dày ban đầu</string>
+    <string name="font_footer">Cổ điển mang lại kiểu chữ dày và khít hơn mà ứng dụng từng dùng trước khi được đồng bộ với Apple Music.</string>
 </resources>

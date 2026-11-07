@@ -264,7 +264,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -368,7 +367,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
-import org.jetbrains.compose.resources.Font as composeFont
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -485,33 +483,8 @@ internal fun desktopColorScheme() =
     )
 
 @Composable
-internal fun desktopTypography(): Typography {
-    val sfProDisplay = FontFamily(
-        composeFont(Res.font.sf_pro_display_regular, FontWeight.W400),
-        composeFont(Res.font.sf_pro_display_medium, FontWeight.W500),
-        composeFont(Res.font.sf_pro_display_semibold, FontWeight.W600),
-        composeFont(Res.font.sf_pro_display_bold, FontWeight.W700),
-        composeFont(Res.font.sf_pro_display_heavy, FontWeight.W800),
-    )
-    val defaults = Typography()
-    return defaults.copy(
-        displayLarge = defaults.displayLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W800, fontSize = 34.sp, letterSpacing = (-0.8).sp),
-        displayMedium = defaults.displayMedium.copy(fontFamily = sfProDisplay),
-        displaySmall = defaults.displaySmall.copy(fontFamily = sfProDisplay),
-        headlineLarge = defaults.headlineLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W800, fontSize = 30.sp, letterSpacing = (-0.7).sp),
-        headlineMedium = defaults.headlineMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W700, fontSize = 22.sp, letterSpacing = (-0.4).sp),
-        headlineSmall = defaults.headlineSmall.copy(fontFamily = sfProDisplay),
-        titleLarge = defaults.titleLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W700, fontSize = 20.sp, letterSpacing = (-0.3).sp),
-        titleMedium = defaults.titleMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 16.sp, letterSpacing = (-0.2).sp),
-        titleSmall = defaults.titleSmall.copy(fontFamily = sfProDisplay),
-        bodyLarge = defaults.bodyLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W400, fontSize = 16.sp),
-        bodyMedium = defaults.bodyMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W400, fontSize = 14.sp),
-        bodySmall = defaults.bodySmall.copy(fontFamily = sfProDisplay),
-        labelLarge = defaults.labelLarge.copy(fontFamily = sfProDisplay),
-        labelMedium = defaults.labelMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 12.sp),
-        labelSmall = defaults.labelSmall.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 11.sp),
-    )
-}
+internal fun desktopTypography(mode: DesktopFontMode = DesktopFontSettings.mode): Typography =
+    desktopSfProTypography(mode)
 
 private enum class DesktopDestination(val id: String, val label: String) {
     LISTEN_NOW("listen-now", "Home"),
@@ -3121,8 +3094,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     }
 
     /**
-     * The account's library, re-read whenever the session behind it changes — signing in, switching
-     * channel, signing out.
+     * Fetch the signed-in account's library as soon as its session is restored. The sidebar needs
+     * the Playlists shelf on Home and every other destination, not just after visiting Library.
+     * Account switches, playlist-picker refreshes and explicit retries still reload it.
      */
     LaunchedEffect(activeAccountId, activeProfileId, sessionRevision, destination == DesktopDestination.LIBRARY, overlays.playlistDialog) {
         youtubeSignedIn = DesktopYouTubeAuth.isSignedIn
@@ -3133,13 +3107,13 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
             return@LaunchedEffect
         }
         val accountChanged = loadedAccountId != activeAccountId || loadedProfileId != activeProfileId
-        if (accountChanged) {
-            libraryState = UiState.Loading
-        }
-        if (destination != DesktopDestination.LIBRARY && !overlays.playlistDialog) {
-            return@LaunchedEffect
-        }
-        if (!accountChanged && libraryState is UiState.Success && destination == DesktopDestination.LIBRARY) {
+        if (!DesktopLibraryLoadPolicy.shouldFetch(
+                accountChanged = accountChanged,
+                hasLoadedLibrary = libraryState is UiState.Success,
+                playlistDialogOpen = overlays.playlistDialog,
+                libraryVisible = destination == DesktopDestination.LIBRARY,
+            )
+        ) {
             return@LaunchedEffect
         }
         libraryState = UiState.Loading
@@ -3652,7 +3626,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
 
     MaterialTheme(
         colorScheme = desktopColorScheme(),
-        typography = desktopTypography(),
+        typography = desktopTypography(DesktopFontSettings.mode),
     ) {
         CompositionLocalProvider(
             LocalContentColor provides DesktopForeground,
@@ -5740,18 +5714,18 @@ private fun DesktopSidebar(
                     Icon(Icons.Rounded.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                 }
             }
-            DesktopSidebarItem(BitChordIcons.Home, DesktopStrings["home", "Home"], !settingsOpen && destination == DesktopDestination.LISTEN_NOW, collapsed = collapsed) {
+            DesktopSidebarItem(DesktopPrimaryNavigationIcons.Home, DesktopStrings["home", "Home"], !settingsOpen && destination == DesktopDestination.LISTEN_NOW, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LISTEN_NOW)
             }
-            DesktopSidebarItem(BitChordIcons.TabExplore, "New", !settingsOpen && destination == DesktopDestination.NEW, collapsed = collapsed) {
+            DesktopSidebarItem(DesktopPrimaryNavigationIcons.New, "New", !settingsOpen && destination == DesktopDestination.NEW, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.NEW)
             }
-            DesktopSidebarItem(BitChordIcons.Search, "Search",
+            DesktopSidebarItem(DesktopPrimaryNavigationIcons.Search, "Search",
                 !settingsOpen && (destination == DesktopDestination.SEARCH || destination == DesktopDestination.EXPLORE), collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.SEARCH)
             }
-            // Library and Spotify are independent destinations in the default sidebar.
-            DesktopSidebarItem(BitChordIcons.Library, "Library", !settingsOpen && destination == DesktopDestination.LIBRARY, collapsed = collapsed) {
+            // Match the mobile tab bar glyphs; Library and Spotify remain independent destinations.
+            DesktopSidebarItem(DesktopPrimaryNavigationIcons.Library, "Library", !settingsOpen && destination == DesktopDestination.LIBRARY, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LIBRARY)
             }
             Spacer(Modifier.height(6.dp))
@@ -5889,7 +5863,7 @@ private fun DesktopSidebarItem(
             Box(
                 Modifier.fillMaxWidth().height(42.dp)
                     .clip(RoundedCornerShape(7.dp))
-                    .background(if (selected) DesktopTheme.palette.navAccent.copy(alpha = 0.12f) else Color.Transparent)
+                    .background(if (selected) DesktopTheme.palette.navSelectedSurface else Color.Transparent)
                     .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
                     .clickable(onClick = onClick),
                 contentAlignment = Alignment.Center,
@@ -5911,7 +5885,7 @@ private fun DesktopSidebarItem(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(7.dp))
-            .background(if (selected) DesktopTheme.palette.navAccent.copy(alpha = 0.12f) else Color.Transparent)
+            .background(if (selected) DesktopTheme.palette.navSelectedSurface else Color.Transparent)
             .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
             .clickable(onClick = onClick)
             .padding(horizontal = 9.dp, vertical = 7.dp),
@@ -6014,12 +5988,12 @@ private fun DesktopFloatingNavigation(
     settingsOpen: Boolean,
     onDestinationSelected: (DesktopDestination) -> Unit,
 ) {
-    // Mirror the full sidebar when the desktop window becomes compact: Search replaces Explore.
+    // Use the same mobile tab glyphs as the expanded sidebar; Search replaces legacy Explore.
     val tabs = listOf(
-        DesktopDestination.LISTEN_NOW to (BitChordIcons.Home to "Home"),
-        DesktopDestination.NEW to (BitChordIcons.TabExplore to "New"),
-        DesktopDestination.SEARCH to (BitChordIcons.Search to "Search"),
-        DesktopDestination.LIBRARY to (BitChordIcons.Library to "Library"),
+        DesktopDestination.LISTEN_NOW to (DesktopPrimaryNavigationIcons.Home to "Home"),
+        DesktopDestination.NEW to (DesktopPrimaryNavigationIcons.New to "New"),
+        DesktopDestination.SEARCH to (DesktopPrimaryNavigationIcons.Search to "Search"),
+        DesktopDestination.LIBRARY to (DesktopPrimaryNavigationIcons.Library to "Library"),
     )
     val selected: DesktopDestination? = if (settingsOpen) {
         null
@@ -7874,6 +7848,40 @@ private fun DesktopSettingsScreen(
                             }
                         }
                     }
+                    val fontTitle = DesktopStrings["font", "Font"]
+                    val fontSubtitle = DesktopStrings[
+                        if (DesktopFontSettings.mode == DesktopFontMode.DEFAULT) "font_default_subtitle"
+                        else "font_legacy_subtitle",
+                        if (DesktopFontSettings.mode == DesktopFontMode.DEFAULT) {
+                            "SF Pro Display · Apple Music weights"
+                        } else {
+                            "SF Pro Display · Original heavy weights"
+                        },
+                    ]
+                    if (settingsRowVisible(fontTitle, "SF Pro Display typeface Default Legacy $fontSubtitle")) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(fontTitle, fontWeight = FontWeight.Medium)
+                                Text(fontSubtitle, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                DesktopFontMode.entries.forEach { option ->
+                                    FilterChip(
+                                        selected = DesktopFontSettings.mode == option,
+                                        onClick = { DesktopFontSettings.selectMode(option) },
+                                        colors = desktopChipColors(),
+                                        label = {
+                                            Text(DesktopStrings[if (option == DesktopFontMode.DEFAULT) "font_default" else "font_legacy", option.label])
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
                     val iconTitle = DesktopStrings["d_app_icon", "App icon"]
                     val iconSubtitle = DesktopStrings[
                         "d_app_icon_subtitle",
@@ -8267,38 +8275,43 @@ private fun DesktopSettingsScreen(
     }
 }
 
-/** The line at the foot of the settings sheet, as Android has it. */
+/** The centered About footer, matching the Android-style version wordmark. */
 @Composable
 private fun DesktopSettingsFooter(onLicenses: () -> Unit) {
-    val version = remember { System.getProperty("bitchord.version") ?: "1.8-beta1" }
+    val version = remember { System.getProperty("bitchord.version") ?: "1.9.1" }
     val linkStyles = TextLinkStyles(
         style = SpanStyle(color = DesktopAccent, textDecoration = TextDecoration.Underline),
     )
-    Text(
-        text = buildAnnotatedString {
-            append("bitchord $version  ")
-            withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
-                append("GitHub")
-            }
-            append("  ")
-            withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
-                append("Developer")
-            }
-            append("  ")
-            withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
-                append("Discord")
-            }
-            append("  ")
-            withLink(LinkAnnotation.Clickable("licenses", linkStyles) { onLicenses() }) {
-                append("Licenses")
-            }
-            append("\n~YouTube Music Backend")
-        },
-        style = MaterialTheme.typography.labelSmall,
-        color = DesktopSecondary,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp),
-    )
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        DesktopAboutVersionTitle(version = version, color = DesktopForeground)
+        Text(
+            text = buildAnnotatedString {
+                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
+                    append("GitHub")
+                }
+                append("  ")
+                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
+                    append("Developer")
+                }
+                append("  ")
+                withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
+                    append("Discord")
+                }
+                append("  ")
+                withLink(LinkAnnotation.Clickable("licenses", linkStyles) { onLicenses() }) {
+                    append("Licenses")
+                }
+                append("\n~YouTube Music Backend")
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = DesktopSecondary,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 /** Everything this build is assembled from, and the terms each part came under. A page of Settings. */

@@ -1,25 +1,21 @@
 package com.music.bitchord.ui.theme
 
-import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import com.music.bitchord.R
+import com.music.bitchord.data.settings.AppFont
 
-// Apple Music's signature red. No longer the primary accent, but kept for the
-// spots (Replay's rank badge) that want that specific red regardless of theme.
+// Apple Music's signature red, retained for artwork-independent Replay accents.
 val AccentRed = Color(0xFFFA2D48)
 
 private val DarkColors = darkColorScheme(
@@ -47,11 +43,20 @@ private val LightColors = lightColorScheme(
 )
 
 /**
- * SF Pro Display, the face Apple Music itself is set in. Only the weights the
- * type scale actually asks for are bundled; Compose synthesises nothing, so a
- * missing weight would silently fall back to the nearest one shipped.
+ * Upstream's logical-to-physical mapping. Shift in the family, not at individual Text calls:
+ * Heavy draws Bold, Bold draws Semibold, Semibold draws Medium, Medium draws Regular.
+ * Regular remains Regular. Explicit inline weights therefore follow the selected profile too.
  */
 val SFProDisplay = FontFamily(
+    Font(R.font.sf_pro_display_regular, FontWeight.W400),
+    Font(R.font.sf_pro_display_regular, FontWeight.W500),
+    Font(R.font.sf_pro_display_medium, FontWeight.W600),
+    Font(R.font.sf_pro_display_semibold, FontWeight.W700),
+    Font(R.font.sf_pro_display_bold, FontWeight.W800),
+)
+
+/** The original one-cut-per-weight family, including the Heavy file. */
+val SFProDisplayLegacy = FontFamily(
     Font(R.font.sf_pro_display_regular, FontWeight.W400),
     Font(R.font.sf_pro_display_medium, FontWeight.W500),
     Font(R.font.sf_pro_display_semibold, FontWeight.W600),
@@ -59,60 +64,27 @@ val SFProDisplay = FontFamily(
     Font(R.font.sf_pro_display_heavy, FontWeight.W800),
 )
 
-// Heavy, tight typography — the backbone of the Apple Music look.
-private val BitChordTypography = Typography(
-    displayLarge = TextStyle(fontWeight = FontWeight.W800, fontSize = 34.sp, letterSpacing = (-0.8).sp),
-    headlineLarge = TextStyle(fontWeight = FontWeight.W800, fontSize = 30.sp, letterSpacing = (-0.7).sp),
-    headlineMedium = TextStyle(fontWeight = FontWeight.W700, fontSize = 22.sp, letterSpacing = (-0.4).sp),
-    titleLarge = TextStyle(fontWeight = FontWeight.W700, fontSize = 20.sp, letterSpacing = (-0.3).sp),
-    titleMedium = TextStyle(fontWeight = FontWeight.W600, fontSize = 16.sp, letterSpacing = (-0.2).sp),
-    bodyLarge = TextStyle(fontWeight = FontWeight.W400, fontSize = 16.sp),
-    bodyMedium = TextStyle(fontWeight = FontWeight.W400, fontSize = 14.sp),
-    labelMedium = TextStyle(fontWeight = FontWeight.W600, fontSize = 12.sp),
-    labelSmall = TextStyle(fontWeight = FontWeight.W600, fontSize = 11.sp),
-).withFamily(SFProDisplay)
-
-/** Applies [family] to every style in the scale, so nothing is left on Roboto. */
-private fun Typography.withFamily(family: FontFamily) = Typography(
-    displayLarge = displayLarge.copy(fontFamily = family),
-    displayMedium = displayMedium.copy(fontFamily = family),
-    displaySmall = displaySmall.copy(fontFamily = family),
-    headlineLarge = headlineLarge.copy(fontFamily = family),
-    headlineMedium = headlineMedium.copy(fontFamily = family),
-    headlineSmall = headlineSmall.copy(fontFamily = family),
-    titleLarge = titleLarge.copy(fontFamily = family),
-    titleMedium = titleMedium.copy(fontFamily = family),
-    titleSmall = titleSmall.copy(fontFamily = family),
-    bodyLarge = bodyLarge.copy(fontFamily = family),
-    bodyMedium = bodyMedium.copy(fontFamily = family),
-    bodySmall = bodySmall.copy(fontFamily = family),
-    labelLarge = labelLarge.copy(fontFamily = family),
-    labelMedium = labelMedium.copy(fontFamily = family),
-    labelSmall = labelSmall.copy(fontFamily = family),
-)
+// Both hosts now consume the same upstream role metrics instead of maintaining two scales.
+private val BitChordTypography = bitChordTypography(SFProDisplay, legacy = false)
+private val LegacyTypography = bitChordTypography(SFProDisplayLegacy, legacy = true)
 
 @Composable
 fun BitChordTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    font: AppFont = AppFont.DEFAULT,
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
-        typography = BitChordTypography,
+        typography = when (font) {
+            AppFont.DEFAULT -> BitChordTypography
+            AppFont.LEGACY -> LegacyTypography
+        },
         content = content,
     )
 }
 
-/**
- * Draws the status and navigation bar glyphs dark or light.
- *
- * `enableEdgeToEdge()` decides this from the *system* dark-mode setting, which
- * is the wrong input the moment the in-app theme disagrees with it: Light theme
- * on a phone in dark mode left white icons on a white bar, invisible. The bars
- * have to follow the content the app is actually painting. The player supplies
- * its own stable light-icon value and paints contrast behind it; every other
- * surface follows the theme. Hence a parameter rather than reading it here.
- */
+/** System bar glyphs follow the effective in-app theme, not merely the OS preference. */
 @Composable
 fun SystemBarIcons(dark: Boolean) {
     val view = LocalView.current
@@ -125,4 +97,3 @@ fun SystemBarIcons(dark: Boolean) {
         }
     }
 }
-

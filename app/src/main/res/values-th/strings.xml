@@ -1271,4 +1271,10 @@
     <string name="spotify_library_subtitle">เพลย์ลิสต์ Spotify ของคุณ</string>
     <string name="spotify_sign_in">ลงชื่อเข้าใช้ด้วย Spotify</string>
     <string name="spotify_track_unavailable">หาเพลงนั้นบน YouTube Music ไม่พบ</string>
+    <string name="font">ฟอนต์</string>
+    <string name="font_default">ค่าเริ่มต้น</string>
+    <string name="font_legacy">แบบเดิม</string>
+    <string name="font_default_subtitle">SF Pro Display · น้ำหนักแบบ Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · น้ำหนักหนาแบบดั้งเดิม</string>
+    <string name="font_footer">แบบเดิมจะนำตัวอักษรที่หนาและชิดกว่าซึ่งแอปเคยใช้ก่อนปรับให้เข้ากับ Apple Music กลับมา</string>
 </resources>

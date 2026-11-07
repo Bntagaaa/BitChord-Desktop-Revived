@@ -35,6 +35,18 @@ class DesktopThemeTest {
     }
 
     @Test
+    fun `selected sidebar background is gray while icons and indicators stay rose`() {
+        assertEquals(Color(0xFFFA586A), DARK_PALETTE.navAccent)
+        assertEquals(Color(0xFFCD3659), LIGHT_PALETTE.navAccent)
+        assertEquals(Color(0xFF2D2D2D), DARK_PALETTE.navSelectedSurface)
+        assertEquals(Color(0xFFDDDDDD), LIGHT_PALETTE.navSelectedSurface)
+        assertEquals(Color(0xFF0D0D0F), DARK_PALETTE.sidebarSurface)
+        assertEquals(Color(0xFFE9ECF2), LIGHT_PALETTE.sidebarSurface)
+        assertNotEquals(DARK_PALETTE.navAccent, DARK_PALETTE.navSelectedSurface)
+        assertNotEquals(LIGHT_PALETTE.navAccent, LIGHT_PALETTE.navSelectedSurface)
+    }
+
+    @Test
     fun `light palette has distinct surfaces and accessible body text`() {
         assertNotEquals(DARK_PALETTE.background, LIGHT_PALETTE.background)
         assertNotEquals(LIGHT_PALETTE.background, LIGHT_PALETTE.surface)

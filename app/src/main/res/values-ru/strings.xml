@@ -1320,4 +1320,10 @@
     <string name="spotify_library_subtitle">Ваши плейлисты Spotify</string>
     <string name="spotify_sign_in">Войти через Spotify</string>
     <string name="spotify_track_unavailable">Не удалось найти этот трек на YouTube Music</string>
+    <string name="font">Шрифт</string>
+    <string name="font_default">По умолчанию</string>
+    <string name="font_legacy">Прежний</string>
+    <string name="font_default_subtitle">SF Pro Display · Начертания Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Исходные жирные начертания</string>
+    <string name="font_footer">«Прежний» возвращает более жирный и плотный шрифт, который приложение использовало до того, как его привели в соответствие с Apple Music.</string>
 </resources>
