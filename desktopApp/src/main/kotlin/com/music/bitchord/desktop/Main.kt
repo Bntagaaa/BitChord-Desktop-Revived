@@ -2,6 +2,7 @@ package com.music.bitchord.desktop
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import com.music.bitchord.ui.LocalLyricAnimationAllowed
 import com.music.bitchord.ui.player.PlayerPlatform
 import com.music.bitchord.data.DebugLog
 import com.music.bitchord.data.TrackLog
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -314,7 +316,20 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         val uiDensity = remember(systemDensity, uiScalePercent) {
             Density(systemDensity.density * (uiScalePercent / 100f), systemDensity.fontScale)
         }
-        CompositionLocalProvider(LocalDensity provides uiDensity) {
+        // Only lyrics can opt out of the focus-based frame limiter; when the main window is
+        // minimized or hidden, keep the frame loop suspended regardless of the preference.
+        val animateLyricsWhileUnfocused by DesktopAppearanceSettings.animateLyricsWhileUnfocused.collectAsState()
+        val lyricsWindowFocused = LocalWindowInfo.current.isWindowFocused
+        val lyricsAnimationAllowed = shouldAnimateDesktopLyrics(
+            windowVisible = visible,
+            windowMinimized = state.isMinimized,
+            windowFocused = lyricsWindowFocused,
+            animateWhenUnfocused = animateLyricsWhileUnfocused,
+        )
+        CompositionLocalProvider(
+            LocalDensity provides uiDensity,
+            LocalLyricAnimationAllowed provides lyricsAnimationAllowed,
+        ) {
             DesktopFlyoutHost {
                 BitChordDesktopApp(welcomeLaunch, pipHost)
             }

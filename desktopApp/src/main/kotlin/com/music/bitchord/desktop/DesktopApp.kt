@@ -7776,6 +7776,13 @@ private fun DesktopSettingsScreen(
                     // Nothing to choose between while the feature is off, and the sources are
                     // third-party services reached on the listener's connection.
                     if (syncedLyrics) {
+                        val animateLyricsWhileUnfocused by DesktopAppearanceSettings.animateLyricsWhileUnfocused.collectAsState()
+                        SettingsToggle(
+                            "Continue lyrics animation when unfocused",
+                            "Keep synced lyrics moving on a visible second monitor. May use more CPU/GPU; stops when minimized or hidden.",
+                            animateLyricsWhileUnfocused,
+                            DesktopAppearanceSettings::setAnimateLyricsWhileUnfocused,
+                        )
                         SettingsToggle(
                             DesktopStrings["d_blur_unfocused_lyrics", "Blur unfocused lyrics"],
                             DesktopStrings["d_keeps_the_spotlight_on_the_current_line", "Keeps the spotlight on the current line"],
