@@ -264,7 +264,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -293,7 +292,6 @@ import bitchord.desktopapp.generated.resources.player_transport_repeat
 import bitchord.desktopapp.generated.resources.player_transport_repeat_one
 import bitchord.desktopapp.generated.resources.player_transport_shuffle
 import bitchord.desktopapp.generated.resources.player_transport_up_next
-import bitchord.desktopapp.generated.resources.bintang_music_black_about
 import bitchord.desktopapp.generated.resources.sf_pro_display_bold
 import bitchord.desktopapp.generated.resources.sf_pro_display_heavy
 import bitchord.desktopapp.generated.resources.sf_pro_display_medium
@@ -369,7 +367,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
-import org.jetbrains.compose.resources.Font as composeFont
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -8290,23 +8287,7 @@ private fun DesktopSettingsFooter(onLicenses: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(
-            text = "BitChord $version",
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontFamily = if (version == "1.9.1") {
-                    FontFamily(composeFont(Res.font.bintang_music_black_about, FontWeight.Black))
-                } else {
-                    MaterialTheme.typography.headlineLarge.fontFamily
-                },
-                fontSize = 34.sp,
-                letterSpacing = 0.sp,
-            ),
-            fontWeight = FontWeight.Black,
-            color = DesktopForeground,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        DesktopAboutVersionTitle(version = version, color = DesktopForeground)
         Text(
             text = buildAnnotatedString {
                 withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
