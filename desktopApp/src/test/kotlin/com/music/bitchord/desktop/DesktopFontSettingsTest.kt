@@ -1,8 +1,10 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+import com.music.bitchord.ui.theme.bitChordTypography
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -27,16 +29,18 @@ class DesktopFontSettingsTest {
     }
 
     @Test
-    fun `modern tracking is more open and legacy reproduces old heading spacing`() {
-        val modern = DesktopFontMode.DEFAULT.tracking()
-        val legacy = DesktopFontMode.LEGACY.tracking()
-        assertEquals((-0.5).sp, modern.displayLarge)
-        assertEquals((-0.8).sp, legacy.displayLarge)
-        assertEquals(0.05.sp, modern.titleMedium)
-        assertEquals((-0.2).sp, legacy.titleMedium)
-        assertEquals(0.2.sp, modern.bodyLarge)
-        assertEquals(TextUnit.Unspecified, legacy.bodyLarge)
-        assertEquals(0.3.sp, modern.labelSmall)
-        assertEquals(TextUnit.Unspecified, legacy.labelSmall)
+    fun `tracking and metrics come from the actual shared production scale`() {
+        val modern = bitChordTypography(FontFamily.SansSerif, legacy = false)
+        val legacy = bitChordTypography(FontFamily.SansSerif, legacy = true)
+        assertEquals((-0.5).sp, modern.displayLarge.letterSpacing)
+        assertEquals((-0.8).sp, legacy.displayLarge.letterSpacing)
+        assertEquals(0.05.sp, modern.titleMedium.letterSpacing)
+        assertEquals((-0.2).sp, legacy.titleMedium.letterSpacing)
+        assertEquals(0.2.sp, modern.bodyLarge.letterSpacing)
+        assertEquals(TextUnit.Unspecified, legacy.bodyLarge.letterSpacing)
+        assertEquals(0.3.sp, modern.labelSmall.letterSpacing)
+        assertEquals(TextUnit.Unspecified, legacy.labelSmall.letterSpacing)
+        assertEquals(TextUnit.Unspecified, modern.displayLarge.lineHeight)
+        assertEquals(TextUnit.Unspecified, legacy.displayLarge.lineHeight)
     }
 }

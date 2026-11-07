@@ -485,44 +485,8 @@ internal fun desktopColorScheme() =
     )
 
 @Composable
-internal fun desktopTypography(mode: DesktopFontMode = DesktopFontSettings.mode): Typography {
-    // Match mobile's two SF Pro Display profiles with the existing bundled OTF cuts:
-    // Default draws each requested weight one cut lighter; Legacy preserves the old mapping.
-    fun resourceFor(cut: FontWeight) = when (cut) {
-        FontWeight.W400 -> Res.font.sf_pro_display_regular
-        FontWeight.W500 -> Res.font.sf_pro_display_medium
-        FontWeight.W600 -> Res.font.sf_pro_display_semibold
-        FontWeight.W700 -> Res.font.sf_pro_display_bold
-        FontWeight.W800 -> Res.font.sf_pro_display_heavy
-        else -> error("Unsupported SF Pro Display cut: $cut")
-    }
-    val sfProDisplay = FontFamily(
-        composeFont(resourceFor(mode.physicalCut(FontWeight.W400)), FontWeight.W400),
-        composeFont(resourceFor(mode.physicalCut(FontWeight.W500)), FontWeight.W500),
-        composeFont(resourceFor(mode.physicalCut(FontWeight.W600)), FontWeight.W600),
-        composeFont(resourceFor(mode.physicalCut(FontWeight.W700)), FontWeight.W700),
-        composeFont(resourceFor(mode.physicalCut(FontWeight.W800)), FontWeight.W800),
-    )
-    val tracking = mode.tracking()
-    val defaults = Typography()
-    return defaults.copy(
-        displayLarge = defaults.displayLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W800, fontSize = 34.sp, letterSpacing = tracking.displayLarge),
-        displayMedium = defaults.displayMedium.copy(fontFamily = sfProDisplay),
-        displaySmall = defaults.displaySmall.copy(fontFamily = sfProDisplay),
-        headlineLarge = defaults.headlineLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W800, fontSize = 30.sp, letterSpacing = tracking.headlineLarge),
-        headlineMedium = defaults.headlineMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W700, fontSize = 22.sp, letterSpacing = tracking.headlineMedium),
-        headlineSmall = defaults.headlineSmall.copy(fontFamily = sfProDisplay),
-        titleLarge = defaults.titleLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W700, fontSize = 20.sp, letterSpacing = tracking.titleLarge),
-        titleMedium = defaults.titleMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 16.sp, letterSpacing = tracking.titleMedium),
-        titleSmall = defaults.titleSmall.copy(fontFamily = sfProDisplay),
-        bodyLarge = defaults.bodyLarge.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W400, fontSize = 16.sp, letterSpacing = tracking.bodyLarge),
-        bodyMedium = defaults.bodyMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W400, fontSize = 14.sp, letterSpacing = tracking.bodyMedium),
-        bodySmall = defaults.bodySmall.copy(fontFamily = sfProDisplay),
-        labelLarge = defaults.labelLarge.copy(fontFamily = sfProDisplay),
-        labelMedium = defaults.labelMedium.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 12.sp, letterSpacing = tracking.labelMedium),
-        labelSmall = defaults.labelSmall.copy(fontFamily = sfProDisplay, fontWeight = FontWeight.W600, fontSize = 11.sp, letterSpacing = tracking.labelSmall),
-    )
-}
+internal fun desktopTypography(mode: DesktopFontMode = DesktopFontSettings.mode): Typography =
+    desktopSfProTypography(mode)
 
 private enum class DesktopDestination(val id: String, val label: String) {
     LISTEN_NOW("listen-now", "Home"),
