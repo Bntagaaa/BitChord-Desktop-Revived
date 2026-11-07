@@ -529,11 +529,12 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
  */
 @Composable
 internal fun LandscapeLyricsPane(
-    compact: Boolean,
+    compact: Boolean = false,
     /** Match the main player's optional "Playing from" status. */
-    caption: String?,
-    onOpenCaption: () -> Unit,
-    credits: @Composable () -> Unit,
+    caption: String? = null,
+    onOpenCaption: () -> Unit = {},
+    /** Null for standalone sidebar lyrics, where the page already owns its header. */
+    credits: (@Composable () -> Unit)? = null,
     hasLyrics: Boolean,
     /** Shown in place of the sheet while there are no lines to draw. */
     placeholder: String,
@@ -549,14 +550,17 @@ internal fun LandscapeLyricsPane(
     panel: @Composable (Modifier) -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        // The track header stays visible while the lyrics list scrolls.
-        LandscapeTrackHeader(
-            compact = compact,
-            caption = caption,
-            onOpenCaption = onOpenCaption,
-            credits = credits,
-        )
-        Spacer(Modifier.height(if (compact) 4.dp else 12.dp))
+        // The Now Playing landscape view owns this header; the standalone sidebar has
+        // no playback header and must keep its original full-height lyrics layout.
+        if (credits != null) {
+            LandscapeTrackHeader(
+                compact = compact,
+                caption = caption,
+                onOpenCaption = onOpenCaption,
+                credits = credits,
+            )
+            Spacer(Modifier.height(if (compact) 4.dp else 12.dp))
+        }
         Box(
             modifier = Modifier
                 .weight(1f)
