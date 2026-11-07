@@ -152,8 +152,13 @@ class DesktopAutomixTest {
     fun `persistence and observer failures cannot stop later track analysis`() = runBlocking {
         DesktopAnalysisRuntime.ensureStarted()
         assertTrue(DesktopAnalysisRuntime.available, "this regression requires the packaged native analyser")
-        val analyzer = DesktopTrackAnalyzer(
-            persistResult = { _, _ -> throw java.io.IOException("simulated full cache disk") },
+        val publishedBeforePersistence = java.util.concurrent.atomic.AtomicBoolean(false)
+        lateinit var analyzer: DesktopTrackAnalyzer
+        analyzer = DesktopTrackAnalyzer(
+            persistResult = { trackId, _ ->
+                if (analyzer.isAnalysed(trackId)) publishedBeforePersistence.set(true)
+                throw java.io.IOException("simulated full cache disk")
+            },
             onAnalysed = { throw IllegalStateException("simulated observer failure") },
             // Exercise the real decoder and DSP without expensive optional inference here.
             loopRegion = { _, _, _, _, _ -> null },
@@ -162,6 +167,7 @@ class DesktopAutomixTest {
             repeat(3) { index ->
                 val id = "analysis-recovery-$index-${System.nanoTime()}"
                 assertTrue(analyse(analyzer, id, 120.0, 55.0).isUsable)
+                assertTrue(!publishedBeforePersistence.get(), "analysis was published before persistence completed")
                 repeat(100) {
                     if (analyzer.stateFor(id) == com.music.bitchord.data.settings.TrackAnalysisState.REFINING)
                         kotlinx.coroutines.delay(10)
