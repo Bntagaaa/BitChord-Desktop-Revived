@@ -72,9 +72,10 @@ internal object DesktopSidebarMica {
     /** An opaque color with restrained wallpaper influence and legible foreground contrast. */
     fun surface(wallpaper: Color?, dark: Boolean, fallback: Color): Color {
         if (wallpaper == null) return fallback
-        val neutral = if (dark) Color(0xFF171719) else Color(0xFFE9ECF2)
-        // Never copy the wallpaper itself: a strong tint would reduce text contrast.
-        return lerp(neutral, wallpaper, if (dark) 0.065f else 0.060f).copy(alpha = 1f)
+        // Tint the themed sidebar surface, not a fixed dark gray: the navigation rail must
+        // remain lighter than the page even when wallpaper-tinted Mica is enabled on Windows.
+        // Keep the dark tint subtle so secondary nav icons remain readable on bright wallpapers.
+        return lerp(fallback, wallpaper, if (dark) 0.030f else 0.060f).copy(alpha = 1f)
     }
 
     private fun transparencyAllowed(): Boolean {
