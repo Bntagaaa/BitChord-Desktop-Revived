@@ -237,21 +237,20 @@ internal class DesktopTrackAnalyzer(
             failedAt[trackId] = System.currentTimeMillis()
             return
         }
+        // isAnalysed() signals completion. Publish only after persistence so callers that
+        // release this analyzer and immediately reload the track cannot outrun the cache write.
+        // Keep the result in memory if the disk write fails: AutoMix can still use it.
+        runCatching {
+            if (persistResult != null) persistResult.invoke(trackId, analysis)
+            else store.save(trackId, analysis)
+        }.onFailure { DesktopTrackLog.log("automix: could not persist '$trackId': ${it.message}") }
+        if (cancelled()) return
+        results[trackId] = analysis
         failedAt.remove(trackId)
         if (!analysis.isUsable) {
             failed += trackId
             failedAt[trackId] = System.currentTimeMillis()
         }
-        // Do not advertise a completed analysis until its cache write has
-        // finished. A caller may restart immediately after isAnalysed() turns
-        // true; publishing first allowed that restart to interrupt persistence
-        // and discard a valid result (intermittent Windows CI failure).
-        // Failure to persist still leaves a usable in-memory analysis.
-        runCatching {
-            if (persistResult != null) persistResult.invoke(trackId, analysis)
-            else store.save(trackId, analysis)
-        }.onFailure { DesktopTrackLog.log("automix: could not persist '$trackId': ${it.message}") }
-        results[trackId] = analysis
         DesktopTrackLog.log(
             "analysed '${song.title}': ${"%.1f".format(analysis.bpm)} bpm" +
                 ", ${analysis.downbeats.size} downbeats" +

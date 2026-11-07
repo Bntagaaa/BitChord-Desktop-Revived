@@ -282,6 +282,7 @@ import androidx.compose.ui.unit.sp
 import bitchord.desktopapp.generated.resources.Res
 import bitchord.desktopapp.generated.resources.logo
 import bitchord.desktopapp.generated.resources.bitchord_logo_original
+import bitchord.desktopapp.generated.resources.bitchord_no_music
 import bitchord.desktopapp.generated.resources.bitchord_wordmark
 import bitchord.desktopapp.generated.resources.player_transport_lyrics
 import bitchord.desktopapp.generated.resources.player_transport_next
@@ -6156,9 +6157,12 @@ private fun DesktopMiniPlayer(
         tonalElevation = 0.dp,
     ) {
         Box(Modifier.fillMaxWidth()) {
+            // Both playing and empty states share the original dock height:
+            // 42.dp artwork + 8.dp vertical padding on each side = 58.dp.
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .height(58.dp)
                     .clickable(enabled = song != null, onClick = onExpand)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -6195,15 +6199,17 @@ private fun DesktopMiniPlayer(
                         modifier = Modifier.size(18.dp),
                     )
                 }
-                Spacer(Modifier.width(8.dp))
                 if (song == null) {
-                    Icon(painterResource(Res.drawable.bitchord_logo_original), "BitChord", tint = DesktopSecondary, modifier = Modifier.size(42.dp))
+                    // Empty state has no artwork or title: keep the side controls in place
+                    // and let the brand mark float at the actual center of the dock.
+                    Spacer(Modifier.weight(1f))
                 } else {
+                    Spacer(Modifier.width(8.dp))
                     DesktopArtwork(song.thumbnailUrl, Modifier.trackArtSize(42.dp, song.isVideo).clip(RoundedCornerShape(7.dp)), px = ROW_ART_PX)
-                }
-                Column(Modifier.weight(1f).padding(start = 8.dp, end = 8.dp)) {
-                    Text(song?.title ?: "BitChord", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(song?.artist ?: "", color = DesktopSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Column(Modifier.weight(1f).padding(start = 8.dp, end = 8.dp)) {
+                        Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                        Text(song.artist, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(1.dp)) {
                     DesktopToolbarButton(onClick = onOpenLyrics, size = 32.dp) {
@@ -6227,6 +6233,16 @@ private fun DesktopMiniPlayer(
                         modifier = Modifier.width(72.dp),
                     )
                 }
+            }
+            if (song == null) {
+                // Render over the dock rather than in its Row, so unequal button groups
+                // cannot push the supplied gray SVG logo away from the true center.
+                Image(
+                    painter = painterResource(Res.drawable.bitchord_no_music),
+                    contentDescription = "BitChord",
+                    // Keep the 48.dp logo inside the fixed 58.dp dock rather than resizing the player.
+                    modifier = Modifier.align(Alignment.Center).size(48.dp),
+                )
             }
             Box(
                 Modifier
@@ -7920,6 +7936,15 @@ private fun DesktopSettingsScreen(
                                 }
                             }
                         }
+                    }
+                    // Show only after the user explicitly chooses Dark, not System or Light.
+                    if (DesktopTheme.supportsPitchBlack(DesktopTheme.mode)) {
+                        SettingsToggle(
+                            "Pitch black background",
+                            "Make both the content area and sidebar true black.",
+                            DesktopTheme.pitchBlack,
+                            DesktopTheme::updatePitchBlack,
+                        )
                     }
                     val fontTitle = DesktopStrings["font", "Font"]
                     val fontSubtitle = DesktopStrings[

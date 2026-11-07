@@ -17,6 +17,29 @@ class DesktopSidebarMicaTest {
             LIGHT_PALETTE.sidebarSurface,
             DesktopSidebarMica.surface(null, false, LIGHT_PALETTE.sidebarSurface),
         )
+        assertEquals(
+            PITCH_BLACK_PALETTE.sidebarSurface,
+            DesktopSidebarMica.surface(null, true, PITCH_BLACK_PALETTE.sidebarSurface),
+        )
+    }
+
+    @Test
+    fun `mica preserves solid pitch black even with light or colorful wallpaper`() {
+        for (wallpaper in listOf(Color.White, Color.Red, Color.Blue)) {
+            assertEquals(
+                Color.Black,
+                DesktopSidebarMica.surface(wallpaper, true, PITCH_BLACK_PALETTE.sidebarSurface),
+            )
+        }
+    }
+
+    @Test
+    fun `mica uses normal theme sidebar color instead of fixed charcoal`() {
+        val wallpaper = Color.White
+        val darkBase = DesktopSidebarMica.surface(wallpaper, true, DARK_PALETTE.sidebarSurface)
+        val charcoalBase = DesktopSidebarMica.surface(wallpaper, true, Color(0xFF202020))
+        assertTrue(charcoalBase.red > darkBase.red)
+        assertTrue(charcoalBase.red < 0.16f)
     }
 
     @Test
