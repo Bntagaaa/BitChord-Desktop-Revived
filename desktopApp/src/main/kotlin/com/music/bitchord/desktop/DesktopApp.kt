@@ -283,6 +283,7 @@ import androidx.compose.ui.unit.sp
 import bitchord.desktopapp.generated.resources.Res
 import bitchord.desktopapp.generated.resources.logo
 import bitchord.desktopapp.generated.resources.bitchord_logo_original
+import bitchord.desktopapp.generated.resources.bitchord_no_music
 import bitchord.desktopapp.generated.resources.bitchord_wordmark
 import bitchord.desktopapp.generated.resources.player_transport_lyrics
 import bitchord.desktopapp.generated.resources.player_transport_next
