@@ -3534,7 +3534,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     playlists = playlists + DesktopPlaylist(title = title, songs = matched)
                     persistence.savePlaylists(playlists)
                 }
-                "Imported ${matched.size} of ${tracks.size} songs into " +
+                return "Imported ${matched.size} of ${tracks.size} songs into " +
                     (if (toAccount) "YouTube Music" else "a local playlist") +
                     (if (missing.isNotEmpty()) ". ${missing.size} songs could not be matched." else ".")
 
