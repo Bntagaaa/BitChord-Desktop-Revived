@@ -8267,38 +8267,51 @@ private fun DesktopSettingsScreen(
     }
 }
 
-/** The line at the foot of the settings sheet, as Android has it. */
+/** The centered About footer, matching the Android-style version wordmark. */
 @Composable
 private fun DesktopSettingsFooter(onLicenses: () -> Unit) {
-    val version = remember { System.getProperty("bitchord.version") ?: "1.8-beta1" }
+    val version = remember { System.getProperty("bitchord.version") ?: "1.9.1" }
     val linkStyles = TextLinkStyles(
         style = SpanStyle(color = DesktopAccent, textDecoration = TextDecoration.Underline),
     )
-    Text(
-        text = buildAnnotatedString {
-            append("bitchord $version  ")
-            withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
-                append("GitHub")
-            }
-            append("  ")
-            withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
-                append("Developer")
-            }
-            append("  ")
-            withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
-                append("Discord")
-            }
-            append("  ")
-            withLink(LinkAnnotation.Clickable("licenses", linkStyles) { onLicenses() }) {
-                append("Licenses")
-            }
-            append("\n~YouTube Music Backend")
-        },
-        style = MaterialTheme.typography.labelSmall,
-        color = DesktopSecondary,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp),
-    )
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = "BitChord $version",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Black,
+            color = DesktopForeground,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = buildAnnotatedString {
+                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
+                    append("GitHub")
+                }
+                append("  ")
+                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
+                    append("Developer")
+                }
+                append("  ")
+                withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
+                    append("Discord")
+                }
+                append("  ")
+                withLink(LinkAnnotation.Clickable("licenses", linkStyles) { onLicenses() }) {
+                    append("Licenses")
+                }
+                append("\n~YouTube Music Backend")
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = DesktopSecondary,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 /** Everything this build is assembled from, and the terms each part came under. A page of Settings. */
