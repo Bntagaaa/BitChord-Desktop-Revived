@@ -64,7 +64,7 @@ class DesktopAboutVersionTitleTest {
                         Text("BitChord ${version.value}", color = Color.White,
                             style = MaterialTheme.typography.headlineLarge.copy(
                                 fontFamily = reference, fontSynthesis = FontSynthesis.None,
-                                fontSize = 34.sp, letterSpacing = 0.sp,
+                                fontSize = 32.sp, letterSpacing = 0.sp,
                             ), fontWeight = FontWeight.Black, textAlign = TextAlign.Center, maxLines = 1,
                             modifier = Modifier.fillMaxWidth().height(64.dp).testTag("uploaded-font-reference"))
                     }

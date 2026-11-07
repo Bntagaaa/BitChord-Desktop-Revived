@@ -23,7 +23,7 @@ internal fun DesktopAboutVersionTitle(version: String, color: Color, modifier: M
         style = MaterialTheme.typography.headlineLarge.copy(
             fontFamily = FontFamily(Font(Res.font.bintang_music_black_about, FontWeight.Black)),
             fontSynthesis = FontSynthesis.None,
-            fontSize = 34.sp,
+            fontSize = 32.sp,
             letterSpacing = 0.sp,
         ),
         fontWeight = FontWeight.Black,
