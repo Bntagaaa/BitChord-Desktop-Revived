@@ -29,7 +29,8 @@ internal class DesktopUpdateService(
     val state = MutableStateFlow(DesktopUpdateState())
     val dialog = MutableStateFlow(false)
     val autoCheck = MutableStateFlow(persistence.boolean("updates_auto", true))
-    val channel = MutableStateFlow(runCatching { DesktopUpdateChecker.Channel.valueOf(persistence.string("updates_channel", "STABLE")) }.getOrDefault(DesktopUpdateChecker.Channel.STABLE))
+    // Stable is the only user-facing channel. Ignore any persisted Preview choice from older builds.
+    val channel = MutableStateFlow(DesktopUpdateChecker.Channel.STABLE)
     val lastCheck = MutableStateFlow(persistence.string("updates_last_success").toLongOrNull() ?: 0)
     private var job: Job? = null
     private var generation = 0L
