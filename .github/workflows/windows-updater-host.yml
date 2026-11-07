@@ -1,0 +1,42 @@
+name: Windows Standalone Updater
+
+on:
+  pull_request:
+    branches: ['1.9.1']
+    paths:
+      - 'desktopApp/src/main/resources/updater/**'
+      - 'desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowsUpdate.kt'
+      - 'desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdate*.kt'
+      - 'desktopApp/src/main/kotlin/com/music/bitchord/desktop/Main.kt'
+      - 'desktopApp/packaging/tests/windows-updater-host-checks.ps1'
+      - 'desktopApp/packaging/tests/windows-updater-window-checks.ps1'
+      - '.github/workflows/windows-updater-host.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-updater-host-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  handoff-and-relaunch:
+    name: Separate updater - Portable and setup relaunch
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test real Windows host and workers with fixture executables
+        shell: pwsh
+        run: ./desktopApp/packaging/tests/windows-updater-host-checks.ps1
+      - name: Test visible native updater window and safe failure
+        shell: pwsh
+        run: ./desktopApp/packaging/tests/windows-updater-window-checks.ps1
+      - name: Preserve host and worker diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-updater-host-results
+          path: ${{ runner.temp }}/bitchord-windows-host-results/
+          if-no-files-found: warn

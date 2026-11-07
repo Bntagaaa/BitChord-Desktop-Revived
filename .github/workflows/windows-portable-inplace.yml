@@ -1,0 +1,25 @@
+name: Windows Portable In-Place Update
+
+on:
+  pull_request:
+    branches: ["1.9.1"]
+    paths:
+      - "desktopApp/src/main/resources/updater/windows-portable-update.ps1"
+      - "desktopApp/packaging/tests/windows-portable-inplace-checks.ps1"
+      - "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdate*.kt"
+      - ".github/workflows/windows-portable-inplace.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-swap:
+    name: Replace portable folder, preserve backup, reject ZIP traversal
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise external portable updater on real Windows filesystem
+        shell: pwsh
+        run: ./desktopApp/packaging/tests/windows-portable-inplace-checks.ps1

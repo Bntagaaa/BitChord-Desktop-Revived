@@ -110,7 +110,12 @@ dependencies {
     }
 
     // The shared player loads artwork through Coil, as the phone does.
+    implementation("io.coil-kt.coil3:coil-compose:3.0.4")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
+    // Release notes use Github-Flavored Markdown, not a plain Text field.
+    implementation("org.commonmark:commonmark:0.24.0")
+    implementation("org.commonmark:commonmark-ext-gfm-tables:0.24.0")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
 
     // Automix runs the same two models the Android build does.
     implementation("com.microsoft.onnxruntime:onnxruntime:1.29.0")

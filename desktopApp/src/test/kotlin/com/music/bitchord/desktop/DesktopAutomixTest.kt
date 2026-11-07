@@ -128,23 +128,30 @@ class DesktopAutomixTest {
         val seconds = 60.0
         val file = clickTrackFile(120.0, seconds)
         val id = "cache-probe-${file.name}"
-        val first = DesktopTrackAnalyzer()
-        first.request(Song(id, id, "Artist", null), DesktopStream(url = file.absolutePath), seconds)
-        var waited = 0
-        while (!first.isAnalysed(id) && waited < 600) {
-            kotlinx.coroutines.delay(100)
-            waited++
-        }
-        val measured = first.analysisFor(id)
-        assertTrue(measured.isUsable, "the probe track was not analysed")
-        first.release()
+        // Wait for the completion callback before checking disk restoration with a fresh analyzer.
+        // The callback runs after the persistence attempt; publication ordering is tested below.
+        val persisted = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val first = DesktopTrackAnalyzer(onAnalysed = { observed ->
+            if (observed == id) persisted.complete(Unit)
+        })
+        try {
+            first.request(Song(id, id, "Artist", null), DesktopStream(url = file.absolutePath), seconds)
+            kotlinx.coroutines.withTimeout(120_000L) { persisted.await() }
+            val measured = first.analysisFor(id)
+            assertTrue(measured.isUsable, "the probe track was not analysed")
 
-        // A second analyzer is a fresh process as far as the cache is concerned: nothing in memory,
-        // everything on disk.
-        val second = DesktopTrackAnalyzer()
-        assertTrue(second.isAnalysed(id), "the analysis did not survive")
-        assertEquals(measured.bpm, second.analysisFor(id).bpm, 0.001)
-        second.release()
+            // A second analyzer has no in-memory results: loading must now
+            // succeed from disk, not from the first analyzer's results map.
+            val second = DesktopTrackAnalyzer()
+            try {
+                assertTrue(second.isAnalysed(id), "the persisted analysis did not survive")
+                assertEquals(measured.bpm, second.analysisFor(id).bpm, 0.001)
+            } finally {
+                second.release()
+            }
+        } finally {
+            first.release()
+        }
     }
 
 

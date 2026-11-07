@@ -27,7 +27,9 @@ internal class DesktopPreparedUpdate(
             .redirectOutput(ProcessBuilder.Redirect.appendTo(operation.resolve("install.log").toFile())).redirectErrorStream(true)
         DesktopUpdateProcess.cleanEnvironment(builder.environment())
         process = builder.start()
-        repeat(100) {
+        // Windows now initializes a separate updater window and re-verifies the
+        // package BEFORE authorizing shutdown. Slow disks need more than 5 s.
+        repeat(if (DesktopPlatform.isWindows) 900 else 100) {
             currentCoroutineContext().ensureActive()
             check(process!!.isAlive) { "Update helper did not start. See updater logs: $operation" }
             if (Files.isRegularFile(operation.resolve("armed"), NOFOLLOW_LINKS)) {
@@ -41,7 +43,6 @@ internal class DesktopPreparedUpdate(
 
     /** The normal application exit is now committed; never called on a failed save/shutdown. */
     fun handoff() { handedOff = true }
-
     fun abort() { handedOff = false; close() }
 
     override fun close() {
@@ -56,7 +57,15 @@ internal class DesktopPreparedUpdate(
 /** Bundled helpers, private persistent state, and same-filesystem staging. No user-data edits. */
 internal object DesktopUpdateInstaller {
     fun canInstall(installation: UpdateInstallation): Boolean = when (installation.format) {
-        UpdateFormat.WINDOWS_SETUP -> true // Interactive installer handoff, not an unattended upgrade.
+        UpdateFormat.WINDOWS_SETUP -> true
+        UpdateFormat.WINDOWS_PORTABLE -> installation.portableRoot?.let { root ->
+            root.isAbsolute && root.parent != null && !Files.isSymbolicLink(root) &&
+                Files.isDirectory(root, NOFOLLOW_LINKS) && !Files.isSymbolicLink(root.parent) &&
+                Files.isWritable(root.parent) &&
+                Files.isRegularFile(root.resolve(".bitchord-portable"), NOFOLLOW_LINKS) &&
+                Files.isRegularFile(root.resolve("BitChord.exe"), NOFOLLOW_LINKS) &&
+                Files.isRegularFile(root.resolve("app/BitChord.cfg"), NOFOLLOW_LINKS)
+        } == true
         UpdateFormat.APPIMAGE -> installation.appImage?.let {
             it.isAbsolute && !Files.isSymbolicLink(it) && Files.isRegularFile(it, NOFOLLOW_LINKS) &&
                 Files.isWritable(it) && Files.isWritable(it.parent) && setsid() != null
@@ -71,23 +80,13 @@ internal object DesktopUpdateInstaller {
         require(file.fileName.toString().endsWith(requireNotNull(installation.format.suffix))) { "Package does not match this installation." }
         require(DesktopUpdateDownloader.sha256(file).equals(verifiedHash, true)) { "Verified package changed. Download again." }
         require(validExecutable(file, installation.format)) { "The verified file is not the expected executable package." }
+        DesktopUpdateDiskSpace.checkBeforeSetup(installation, file)
         val operation = DesktopUpdateDiagnostics.createOperation()
         val temporary = mutableListOf<Path>()
         try {
             DesktopUpdateDiagnostics.log(operation, "stage=preparing installed_version=${DesktopUpdateChecker.currentVersion} target_version=$targetVersion format=${installation.format} parent_pid=${ProcessHandle.current().pid()}")
-            if (installation.format == UpdateFormat.WINDOWS_SETUP) {
-                // Copy into our private operation directory, not a mutable shared cache location.
-                val installer = operation.resolve("verified-setup.exe")
-                Files.copy(file, installer)
-                require(DesktopUpdateDownloader.sha256(installer).equals(verifiedHash, true))
-                val helper = operation.resolve("install.ps1")
-                copyHelper("windows-update.ps1", helper)
-                val windows = Path.of(System.getenv("SystemRoot") ?: "C:\\Windows")
-                return DesktopPreparedUpdate(operation, listOf(windows.resolve("System32/WindowsPowerShell/v1.0/powershell.exe").toString(),
-                    "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper.toString(),
-                    "-ParentPid", ProcessHandle.current().pid().toString(), "-Installer", installer.toString(),
-                    "-Expected", verifiedHash.lowercase(), "-Operation", operation.toString(),
-                    "-ParentStartMillis", (ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli()).toString()), listOf(installer))
+            if (installation.format in setOf(UpdateFormat.WINDOWS_SETUP, UpdateFormat.WINDOWS_PORTABLE)) {
+                return DesktopWindowsUpdate.prepare(installation, file, verifiedHash, targetVersion, operation, temporary)
             }
             val current = requireNotNull(installation.appImage).normalize()
             require('\n' !in current.toString() && '\r' !in current.toString()) { "Use manual replacement for a path containing line breaks." }
@@ -108,6 +107,7 @@ internal object DesktopUpdateInstaller {
             val backup = current.resolveSibling(current.fileName.toString() + ".previous-" + token)
             val helper = operation.resolve("install.sh")
             copyHelper("appimage-update.sh", helper)
+            copyHelper("linux-updater-ui.sh", operation.resolve("linux-updater-ui.sh"))
             DesktopUpdateDiagnostics.log(operation, "stage=verified current=$current staged=$staged backup=$backup sha256=${verifiedHash.lowercase()}")
             return DesktopPreparedUpdate(operation, listOf(requireNotNull(setsid()), "/bin/sh", helper.toString(),
                 ProcessHandle.current().pid().toString(), current.toString(), staged.toString(), backup.toString(), verifiedHash.lowercase(),
@@ -126,6 +126,8 @@ internal object DesktopUpdateInstaller {
             UpdateFormat.APPIMAGE -> bytes.size >= 11 && bytes.take(4) == listOf(0x7f.toByte(), 69.toByte(), 76.toByte(), 70.toByte()) &&
                 bytes[8] == 65.toByte() && bytes[9] == 73.toByte() && bytes[10] == 2.toByte()
             UpdateFormat.WINDOWS_SETUP -> bytes.size >= 2 && bytes[0] == 77.toByte() && bytes[1] == 90.toByte()
+            UpdateFormat.WINDOWS_PORTABLE -> bytes.size >= 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4b.toByte() &&
+                bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()
             else -> false
         }
     }.getOrDefault(false)

@@ -23,9 +23,18 @@ internal object DesktopUpdateReadiness {
             require(!Files.isSymbolicLink(operation.resolve("request.token")))
             require(Files.size(operation.resolve("request.token")) == 32L && Files.readString(operation.resolve("request.token")) == token) { "Readiness operation does not match." }
             require(environment["BITCHORD_UPDATE_EXPECTED_VERSION"] == version) { "Unexpected application version." }
-            val ticks = requireNotNull(DesktopUpdateProcess.linuxStartTicks())
+            val identity = if (DesktopPlatform.isWindows) {
+                val launcher = Path.of(requireNotNull(System.getProperty("jpackage.app-path"))).toAbsolutePath().normalize()
+                val expected = Path.of(requireNotNull(environment["BITCHORD_UPDATE_EXPECTED_LAUNCHER"])).toAbsolutePath().normalize()
+                require(launcher.toString().equals(expected.toString(), ignoreCase = true)) { "Unexpected relaunched executable." }
+                require('\n' !in launcher.toString() && '\r' !in launcher.toString())
+                val start = ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli()
+                "start_millis=$start\nlauncher_path=$launcher\n"
+            } else {
+                "start_ticks=${requireNotNull(DesktopUpdateProcess.linuxStartTicks())}\n"
+            }
             temporary = Files.createTempFile(operation, ".ready-", ".tmp")
-            Files.writeString(temporary, "token=$token\npid=${ProcessHandle.current().pid()}\nstart_ticks=$ticks\nversion=$version\nstate=gui-ready\n")
+            Files.writeString(temporary, "token=$token\npid=${ProcessHandle.current().pid()}\n${identity}version=$version\nstate=gui-ready\n")
             FileChannel.open(temporary, WRITE).use { it.force(true) }
             Files.move(temporary, ready, ATOMIC_MOVE)
             DesktopUpdateDiagnostics.log(operation, "stage=gui-ready pid=${ProcessHandle.current().pid()} version=$version")
@@ -37,8 +46,9 @@ internal object DesktopUpdateReadiness {
         } finally { temporary?.let { runCatching { Files.deleteIfExists(it) } } }
     }
 
-    /** Bridge the already-installed 7eaa helper. Invalid modern tokens never downgrade here. */
+    /** Bridge the already-installed Linux helper. Invalid modern tokens never downgrade here. */
     private fun acknowledgeLegacy(destination: String, version: String): Boolean {
+        if (!DesktopPlatform.isLinux) return false
         val ready = runCatching { Path.of(destination) }.getOrNull() ?: return false
         val operation = ready.parent ?: return false
         if (!ready.isAbsolute || !operation.fileName.toString().startsWith("bitchord-update-helper-") ||
@@ -48,7 +58,6 @@ internal object DesktopUpdateReadiness {
             require(Files.getOwner(operation) == Files.getOwner(Path.of("/proc/self")))
             val permissions = Files.getPosixFilePermissions(operation)
             require(permissions.none { it.name.startsWith("GROUP_") || it.name.startsWith("OTHERS_") })
-            // Never overwrite a stale marker/symlink, even on the compatibility path.
             Files.writeString(ready, "window-ready\npid=${ProcessHandle.current().pid()}\nversion=$version\n",
                 java.nio.file.StandardOpenOption.CREATE_NEW, WRITE, NOFOLLOW_LINKS)
             DesktopTrackLog.log("updater: visible window acknowledged the legacy installed helper")
