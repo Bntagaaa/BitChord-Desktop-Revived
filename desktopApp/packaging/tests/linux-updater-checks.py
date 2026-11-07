@@ -159,13 +159,19 @@ def ui_cases(ui):
                 def visible():
                     listing = subprocess.run(['xwininfo', '-root', '-tree'], capture_output=True,
                                              text=True, check=True).stdout
-                    return 'BitChord Updater' in listing
+                    for window in re.findall(r'(0x[0-9a-fA-F]+) \"[^\"]*BitChord Updater[^\"]*\"', listing):
+                        details = subprocess.run(['xwininfo', '-id', window], capture_output=True,
+                                                 text=True, check=False).stdout
+                        if 'Map State: IsViewable' in details:
+                            return True
+                    return False
                 wait_for(visible, 15)
                 assert parent.poll() is None
                 (op / 'status').write_text('success-gui-confirmed\n')
                 (op / 'completed').write_text('success-gui-confirmed\n')
                 output, _ = proc.communicate(timeout=10)
                 assert proc.returncode == 0, output.decode(errors='replace')
+                wait_for(lambda: not visible(), 5)
                 expected = 'kdialog' if desktop == 'KDE' else 'zenity'
                 assert ('progress-ui=' + expected).encode() in output, output
                 assert parent.poll() is None, 'UI must not kill the worker'
