@@ -1293,4 +1293,10 @@
     <string name="spotify_library_subtitle">הפלייליסטים שלכם ב-Spotify</string>
     <string name="spotify_sign_in">התחברות עם Spotify</string>
     <string name="spotify_track_unavailable">לא נמצא שיר כזה ב-YouTube Music</string>
+    <string name="font">גופן</string>
+    <string name="font_default">ברירת מחדל</string>
+    <string name="font_legacy">קלאסי</string>
+    <string name="font_default_subtitle">SF Pro Display · משקלי Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · המשקלים העבים המקוריים</string>
+    <string name="font_footer">האפשרות קלאסי מחזירה את הגופן העבה והצפוף יותר שהאפליקציה השתמשה בו לפני שהותאמה ל-Apple Music.</string>
 </resources>

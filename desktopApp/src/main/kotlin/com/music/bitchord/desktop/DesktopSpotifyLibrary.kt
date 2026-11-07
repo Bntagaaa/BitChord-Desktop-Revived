@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
@@ -20,6 +23,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CancellationException
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -171,7 +180,9 @@ internal fun DesktopSpotifyLibraryPage(
     onManageAccount: () -> Unit,
     onRetry: () -> Unit,
     onOpenPlaylist: (SpotifyPlaylist) -> Unit,
+    onImport: suspend (String, Boolean, (String) -> Unit) -> String,
 ) {
+    var showImport by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
@@ -186,6 +197,7 @@ internal fun DesktopSpotifyLibraryPage(
             )
             Text("Spotify", style = MaterialTheme.typography.headlineLarge)
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = { showImport = true }) { Text("Import playlist") }
             TextButton(onClick = onManageAccount) {
                 Text("Account & integrations")
             }
@@ -244,5 +256,89 @@ internal fun DesktopSpotifyLibraryPage(
                 )
             }
         }
+        if (showImport) {
+            DesktopSpotifyImportDialog(onImport = onImport, onDismiss = { showImport = false })
+        }
     }
+}
+
+/**
+ * Shared import dialog for Spotify and Library entry points. It owns a single import
+ * session and prevents dismissal while an account/local playlist is being written.
+ */
+@Composable
+internal fun DesktopSpotifyImportDialog(
+    onImport: suspend (String, Boolean, (String) -> Unit) -> String,
+    onDismiss: () -> Unit,
+) {
+    val importScope = rememberCoroutineScope()
+    var importUrl by remember { mutableStateOf("") }
+    var importToAccount by remember { mutableStateOf(false) }
+    var importBusy by remember { mutableStateOf(false) }
+    var importProgress by remember { mutableStateOf("") }
+    var importError by remember { mutableStateOf<String?>(null) }
+    var importResult by remember { mutableStateOf<String?>(null) }
+            AlertDialog(
+                onDismissRequest = { if (!importBusy) onDismiss() },
+                title = { Text("Import Spotify playlist") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Paste a Spotify playlist link or Spotify URI. Songs will be matched on YouTube Music.")
+                        OutlinedTextField(
+                            value = importUrl,
+                            onValueChange = { importUrl = it; importError = null; importResult = null },
+                            label = { Text("Spotify playlist URL") },
+                            singleLine = true,
+                            enabled = !importBusy,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Save to YouTube Music account", modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = importToAccount,
+                                onCheckedChange = { importToAccount = it },
+                                enabled = !importBusy,
+                            )
+                        }
+                        if (importBusy) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Text(importProgress.ifBlank { "Importing…" })
+                            }
+                        }
+                        importError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                        importResult?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !importBusy && SpotifyImporter.extractPlaylistId(importUrl) != null,
+                        onClick = {
+                            importBusy = true
+                            importError = null
+                            importResult = null
+                            importScope.launch {
+                                try {
+                                    importResult = onImport(importUrl, importToAccount) { message ->
+                                        importScope.launch { importProgress = message }
+                                    }
+                                    importUrl = ""
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (error: Exception) {
+                                    importError = error.message ?: "Import failed."
+                                } finally {
+                                    importBusy = false
+                                    importProgress = ""
+                                }
+                            }
+                        },
+                    ) { Text("Import") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { if (!importBusy) onDismiss() }, enabled = !importBusy) {
+                        Text("Close")
+                    }
+                },
+            )
 }

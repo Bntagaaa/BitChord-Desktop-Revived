@@ -309,6 +309,12 @@
     <string name="show_nerd_stats">Show stats for nerds</string>
     <string name="show_nerd_stats_subtitle">Codec, bitrate and sample rate on the player</string>
     <string name="theme">Theme</string>
+    <string name="font">Font</string>
+    <string name="font_default">Default</string>
+    <string name="font_legacy">Legacy</string>
+    <string name="font_default_subtitle">SF Pro Display · Apple Music weights</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Original heavy weights</string>
+    <string name="font_footer">Legacy brings back the heavier, tighter type the app used before it was matched to Apple Music.</string>
     <string name="reduce_animation">Reduce animation</string>
     <string name="reduce_animation_subtitle">Freezes the main player\'s gradient instead of drifting</string>
     <string name="reduce_dynamic_blur">Reduce dynamic blur</string>

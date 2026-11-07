@@ -1365,4 +1365,10 @@
     <string name="progressive_blur">漸進模糊</string>
     <string name="remove_from_history">從歷史記錄中移除</string>
     <string name="remove_from_history_failed">無法從歷史記錄中移除</string>
+    <string name="font">字型</string>
+    <string name="font_default">預設</string>
+    <string name="font_legacy">舊版</string>
+    <string name="font_default_subtitle">SF Pro Display · Apple Music 字重</string>
+    <string name="font_legacy_subtitle">SF Pro Display · 原始粗字重</string>
+    <string name="font_footer">舊版會恢復應用程式在配合 Apple Music 之前使用的較粗、較緊湊的字型。</string>
 </resources>

@@ -1266,4 +1266,10 @@
     <string name="spotify_library_subtitle">あなたの Spotify プレイリスト</string>
     <string name="spotify_sign_in">Spotify でサインイン</string>
     <string name="spotify_track_unavailable">その曲は YouTube Music で見つかりません</string>
+    <string name="font">フォント</string>
+    <string name="font_default">デフォルト</string>
+    <string name="font_legacy">従来</string>
+    <string name="font_default_subtitle">SF Pro Display · Apple Music のウェイト</string>
+    <string name="font_legacy_subtitle">SF Pro Display · 元の太いウェイト</string>
+    <string name="font_footer">「従来」では、Apple Music に合わせる前にアプリで使われていた、太めで詰まった書体に戻します。</string>
 </resources>

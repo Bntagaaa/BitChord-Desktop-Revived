@@ -1227,4 +1227,10 @@
     <string name="spotify_library_subtitle">Le tue playlist Spotify</string>
     <string name="spotify_sign_in">Accedi con Spotify</string>
     <string name="spotify_track_unavailable">Impossibile trovare quel brano su YouTube Music</string>
+    <string name="font">Carattere</string>
+    <string name="font_default">Predefinito</string>
+    <string name="font_legacy">Classico</string>
+    <string name="font_default_subtitle">SF Pro Display · Pesi di Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Pesi marcati originali</string>
+    <string name="font_footer">Classico riporta il carattere più marcato e compatto che l\'app usava prima di essere allineata ad Apple Music.</string>
 </resources>

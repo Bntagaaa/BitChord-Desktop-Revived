@@ -1245,4 +1245,10 @@
     <string name="spotify_library_subtitle">Spotify çalma listeleriniz</string>
     <string name="spotify_sign_in">Spotify ile oturum aç</string>
     <string name="spotify_track_unavailable">O şarkı YouTube Music’de bulunamadı</string>
+    <string name="font">Yazı tipi</string>
+    <string name="font_default">Varsayılan</string>
+    <string name="font_legacy">Eski</string>
+    <string name="font_default_subtitle">SF Pro Display · Apple Music ağırlıkları</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Orijinal kalın ağırlıklar</string>
+    <string name="font_footer">Eski, uygulamanın Apple Music\'e uyarlanmadan önce kullandığı daha kalın ve sıkı yazı tipini geri getirir.</string>
 </resources>

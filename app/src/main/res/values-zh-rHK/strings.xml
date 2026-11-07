@@ -1365,4 +1365,10 @@
     <string name="wear_os_done">完成</string>
     <string name="signed_by">由 %1$s 簽名</string>
     <string name="find_your_mood">尋找你的心情</string>
+    <string name="font">字型</string>
+    <string name="font_default">預設</string>
+    <string name="font_legacy">舊版</string>
+    <string name="font_default_subtitle">SF Pro Display · Apple Music 字重</string>
+    <string name="font_legacy_subtitle">SF Pro Display · 原始粗字重</string>
+    <string name="font_footer">舊版會恢復應用程式在配合 Apple Music 之前使用的較粗、較緊湊的字型。</string>
 </resources>
