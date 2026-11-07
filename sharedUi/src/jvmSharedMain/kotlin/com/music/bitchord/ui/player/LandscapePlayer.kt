@@ -147,7 +147,7 @@ internal fun LandscapePlayerLayout(
     actions: @Composable () -> Unit,
     /** Credits and transport. [compact] is a phone-height window. */
     mainPane: @Composable (compact: Boolean) -> Unit,
-    lyricsPane: @Composable () -> Unit,
+    lyricsPane: @Composable (compact: Boolean) -> Unit,
     queuePane: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -232,7 +232,7 @@ internal fun LandscapePlayerLayout(
                                 .fillMaxSize()
                                 .padding(horizontal = PLAYER_GUTTER),
                         ) {
-                            lyricsPane()
+                            lyricsPane(compact)
                         }
                         PlayerPane.Queue -> Box(
                             Modifier
@@ -380,6 +380,37 @@ internal fun LandscapeMainPane(
             .widthIn(max = PLAYER_MAX_WIDTH)
             .fillMaxWidth(),
     ) {
+        LandscapeTrackHeader(
+            compact = compact,
+            caption = caption,
+            onOpenCaption = onOpenCaption,
+            credits = credits,
+        )
+        Spacer(Modifier.height(if (compact) 2.dp else 10.dp))
+        lyricStrip?.invoke()
+        scrubber()
+        Spacer(Modifier.height(if (compact) 0.dp else 8.dp))
+        transport()
+        if (volume != null) {
+            Spacer(Modifier.height(if (compact) 0.dp else 12.dp))
+            volume()
+        }
+    }
+}
+
+/**
+ * Playback origin, title, artist, and track actions shared by the landscape
+ * player and lyrics views. Keeping one header ensures both views honor the
+ * same spacing, marquee, buttons, and hidden-status setting.
+ */
+@Composable
+internal fun LandscapeTrackHeader(
+    compact: Boolean,
+    caption: String?,
+    onOpenCaption: () -> Unit,
+    credits: @Composable () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
         if (caption != null) {
             PlaybackOriginCaption(
                 text = caption,
@@ -390,15 +421,6 @@ internal fun LandscapeMainPane(
             Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
         }
         credits()
-        Spacer(Modifier.height(if (compact) 2.dp else 10.dp))
-        lyricStrip?.invoke()
-        scrubber()
-        Spacer(Modifier.height(if (compact) 0.dp else 8.dp))
-        transport()
-        if (volume != null) {
-            Spacer(Modifier.height(if (compact) 0.dp else 12.dp))
-            volume()
-        }
     }
 }
 
@@ -507,6 +529,11 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
  */
 @Composable
 internal fun LandscapeLyricsPane(
+    compact: Boolean,
+    /** Match the main player's optional "Playing from" status. */
+    caption: String?,
+    onOpenCaption: () -> Unit,
+    credits: @Composable () -> Unit,
     hasLyrics: Boolean,
     /** Shown in place of the sheet while there are no lines to draw. */
     placeholder: String,
@@ -522,6 +549,14 @@ internal fun LandscapeLyricsPane(
     panel: @Composable (Modifier) -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
+        // The track header stays visible while the lyrics list scrolls.
+        LandscapeTrackHeader(
+            compact = compact,
+            caption = caption,
+            onOpenCaption = onOpenCaption,
+            credits = credits,
+        )
+        Spacer(Modifier.height(if (compact) 4.dp else 12.dp))
         Box(
             modifier = Modifier
                 .weight(1f)
