@@ -20,6 +20,15 @@ class DesktopSidebarMicaTest {
     }
 
     @Test
+    fun `mica uses the active sidebar base instead of a fixed charcoal tone`() {
+        val wallpaper = Color.White
+        val darkBase = DesktopSidebarMica.surface(wallpaper, true, Color(0xFF0D0D0F))
+        val charcoalBase = DesktopSidebarMica.surface(wallpaper, true, DARK_PALETTE.sidebarSurface)
+        assertTrue(charcoalBase.red > darkBase.red)
+        assertTrue(charcoalBase.red < 0.16f)
+    }
+
+    @Test
     fun `sampled wallpaper subtly influences sidebar without making it translucent`() {
         val warm = Color(0xFFFF5018)
         val cool = Color(0xFF1850FF)
