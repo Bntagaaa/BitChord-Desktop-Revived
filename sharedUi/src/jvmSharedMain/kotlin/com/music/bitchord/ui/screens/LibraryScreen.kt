@@ -435,6 +435,7 @@ fun LibraryGridPage(
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
     onNewPlaylist: (() -> Unit)? = null,
+    onImportSpotifyPlaylist: (() -> Unit)? = null,
 ) {
     // Re-read live rather than trusting [shelf] to already be sorted: this page
     // is opened from a snapshot (see `libraryShowAll` in MainActivity), and a
@@ -464,6 +465,18 @@ fun LibraryGridPage(
                         label = stringResource(Res.string.new_playlist),
                         subtitle = stringResource(Res.string.saved_to_youtube_music),
                         onClick = onNewPlaylist,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            if (onImportSpotifyPlaylist != null) {
+                item(key = "import-spotify") {
+                    NewShelfCard(
+                        icon = BitChordIcons.Download,
+                        label = stringResource(Res.string.import_spotify),
+                        subtitle = stringResource(Res.string.import_spotify_subtitle),
+                        onClick = onImportSpotifyPlaylist,
+                        logo = Res.drawable.spotify_logo,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
