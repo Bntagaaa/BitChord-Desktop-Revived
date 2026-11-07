@@ -52,6 +52,86 @@ internal object DesktopReleaseNotesMarkdown {
 
     fun parse(markdown: String): Node = parser.parse(markdown.take(32_000))
 
+    /** Only the changelog section belongs in the compact update dialog. */
+    internal data class WhatsNew(
+        val preview: Pair<String, String>?,
+        val blocks: List<Node>,
+    )
+
+    internal fun whatsNew(markdown: String): WhatsNew {
+        val blocks = parse(markdown).children()
+        val index = blocks.indexOfFirst { node ->
+            sectionHeading(node)?.second?.let(::isWhatsNewTitle) == true
+        }
+        // Do not show Installation, Credits or arbitrary release-body text
+        // when an older release has no What's New heading.
+        if (index < 0) return WhatsNew(null, emptyList())
+        val level = requireNotNull(sectionHeading(blocks[index])).first
+        val selected = mutableListOf<Node>()
+        for (block in blocks.drop(index + 1)) {
+            if (block is ThematicBreak) break
+            val heading = sectionHeading(block)
+            if (heading != null && heading.first <= level) break
+            selected += block
+        }
+
+        // GitHub releases commonly place a banner before the HTML h2 "What's New".
+        // Bring that banner into the section while excluding the rest of the preface.
+        val leadingImage = blocks.take(index).asReversed().firstNotNullOfOrNull(::standaloneImage)
+        val inSectionImage = selected.firstOrNull()?.let(::standaloneImage)
+        val preview = leadingImage ?: inSectionImage
+        if (leadingImage == null && inSectionImage != null) selected.removeAt(0)
+        return WhatsNew(preview, selected)
+    }
+
+    private fun sectionHeading(node: Node): Pair<Int, String>? = when (node) {
+        is Heading -> node.level to plainText(node)
+        is HtmlBlock -> {
+            val elements = Jsoup.parseBodyFragment(node.literal).body().children()
+            val element = elements.singleOrNull()
+            val tag = element?.tagName().orEmpty()
+            if (tag.length == 2 && tag[0] == 'h' && tag[1] in '1'..'6') {
+                (tag[1] - '0') to element!!.text()
+            } else null
+        }
+        else -> null
+    }
+
+    private fun isWhatsNewTitle(raw: String): Boolean {
+        val text = raw.trim().replace('’', '\'').replace('‘', '\'')
+            .trimEnd(':', '!', ' ').lowercase(java.util.Locale.ROOT)
+        return text == "what's new" || text == "whats new"
+    }
+
+    private fun plainText(node: Node): String = buildString {
+        fun visit(current: Node) {
+            when (current) {
+                is org.commonmark.node.Text -> append(current.literal)
+                is Code -> append(current.literal)
+                else -> current.children().forEach(::visit)
+            }
+        }
+        visit(node)
+    }
+
+    private fun standaloneImage(node: Node): Pair<String, String>? = when (node) {
+        is Paragraph -> {
+            val child = node.children().filterNot { it is SoftLineBreak }.singleOrNull()
+            (child as? MarkdownImageNode)?.let {
+                it.destination to it.title.orEmpty().ifBlank { imageAlt(it) }
+            }
+        }
+        is HtmlBlock -> {
+            val body = Jsoup.parseBodyFragment(node.literal).body()
+            val images = body.select("img[src]")
+            if (body.text().isBlank() && images.size == 1) {
+                images.first()!!.let { it.attr("src") to it.attr("alt") }
+            } else null
+        }
+        else -> null
+    }
+
+
     fun safeLinkUrl(destination: String): String? = safeUrl(destination, image = false)
 
     fun safeImageUrl(destination: String): String? = safeUrl(destination, image = true)
@@ -92,6 +172,21 @@ internal fun DesktopReleaseNotes(markdown: String, modifier: Modifier = Modifier
     val ast = remember(markdown) { DesktopReleaseNotesMarkdown.parse(markdown) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
         ast.children().forEach { ReleaseMarkdownBlock(it) }
+    }
+}
+
+/** Compact release summary: banner + What's New items, never installation instructions. */
+@Composable
+internal fun DesktopReleaseWhatsNew(markdown: String, modifier: Modifier = Modifier) {
+    val section = remember(markdown) { DesktopReleaseNotesMarkdown.whatsNew(markdown) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        section.preview?.let { (url, description) -> ReleaseMarkdownImage(url, description) }
+        if (section.blocks.isEmpty()) {
+            Text("No What's New details were provided for this release.",
+                style = MaterialTheme.typography.bodySmall, color = DesktopSecondary)
+        } else {
+            section.blocks.forEach { ReleaseMarkdownBlock(it) }
+        }
     }
 }
 
