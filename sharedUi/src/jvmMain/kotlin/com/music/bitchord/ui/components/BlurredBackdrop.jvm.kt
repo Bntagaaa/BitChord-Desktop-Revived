@@ -34,6 +34,9 @@ actual fun rememberBlurredBackdrop(url: String?): Any? {
         key1 = url,
         key2 = loader,
     ) {
+        // produceState retains its previous value when a key changes. Reset it
+        // to the new artwork's cached strip before starting another request.
+        value = url?.let(DesktopBackdropCache::get)
         if (url == null || value != null) return@produceState
         try {
             val result = loader.execute(
