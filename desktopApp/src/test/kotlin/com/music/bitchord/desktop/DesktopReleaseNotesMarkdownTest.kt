@@ -50,6 +50,85 @@ class DesktopReleaseNotesMarkdownTest {
         assertTrue(nodes.any { it is FencedCodeBlock })
     }
 
+    @Test fun onlyWhatsNewAndPrecedingBannerAreShownFromActualReleaseStyle() {
+        val body = """
+            <img width="1920" height="1080" alt="Desktop" src="https://github.com/user-attachments/assets/cb42bea9-f955-4344-8161-cc044f57ba22" />
+
+            <h2 align="center">What's New</h2>
+
+            - 🎬 **Music Video Integration:** Play videos.
+            - ⚡ **Instant Playback:** Start songs faster.
+
+            ---
+
+            <h2 align="center">Installation</h2>
+
+            Download packages from Assets.
+
+            <h2 align="center">Credits</h2>
+
+            Thank you to contributors.
+        """.trimIndent()
+        val section = DesktopReleaseNotesMarkdown.whatsNew(body)
+        assertEquals("https://github.com/user-attachments/assets/cb42bea9-f955-4344-8161-cc044f57ba22", section.preview?.first)
+        assertEquals("Desktop", section.preview?.second)
+        val contents = section.blocks.flatMap(::allNodes).filterIsInstance<org.commonmark.node.Text>()
+            .joinToString(" ") { it.literal }
+        assertTrue(contents.contains("Music Video Integration"))
+        assertTrue(contents.contains("Instant Playback"))
+        assertFalse(contents.contains("Installation"))
+        assertFalse(contents.contains("Credits"))
+        assertFalse(contents.contains("Download packages"))
+    }
+
+    @Test fun markdownHeadingKeepsNestedSubsectionsAndSeparatesOtherReleaseSections() {
+        val body = """
+            # BitChord 1.9.0
+
+            ![Banner](https://github.com/user-attachments/assets/banner)
+
+            ## What’s New
+            ### Playback
+            **Instant playback** is now supported.
+
+            ## Installation
+            Never show package manager instructions in the popup.
+        """.trimIndent()
+        val section = DesktopReleaseNotesMarkdown.whatsNew(body)
+        assertEquals("https://github.com/user-attachments/assets/banner", section.preview?.first)
+        assertTrue(section.blocks.any { it is Heading && it.level == 3 })
+        val contents = section.blocks.flatMap(::allNodes).filterIsInstance<org.commonmark.node.Text>()
+            .joinToString(" ") { it.literal }
+        assertTrue(contents.contains("Instant playback"))
+        assertFalse(contents.contains("package manager"))
+    }
+
+    @Test fun imageInsideWhatsNewBecomesHeroWithoutRenderingTwice() {
+        val section = DesktopReleaseNotesMarkdown.whatsNew("""
+            ## What's New
+
+            ![Screenshot](https://github.com/user-attachments/assets/banner)
+
+            - New portable updater
+        """.trimIndent())
+        assertEquals("https://github.com/user-attachments/assets/banner", section.preview?.first)
+        assertTrue(section.blocks.none { it is org.commonmark.node.Paragraph })
+        assertTrue(section.blocks.any { it is org.commonmark.node.BulletList })
+    }
+
+    @Test fun missingWhatsNewDoesNotLeakInstallOrCreditsIntoPopup() {
+        val section = DesktopReleaseNotesMarkdown.whatsNew("""
+            # BitChord 1.8.3
+
+            Download packages below.
+
+            ## Installation
+            Run the installer.
+        """.trimIndent())
+        assertNull(section.preview)
+        assertTrue(section.blocks.isEmpty())
+    }
+
     @Test fun validGithubImagesLoadOverHttpsIncludingRelativeReadmePaths() {
         assertEquals("https://github.com/user-attachments/assets/0123",
             DesktopReleaseNotesMarkdown.safeImageUrl("https://github.com/user-attachments/assets/0123"))
