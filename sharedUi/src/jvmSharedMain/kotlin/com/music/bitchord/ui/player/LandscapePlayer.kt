@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -177,7 +178,13 @@ internal fun LandscapePlayerLayout(
                     .height(5.dp)
                     .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(Color.White.copy(alpha = 0.70f)),
+                    .background(
+                        Color.White.copy(
+                            alpha = if (PlayerPlatform.host.mobileTextChrome) {
+                                DESKTOP_PLAYER_HANDLE_ALPHA
+                            } else 0.70f,
+                        ),
+                    ),
             )
         }
     }
@@ -358,6 +365,18 @@ internal fun LandscapeTrackHeader(
 }
 
 /** Credits in the music-video layout use the same motion without a second nested transition. */
+/**
+ * Android's narrow landscape layout keeps its compact 16sp artist line.
+ * Desktop has the width for the 20sp portrait credit that the mobile screenshot
+ * uses. Both keep upstream's logical W500 cut and the chosen SF Pro family.
+ */
+internal fun landscapeArtistTextStyle(
+    mobilePortrait: TextStyle,
+    compactLandscape: TextStyle,
+    desktopPlayer: Boolean,
+): TextStyle = (if (desktopPlayer) mobilePortrait else compactLandscape)
+    .copy(fontWeight = FontWeight.W500)
+
 @Composable
 internal fun LandscapeCredits(
     song: Song,
@@ -413,7 +432,11 @@ private fun LandscapeCreditsText(
             credits = remember(song.artist, song.artists, song.artistId) {
                 artistCredits(song.artist, song.artists, song.artistId)
             },
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W500),
+            style = landscapeArtistTextStyle(
+                mobilePortrait = MaterialTheme.typography.titleLarge,
+                compactLandscape = MaterialTheme.typography.titleMedium,
+                desktopPlayer = PlayerPlatform.host.mobileTextChrome,
+            ),
             color = artistColor,
             enabled = marqueeEnabled,
             paused = marqueePaused,
@@ -438,7 +461,14 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
             )) {
             val liked = likeStatus == LikeStatus.LIKE
             CircleGlyph(
-                icon = if (liked) BitChordIcons.HeartFilled else BitChordIcons.Heart,
+                // Desktop follows the current mobile star for the Liked
+                // playlist; retain the fork's old heart on Android.
+                icon = when {
+                    PlayerPlatform.host.mobileTextChrome && liked -> BitChordIcons.StarFilled
+                    PlayerPlatform.host.mobileTextChrome -> BitChordIcons.Star
+                    liked -> BitChordIcons.HeartFilled
+                    else -> BitChordIcons.Heart
+                },
                 contentDescription = stringResource(
                     if (liked) Res.string.remove_from_liked else Res.string.like,
                 ),

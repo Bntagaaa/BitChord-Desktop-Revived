@@ -766,10 +766,12 @@ fun NowPlayingScreen(
     // The sleeve's own colour, lifted pale, read off the decode the scrim above
     // already made. Plain white until it is known, and for a sleeve with no
     // colour to give.
-    // The newer mobile player draws secondary text in white chrome rather than a
-    // second sampled artwork tint. Desktop can skip that extra artwork decode.
+    // Desktop draws text directly rather than adding white glyphs through an
+    // offscreen blend layer. Its secondary ink therefore uses the same pale
+    // cover tint already cached with the artwork seed; this costs no extra
+    // decoding because the status-bar luminance above reads the same seed.
     val mobileTextChrome = PlayerPlatform.host.mobileTextChrome
-    val artworkTint = if (mobileTextChrome) Color.White else rememberPlayerTint(remoteArt, ART_PX) ?: Color.White
+    val artworkTint = rememberPlayerTint(remoteArt, ART_PX) ?: Color.White
 
     // Media-player convention: the player always owns light status icons. The
     // top treatment below, rather than a window-flag flip per cover, provides
@@ -1787,7 +1789,7 @@ fun NowPlayingScreen(
     // or a full-screen music video is the backdrop.
     val chrome = mobileTextChrome && !reduceBlur && !videoMode
     CompositionLocalProvider(
-        LocalPlayerTint provides if (mobileTextChrome) Color.White else playerTint,
+        LocalPlayerTint provides playerTint,
         LocalPlayerChrome provides chrome,
     ) {
         val reducePlayerMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
@@ -2610,7 +2612,13 @@ fun NowPlayingScreen(
                                 .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
                                 .clip(RoundedCornerShape(3.dp))
                                 .additiveChrome(LocalPlayerChrome.current)
-                                .background(playerSecondaryColor(0.70f)),
+                                .background(
+                                    if (mobileTextChrome) {
+                                        Color.White.copy(alpha = DESKTOP_PLAYER_HANDLE_ALPHA)
+                                    } else {
+                                        playerSecondaryColor(0.70f)
+                                    },
+                                ),
                         )
                         // [p] is the shared album-to-panel transition. Keeping this in
                         // composition until its final frame gives the caption a real

@@ -1456,10 +1456,14 @@ internal fun TranslationToggleButton(
     onClick: () -> Unit,
 ) {
     val active = showingTranslation || state is LyricsTranslationUiState.Loading
+    // Mobile draws these small utility controls in translucent additive white.
+    // Desktop uses direct artwork-tinted ink to preserve native glyph edges.
+    val desktop = PlayerPlatform.host.mobileTextChrome
     val tint = when {
-        !enabled || state is LyricsTranslationUiState.SameLanguage -> LocalPlayerTint.current.copy(alpha = 0.42f)
-        active -> LocalPlayerTint.current
-        else -> LocalPlayerTint.current.copy(alpha = 0.78f)
+        !enabled || state is LyricsTranslationUiState.SameLanguage ->
+            if (desktop) playerSecondaryColor(0.42f) else LocalPlayerTint.current.copy(alpha = 0.42f)
+        active -> if (desktop) Color.White else LocalPlayerTint.current
+        else -> if (desktop) playerSecondaryColor(0.78f) else LocalPlayerTint.current.copy(alpha = 0.78f)
     }
     val discAlpha by animateFloatAsState(
         targetValue = if (active) 0.34f else 0.18f,
@@ -1469,7 +1473,10 @@ internal fun TranslationToggleButton(
         modifier = Modifier
             .size(34.dp)
             .clip(CircleShape)
-            .background(LocalPlayerTint.current.copy(alpha = discAlpha))
+            .background(
+                if (desktop) Color.White.copy(alpha = discAlpha)
+                else LocalPlayerTint.current.copy(alpha = discAlpha),
+            )
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1507,10 +1514,14 @@ internal fun RomanizationToggleButton(
     onClick: () -> Unit,
 ) {
     val active = showingRomanization || state is LyricsTranslationUiState.Loading
+    // Mobile draws these small utility controls in translucent additive white.
+    // Desktop uses direct artwork-tinted ink to preserve native glyph edges.
+    val desktop = PlayerPlatform.host.mobileTextChrome
     val tint = when {
-        !enabled || state is LyricsTranslationUiState.SameLanguage -> LocalPlayerTint.current.copy(alpha = 0.42f)
-        active -> LocalPlayerTint.current
-        else -> LocalPlayerTint.current.copy(alpha = 0.78f)
+        !enabled || state is LyricsTranslationUiState.SameLanguage ->
+            if (desktop) playerSecondaryColor(0.42f) else LocalPlayerTint.current.copy(alpha = 0.42f)
+        active -> if (desktop) Color.White else LocalPlayerTint.current
+        else -> if (desktop) playerSecondaryColor(0.78f) else LocalPlayerTint.current.copy(alpha = 0.78f)
     }
     val discAlpha by animateFloatAsState(
         targetValue = if (active) 0.34f else 0.18f,
@@ -1520,7 +1531,10 @@ internal fun RomanizationToggleButton(
         modifier = Modifier
             .size(34.dp)
             .clip(CircleShape)
-            .background(LocalPlayerTint.current.copy(alpha = discAlpha))
+            .background(
+                if (desktop) Color.White.copy(alpha = discAlpha)
+                else LocalPlayerTint.current.copy(alpha = discAlpha),
+            )
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
