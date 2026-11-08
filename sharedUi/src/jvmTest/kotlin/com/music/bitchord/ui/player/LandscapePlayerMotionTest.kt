@@ -177,6 +177,10 @@ class LandscapePlayerMotionTest {
             val art = onNodeWithTag("artwork").getUnclippedBoundsInRoot()
             val buttons = onNodeWithTag("output-buttons").getUnclippedBoundsInRoot()
             val caption = onNodeWithTag("output-caption").getUnclippedBoundsInRoot()
+            val window = onNodeWithTag("viewport").getUnclippedBoundsInRoot()
+            assertEquals((window.left.value + window.right.value) / 2,
+                (buttons.left.value + buttons.right.value) / 2, .1f,
+                "Center the entire toolbar in the player, not in the artwork column")
             assertTrue(art.bottom < buttons.top)
             assertEquals(18f, caption.top.value - buttons.bottom.value, .1f)
             assertEquals(72f, (caption.bottom - buttons.top).value, .1f)
@@ -257,7 +261,7 @@ class LandscapePlayerMotionTest {
                     val body = onNodeWithTag("lyrics").getUnclippedBoundsInRoot()
                     val root = onNodeWithTag("viewport").getUnclippedBoundsInRoot()
                     assertEquals(art.top.value, header.top.value, .1f, "$width x $height at $density")
-                    assertTrue(body.top >= header.bottom)
+                    assertEquals(art.top, body.top, "The header overlays lyrics instead of reserving space")
                     assertEquals(art.bottom.value, body.bottom.value, .1f, "Lyrics must stop at the cover bottom")
                     assertTrue(body.right <= root.right)
                     assertTrue((body.bottom - body.top).value > 0)

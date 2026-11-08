@@ -112,6 +112,10 @@ internal fun LandscapePlayerColumns(
             .measure(Constraints(maxWidth = contentWidth, maxHeight = height))
         val geometry = landscapeColumnGeometry(contentWidth, height, actionRow.height,
             (if (compact) 12.dp else 24.dp).roundToPx())
+        val actionTop = if (boundLyricsToArtwork) {
+            val coverBottom = geometry.artworkTop + geometry.artworkSize
+            coverBottom + (height - coverBottom - actionRow.height) / 2
+        } else height - actionRow.height
         val art = subcompose(LandscapeSlot.Artwork) {
             Box(Modifier.testTag("landscape-artwork")) { artwork(Modifier.fillMaxSize()) }
         }.single().measure(Constraints.fixed(geometry.artworkSize, geometry.artworkSize))
@@ -143,9 +147,11 @@ internal fun LandscapePlayerColumns(
                 .graphicsLayer { alpha = mainAlpha }) { mainPane() }
         }.single().measure(Constraints(
             maxWidth = (rightWidth - inset * 2).coerceAtLeast(0),
-            maxHeight = (height - metadata.height - headerGap).coerceAtLeast(0),
+            maxHeight = ((if (boundLyricsToArtwork) actionTop else height) - metadata.height - headerGap).coerceAtLeast(0),
         ))
-        val mainHeaderTop = ((height - metadata.height - headerGap - main.height) / 2).coerceAtLeast(0)
+        val mainStackHeight = metadata.height + headerGap + main.height
+        val mainHeaderTop = ((height - mainStackHeight) / 2).coerceIn(0,
+            ((if (boundLyricsToArtwork) actionTop else height) - mainStackHeight).coerceAtLeast(0))
         fun headerTop(): Int {
             val position = if (panelTransition.currentState == PlayerPane.Queue || pane == PlayerPane.Queue)
                 if (pane == PlayerPane.Lyrics) 1f else 0f
@@ -173,16 +179,19 @@ internal fun LandscapePlayerColumns(
                 // gets its own inset, so switching Queue never translates an exiting panel.
                 Box(Modifier.fillMaxSize().padding(
                     start = inset.toDp(), end = inset.toDp(),
-                    top = if (shown == PlayerPane.Queue) {
+                    top = if (shown == PlayerPane.Queue || (shown == PlayerPane.Lyrics && boundLyricsToArtwork)) {
                         if (boundLyricsToArtwork) geometry.artworkTop.toDp() else 0.dp
                     } else topInset,
                     bottom = if (shown != PlayerPane.Main) lyricsBottomInset else 0.dp,
                 ).testTag(if (shown == PlayerPane.Lyrics) "landscape-lyrics-body" else "landscape-other-pane").drawWithContent {
-                    // Reveal the lyrics beneath the travelling header. Their layout stays
-                    // fixed, and no lyric can draw through the header during either direction.
-                    val clipTop = if (shown == PlayerPane.Lyrics)
-                        (headerTop() + metadata.height + headerGap - bodyTop).coerceAtLeast(0).toFloat()
-                    else 0f
+                    // Desktop metadata overlays the full-cover lyric viewport. It never
+                    // reserves a blank strip or moves the lyric renderer when revealed.
+                    val clipTop = when {
+                        shown != PlayerPane.Lyrics -> 0f
+                        boundLyricsToArtwork ->
+                            (headerTop() + metadata.height - geometry.artworkTop).coerceAtLeast(0) * headerReveal
+                        else -> (headerTop() + metadata.height + headerGap - bodyTop).coerceAtLeast(0).toFloat()
+                    }
                     clipRect(top = clipTop.coerceAtMost(size.height)) { this@drawWithContent.drawContent() }
                 }) {
                     when (shown) {
@@ -196,11 +205,9 @@ internal fun LandscapePlayerColumns(
         }.single().measure(Constraints.fixed(rightWidth, height))
         layout(width, height) {
             art.placeRelative(inset + (contentWidth - art.width) / 2, geometry.artworkTop)
-            val actionTop = if (boundLyricsToArtwork) {
-                val coverBottom = geometry.artworkTop + geometry.artworkSize
-                coverBottom + (height - coverBottom - actionRow.height) / 2
-            } else height - actionRow.height
-            actionRow.placeRelative(inset + (contentWidth - actionRow.width) / 2, actionTop)
+            val actionLeft = if (boundLyricsToArtwork) (width - actionRow.width) / 2
+                else inset + (contentWidth - actionRow.width) / 2
+            actionRow.placeRelative(actionLeft, actionTop)
             if (mainAlpha > 0f) main.placeRelative(
                 leftWidth + (rightWidth - main.width) / 2, mainHeaderTop + metadata.height + headerGap)
             body.placeRelative(leftWidth, 0)
