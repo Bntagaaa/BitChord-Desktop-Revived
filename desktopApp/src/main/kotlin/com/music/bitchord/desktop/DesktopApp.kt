@@ -168,7 +168,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -7868,7 +7867,7 @@ private fun DesktopSettingsScreen(
                         ) { languageMenuOpen = true }
                         DesktopDropdownMenu(languageMenuOpen, onDismissRequest = { languageMenuOpen = false }) {
                             DesktopStrings.available.forEach { language ->
-                                DropdownMenuItem(
+                                DesktopDropdownMenuItem(
                                     text = { Text(language.label) },
                                     trailingIcon = if (language.tag == chosen) {
                                         { Icon(BitChordIcons.Check, contentDescription = null) }
@@ -8086,7 +8085,7 @@ private fun DesktopSettingsScreen(
                                     onDismissRequest = { uiScaleMenuOpen = false },
                                 ) {
                                     DesktopUiScaleSettings.options.forEach { percent ->
-                                        DropdownMenuItem(
+                                        DesktopDropdownMenuItem(
                                             text = { Text("$percent%") },
                                             trailingIcon = if (percent == uiScalePercent) {
                                                 { Icon(BitChordIcons.Check, contentDescription = null) }
