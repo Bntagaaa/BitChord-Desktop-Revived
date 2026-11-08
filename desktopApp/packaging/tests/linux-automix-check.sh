@@ -21,6 +21,9 @@ print(f'Packaged analyser and {len(models)} ONNX models found')
 PY
 ldd "$tmp_dir/libbitchord_analysis.so" > "$tmp_dir/imports.txt"
 cat "$tmp_dir/imports.txt"
-if rg -q 'not found' "$tmp_dir/imports.txt"; then exit 1; fi
+if grep -Fq 'not found' "$tmp_dir/imports.txt"; then
+    echo 'Missing shared library dependency in packaged AutoMix analyser' >&2
+    exit 1
+fi
 javac -d "$tmp_dir/classes" "$repo_root/desktopApp/packaging/tests/native/TrackFeatures.java"
 java -cp "$tmp_dir/classes" com.music.bitchord.playback.smart.TrackFeatures "$tmp_dir/libbitchord_analysis.so"
