@@ -62,13 +62,33 @@ jobs:
           if ($version -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$') { throw 'Invalid build label' }
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      - name: WiX for installer audit
-        if: ${{ inputs.installers }}
+      # Compose Desktop honors WIX_PATH and skips the unreliable downloadWix
+      # GitHub Releases request. windows-latest ships WiX Toolset 3.14.
+      - name: Use preinstalled WiX Toolset 3
         shell: pwsh
         run: |
-          Invoke-WebRequest https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip -OutFile "$env:RUNNER_TEMP/wix.zip"
-          Expand-Archive "$env:RUNNER_TEMP/wix.zip" -DestinationPath "$env:RUNNER_TEMP/wix"
-          "$env:RUNNER_TEMP/wix" >> $env:GITHUB_PATH
+          $wixBin = $null
+          $fromPath = Get-Command candle.exe -ErrorAction SilentlyContinue
+          if ($fromPath) {
+            $candidate = Split-Path -Parent $fromPath.Source
+            if (Test-Path (Join-Path $candidate 'light.exe')) { $wixBin = $candidate }
+          }
+          if (-not $wixBin) {
+            $roots = @(${env:ProgramFiles(x86)}, $env:ProgramFiles) | Where-Object { $_ -and (Test-Path $_) }
+            $candidates = @(
+              foreach ($root in $roots) {
+                Get-ChildItem -Path $root -Directory -Filter 'WiX Toolset v3*' -ErrorAction SilentlyContinue |
+                  ForEach-Object { Join-Path $_.FullName 'bin' }
+              }
+            )
+            $wixBin = $candidates | Where-Object {
+              (Test-Path (Join-Path $_ 'candle.exe')) -and (Test-Path (Join-Path $_ 'light.exe'))
+            } | Select-Object -First 1
+          }
+          if (-not $wixBin) { throw 'WiX 3.x not found on Windows runner; cannot build MSI without it' }
+          "WIX_PATH=$wixBin" >> $env:GITHUB_ENV
+          "$wixBin" >> $env:GITHUB_PATH
+          Write-Host "WiX Toolset: $wixBin"
 
       - name: Updater unit tests
         if: ${{ inputs.installers }}
