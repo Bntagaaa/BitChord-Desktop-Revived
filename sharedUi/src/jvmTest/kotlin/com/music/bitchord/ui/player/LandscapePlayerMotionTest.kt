@@ -19,6 +19,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
@@ -48,6 +49,36 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class LandscapePlayerMotionTest {
     private data class Track(val id: String, val title: String = "Title $id", val origin: String = "Playing from Search", val artist: String = "Artist $id")
+
+    @Test fun scaledLinuxWindowCentersToolbarAndFullyRevealsFooterInsideTheCoverBounds() =
+        runDesktopComposeUiTest(width = 1920, height = 1010) {
+            mainClock.autoAdvance = false
+            setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1.25f, 1f)) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Fixture(Track("a"), PlayerPane.Lyrics, width = 1100, height = 760)
+                    }
+                }
+            }
+            mainClock.advanceTimeBy(2500)
+            waitForIdle()
+            val toolbar = onNodeWithTag("output-buttons").fetchSemanticsNode().boundsInRoot
+            assertEquals(960f, toolbar.center.x, 1f, "Center the rendered controls in the physical window")
+            val artwork = onNodeWithTag("artwork").fetchSemanticsNode().boundsInRoot
+            val frame = onNodeWithTag("landscape-lyrics-frame").fetchSemanticsNode().boundsInRoot
+            assertEquals(artwork.top, frame.top, 1f)
+            assertEquals(artwork.bottom, frame.bottom, 1f)
+            onNodeWithTag("title-a").assertDoesNotExist()
+            save(onRoot().captureToImage(), "1920-scaled-lyrics-idle.png")
+            onNodeWithTag("landscape-lyrics-frame").performMouseInput { enter(center) }
+            mainClock.advanceTimeBy(400)
+            waitForIdle()
+            val footer = onNodeWithTag("fixture-footer").fetchSemanticsNode().boundsInRoot
+            assertEquals(55f, footer.height, 1f, "The entire 44dp footer must be visible at 125% scale")
+            assertEquals(frame.bottom, footer.bottom, 1f)
+            onNodeWithTag("title-a").assertIsDisplayed()
+            save(onRoot().captureToImage(), "1920-scaled-lyrics-hover.png")
+        }
 
     @Test fun headerTimesOutAndHoverRevealsBothChromeEdgesWithoutMovingLyrics() =
         runDesktopComposeUiTest(width = 1100, height = 800) {

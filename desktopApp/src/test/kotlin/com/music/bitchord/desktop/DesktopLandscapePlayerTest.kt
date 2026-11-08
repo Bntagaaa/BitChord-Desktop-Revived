@@ -5,6 +5,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
@@ -26,15 +28,17 @@ import kotlin.test.assertTrue
 class DesktopLandscapePlayerTest {
     @Test fun actualLandscapePlayerAnimatesBetweenItsMainAndLyricsLayouts() = verify(1360, 800)
     @Test fun actualCompactLandscapePlayerKeepsItsOutputCaptionBelowTheButtons() = verify(900, 420)
+    @Test fun scaledLinuxScreenshotSizeCentersVisibleButtonsAndKeepsLyricsControlsUnclipped() =
+        verify(1920, 1010, density = 1.25f, reduceBlur = false)
 
-    private fun verify(width: Int, height: Int) = runDesktopComposeUiTest(width = width, height = height) {
+    private fun verify(width: Int, height: Int, density: Float = 1f, reduceBlur: Boolean = true) = runDesktopComposeUiTest(width = width, height = height) {
         mainClock.autoAdvance = false
         val lastScreen = MutableStateFlow(LastPlayerScreen.MAIN)
         val host = object : PlayerHost by DesktopPlayerHost {
             override val settings = object : PlayerSettingsSource by DesktopPlayerSettings {
                 override val lastPlayerScreen = lastScreen
                 override val reduceAnimation = MutableStateFlow(false)
-                override val reduceDynamicBlur = MutableStateFlow(true)
+                override val reduceDynamicBlur = MutableStateFlow(reduceBlur)
                 override val animatedCanvas = MutableStateFlow(false)
                 override val hideSongStatus = MutableStateFlow(false)
                 override val hideVolumeBar = MutableStateFlow(false)
@@ -54,6 +58,7 @@ class DesktopLandscapePlayerTest {
         val index = mutableStateOf(0)
         try {
             setContent {
+                CompositionLocalProvider(LocalDensity provides Density(density, 1f)) {
                 if (mounted.value) MaterialTheme(colorScheme = darkColorScheme(primary = Color.White)) {
                     DesktopPlayerSheet(true, onDismiss = {}, dragToDismiss = false) { windowWidth, windowHeight ->
                         NowPlayingScreen(song = songs[index.value], isPlaying = false, isLoading = false,
@@ -74,6 +79,7 @@ class DesktopLandscapePlayerTest {
                             onDismissLyricsOffset = {}, windowWidth = windowWidth, windowHeight = windowHeight)
                     }
                 }
+                }
             }
             mainClock.advanceTimeBy(2500)
             waitForIdle()
@@ -91,6 +97,10 @@ class DesktopLandscapePlayerTest {
             assertEquals((actionBounds.top - artwork.bottom).value, (columns.bottom - actionBounds.bottom).value, 1f)
             assertEquals((columns.left.value + columns.right.value) / 2,
                 (actionBounds.left.value + actionBounds.right.value) / 2, 1f, "Center the complete group in the whole player")
+            assertEquals(width / 2f,
+                (onNodeWithContentDescription("Lyrics").fetchSemanticsNode().boundsInRoot.left +
+                    onNodeWithContentDescription("Up next").fetchSemanticsNode().boundsInRoot.right) / 2f,
+                1f, "Center the visible controls in the window, not just their container")
             assertTrue(controls.bottom <= actionBounds.top, "The centered toolbar must not cover compact transport controls")
             assertTrue(output.bottom <= onNodeWithTag("landscape-output-controls").getUnclippedBoundsInRoot().bottom)
             save(onRoot().captureToImage(), "$width-main.png")
@@ -143,6 +153,11 @@ class DesktopLandscapePlayerTest {
             onNodeWithText("Test Artist B").assertIsDisplayed()
             onNodeWithContentDescription("Romanize lyrics").assertIsDisplayed()
             onNodeWithContentDescription("Translate lyrics").assertIsDisplayed()
+            for (description in listOf("Romanize lyrics", "Translate lyrics")) {
+                val visibleBounds = onNodeWithContentDescription(description).fetchSemanticsNode().boundsInRoot
+                assertEquals(34f * density, visibleBounds.height, 1f,
+                    "$description must be fully visible, not only the top of its circle")
+            }
             val shortened = onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot()
             assertEquals(44f, (viewport.bottom - shortened.bottom).value, 1f)
             assertEquals(frame, onNodeWithTag("landscape-lyrics-frame").getUnclippedBoundsInRoot())
