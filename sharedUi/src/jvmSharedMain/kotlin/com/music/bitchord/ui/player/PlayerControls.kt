@@ -180,7 +180,12 @@ internal fun PlaybackOriginCaption(
                 blurRadius = 4f,
             ),
         ),
-        color = if (mobileChrome) Color.White.copy(alpha = CHROME_FULL_ALPHA) else LocalPlayerTint.current,
+        color = when {
+            mobileChrome && PlayerPlatform.host.mobileTextChrome ->
+                Color.White.copy(alpha = desktopDirectChromeAlpha(CHROME_FULL_ALPHA))
+            mobileChrome -> Color.White.copy(alpha = CHROME_FULL_ALPHA)
+            else -> LocalPlayerTint.current
+        },
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         textAlign = textAlign,

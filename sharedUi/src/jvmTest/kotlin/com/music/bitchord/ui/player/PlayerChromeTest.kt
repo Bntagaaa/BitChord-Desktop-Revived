@@ -25,6 +25,15 @@ class PlayerChromeTest {
         assertEquals(1f, mobileChromeAlpha(2f, blended = false))
     }
     @Test
+    fun `desktop direct ink compensates for the skipped mobile additive layer`() {
+        assertEquals(0.8525f, desktopDirectChromeAlpha(0.55f), 0.00001f)
+        assertEquals(0.6975f, desktopDirectChromeAlpha(0.45f), 0.00001f)
+        assertEquals(1f, desktopDirectChromeAlpha(CHROME_FULL_ALPHA))
+        assertEquals(0f, desktopDirectChromeAlpha(0f))
+        assertEquals(1f, desktopDirectChromeAlpha(2f))
+    }
+
+    @Test
     fun `desktop text never goes through a recorded additive layer`() {
         assertFalse(shouldUseOffscreenChromeLayer(false, true, true))
         assertFalse(shouldUseOffscreenChromeLayer(true, true, true))

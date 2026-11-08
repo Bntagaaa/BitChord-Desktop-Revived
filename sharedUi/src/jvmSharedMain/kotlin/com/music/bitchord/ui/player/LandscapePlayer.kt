@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -409,6 +410,18 @@ internal fun LandscapeMainPane(
  * is wider, not infinitely wide, and a long title truncated on the one surface
  * with room to scroll it would be the odd one out.
  */
+/**
+ * Android's narrow landscape layout keeps its compact 16sp artist line.
+ * Desktop has the width for the 20sp portrait credit that the mobile screenshot
+ * uses. Both keep upstream's logical W500 cut and the chosen SF Pro family.
+ */
+internal fun landscapeArtistTextStyle(
+    mobilePortrait: TextStyle,
+    compactLandscape: TextStyle,
+    desktopPlayer: Boolean,
+): TextStyle = (if (desktopPlayer) mobilePortrait else compactLandscape)
+    .copy(fontWeight = FontWeight.W500)
+
 @Composable
 internal fun LandscapeCredits(
     song: Song,
@@ -453,7 +466,11 @@ internal fun LandscapeCredits(
                     credits = remember(song.artist, song.artists, song.artistId) {
                         artistCredits(song.artist, song.artists, song.artistId)
                     },
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W500),
+                    style = landscapeArtistTextStyle(
+                        mobilePortrait = MaterialTheme.typography.titleLarge,
+                        compactLandscape = MaterialTheme.typography.titleMedium,
+                        desktopPlayer = PlayerPlatform.host.mobileTextChrome,
+                    ),
                     color = artistColor,
 
                     // A title that's also scrolling gets to go first — starting
