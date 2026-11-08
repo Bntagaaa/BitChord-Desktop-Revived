@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +29,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Constraints
 import kotlin.math.roundToInt
+
+internal const val LANDSCAPE_CHROME_MOTION_MS = 200
+
+@Stable
+internal class LandscapeLyricsChrome {
+    var bodyActive by mutableStateOf(false)
+    var headerHovered by mutableStateOf(false)
+}
+internal val LocalLandscapeLyricsChrome = compositionLocalOf<LandscapeLyricsChrome?> { null }
 
 /** A fixed hover target; only the visible lyric viewport gives space to the footer. */
 @Composable
@@ -40,10 +53,13 @@ internal fun LandscapeLyricsFrame(
     val hovered by interaction.collectIsHoveredAsState()
     var hasFocus by remember { mutableStateOf(false) }
     var keyboardFocused by remember { mutableStateOf(false) }
-    val visible = !revealControlsOnHover || hovered || keyboardFocused || controlsPinned
+    val chrome = LocalLandscapeLyricsChrome.current
+    SideEffect { chrome?.bodyActive = hovered || keyboardFocused || controlsPinned }
+    DisposableEffect(chrome) { onDispose { chrome?.bodyActive = false } }
+    val visible = !revealControlsOnHover || hovered || keyboardFocused || controlsPinned || chrome?.headerHovered == true
     val reveal by animateFloatAsState(
         if (visible) 1f else 0f,
-        if (reduceMotion) snap() else tween(200),
+        if (reduceMotion) snap() else tween(LANDSCAPE_CHROME_MOTION_MS),
         label = "landscapeLyricsControls",
     )
     Layout(

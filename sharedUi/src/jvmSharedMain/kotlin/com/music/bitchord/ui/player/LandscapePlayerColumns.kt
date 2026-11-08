@@ -12,22 +12,34 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 internal enum class PlayerPane { Main, Lyrics, Queue }
 private enum class LandscapeSlot { Actions, Artwork, Header, Main, Panes }
@@ -57,6 +69,22 @@ internal fun LandscapePlayerColumns(
     modifier: Modifier = Modifier,
     boundLyricsToArtwork: Boolean = false,
 ) {
+    val chrome = remember { LandscapeLyricsChrome() }
+    val headerInteraction = remember { MutableInteractionSource() }
+    val headerHovered by headerInteraction.collectIsHoveredAsState()
+    SideEffect { chrome.headerHovered = headerHovered && pane == PlayerPane.Lyrics }
+    var introductoryHeader by remember { mutableStateOf(true) }
+    LaunchedEffect(pane, boundLyricsToArtwork) {
+        introductoryHeader = true
+        if (pane == PlayerPane.Lyrics && boundLyricsToArtwork) {
+            delay(2000)
+            introductoryHeader = false
+        }
+    }
+    val showHeader = pane != PlayerPane.Lyrics || !boundLyricsToArtwork ||
+        introductoryHeader || chrome.bodyActive || headerHovered
+    val headerReveal by animateFloatAsState(if (showHeader) 1f else 0f,
+        if (reduceMotion) snap() else tween(LANDSCAPE_CHROME_MOTION_MS), label = "landscapeHeaderReveal")
     // This moves the one persistent header between its two real layouts. Song
     // changes only move the text inside it, never the controls or lyric list.
     val panelTransition = updateTransition(pane, label = "landscapeHeaderPosition")
@@ -69,7 +97,7 @@ internal fun LandscapePlayerColumns(
         if (reduceMotion) snap() else tween(120, delayMillis = if (pane == PlayerPane.Main) 240 else 0),
         label = "landscapeMainControls",
     )
-    SubcomposeLayout(modifier) { constraints ->
+    SubcomposeLayout(modifier.testTag("landscape-columns")) { constraints ->
         val width = constraints.maxWidth
         val height = constraints.maxHeight
         val leftWidth = width / 2
@@ -88,7 +116,20 @@ internal fun LandscapePlayerColumns(
             Box(Modifier.testTag("landscape-artwork")) { artwork(Modifier.fillMaxSize()) }
         }.single().measure(Constraints.fixed(geometry.artworkSize, geometry.artworkSize))
         val metadata = subcompose(LandscapeSlot.Header) {
-            Box(Modifier.testTag("landscape-track-header")) { header(pane != PlayerPane.Queue) }
+            Box(Modifier.testTag("landscape-track-header").clipToBounds()
+                .hoverable(headerInteraction, enabled = boundLyricsToArtwork && pane == PlayerPane.Lyrics)) {
+                Box(Modifier
+                    .then(if (showHeader) Modifier else Modifier.clearAndSetSemantics {})
+                    .layout { measurable, bounds ->
+                        val child = measurable.measure(bounds)
+                        layout(child.width, child.height) {
+                            if (headerReveal > 0f) child.placeRelativeWithLayer(0, 0) {
+                                translationY = -(1f - headerReveal) * child.height
+                                alpha = headerReveal
+                            }
+                        }
+                    }) { header(pane != PlayerPane.Queue) }
+            }
         }.single().measure(Constraints(
             minWidth = (rightWidth - inset * 2).coerceAtLeast(0),
             maxWidth = (rightWidth - inset * 2).coerceAtLeast(0),
@@ -118,6 +159,7 @@ internal fun LandscapePlayerColumns(
             (height - geometry.artworkTop - geometry.artworkSize).coerceAtLeast(0).toDp()
         else 0.dp
         val body = subcompose(LandscapeSlot.Panes) {
+          CompositionLocalProvider(LocalLandscapeLyricsChrome provides chrome) {
             AnimatedContent(
                 targetState = pane,
                 transitionSpec = {
@@ -131,9 +173,11 @@ internal fun LandscapePlayerColumns(
                 // gets its own inset, so switching Queue never translates an exiting panel.
                 Box(Modifier.fillMaxSize().padding(
                     start = inset.toDp(), end = inset.toDp(),
-                    top = if (shown == PlayerPane.Queue) 0.dp else topInset,
-                    bottom = if (shown == PlayerPane.Lyrics) lyricsBottomInset else 0.dp,
-                ).then(if (shown == PlayerPane.Lyrics) Modifier.testTag("landscape-lyrics-body") else Modifier).drawWithContent {
+                    top = if (shown == PlayerPane.Queue) {
+                        if (boundLyricsToArtwork) geometry.artworkTop.toDp() else 0.dp
+                    } else topInset,
+                    bottom = if (shown != PlayerPane.Main) lyricsBottomInset else 0.dp,
+                ).testTag(if (shown == PlayerPane.Lyrics) "landscape-lyrics-body" else "landscape-other-pane").drawWithContent {
                     // Reveal the lyrics beneath the travelling header. Their layout stays
                     // fixed, and no lyric can draw through the header during either direction.
                     val clipTop = if (shown == PlayerPane.Lyrics)
@@ -148,10 +192,15 @@ internal fun LandscapePlayerColumns(
                     }
                 }
             }
+          }
         }.single().measure(Constraints.fixed(rightWidth, height))
         layout(width, height) {
             art.placeRelative(inset + (contentWidth - art.width) / 2, geometry.artworkTop)
-            actionRow.placeRelative(inset + (contentWidth - actionRow.width) / 2, height - actionRow.height)
+            val actionTop = if (boundLyricsToArtwork) {
+                val coverBottom = geometry.artworkTop + geometry.artworkSize
+                coverBottom + (height - coverBottom - actionRow.height) / 2
+            } else height - actionRow.height
+            actionRow.placeRelative(inset + (contentWidth - actionRow.width) / 2, actionTop)
             if (mainAlpha > 0f) main.placeRelative(
                 leftWidth + (rightWidth - main.width) / 2, mainHeaderTop + metadata.height + headerGap)
             body.placeRelative(leftWidth, 0)

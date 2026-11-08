@@ -86,6 +86,9 @@ class DesktopLandscapePlayerTest {
             assertTrue(header.bottom < controls.top, "Transport must sit beneath the metadata")
             assertTrue(artwork.bottom < lyricsButton.top)
             assertTrue(lyricsButton.bottom < output.top, "Output caption must never overlay the real action buttons")
+            val actionBounds = onNodeWithTag("landscape-output-controls").getUnclippedBoundsInRoot()
+            val columns = onNodeWithTag("landscape-columns").getUnclippedBoundsInRoot()
+            assertEquals((actionBounds.top - artwork.bottom).value, (columns.bottom - actionBounds.bottom).value, 1f)
             assertTrue(output.bottom <= onNodeWithTag("landscape-output-controls").getUnclippedBoundsInRoot().bottom)
             save(onRoot().captureToImage(), "$width-main.png")
 
@@ -120,11 +123,18 @@ class DesktopLandscapePlayerTest {
             onNodeWithContentDescription("Romanize lyrics").assertDoesNotExist()
             onNodeWithContentDescription("Translate lyrics").assertDoesNotExist()
             save(onRoot().captureToImage(), "$width-lyrics-hidden-controls.png")
+            mainClock.advanceTimeBy(2000)
+            waitForIdle()
+            onNodeWithText("Landscape Track B").assertDoesNotExist()
+            onNodeWithText("Test Artist B").assertDoesNotExist()
+            assertEquals(viewport, onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot())
 
             onNodeWithTag("landscape-lyrics-frame").performMouseInput { enter(center) }
             mainClock.advanceTimeBy(300)
             waitForIdle()
             onNodeWithText("Lyrics by KuGou").assertIsDisplayed()
+            onNodeWithText("Landscape Track B").assertIsDisplayed()
+            onNodeWithText("Test Artist B").assertIsDisplayed()
             onNodeWithContentDescription("Romanize lyrics").assertIsDisplayed()
             onNodeWithContentDescription("Translate lyrics").assertIsDisplayed()
             val shortened = onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot()
@@ -142,6 +152,7 @@ class DesktopLandscapePlayerTest {
             mainClock.advanceTimeBy(300)
             waitForIdle()
             onNodeWithText("Lyrics by KuGou").assertDoesNotExist()
+            onNodeWithText("Landscape Track B").assertDoesNotExist()
             assertEquals(viewport, onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot())
 
             onNodeWithContentDescription("Close lyrics").performClick()
@@ -149,6 +160,12 @@ class DesktopLandscapePlayerTest {
             waitForIdle()
             assertEquals(header, onNodeWithTag("landscape-track-header").getUnclippedBoundsInRoot())
             assertEquals(controls, onNodeWithTag("landscape-main-controls").getUnclippedBoundsInRoot())
+            onNodeWithContentDescription("Queue").performClick()
+            mainClock.advanceTimeBy(600)
+            waitForIdle()
+            val queueBounds = onNodeWithTag("landscape-other-pane").getUnclippedBoundsInRoot()
+            assertEquals(artwork.top.value, queueBounds.top.value, 1f)
+            assertEquals(artwork.bottom.value, queueBounds.bottom.value, 1f)
         } finally {
             runOnIdle { mounted.value = false; DesktopWindowMode.exit() }
             waitForIdle()

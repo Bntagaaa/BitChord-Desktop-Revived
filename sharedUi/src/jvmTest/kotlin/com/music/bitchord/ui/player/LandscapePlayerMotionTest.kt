@@ -27,11 +27,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -45,6 +48,32 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class LandscapePlayerMotionTest {
     private data class Track(val id: String, val title: String = "Title $id", val origin: String = "Playing from Search", val artist: String = "Artist $id")
+
+    @Test fun headerTimesOutAndHoverRevealsBothChromeEdgesWithoutMovingLyrics() =
+        runDesktopComposeUiTest(width = 1100, height = 800) {
+            mainClock.autoAdvance = false
+            val track = mutableStateOf(Track("a"))
+            setContent { Fixture(track.value, PlayerPane.Lyrics) }
+            waitForIdle()
+            val lyrics = onNodeWithTag("lyrics").getUnclippedBoundsInRoot()
+            mainClock.advanceTimeBy(1500)
+            onNodeWithTag("title-a").assertExists()
+            runOnIdle { track.value = Track("b") }
+            mainClock.advanceTimeBy(900)
+            waitForIdle()
+            onNodeWithTag("title-b").assertDoesNotExist()
+            onNodeWithTag("landscape-lyrics-frame").performMouseInput { enter(center) }
+            mainClock.advanceTimeBy(300)
+            waitForIdle()
+            onNodeWithTag("title-b").assertIsDisplayed()
+            onNodeWithTag("fixture-footer").assertIsDisplayed()
+            assertEquals(lyrics, onNodeWithTag("lyrics").getUnclippedBoundsInRoot())
+            onNodeWithTag("landscape-lyrics-frame").performMouseInput { moveTo(centerRight + Offset(8f, 0f)) }
+            mainClock.advanceTimeBy(300)
+            waitForIdle()
+            onNodeWithTag("title-b").assertDoesNotExist()
+            onNodeWithTag("fixture-footer").assertDoesNotExist()
+        }
 
     @Test fun songChangeSlidesEveryMetadataLineUpWithoutMovingHeaderActionsOrLyrics() =
         runDesktopComposeUiTest(width = 1100, height = 800) {
@@ -289,7 +318,12 @@ class LandscapePlayerMotionTest {
                         }
                     },
                     mainPane = { Box(Modifier.fillMaxWidth().height(200.dp).testTag("main")) { Text("Scrubber and transport") } },
-                    lyricsPane = { Box(Modifier.fillMaxSize().testTag("lyrics")) { Text("Synchronized lyric rows") } },
+                    lyricsPane = {
+                        LandscapeLyricsFrame(true, false, reduceMotion,
+                            lyrics = { Box(Modifier.fillMaxSize().testTag("lyrics")) { Text("Synchronized lyric rows") } },
+                            controls = { Box(Modifier.fillMaxWidth().height(44.dp).testTag("fixture-footer")) },
+                        )
+                    },
                     queuePane = { Box(Modifier.fillMaxSize().testTag("queue")) { Text("Up Next") } },
                     modifier = Modifier.size(width.dp, height.dp).testTag("viewport"),
                 )
