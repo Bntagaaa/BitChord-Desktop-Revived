@@ -19,14 +19,13 @@ internal object DesktopMenuTuning {
     private val _blur = MutableStateFlow(saved("debug_menu_blur", 30f, 0f, 60f))
     val tintAlpha: StateFlow<Float> = _tint
     val blurRadiusDp: StateFlow<Float> = _blur
-    fun setTint(value: Float) {
-        _tint.value = value.coerceIn(0.08f, 0.95f)
-        store.saveString("debug_menu_tint", _tint.value.toString())
-    }
-    fun setBlur(value: Float) {
-        _blur.value = value.coerceIn(0f, 60f)
-        store.saveString("debug_menu_blur", _blur.value.toString())
-    }
+    // Apply immediately while dragging but commit to disk only on release.
+    // Persisting each mouse-motion event stutters fractional-scale UI.
+    fun setTint(value: Float) { _tint.value = value.coerceIn(0.08f, 0.95f) }
+    fun setBlur(value: Float) { _blur.value = value.coerceIn(0f, 60f) }
+    fun saveTint() { store.saveString("debug_menu_tint", _tint.value.toString()) }
+    fun saveBlur() { store.saveString("debug_menu_blur", _blur.value.toString()) }
+
 }
 
 @Composable
@@ -41,12 +40,20 @@ internal fun DesktopMenuDebugSettings() {
             Text("Surface opacity")
             Text("${(tint * 100).toInt()}%")
         }
-        DesktopBareSlider(tint, DesktopMenuTuning::setTint, valueRange = 0.08f..0.95f)
+        DesktopBareSlider(
+            tint, DesktopMenuTuning::setTint,
+            valueRange = 0.08f..0.95f,
+            onValueChangeFinished = DesktopMenuTuning::saveTint,
+        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Blur strength")
             Text("${blur.toInt()} dp")
         }
-        DesktopBareSlider(blur, DesktopMenuTuning::setBlur, valueRange = 0f..60f)
+        DesktopBareSlider(
+            blur, DesktopMenuTuning::setBlur,
+            valueRange = 0f..60f,
+            onValueChangeFinished = DesktopMenuTuning::saveBlur,
+        )
         Text("Reduce Dynamic Blur overrides the blur slider.", color = DesktopSecondary, style = MaterialTheme.typography.labelSmall)
     }
 }
