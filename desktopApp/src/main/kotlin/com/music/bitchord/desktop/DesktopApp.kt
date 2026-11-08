@@ -5048,7 +5048,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             state = (homeState as? UiState.Success<List<HomeShelf>>)?.let { loaded ->
                                 val prefs = DesktopContentPreferences
                                 val trimmed = loaded.data.mapNotNull { shelf ->
-                                    if (prefs.hideRecents && (shelf.title.equals("Recents", true) || shelf.title.equals("Recently played", true) || shelf.title.equals(YtMusicRepository.RECENT_TITLE, true))) return@mapNotNull null
+                                    if (prefs.hideRecents && (shelf.title.equals("Recents", ignoreCase = true) || shelf.title.equals("Recently played", ignoreCase = true))) return@mapNotNull null
                                     if (!prefs.hideHomeVideos) return@mapNotNull shelf
                                     if (shelf.layout == com.music.bitchord.data.model.ShelfLayout.VIDEO) return@mapNotNull null
                                     val kept = shelf.items.filterNot { it.isVideo }
