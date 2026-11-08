@@ -20,6 +20,11 @@ internal fun MobileSettingsPage(session: MobileSession, onExit: () -> Unit, onPa
     val signedIn by session.signedIn.collectAsState()
     val playback by session.player.state.collectAsState()
     val settings = MobilePlayerSettings
+    var contentPreferencesOpen by remember { mutableStateOf(false) }
+    if (contentPreferencesOpen) {
+        MobileContentPreferencesPage(onBack = { contentPreferencesOpen = false })
+        return
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineLarge)
         SettingsSection("Accounts") {
@@ -28,6 +33,16 @@ internal fun MobileSettingsPage(session: MobileSession, onExit: () -> Unit, onPa
             })
             if (signedIn) TextButton(onClick = session::signOut) { Text("Remove current saved account") }
             OutlinedButton(onClick = { DesktopBrowserAuth.spotify { session.notice("Spotify connected") } }) { Text("Connect Spotify") }
+        }
+        SettingsSection("Content") {
+            Text("Choose what appears in your feed and how music videos are displayed.", style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(onClick = { contentPreferencesOpen = true }) {
+                Icon(Icons.Rounded.Tune, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Content Preferences")
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+            }
         }
         SettingsSection("Appearance") {
             ReworkedAppearanceSettings()
@@ -48,18 +63,9 @@ internal fun MobileSettingsPage(session: MobileSession, onExit: () -> Unit, onPa
             SettingsFlag("Reduce animations", "reduce_animation", settings.reduceAnimation)
             SettingsFlag("Reduce dynamic blur", "reduce_dynamic_blur", settings.reduceDynamicBlur)
             SettingsFlag("Disable blend effects", "disable_blend", settings.disableBlendEffects)
-            SettingsFlag("Square video thumbnails", "square_video_thumbnails", settings.squareVideoThumbnails)
             MobileArtistSettings(session::notice)
         }
-        SettingsSection("Home") {
-            SettingsFlag("Hide recently played", "hide_recents", settings.hideRecents)
-            SettingsFlag("Hide videos in recommendations", "hide_home_videos", settings.hideHomeVideos)
-            SettingsFlag("Hide Top Picks", "hide_top_picks", settings.hideTopPicks)
-            SettingsFlag("Hide mood tiles", "hide_home_moods", settings.hideHomeMoods)
-        }
         SettingsSection("Playback") {
-            val musicOnly by MobilePlaybackPolicy.preferMusicOnly.collectAsState()
-            ReworkedToggle("Prefer music-only versions", musicOnly, MobilePlaybackPolicy::setPreferMusicOnly)
             SettingsFlag("Align audio and video versions by their sound", "smart_version_alignment", settings.smartVersionAlignment)
             val autoplay by session.autoplay.collectAsState()
             ReworkedToggle("Autoplay recommendations", autoplay) { session.autoplay.value = it; DesktopStore.preferences.putBoolean("autoplay", it) }
