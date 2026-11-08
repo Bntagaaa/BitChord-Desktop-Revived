@@ -77,69 +77,102 @@ jobs:
           printf 'LASTFM_API_KEY=%s\n' "$LASTFM_API_KEY" > local.properties
           printf 'LASTFM_SECRET=%s\n' "$LASTFM_SECRET" >> local.properties
 
-      # Keep the verified stable tool in the Actions cache. The old workflow
-      # fetched the mutable "continuous" release on every run; a GitHub CDN 504
-      # then failed AppImage builds before Gradle could even start.
-      - name: Cache stable AppImage packaging tool
-        uses: actions/cache@v4
+      # Restore a verified packaging binary before trying the network. A regular
+      # cache action saves only at the end of a successful job; on #173 the tool
+      # downloaded correctly, but the later packaging error prevented caching.
+      # Split restore/save so successful downloads survive subsequent failures.
+      - name: Restore verified AppImage tool cache
+        id: appimagetool-cache
+        uses: actions/cache/restore@v4
         with:
           path: appimagetool.AppImage
-          key: appimagetool-x86_64-1.9.1-ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+          key: appimagetool-x86_64-verified-stable-v2
 
       - name: Download and verify AppImage packaging tool
         shell: bash
         run: |
           set -euo pipefail
-          # Official, fixed AppImage/appimagetool release. Its SHA-256 is taken
-          # from the release asset metadata, not the mutable "continuous" tag.
-          expected_sha="ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+          expected_191="ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+          # 1.9.0 fallback digest recorded by successful download in CI #173.
+          expected_190="46fdd785094c7f6e545b61afcfb0f3d98d8eab243f644b4b17698c01d06083d1"
+          # Additional pinned official release, if both stable release assets
+          # are temporarily unavailable through GitHub's downloads CDN.
+          expected_continuous="e8c1169c4af66c3184d7ee110713d4be04befe671fa358e2c1591ee840553b03"
           tool_path="appimagetool.AppImage"
-          stable_url="https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
-          fallback_url="https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage"
 
-          if [[ -s "$tool_path" ]] && echo "$expected_sha  $tool_path" | sha256sum --check --status; then
-            echo "Using SHA-256 verified cached appimagetool 1.9.1"
+          checksum_valid() {
+            local sha
+            [[ -s "$1" ]] || return 1
+            sha="$(sha256sum "$1" | cut -d ' ' -f 1)"
+            [[ "$sha" == "$expected_191" || "$sha" == "$expected_190" || "$sha" == "$expected_continuous" ]]
+          }
+          valid_appimage() {
+            [[ "$(wc -c < "$1")" -ge 10000000 ]] &&
+              [[ "$(od -An -tx1 -j8 -N3 "$1" | tr -d '[:space:]')" == "414902" ]]
+          }
+
+          if checksum_valid "$tool_path" && valid_appimage "$tool_path"; then
+            echo "Reusing checksum-verified cached appimagetool"
           else
             rm -f "$tool_path"
-            downloaded=false
-            for release in 1.9.1 1.9.0; do
-              if [[ "$release" == "1.9.1" ]]; then
-                url="$stable_url"
-              else
-                url="$fallback_url"
-              fi
-              tmp="$(mktemp)"
-              echo "Fetching official appimagetool $release"
-              if curl --fail --location --silent --show-error \
-                  --connect-timeout 20 --max-time 180 \
-                  --retry 4 --retry-all-errors --retry-delay 3 \
-                  --output "$tmp" "$url"; then
-                size="$(wc -c < "$tmp")"
-                # Type-2 AppImages have the magic bytes 'AI' + 02 at offset 8.
-                magic="$(od -An -tx1 -j8 -N3 "$tmp" | tr -d '[:space:]')"
-                if [[ "$size" -ge 10000000 && "$magic" == "414902" ]]; then
-                  if [[ "$release" != "1.9.1" ]] || echo "$expected_sha  $tmp" | sha256sum --check --status; then
-                    mv "$tmp" "$tool_path"
-                    downloaded=true
-                    echo "Validated official appimagetool $release (bytes=$size)"
-                    break
-                  fi
-                  echo "::warning::appimagetool 1.9.1 checksum mismatch; rejecting download"
-                else
-                  echo "::warning::Invalid appimagetool $release (bytes=$size, type2 magic=$magic)"
-                fi
-              else
-                echo "::warning::Could not fetch official appimagetool $release; trying fallback"
-              fi
+            urls=(
+              # The GitHub Releases *API* asset endpoint can stream bytes or
+              # redirect to object storage, independently of the /download URL
+              # which intermittently returned HTTP 504 on CI runs #172/#174.
+              "https://api.github.com/repos/AppImage/appimagetool/releases/assets/324406736"
+              "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
+              "https://api.github.com/repos/AppImage/appimagetool/releases/assets/184558942"
+              "https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage"
+              "https://api.github.com/repos/AppImage/appimagetool/releases/assets/715388534"
+            )
+            digests=(
+              "$expected_191" "$expected_191"
+              "$expected_190" "$expected_190"
+              "$expected_continuous"
+            )
+            tmp="$(mktemp)"
+            trap 'rm -f "$tmp"' EXIT
+            for idx in "${!urls[@]}"; do
+              url="${urls[$idx]}"
               rm -f "$tmp"
+              curl_args=(
+                --fail --location --silent --show-error
+                --connect-timeout 20 --max-time 120
+                --retry 2 --retry-all-errors --retry-delay 3
+              )
+              if [[ "$url" == https://api.github.com/* ]]; then
+                curl_args+=(--header "Accept: application/octet-stream"
+                            --header "X-GitHub-Api-Version: 2022-11-28")
+              fi
+              echo "Trying appimagetool source $((idx + 1))/${#urls[@]}"
+              if curl "${curl_args[@]}" --output "$tmp" "$url"; then
+                if valid_appimage "$tmp" &&
+                   echo "${digests[$idx]}  $tmp" | sha256sum --check --status; then
+                  mv "$tmp" "$tool_path"
+                  echo "Accepted and SHA-256 verified appimagetool source $((idx + 1))"
+                  break
+                fi
+                echo "::warning::Rejected non-AppImage or checksum mismatch from source $((idx + 1))"
+              else
+                echo "::warning::Download source $((idx + 1)) unavailable; trying the next source"
+              fi
             done
-            if [[ "$downloaded" != true ]]; then
-              echo "::error::All official AppImage packaging tool sources failed"
+            if ! checksum_valid "$tool_path" || ! valid_appimage "$tool_path"; then
+              echo "::error::All verified appimagetool sources failed (GitHub asset API and release URLs)"
               exit 1
             fi
           fi
           chmod +x "$tool_path" gradlew desktopApp/packaging/appimage.sh
           sha256sum "$tool_path"
+
+      # Save immediately after a validated download, not at the end of the
+      # entire packaging job, so unrelated packaging/tests cannot erase the cache.
+      - name: Save verified AppImage tool cache
+        if: steps.appimagetool-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: appimagetool.AppImage
+          key: appimagetool-x86_64-verified-stable-v2
 
       # appimagetool 1.9.x invokes desktop-file-validate while packaging.
       # The Ubuntu 22.04 runner does not guarantee that binary is preinstalled.
