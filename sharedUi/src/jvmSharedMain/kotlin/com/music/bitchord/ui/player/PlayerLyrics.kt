@@ -137,6 +137,7 @@ import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.Haptics
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.icons.BitChordIcons
+import com.music.bitchord.ui.LocalLyricAnimationAllowed
 import com.music.bitchord.ui.rememberIsForeground
 import java.util.Locale
 import kotlin.math.PI
@@ -515,13 +516,13 @@ internal fun LyricsStatusWithChange(
 ) {
     val haptics = rememberHaptics()
     Row(
-        modifier = modifier,
+        modifier = modifier.additiveChrome(LocalPlayerChrome.current),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = status,
             style = MaterialTheme.typography.titleMedium,
-            color = LocalPlayerTint.current.copy(alpha = 0.55f),
+            color = playerSecondaryColor(0.55f),
             textDecoration = if (onStatusClick != null) TextDecoration.Underline else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -723,7 +724,9 @@ private fun rememberLyricClock(
     // One loop for the whole run, reading the playhead itself. Keyed on the
     // reading instead, every reading restarted it, and each restart spent a
     // frame waiting for its first frame time — a hitch twice a second.
-    val foreground = visibleOverride ?: rememberIsForeground()
+    // A desktop window can explicitly opt in while unfocused; Android still follows
+    // its normal activity lifecycle, and floating lyrics keep their visibility override.
+    val foreground = visibleOverride ?: LocalLyricAnimationAllowed.current ?: rememberIsForeground()
     LaunchedEffect(engine, playhead, isPlaying, foreground) {
         if (!isPlaying || !foreground) return@LaunchedEffect
         engine.restart()
@@ -1560,7 +1563,7 @@ internal fun LyricsTranslationMotion(
     content: @Composable (State<Float>?) -> Unit,
 ) {
     val progress = remember { Animatable(1f) }
-    val foreground = rememberIsForeground()
+    val foreground = LocalLyricAnimationAllowed.current ?: rememberIsForeground()
     // Reopening the panel or returning from the background must not replay a
     // previous toggle. A new toggle cancels the previous effect automatically.
     var consumedTrigger by remember { mutableIntStateOf(trigger) }

@@ -327,7 +327,7 @@ internal fun LandscapeTrackHeader(
             value = LandscapeTrackMetadata(song, caption),
             identity = { it.song.videoId },
             animate = active && !reduceMotion,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).additiveChrome(LocalPlayerChrome.current),
         ) { displayed, moving, interactive ->
             Column {
                 displayed.caption?.let { label ->
@@ -370,7 +370,7 @@ internal fun LandscapeCredits(
 ) {
     val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        LandscapeMetadataMotion(song, { it.videoId }, !reduceMotion, Modifier.weight(1f)) { displayed, moving, interactive ->
+        LandscapeMetadataMotion(song, { it.videoId }, !reduceMotion, Modifier.weight(1f).additiveChrome(LocalPlayerChrome.current)) { displayed, moving, interactive ->
             LandscapeCreditsText(
                 song = displayed,
                 onOpenAlbum = { if (interactive) onOpenAlbum(it) },
@@ -393,7 +393,7 @@ private fun LandscapeCreditsText(
 ) {
     Column {
         var titleOverflowing by remember(song.videoId) { mutableStateOf(false) }
-        val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
+        val artistColor = playerSecondaryColor(0.55f)
         MarqueeText(
             text = song.title,
             style = MaterialTheme.typography.titleLarge,

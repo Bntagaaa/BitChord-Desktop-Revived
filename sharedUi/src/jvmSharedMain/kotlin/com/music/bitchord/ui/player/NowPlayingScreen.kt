@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.data.settings.PlayerTheme
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.constrainHeight
@@ -764,7 +766,10 @@ fun NowPlayingScreen(
     // The sleeve's own colour, lifted pale, read off the decode the scrim above
     // already made. Plain white until it is known, and for a sleeve with no
     // colour to give.
-    val artworkTint = rememberPlayerTint(remoteArt, ART_PX) ?: Color.White
+    // The newer mobile player draws secondary text in white chrome rather than a
+    // second sampled artwork tint. Desktop can skip that extra artwork decode.
+    val mobileTextChrome = PlayerPlatform.host.mobileTextChrome
+    val artworkTint = if (mobileTextChrome) Color.White else rememberPlayerTint(remoteArt, ART_PX) ?: Color.White
 
     // Media-player convention: the player always owns light status icons. The
     // top treatment below, rather than a window-flag flip per cover, provides
@@ -865,6 +870,9 @@ fun NowPlayingScreen(
     val canvasCover = remember(canvas?.url) { mutableFloatStateOf(0f) }
     // v1.5's backdrop, kept behind a switch — see [PlayerSettings.legacyMeshGradient].
     val legacyMesh by PlayerSettings.legacyMeshGradient.collectAsStateWithLifecycle()
+    val selectedPlayerTheme by PlayerSettings.playerTheme.collectAsStateWithLifecycle()
+    // Keep Android's pre-existing Legacy toggle working; desktop uses the three-way setting.
+    val playerBackdropTheme = if (legacyMesh) PlayerTheme.LEGACY else selectedPlayerTheme
     // The backdrop's colours, taken off the artwork's own arrangement rather
     // than quantised out of it — see [ArtworkMesh].
     //
@@ -880,7 +888,7 @@ fun NowPlayingScreen(
     // with it every few seconds. What keeps that affordable is the size of each
     // read, not the number of them: the frame comes back at `frameCapturePx`
     // rather than full-bleed, and is averaged on a stride off the main thread.
-    val meshRefreshMs = MESH_REFRESH_MS
+    val meshRefreshMs = MESH_REFRESH_MS.takeIf { playerBackdropTheme != PlayerTheme.SIMPLE }
 
     val scrub = rememberPlayerScrub(song.videoId, position, durationMs)
     // Read by the scrubber itself — see [PlayerScrubber.shown].
@@ -1374,7 +1382,7 @@ fun NowPlayingScreen(
     }
     // Portrait clips always use the existing artwork mesh, even if the user
     // selected the legacy backdrop for ordinary artwork.
-    val artMesh = if (legacyMesh && !canvasFirstPortrait) null else
+    val artMesh = if (playerBackdropTheme != PlayerTheme.DEFAULT) null else
         key(song.videoId) { rememberArtworkMesh(remoteArt, canvasFrame, ART_PX) }
     // Whether the banner is the presentation at all: full-bleed is on, and there
     // is something to blow out. The collapse is deliberately *not* part of this:
@@ -1649,8 +1657,8 @@ fun NowPlayingScreen(
     val fullArtworkBlurImage = rememberFullArtworkBlurImage(
         imageUrl = remoteArt,
         artPx = ART_PX,
-        prepare = landscape || tabletArtworkBackdrop || lyricsOpen || queueOpen ||
-            playerPrewarmStage >= 1,
+        prepare = playerBackdropTheme == PlayerTheme.SIMPLE ||
+            landscape || tabletArtworkBackdrop || lyricsOpen || queueOpen || playerPrewarmStage >= 1,
     )
     // One movable Image node, not two backdrop call sites. Compose carries it
     // between the portrait and landscape players; only the cached bitmap
@@ -1773,7 +1781,15 @@ fun NowPlayingScreen(
         animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
         label = "playerTint",
     )
-    CompositionLocalProvider(LocalPlayerTint provides playerTint) {
+    val reduceBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    // Mobile uses additive white chrome for titles, artists and captions. Keep it
+    // scoped to the player and avoid extra graphics layers when Reduce Blur is on
+    // or a full-screen music video is the backdrop.
+    val chrome = mobileTextChrome && !reduceBlur && !videoMode
+    CompositionLocalProvider(
+        LocalPlayerTint provides if (mobileTextChrome) Color.White else playerTint,
+        LocalPlayerChrome provides chrome,
+    ) {
         val reducePlayerMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
         val landscapeTrackHeader: @Composable (Boolean, Boolean) -> Unit = { compact, active ->
             LandscapeTrackHeader(
@@ -2026,9 +2042,26 @@ fun NowPlayingScreen(
                         else -> PlayerPane.Main
                     },
                     background = { backgroundModifier ->
-                        // The whole screen is the sheets' frost source: there is
-                        // no full-bleed banner here to be it instead.
-                        fullArtworkBlurContent(backgroundModifier.hazeSource(playerHaze))
+                        // On desktop the expanded player is usually landscape. Give
+                        // each theme its own backdrop, using the existing cached
+                        // low-resolution CPU blur for Simple (and the Default fallback).
+                        val backdropModifier = backgroundModifier.hazeSource(playerHaze)
+                        when (playerBackdropTheme) {
+                            PlayerTheme.DEFAULT ->
+                                if (artMesh != null) {
+                                    ArtworkMeshBackdrop(
+                                        mesh = artMesh,
+                                        seam = 0.dp,
+                                        modifier = backdropModifier,
+                                    )
+                                } else fullArtworkBlurContent(backdropModifier)
+                            PlayerTheme.LEGACY -> MeshGradientBackground(
+                                palette = rememberArtworkColors(remoteArt, canvasFrame),
+                                trackKey = song.videoId,
+                                modifier = backdropModifier,
+                            )
+                            PlayerTheme.SIMPLE -> fullArtworkBlurContent(backdropModifier)
+                        }
                     },
                     artwork = { artworkModifier ->
                         LandscapeArtwork(
@@ -2222,11 +2255,12 @@ fun NowPlayingScreen(
                 // Legacy mesh is the whole backdrop on every page, so the lyrics and
                 // queue panels must not crossfade the blurred artwork over it.
                 val legacyMeshBackdrop = !tabletArtworkBackdrop && !spotifyCanvasPresentation &&
-                    legacyMesh && !canvasFirstPortrait
+                    playerBackdropTheme == PlayerTheme.LEGACY && !canvasFirstPortrait
                 val fullArtworkBackdropAlpha by animateFloatAsState(
                     targetValue = if (
                         !legacyMeshBackdrop &&
-                        (tabletArtworkBackdrop || lyricsOpen || queueOpen || !heroMode) &&
+                        (tabletArtworkBackdrop || playerBackdropTheme == PlayerTheme.SIMPLE ||
+                            lyricsOpen || queueOpen || !heroMode) &&
                         (tabletArtworkBackdrop || fullArtworkBlurImage != null)
                     ) 1f else 0f,
                     animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
@@ -2245,7 +2279,8 @@ fun NowPlayingScreen(
                         trackKey = song.videoId,
                         modifier = Modifier.graphicsLayer { alpha = 1f - fullArtworkBackdropAlpha },
                     )
-                } else if (!tabletArtworkBackdrop && !spotifyCanvasPresentation) {
+                } else if (playerBackdropTheme == PlayerTheme.DEFAULT &&
+                    !tabletArtworkBackdrop && !spotifyCanvasPresentation) {
                     ArtworkMeshBackdrop(
                         mesh = artMesh,
                         seam = if (canvasFirstPortrait) renderedCanvasBottom else if (heroMode) heroHeight else 0.dp,
@@ -2295,7 +2330,8 @@ fun NowPlayingScreen(
                             presentationAlpha = { (1f - 2f * p()).coerceIn(0f, 1f) * dockFade() },
                             onRenderedChanged = { canvasRendered = it },
                             onFrameCaptured = {
-                                if (!clipFullscreen && !tabletArtworkBackdrop &&
+                                if (playerBackdropTheme != PlayerTheme.SIMPLE &&
+                                    !clipFullscreen && !tabletArtworkBackdrop &&
                                     !lyricsOpen && !queueOpen && !queueDragging
                                 ) canvasFrame = it
                             },
@@ -2568,7 +2604,8 @@ fun NowPlayingScreen(
                                 .graphicsLayer { alpha = spotifyChromeAlpha }
                                 .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(LocalPlayerTint.current.copy(alpha = 0.70f)),
+                                .additiveChrome(LocalPlayerChrome.current)
+                                .background(playerSecondaryColor(0.70f)),
                         )
                         // [p] is the shared album-to-panel transition. Keeping this in
                         // composition until its final frame gives the caption a real
@@ -3518,11 +3555,12 @@ fun NowPlayingScreen(
                                 // it.
                                 Crossfade(
                                     targetState = song.title to song.artist,
+                                    modifier = Modifier.additiveChrome(LocalPlayerChrome.current),
                                     animationSpec = tween(durationMillis = 300),
                                     label = "playerCredits",
                                 ) {
                                     val scrolling = scrolls()
-                                    val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
+                                    val artistColor = playerSecondaryColor(0.55f)
                                     Column {
                                         MarqueeText(
                                             text = song.title,

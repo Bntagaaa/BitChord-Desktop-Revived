@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -289,5 +291,21 @@ internal fun DesktopDropdownMenu(
         shape = shape,
         containerColor = Color.Transparent,
         content = content,
+    )
+}
+
+/** Compact, consistent rows for desktop dropdowns (sort, language and display-scale choices). */
+@Composable
+internal fun DesktopDropdownMenuItem(
+    text: @Composable () -> Unit,
+    onClick: () -> Unit,
+    trailingIcon: (@Composable () -> Unit)? = null,
+) {
+    androidx.compose.material3.DropdownMenuItem(
+        text = text,
+        onClick = onClick,
+        trailingIcon = trailingIcon,
+        modifier = Modifier.height(40.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp),
     )
 }

@@ -168,7 +168,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -334,6 +333,7 @@ import com.music.bitchord.data.model.isSameTrackAs
 import com.music.bitchord.data.model.withoutRepeatsOf
 import com.music.bitchord.data.settings.AutomixPerformanceMode
 import com.music.bitchord.data.settings.LastPlayerScreen
+import com.music.bitchord.data.settings.PlayerTheme
 import com.music.bitchord.data.settings.SmartAnalysis
 import com.music.bitchord.data.settings.TrackAnalysisState
 import com.music.bitchord.data.settings.TransitionWindow
@@ -487,7 +487,7 @@ internal fun desktopColorScheme() =
 internal fun desktopTypography(mode: DesktopFontMode = DesktopFontSettings.mode): Typography =
     desktopSfProTypography(mode)
 
-private enum class DesktopDestination(val id: String, val label: String) {
+internal enum class DesktopDestination(val id: String, val label: String) {
     LISTEN_NOW("listen-now", "Home"),
     NEW("new", "New"),
     EXPLORE("explore", "Explore"),
@@ -616,6 +616,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var libraryShowAll by remember { mutableStateOf<HomeShelf?>(null) }
     /** Where the one back button in the top bar goes: every place visited, oldest first. */
     val navHistory = remember { mutableStateListOf<DesktopNavEntry>() }
+    val recentPageUsage = remember { mutableStateListOf(DesktopDestination.LISTEN_NOW) }
     /** Set while [goBack] puts a place back, so that move is not itself recorded as a visit. */
     val navRestoring = remember { booleanArrayOf(false) }
     /** Opens a song's menu at the pointer; set by the pages' menu host once it is in place. */
@@ -623,6 +624,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     val homeSeenTitles = remember { HashSet<String>() }
     var homeGeneration by remember { mutableStateOf(0) }
     var homeIdentity by remember { mutableStateOf<String?>(null) }
+    var homeEvicted by remember { mutableStateOf(false) }
     var homeJob by remember { mutableStateOf<Job?>(null) }
     var homeRenderedLogged by remember { mutableStateOf(false) }
     var exploreState by remember { mutableStateOf<UiState<List<MoodGenreSection>>>(UiState.Loading) }
@@ -729,8 +731,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var dolbyAtmos by remember { mutableStateOf(persistence.boolean("dolby_atmos", true)) }
     var skipSilence by remember { mutableStateOf(persistence.boolean("skip_silence", false)) }
     var outputPrecision by remember { mutableStateOf(persistence.string("output_precision", "PCM_16")) }
-    // The blob backdrop the mesh replaced, kept as an opt-out.
-    var legacyMeshGradient by remember { mutableStateOf(persistence.boolean("legacy_mesh_gradient", false)) }
     var animatedCanvas by remember { mutableStateOf(persistence.boolean("animated_canvas", true)) }
     var spotifyCanvasCookie by remember { mutableStateOf(DesktopSpotifyToken.cookie()) }
     var spotifyPlaylists by remember { mutableStateOf<List<SpotifyPlaylist>>(emptyList()) }
@@ -2830,6 +2830,14 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         loadHome()
     }
 
+    // A trimmed Home feed must be fetched again on the next visit, while preserving Back history.
+    LaunchedEffect(destination) {
+        if (destination == DesktopDestination.LISTEN_NOW && homeEvicted) {
+            homeEvicted = false
+            loadHome()
+        }
+    }
+
     // The feed is the account's: signing in, out or across to another channel is a different Home,
     // and Recently Played only exists with an account behind it.
     LaunchedEffect(youtubeSignedIn, activeAccountId) {
@@ -2940,6 +2948,45 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
             (newState is UiState.Loading || newReloads > 0)
         ) {
             loadNew()
+        }
+    }
+
+    // Page composables are already disposed on navigation; under RSS pressure trim
+    // their retained feed data. History, playback and the active page are untouched.
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            delay(5_000L)
+            val rss = withContext(Dispatchers.IO) { DesktopPageMemoryPolicy.processResidentBytes() }
+            if (rss == null || rss < DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES) continue
+            val evict = DesktopPageMemoryPolicy.oldestEvictable(recentPageUsage, destination) ?: continue
+            when (evict) {
+                DesktopDestination.LISTEN_NOW -> {
+                    homeJob?.cancel()
+                    homeJob = null
+                    homeState = UiState.Loading
+                    homeContinuation = null
+                    homeSeenTitles.clear()
+                    topPicks = null
+                    topPicksLoading = false
+                    homeIdentity = null
+                    homeEvicted = true
+                    homeGeneration++ // Ignore any in-flight Home responses from before eviction.
+                    homeRenderedLogged = false
+                }
+                DesktopDestination.NEW -> newState = UiState.Loading
+                DesktopDestination.SEARCH, DesktopDestination.EXPLORE -> {
+                    searchJob?.cancel()
+                    searchJob = null
+                    searchSession.reset()
+                    searchSuggestions = emptyList()
+                    searchTypeahead = emptyList()
+                    exploreState = UiState.Loading
+                    moodGenreShelves = UiState.Loading
+                }
+                else -> Unit
+            }
+            recentPageUsage.remove(evict)
+            DesktopTrackLog.log("memory: evicted inactive page ${evict.id} at ${rss / 1_048_576L} MiB RSS")
         }
     }
 
@@ -3169,6 +3216,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
             }
             // The newest copy of the same place, so an album that has paged in more tracks comes
             // back with them.
+            recentPageUsage.remove(now.destination)
+            recentPageUsage.add(now.destination)
             last = now
         }
     }
@@ -3329,7 +3378,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         DesktopPlayerHost.videoSpeed = playbackSpeed
         DesktopPlayerSettings.animatedCanvas.value = animatedCanvas
         DesktopPlayerSettings.fullBleedArtwork.value = fullBleedArtwork
-        DesktopPlayerSettings.legacyMeshGradient.value = legacyMeshGradient
         DesktopPlayerSettings.lyricsBlur.value = lyricsBlur
         DesktopPlayerSettings.syncedLyrics.value = syncedLyrics
         DesktopPlayerSettings.showNerdStats.value = showNerdStats
@@ -4681,11 +4729,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                     onFullBleedArtworkChange = {
                                         fullBleedArtwork = it
                                         persistence.saveBoolean("full_bleed_artwork", it)
-                                    },
-                                    legacyMeshGradient = legacyMeshGradient,
-                                    onLegacyMeshGradientChange = {
-                                        legacyMeshGradient = it
-                                        persistence.saveBoolean("legacy_mesh_gradient", it)
                                     },
                                     spatialAudio = spatialAudio,
                                     onSpatialAudioChange = {
@@ -7527,8 +7570,6 @@ private fun DesktopSettingsScreen(
     onShowNerdStatsChange: (Boolean) -> Unit,
     fullBleedArtwork: Boolean,
     onFullBleedArtworkChange: (Boolean) -> Unit,
-    legacyMeshGradient: Boolean,
-    onLegacyMeshGradientChange: (Boolean) -> Unit,
     trayIconEnabled: Boolean,
     closeToTray: Boolean,
     onCloseToTrayChange: (Boolean) -> Unit,
@@ -7776,6 +7817,13 @@ private fun DesktopSettingsScreen(
                     // Nothing to choose between while the feature is off, and the sources are
                     // third-party services reached on the listener's connection.
                     if (syncedLyrics) {
+                        val animateLyricsWhileUnfocused by DesktopAppearanceSettings.animateLyricsWhileUnfocused.collectAsState()
+                        SettingsToggle(
+                            "Continue lyrics animation when unfocused",
+                            "Keep synced lyrics moving on a visible second monitor. May use more CPU/GPU; stops when minimized or hidden.",
+                            animateLyricsWhileUnfocused,
+                            DesktopAppearanceSettings::setAnimateLyricsWhileUnfocused,
+                        )
                         SettingsToggle(
                             DesktopStrings["d_blur_unfocused_lyrics", "Blur unfocused lyrics"],
                             DesktopStrings["d_keeps_the_spotlight_on_the_current_line", "Keeps the spotlight on the current line"],
@@ -7810,7 +7858,7 @@ private fun DesktopSettingsScreen(
                         ) { languageMenuOpen = true }
                         DesktopDropdownMenu(languageMenuOpen, onDismissRequest = { languageMenuOpen = false }) {
                             DesktopStrings.available.forEach { language ->
-                                DropdownMenuItem(
+                                DesktopDropdownMenuItem(
                                     text = { Text(language.label) },
                                     trailingIcon = if (language.tag == chosen) {
                                         { Icon(BitChordIcons.Check, contentDescription = null) }
@@ -8028,7 +8076,7 @@ private fun DesktopSettingsScreen(
                                     onDismissRequest = { uiScaleMenuOpen = false },
                                 ) {
                                     DesktopUiScaleSettings.options.forEach { percent ->
-                                        DropdownMenuItem(
+                                        DesktopDropdownMenuItem(
                                             text = { Text("$percent%") },
                                             trailingIcon = if (percent == uiScalePercent) {
                                                 { Icon(BitChordIcons.Check, contentDescription = null) }
@@ -8114,12 +8162,58 @@ private fun DesktopSettingsScreen(
                         fullBleedArtwork,
                         onFullBleedArtworkChange,
                     )
-                    SettingsToggle(
-                        DesktopStrings["legacy_mesh_gradient", "Legacy mesh gradient"],
-                        DesktopStrings["d_use_the_older_blob_backdrop_behind_the_player", "Use the older blob backdrop behind the player"],
-                        legacyMeshGradient,
-                        onLegacyMeshGradientChange,
-                    )
+                    // Like the mobile segmented setting; preserve all three backdrop implementations.
+                    val playerTheme by DesktopPlayerThemeSettings.theme.collectAsState()
+                    if (settingsRowVisible("Player theme", "Default Legacy Simple background mesh gradient blur")) {
+                        val playerThemeDescription = when (playerTheme) {
+                            PlayerTheme.DEFAULT -> "The cover's own colours carry on below it."
+                            PlayerTheme.LEGACY -> "Animated colours from the cover drift behind the player."
+                            PlayerTheme.SIMPLE -> "A soft blur of the cover fills the player."
+                        }
+                        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                            Text("Player theme", fontWeight = FontWeight.Medium)
+                            Text(
+                                playerThemeDescription,
+                                color = DesktopSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(if (DesktopTheme.isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.08f))
+                                    .padding(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                PlayerTheme.entries.forEach { option ->
+                                    val selected = playerTheme == option
+                                    val optionLabel = when (option) {
+                                        PlayerTheme.DEFAULT -> "Default"
+                                        PlayerTheme.LEGACY -> "Legacy"
+                                        PlayerTheme.SIMPLE -> "Simple"
+                                    }
+                                    Box(
+                                        modifier = Modifier.weight(1f)
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(
+                                                if (selected) {
+                                                    if (DesktopTheme.isDark) Color.White.copy(alpha = 0.24f) else Color.White
+                                                } else Color.Transparent,
+                                            )
+                                            .clickable { DesktopPlayerThemeSettings.setTheme(option) }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            optionLabel,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                     SettingsToggle(
                         DesktopStrings["d_animated_canvas", "Animated canvas"],
                         DesktopStrings["d_show_motion_artwork_when_it_is_available", "Show motion artwork when it is available"],

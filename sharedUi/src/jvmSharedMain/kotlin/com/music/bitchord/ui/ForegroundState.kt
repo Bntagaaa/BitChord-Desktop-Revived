@@ -2,6 +2,7 @@ package com.music.bitchord.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -9,6 +10,12 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+
+/**
+ * Desktop overrides lyric animation activity independently of the Android lifecycle.
+ * Null preserves the original lifecycle-based behavior on platforms without an override.
+ */
+val LocalLyricAnimationAllowed = compositionLocalOf<Boolean?> { null }
 
 /**
  * Whether the app is actually on screen.
