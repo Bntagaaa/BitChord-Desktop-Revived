@@ -3,6 +3,9 @@ name: Build tes Appimage
 # One-click portable Linux build from the branch selected in Actions.
 # This workflow does NOT publish a release or modify the AUR.
 on:
+  # Keep the landscape PR's downloadable binary tied to its latest commit.
+  push:
+    branches: [fix/1.9.2-landscape-lyrics-track-header]
   workflow_call:
     inputs:
       version:
@@ -52,6 +55,9 @@ jobs:
         run: |
           set -euo pipefail
           version="${INPUT_VERSION:-1.8.2-test}"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            version="1.9.2-landscape-${GITHUB_SHA:0:8}"
+          fi
           if [[ ! "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
             echo "::error::Version label may only contain letters, digits, '.', '_' and '-' (max 64 characters)."
             exit 1
@@ -319,6 +325,7 @@ jobs:
           test -x squashfs-root/usr/bin/BitChord
           test -f squashfs-root/bitchord.desktop
           test -f squashfs-root/bitchord.png
+          python3 .github/scripts/check-packaged-player-ui.py squashfs-root/usr
           bash desktopApp/packaging/tests/linux-automix-check.sh squashfs-root/usr
           sha256sum "$appimage"
           ls -lh "$appimage"
