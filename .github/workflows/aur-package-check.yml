@@ -6,7 +6,7 @@ on:
       - 'packaging/aur/**'
       - '.github/workflows/aur-package-check.yml'
   push:
-    branches: [main]
+    branches: [main, '1.9.1', '1.9.2']
     paths:
       - 'packaging/aur/**'
       - '.github/workflows/aur-package-check.yml'
