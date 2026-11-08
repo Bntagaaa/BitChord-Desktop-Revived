@@ -46,7 +46,12 @@ jobs:
       - name: Tests
         env:
           BITCHORD_PIP_NATIVE_TEST: '1'
-        run: xvfb-run -a ./gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua"
+        shell: bash
+        run: xvfb-run -a ./gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | tee desktop-tests.log
+
+      - name: Report test failures
+        if: failure()
+        run: python .github/scripts/report-desktop-test-failures.py
 
       - name: Build the distributable
         run: ./gradlew :desktopApp:createDistributable "-Pbitchord.version=test-visua"
@@ -111,7 +116,13 @@ jobs:
 
       # Keep Windows' EXE/MSI metadata valid for the same descriptive build labels.
       - name: Tests
-        run: .\gradlew.bat :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua"
+        run: |
+          .\gradlew.bat :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | Tee-Object -FilePath desktop-tests.log
+          exit $LASTEXITCODE
+
+      - name: Report test failures
+        if: failure()
+        run: python .github/scripts/report-desktop-test-failures.py
 
       - name: Build the distributable
         run: .\gradlew.bat :desktopApp:createDistributable "-Pbitchord.version=test-visua"
