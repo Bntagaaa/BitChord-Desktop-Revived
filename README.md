@@ -1,5 +1,9 @@
 # BitChord Desktop Reworked
 
+> [!WARNING]
+> **EXPERIMENTAL BRANCH — NOT A STABLE RELEASE**
+> `bitchord-desktop-reworked` is an experimental mobile-to-desktop rewrite for development and testing only. Expect incomplete features, regressions and breaking changes on Windows/Linux. Do **not** treat this branch as the release/production baseline; use `1.9.2` for the active Desktop Revived feature work. Test packages at your own risk and report issues separately from stable releases.
+
 This branch, `bitchord-desktop-reworked`, builds a fresh **Windows and Linux x86_64** application from the original BitChord mobile stable **v1.9.1**. It uses the original shared UI, music clients, assets and playback algorithms with new desktop adapters, then recreates the non-optimization desktop features audited from Revived **1.9.2**.
 
 The desktop product is **BitChordReworked**, with a separate application profile and installer identity. This is a development branch: use the **Reworked desktop** Actions workflow's Windows/Linux artifacts after their jobs pass. The original mobile download links below still describe the upstream Android application.
