@@ -262,7 +262,7 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
                                 val visibleHome = remember(home, hideRecents, hideVideos) {
                                     (home as? UiState.Success)?.let { loaded ->
                                         var shelves = loaded.data
-                                        if (hideRecents) shelves = shelves.filterNot { it.title == YtMusicRepository.RECENT_TITLE }
+                                        if (hideRecents) shelves = shelves.filterNot { it.title.equals(YtMusicRepository.RECENT_TITLE, ignoreCase = true) || it.title.equals("Recently played", ignoreCase = true) || it.title.equals("Recents", ignoreCase = true) }
                                         if (hideVideos) shelves = shelves.withoutVideos()
                                         UiState.Success(shelves)
                                     } ?: home
