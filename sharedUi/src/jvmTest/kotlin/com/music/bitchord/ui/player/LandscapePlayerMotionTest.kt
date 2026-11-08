@@ -229,7 +229,7 @@ class LandscapePlayerMotionTest {
                     val root = onNodeWithTag("viewport").getUnclippedBoundsInRoot()
                     assertEquals(art.top.value, header.top.value, .1f, "$width x $height at $density")
                     assertTrue(body.top >= header.bottom)
-                    assertTrue(body.bottom <= root.bottom)
+                    assertEquals(art.bottom.value, body.bottom.value, .1f, "Lyrics must stop at the cover bottom")
                     assertTrue(body.right <= root.right)
                     assertTrue((body.bottom - body.top).value > 0)
                 }
@@ -267,6 +267,7 @@ class LandscapePlayerMotionTest {
             Surface {
                 LandscapePlayerColumns(
                     pane, compact = height < 440, gutter = 24.dp, reduceMotion = reduceMotion,
+                    boundLyricsToArtwork = true,
                     artwork = { Box(it.background(Color.DarkGray).testTag("artwork")) },
                     actions = {
                         Box(Modifier.fillMaxWidth().height(34.dp).testTag("output-buttons")) { Text("Lyrics   Output   Queue") }

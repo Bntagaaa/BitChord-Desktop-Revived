@@ -155,6 +155,7 @@ internal fun LandscapePlayerLayout(
                 mainPane = { mainPane(compact) },
                 lyricsPane = lyricsPane,
                 queuePane = queuePane,
+                boundLyricsToArtwork = PlayerPlatform.host.musicVideoFullscreen != null,
                 modifier = Modifier
                     .widthIn(max = LANDSCAPE_PLAYER_MAX_WIDTH)
                     .fillMaxSize()
@@ -454,13 +455,9 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
 }
 
 /**
- * The landscape player's right column with the lyrics open: the sheet, and
- * under it the romanize / source / translate bar.
- *
- * The bar is where the portrait player's status line and its two floating
- * toggles went. There the line sits over the scrubber and the toggles float
- * over the foot of the words; here there is no scrubber beside the lyrics, and
- * the bar gives all three a place of their own that costs the sheet no lines.
+ * The landscape lyric sheet and its existing romanize / source / translate bar.
+ * Desktop reveals the bar on hover and borrows space from the visible sheet;
+ * touch and standalone sidebar callers keep their permanently visible bar.
  */
 @Composable
 internal fun LandscapeLyricsPane(
@@ -475,15 +472,18 @@ internal fun LandscapeLyricsPane(
     pickBar: @Composable () -> Unit = {},
     romanizationToggle: @Composable () -> Unit,
     translationToggle: @Composable () -> Unit,
+    revealControlsOnHover: Boolean = false,
+    controlsPinned: Boolean = false,
+    reduceMotion: Boolean = false,
     modifier: Modifier = Modifier,
     panel: @Composable (Modifier) -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-        ) {
+    LandscapeLyricsFrame(
+        revealControlsOnHover = revealControlsOnHover,
+        controlsPinned = controlsPinned || picking,
+        reduceMotion = reduceMotion,
+        modifier = modifier,
+        lyrics = {
             if (hasLyrics) {
                 panel(Modifier.fillMaxSize())
             } else {
@@ -499,36 +499,38 @@ internal fun LandscapeLyricsPane(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
-        }
-        // While a pick is open the row below gives way to the bar: the two
-        // toggles in it would redraw the very lines the pick is indexing, and
-        // the status line is the one thing the bar's own Cancel and Share sit
-        // where.
-        if (picking) {
-            Box(Modifier.fillMaxWidth()) { pickBar() }
-        } else {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Fixed slots either side whether or not the toggles are drawn, so
-            // the status line stays centred as lyrics arrive.
-            Box(Modifier.size(34.dp)) { if (hasLyrics) romanizationToggle() }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                LyricsStatusWithChange(
-                    status = status,
-                    onStatusClick = onStatusClick,
-                )
+        },
+        controls = {
+            // While a pick is open the row below gives way to the bar: the two
+            // toggles in it would redraw the very lines the pick is indexing, and
+            // the status line is the one thing the bar's own Cancel and Share sit
+            // where.
+            if (picking) {
+                Box(Modifier.fillMaxWidth()) { pickBar() }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Fixed slots either side whether or not the toggles are drawn, so
+                    // the status line stays centred as lyrics arrive.
+                    Box(Modifier.size(34.dp)) { if (hasLyrics) romanizationToggle() }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        LyricsStatusWithChange(
+                            status = status,
+                            onStatusClick = onStatusClick,
+                        )
+                    }
+                    Box(Modifier.size(34.dp)) { if (hasLyrics) translationToggle() }
+                }
             }
-            Box(Modifier.size(34.dp)) { if (hasLyrics) translationToggle() }
-        }
-        }
-    }
+        },
+    )
 }

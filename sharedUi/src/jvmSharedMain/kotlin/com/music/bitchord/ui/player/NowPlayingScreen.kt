@@ -1808,6 +1808,9 @@ fun NowPlayingScreen(
         }
         val landscapeLyricsPane: @Composable () -> Unit = {
             LandscapeLyricsPane(
+                revealControlsOnHover = PlayerPlatform.host.musicVideoFullscreen != null,
+                controlsPinned = showLyricsProviders,
+                reduceMotion = reducePlayerMotion,
                 hasLyrics = lyricsTranslation.displayedLyrics.isNotEmpty(),
                 placeholder = if (lyricsUnavailable) {
                     stringResource(Res.string.lyrics_not_available)

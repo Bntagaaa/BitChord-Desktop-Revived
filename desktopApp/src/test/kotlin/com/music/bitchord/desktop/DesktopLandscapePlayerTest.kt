@@ -3,6 +3,7 @@ package com.music.bitchord.desktop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -10,6 +11,8 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.*
 import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.lyrics.LyricLine
+import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.settings.LastPlayerScreen
 import com.music.bitchord.playback.PlaybackPosition
 import com.music.bitchord.ui.player.*
@@ -64,8 +67,10 @@ class DesktopLandscapePlayerTest {
                             onCycleRepeat = {}, onToggleAutoplay = {}, onJumpTo = {}, onRemoveFromQueue = {},
                             onMoveInQueue = { _, _ -> }, onClearQueue = {}, onOpenMenu = {}, onOpenAlbum = {},
                             onOpenArtist = { _, _ -> }, onOpenPlaybackSource = {}, onListenTogether = {},
-                            lyrics = null, lyricsSource = null, lyricsProviderStates = emptyMap(),
-                            onSelectLyricsProvider = {}, lyricsUnavailable = true, lyricsOffsetOpen = false,
+                            lyrics = listOf(LyricLine(0, "First lyric"), LyricLine(20_000, "Current lyric"),
+                                LyricLine(40_000, "Next lyric"), LyricLine(60_000, "Last lyric")),
+                            lyricsSource = LyricsSource.KUGOU, lyricsProviderStates = emptyMap(),
+                            onSelectLyricsProvider = {}, lyricsUnavailable = false, lyricsOffsetOpen = false,
                             onDismissLyricsOffset = {}, windowWidth = windowWidth, windowHeight = windowHeight)
                     }
                 }
@@ -107,7 +112,37 @@ class DesktopLandscapePlayerTest {
             val lyricsHeader = onNodeWithTag("landscape-track-header").getUnclippedBoundsInRoot()
             assertEquals(artwork.top.value, lyricsHeader.top.value, 1f)
             assertTrue(onNodeWithTag("landscape-lyrics-body").getUnclippedBoundsInRoot().top >= lyricsHeader.bottom)
-            save(onRoot().captureToImage(), "$width-lyrics.png")
+            val frame = onNodeWithTag("landscape-lyrics-frame").getUnclippedBoundsInRoot()
+            val viewport = onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot()
+            assertEquals(artwork.bottom.value, frame.bottom.value, 1f, "Lyrics cut out at the bottom of the cover")
+            assertEquals(frame.bottom, viewport.bottom, "Hidden controls reserve no space")
+            onNodeWithText("Lyrics by KuGou").assertDoesNotExist()
+            onNodeWithContentDescription("Romanize lyrics").assertDoesNotExist()
+            onNodeWithContentDescription("Translate lyrics").assertDoesNotExist()
+            save(onRoot().captureToImage(), "$width-lyrics-hidden-controls.png")
+
+            onNodeWithTag("landscape-lyrics-frame").performMouseInput { enter(center) }
+            mainClock.advanceTimeBy(300)
+            waitForIdle()
+            onNodeWithText("Lyrics by KuGou").assertIsDisplayed()
+            onNodeWithContentDescription("Romanize lyrics").assertIsDisplayed()
+            onNodeWithContentDescription("Translate lyrics").assertIsDisplayed()
+            val shortened = onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot()
+            assertEquals(44f, (viewport.bottom - shortened.bottom).value, 1f)
+            assertEquals(frame, onNodeWithTag("landscape-lyrics-frame").getUnclippedBoundsInRoot())
+            assertEquals(lyricsHeader, onNodeWithTag("landscape-track-header").getUnclippedBoundsInRoot())
+            save(onRoot().captureToImage(), "$width-lyrics-hover-controls.png")
+
+            // Enter the revealed footer itself: the fixed outer hover target must
+            // keep all three controls present until the pointer actually leaves.
+            onNodeWithText("Lyrics by KuGou").performMouseInput { moveTo(center) }
+            mainClock.advanceTimeBy(100)
+            onNodeWithContentDescription("Translate lyrics").assertIsDisplayed()
+            onNodeWithTag("landscape-lyrics-frame").performMouseInput { moveTo(centerRight + Offset(8f, 0f)) }
+            mainClock.advanceTimeBy(300)
+            waitForIdle()
+            onNodeWithText("Lyrics by KuGou").assertDoesNotExist()
+            assertEquals(viewport, onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot())
 
             onNodeWithContentDescription("Close lyrics").performClick()
             mainClock.advanceTimeBy(600)

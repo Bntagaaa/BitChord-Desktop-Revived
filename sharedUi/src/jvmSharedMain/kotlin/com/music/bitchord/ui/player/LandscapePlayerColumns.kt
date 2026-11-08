@@ -55,6 +55,7 @@ internal fun LandscapePlayerColumns(
     lyricsPane: @Composable () -> Unit,
     queuePane: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    boundLyricsToArtwork: Boolean = false,
 ) {
     // This moves the one persistent header between its two real layouts. Song
     // changes only move the text inside it, never the controls or lyric list.
@@ -113,6 +114,9 @@ internal fun LandscapePlayerColumns(
         val bodyTop = (geometry.headerTop + metadata.height + headerGap)
             .coerceAtMost(height)
         val topInset = bodyTop.toDp()
+        val lyricsBottomInset = if (boundLyricsToArtwork)
+            (height - geometry.artworkTop - geometry.artworkSize).coerceAtLeast(0).toDp()
+        else 0.dp
         val body = subcompose(LandscapeSlot.Panes) {
             AnimatedContent(
                 targetState = pane,
@@ -128,6 +132,7 @@ internal fun LandscapePlayerColumns(
                 Box(Modifier.fillMaxSize().padding(
                     start = inset.toDp(), end = inset.toDp(),
                     top = if (shown == PlayerPane.Queue) 0.dp else topInset,
+                    bottom = if (shown == PlayerPane.Lyrics) lyricsBottomInset else 0.dp,
                 ).then(if (shown == PlayerPane.Lyrics) Modifier.testTag("landscape-lyrics-body") else Modifier).drawWithContent {
                     // Reveal the lyrics beneath the travelling header. Their layout stays
                     // fixed, and no lyric can draw through the header during either direction.
