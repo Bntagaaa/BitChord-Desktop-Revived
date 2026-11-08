@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -98,7 +99,7 @@ class LandscapePlayerMotionTest {
             assertEquals(header, onNodeWithTag("header").getUnclippedBoundsInRoot())
         }
 
-    @Test fun paneSwitchesKeepOneHeaderAndReopeningDoesNotReplayAnEntrance() =
+    @Test fun lyricsOpensByMovingTheSameHeaderUpAndClosingRestoresItsMainPosition() =
         runDesktopComposeUiTest(width = 1100, height = 800) {
             mainClock.autoAdvance = false
             val pane = mutableStateOf(PlayerPane.Main)
@@ -107,15 +108,28 @@ class LandscapePlayerMotionTest {
             setContent { Fixture(track.value, pane.value, onHeaderMount = { mounts++ }) }
             waitForIdle()
             val title = onNodeWithTag("title-a").getUnclippedBoundsInRoot()
-            for (next in listOf(PlayerPane.Lyrics, PlayerPane.Main, PlayerPane.Queue, PlayerPane.Lyrics)) {
-                runOnIdle { pane.value = next }
-                mainClock.advanceTimeByFrame()
-                if (next != PlayerPane.Queue) {
-                    waitForIdle()
-                    assertEquals(title, onNodeWithTag("title-a").getUnclippedBoundsInRoot())
-                }
-                mainClock.advanceTimeBy(500)
-            }
+            val mainHeader = onNodeWithTag("header").getUnclippedBoundsInRoot()
+            val artwork = onNodeWithTag("artwork").getUnclippedBoundsInRoot()
+            val controls = onNodeWithTag("main").getUnclippedBoundsInRoot()
+            assertTrue(mainHeader.top > artwork.top, "Main must retain its centered metadata/controls stack")
+            assertTrue(mainHeader.bottom < controls.top)
+            save(onRoot().captureToImage(), "main-before-lyrics.png")
+            runOnIdle { pane.value = PlayerPane.Lyrics }
+            mainClock.advanceTimeBy(140)
+            waitForIdle()
+            val between = onNodeWithTag("header").getUnclippedBoundsInRoot()
+            assertTrue(between.top < mainHeader.top && between.top > artwork.top,
+                "Opening Lyrics must visibly travel upward, not teleport to the top")
+            save(onRoot().captureToImage(), "header-moving-to-lyrics.png")
+            mainClock.advanceTimeBy(500)
+            waitForIdle()
+            assertEquals(artwork.top, onNodeWithTag("header").getUnclippedBoundsInRoot().top)
+            save(onRoot().captureToImage(), "lyrics-after-header-move.png")
+            runOnIdle { pane.value = PlayerPane.Main }
+            mainClock.advanceTimeBy(500)
+            waitForIdle()
+            assertEquals(title, onNodeWithTag("title-a").getUnclippedBoundsInRoot())
+            assertEquals(controls, onNodeWithTag("main").getUnclippedBoundsInRoot())
             assertEquals(1, mounts, "Main/Lyrics/Queue must share one mounted header")
             runOnIdle { pane.value = PlayerPane.Queue; track.value = Track("hidden-change") }
             mainClock.advanceTimeBy(100)
@@ -124,8 +138,19 @@ class LandscapePlayerMotionTest {
             waitForIdle()
             val reopened = onNodeWithTag("title-hidden-change").getUnclippedBoundsInRoot()
             assertEquals(title.left, reopened.left)
-            assertEquals(title.top, reopened.top)
-            assertEquals(title.bottom, reopened.bottom)
+            assertEquals(artwork.top.value + 18f, reopened.top.value, .1f)
+        }
+
+    @Test fun outputCaptionIsBelowTheActionButtonsAndBothStayBelowTheArtwork() =
+        runDesktopComposeUiTest(width = 1100, height = 800) {
+            setContent { Fixture(Track("a"), PlayerPane.Main) }
+            waitForIdle()
+            val art = onNodeWithTag("artwork").getUnclippedBoundsInRoot()
+            val buttons = onNodeWithTag("output-buttons").getUnclippedBoundsInRoot()
+            val caption = onNodeWithTag("output-caption").getUnclippedBoundsInRoot()
+            assertTrue(art.bottom < buttons.top)
+            assertEquals(18f, caption.top.value - buttons.bottom.value, .1f)
+            assertEquals(72f, (caption.bottom - buttons.top).value, .1f)
         }
 
     @Test fun rapidSkipsAndReducedMotionSettleOnTheLatestTrack() =
@@ -163,23 +188,23 @@ class LandscapePlayerMotionTest {
             setContent { Fixture(track.value, pane.value) }
             waitForIdle()
             val header = onNodeWithTag("header").getUnclippedBoundsInRoot()
-            val body = onNodeWithTag("main").getUnclippedBoundsInRoot()
             runOnIdle { track.value = Track("b") }
             mainClock.advanceTimeBy(100)
             waitForIdle()
-            val beforeSwitch = onNodeWithTag("title-b").getUnclippedBoundsInRoot().top
+            val beforeSwitch = (onNodeWithTag("title-b").getUnclippedBoundsInRoot().top -
+                onNodeWithTag("header").getUnclippedBoundsInRoot().top).value
             runOnIdle { pane.value = PlayerPane.Lyrics }
             mainClock.advanceTimeBy(32)
             waitForIdle()
-            assertTrue(onNodeWithTag("title-b").getUnclippedBoundsInRoot().top < beforeSwitch,
+            val afterSwitch = (onNodeWithTag("title-b").getUnclippedBoundsInRoot().top -
+                onNodeWithTag("header").getUnclippedBoundsInRoot().top).value
+            assertTrue(afterSwitch < beforeSwitch,
                 "The same slide must continue upward across a pane change")
-            assertEquals(header, onNodeWithTag("header").getUnclippedBoundsInRoot())
-            assertEquals(body, onNodeWithTag("lyrics").getUnclippedBoundsInRoot())
             // A suspended host frame (for example while minimized) settles the same clock;
             // returning to another panel cannot replay a mount-time entrance.
             mainClock.advanceTimeBy(10_000)
             runOnIdle { pane.value = PlayerPane.Main }
-            mainClock.advanceTimeByFrame()
+            mainClock.advanceTimeBy(500)
             waitForIdle()
             assertEquals(header.top.value + 18f,
                 onNodeWithTag("title-b").getUnclippedBoundsInRoot().top.value, .1f)
@@ -243,7 +268,11 @@ class LandscapePlayerMotionTest {
                 LandscapePlayerColumns(
                     pane, compact = height < 440, gutter = 24.dp, reduceMotion = reduceMotion,
                     artwork = { Box(it.background(Color.DarkGray).testTag("artwork")) },
-                    actions = { Box(Modifier.height(48.dp)) { Text("Player controls") } },
+                    actions = {
+                        Box(Modifier.fillMaxWidth().height(34.dp).testTag("output-buttons")) { Text("Lyrics   Output   Queue") }
+                        Spacer(Modifier.height(18.dp))
+                        Box(Modifier.fillMaxWidth().height(20.dp).testTag("output-caption")) { Text("System output") }
+                    },
                     header = { active ->
                         DisposableEffect(Unit) { onHeaderMount(); onDispose {} }
                         Row(Modifier.fillMaxWidth().testTag("header")) {
@@ -258,7 +287,7 @@ class LandscapePlayerMotionTest {
                             Box(Modifier.size(34.dp).testTag("menu")) { Text("⋯") }
                         }
                     },
-                    mainPane = { Box(Modifier.fillMaxSize().testTag("main")) { Text("Scrubber and transport") } },
+                    mainPane = { Box(Modifier.fillMaxWidth().height(200.dp).testTag("main")) { Text("Scrubber and transport") } },
                     lyricsPane = { Box(Modifier.fillMaxSize().testTag("lyrics")) { Text("Synchronized lyric rows") } },
                     queuePane = { Box(Modifier.fillMaxSize().testTag("queue")) { Text("Up Next") } },
                     modifier = Modifier.size(width.dp, height.dp).testTag("viewport"),

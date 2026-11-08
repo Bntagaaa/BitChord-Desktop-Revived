@@ -130,6 +130,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -1547,7 +1548,7 @@ fun NowPlayingScreen(
         // Keep the current output caption visible in every state.
         Spacer(Modifier.height(18.dp))
         Box(
-            modifier = Modifier.fillMaxWidth().height(20.dp),
+            modifier = Modifier.fillMaxWidth().height(20.dp).testTag("player-output-caption"),
             contentAlignment = Alignment.TopCenter,
         ) {
             OutputCaption(
@@ -2120,7 +2121,7 @@ fun NowPlayingScreen(
                                         lines = lyricsTranslation.displayedLyrics,
                                         trackKey = song.videoId,
                                         playhead = lyricsPlayhead,
-                                        isPlaying = isPlaying && position.advancing,
+                                        isPlaying = isPlaying && position.advancing && !panelOpen,
                                         durationMs = durationMs,
                                         lyricsUnavailable = lyricsUnavailable,
                                         loadingText = lyricsLoadingText,

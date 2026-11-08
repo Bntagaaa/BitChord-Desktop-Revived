@@ -5,6 +5,8 @@ import com.music.bitchord.ui.components.ExplicitBadge
 import com.music.bitchord.sharedui.resources.*
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -291,7 +293,8 @@ internal fun LandscapeMainPane(
     Column(
         modifier = modifier
             .widthIn(max = PLAYER_MAX_WIDTH)
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
     ) {
         lyricStrip?.invoke()
         scrubber()

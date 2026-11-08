@@ -78,7 +78,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: landscape-player-linux-render-evidence
-          path: sharedUi/build/reports/landscape-player/
+          path: |
+            sharedUi/build/reports/landscape-player/
+            desktopApp/build/reports/landscape-player/
           if-no-files-found: ignore
 
       - name: Upload test reports
@@ -153,7 +155,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: landscape-player-windows-render-evidence
-          path: sharedUi/build/reports/landscape-player/
+          path: |
+            sharedUi/build/reports/landscape-player/
+            desktopApp/build/reports/landscape-player/
           if-no-files-found: ignore
 
       - name: Upload test reports
