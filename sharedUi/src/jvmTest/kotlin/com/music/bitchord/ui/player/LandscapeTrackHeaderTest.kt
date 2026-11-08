@@ -15,13 +15,32 @@ import androidx.compose.ui.unit.dp
 import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.Song
 import org.junit.Test
+import java.lang.reflect.Proxy
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+/**
+ * This component test needs only the platform's visual chrome flag. Any other
+ * PlayerHost interaction is unexpected and should fail rather than silently
+ * making the test behave differently from the real player.
+ */
+private fun withLandscapeTestHost(block: () -> Unit) {
+    val host = Proxy.newProxyInstance(
+        PlayerHost::class.java.classLoader,
+        arrayOf(PlayerHost::class.java),
+    ) { _, method, _ ->
+        when (method.name) {
+            "getMobileTextChrome" -> false
+            else -> error("Unexpected PlayerHost access in landscape test: ${method.name}")
+        }
+    } as PlayerHost
+    PlayerPlatform.withHostForTest(host, block)
+}
 
 @OptIn(ExperimentalTestApi::class)
 class LandscapeTrackHeaderTest {
     @Test fun desktopLikeAndMenuUseLiveCallbacksOutsideTheMovingMetadata() =
-        runDesktopComposeUiTest(width = 720, height = 240) {
+        withLandscapeTestHost { runDesktopComposeUiTest(width = 720, height = 240) {
             mainClock.autoAdvance = false
             val song = mutableStateOf(Song("a", "First title", "First artist", null, albumId = "album-a"))
             val status = mutableStateOf(LikeStatus.INDIFFERENT)
@@ -78,10 +97,10 @@ class LandscapeTrackHeaderTest {
             assertEquals("album-b", openedAlbum)
             onNodeWithText("Another artist").performClick()
             assertEquals("artist-b" to "Another artist", openedArtist)
-        }
+        } }
 
     @Test fun signedOutMobileGuestDoesNotGainAnAccountLikeButLocalMusicRetainsIt() =
-        runDesktopComposeUiTest(width = 200, height = 100) {
+        withLandscapeTestHost { runDesktopComposeUiTest(width = 200, height = 100) {
             val local = mutableStateOf(false)
             setContent {
                 MaterialTheme {
@@ -96,5 +115,5 @@ class LandscapeTrackHeaderTest {
             runOnIdle { local.value = true }
             onNodeWithContentDescription("Like").assertExists()
             onNodeWithContentDescription("More").assertExists()
-        }
+        } }
 }
