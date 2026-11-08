@@ -3,12 +3,15 @@
 # Wraps the app image jpackage produced into an AppImage, the one Linux format
 # Gradle cannot make itself.
 #
-# Usage: desktopApp/packaging/appimage.sh <app-image-dir> <out.AppImage> [appimagetool]
+# Usage: desktopApp/packaging/appimage.sh <app-image-dir> <out.AppImage> [appimagetool] [runtime-file]
 set -euo pipefail
 
 APP_DIR_SRC=${1:?usage: appimage.sh <app-image-dir> <out.AppImage> [appimagetool]}
 OUT=${2:?usage: appimage.sh <app-image-dir> <out.AppImage> [appimagetool]}
 TOOL=${3:-appimagetool}
+# A local verified type-2 runtime keeps CI independent of GitHub Releases CDN.
+# The fourth argument is optional for existing manual/packaging callers.
+RUNTIME_FILE=${4:-}
 
 [ -x "$APP_DIR_SRC/bin/BitChord" ] || { echo "no launcher in $APP_DIR_SRC" >&2; exit 1; }
 
@@ -58,5 +61,11 @@ mkdir -p "$(dirname "$OUT")"
 # APPIMAGE_EXTRACT_AND_RUN rather than the flag of the same name: it is read by the AppImage
 # runtime, so it covers a CI runner with no FUSE, and a natively built appimagetool — which has
 # no such flag and would refuse to start — simply ignores it.
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" "$APPDIR" "$OUT"
+if [[ -n "$RUNTIME_FILE" ]]; then
+  [[ -s "$RUNTIME_FILE" ]] || { echo "missing AppImage type-2 runtime: $RUNTIME_FILE" >&2; exit 1; }
+  ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" --runtime-file "$RUNTIME_FILE" "$APPDIR" "$OUT"
+else
+  # Preserve old behavior for manual calls without a pre-fetched runtime.
+  ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" "$APPDIR" "$OUT"
+fi
 echo "appimage: $OUT"
