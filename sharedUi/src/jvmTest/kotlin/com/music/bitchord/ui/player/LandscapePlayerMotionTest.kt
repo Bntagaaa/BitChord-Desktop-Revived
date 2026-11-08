@@ -155,6 +155,36 @@ class LandscapePlayerMotionTest {
             assertEquals(restY, onNodeWithTag("title-reduced").getUnclippedBoundsInRoot().top.value, .1f)
         }
 
+    @Test fun switchingPanelsDuringASlideDoesNotRestartMetadataOrMoveThePaneSlot() =
+        runDesktopComposeUiTest(width = 1100, height = 800) {
+            mainClock.autoAdvance = false
+            val pane = mutableStateOf(PlayerPane.Main)
+            val track = mutableStateOf(Track("a"))
+            setContent { Fixture(track.value, pane.value) }
+            waitForIdle()
+            val header = onNodeWithTag("header").getUnclippedBoundsInRoot()
+            val body = onNodeWithTag("main").getUnclippedBoundsInRoot()
+            runOnIdle { track.value = Track("b") }
+            mainClock.advanceTimeBy(100)
+            waitForIdle()
+            val beforeSwitch = onNodeWithTag("title-b").getUnclippedBoundsInRoot().top
+            runOnIdle { pane.value = PlayerPane.Lyrics }
+            mainClock.advanceTimeBy(32)
+            waitForIdle()
+            assertTrue(onNodeWithTag("title-b").getUnclippedBoundsInRoot().top < beforeSwitch,
+                "The same slide must continue upward across a pane change")
+            assertEquals(header, onNodeWithTag("header").getUnclippedBoundsInRoot())
+            assertEquals(body, onNodeWithTag("lyrics").getUnclippedBoundsInRoot())
+            // A suspended host frame (for example while minimized) settles the same clock;
+            // returning to another panel cannot replay a mount-time entrance.
+            mainClock.advanceTimeBy(10_000)
+            runOnIdle { pane.value = PlayerPane.Main }
+            mainClock.advanceTimeByFrame()
+            waitForIdle()
+            assertEquals(header.top.value + 18f,
+                onNodeWithTag("title-b").getUnclippedBoundsInRoot().top.value, .1f)
+        }
+
     @Test fun resizingAndFontScalingKeepHeaderAlignedAndPanesBounded() =
         runDesktopComposeUiTest(width = 1500, height = 1200) {
             val size = mutableStateOf(1000 to 700)

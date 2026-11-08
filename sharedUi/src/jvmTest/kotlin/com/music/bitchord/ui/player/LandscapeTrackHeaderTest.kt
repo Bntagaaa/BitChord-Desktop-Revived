@@ -6,8 +6,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertDoesNotExist
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -29,20 +27,24 @@ class LandscapeTrackHeaderTest {
             val status = mutableStateOf(LikeStatus.INDIFFERENT)
             var likedTrack: String? = null
             var menuTrack: String? = null
+            var openedAlbum: String? = null
+            var openedArtist: Pair<String?, String>? = null
             var originClicks = 0
             setContent {
+                val currentSong = song.value
                 MaterialTheme {
                     Column(Modifier.width(640.dp)) {
                         LandscapeTrackHeader(
-                            compact = false, song = song.value, caption = "Playing from Search",
-                            onOpenCaption = { originClicks++ }, onOpenAlbum = {}, onOpenArtist = { _, _ -> },
+                            compact = false, song = currentSong, caption = "Playing from Search",
+                            onOpenCaption = { originClicks++ }, onOpenAlbum = { openedAlbum = it },
+                            onOpenArtist = { id, name -> openedArtist = id to name },
                             active = true, reduceMotion = false,
                             actions = {
-                                LandscapeTrackActions(song.value, signedIn = false, likeStatus = status.value,
+                                LandscapeTrackActions(currentSong, signedIn = false, likeStatus = status.value,
                                     showRevertCue = false, onToggleLike = {
-                                        likedTrack = song.value.videoId
+                                        likedTrack = currentSong.videoId
                                         status.value = if (status.value == LikeStatus.LIKE) LikeStatus.INDIFFERENT else LikeStatus.LIKE
-                                    }, onOpenMenu = { menuTrack = song.value.videoId }, desktop = true)
+                                    }, onOpenMenu = { menuTrack = currentSong.videoId }, desktop = true)
                             },
                         )
                     }
@@ -56,11 +58,13 @@ class LandscapeTrackHeaderTest {
             assertEquals("a", likedTrack)
             mainClock.advanceTimeBy(240)
             onNodeWithContentDescription("Remove from Liked Music").assertExists()
-            runOnIdle { song.value = Song("b", "A much longer second title", "Another artist", null) }
+            runOnIdle { song.value = Song("b", "A much longer second title", "Another artist", null,
+                albumId = "album-b", artistId = "artist-b") }
             mainClock.advanceTimeBy(100)
             waitForIdle()
             assertEquals(like, onNodeWithContentDescription("Remove from Liked Music").getUnclippedBoundsInRoot())
             assertEquals(menu, onNodeWithContentDescription("More").getUnclippedBoundsInRoot())
+            onNodeWithText("First title").assertDoesNotExist()
             onNodeWithContentDescription("More").performClick()
             assertEquals("b", menuTrack, "Stationary actions must address the current song")
             onNodeWithContentDescription("Remove from Liked Music").performClick()
@@ -70,6 +74,10 @@ class LandscapeTrackHeaderTest {
             onNodeWithText("First title").assertDoesNotExist()
             onNodeWithText("Playing from Search").performClick()
             assertEquals(1, originClicks)
+            onNodeWithText("A much longer second title").performClick()
+            assertEquals("album-b", openedAlbum)
+            onNodeWithText("Another artist").performClick()
+            assertEquals("artist-b" to "Another artist", openedArtist)
         }
 
     @Test fun signedOutMobileGuestDoesNotGainAnAccountLikeButLocalMusicRetainsIt() =
