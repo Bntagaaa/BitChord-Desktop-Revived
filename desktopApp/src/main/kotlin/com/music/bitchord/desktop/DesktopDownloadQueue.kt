@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -79,12 +81,14 @@ object DesktopDownloadQueue {
     fun enqueue(song: Song) {
         val id = song.videoId
         if (id.isBlank()) return
-        val item = synchronized(lock) {
+        synchronized(lock) {
             if (id in pending || id in running) return
-            DesktopDownloadItem(song, DesktopDownloadState.Queued, sequence.incrementAndGet())
-                .also { pending[id] = it }
+            val item = DesktopDownloadItem(song, DesktopDownloadState.Queued, sequence.incrementAndGet())
+            pending[id] = item
+            // Publish while holding the same lock used by cancellation. Otherwise
+            // a delayed enqueue publication can resurrect a cancelled item.
+            _active.update { it + (id to item) }
         }
-        _active.update { it + (id to item) }
         ensureWorkers()
     }
 
@@ -100,17 +104,29 @@ object DesktopDownloadQueue {
     fun cancel(videoId: String) {
         val job = synchronized(lock) {
             pending.remove(videoId)
-            if (videoId !in running) return@synchronized null
-            running.remove(videoId)
+            val runningJob = running.remove(videoId)
+            // Removal and worker ownership change must be atomic: an in-flight
+            // worker cannot publish its Running row after this completes.
+            _active.update { it - videoId }
+            runningJob
         }
         job?.cancel()
         DesktopDownloadManager.cancel(videoId)
-        // A download called off is not something anyone needs reminding to check on, so it leaves
-        // the manager rather than sitting in it as a permanent "cancelled" row.
-        _active.update { it - videoId }
     }
 
-    fun cancelAll() = _active.value.keys.toList().forEach(::cancel)
+    /** Atomically cancel the complete batch, including failed rows. */
+    fun cancelAll() {
+        val (ids, jobs) = synchronized(lock) {
+            val ids = (pending.keys + running.keys + _active.value.keys).toSet()
+            val jobs = running.values.filterNotNull().toList()
+            pending.clear()
+            running.clear()
+            _active.value = emptyMap()
+            ids to jobs
+        }
+        jobs.forEach(Job::cancel)
+        ids.forEach(DesktopDownloadManager::cancel)
+    }
 
     /** Drops the finished and failed rows, leaving whatever is still going. */
     fun clearFinished() {
@@ -139,10 +155,11 @@ object DesktopDownloadQueue {
     private suspend fun work() {
         try {
             while (true) {
+                currentCoroutineContext().ensureActive()
                 val item = takeNext() ?: return
                 val id = item.song.videoId
-                onRunning(id, currentJob())
-                _active.update { it + (id to item.copy(state = DesktopDownloadState.Running(0f))) }
+                val job = currentJob()
+                if (!onRunning(item, job)) continue
                 val result = runCatching {
                     DesktopDownloadManager.download(item.song) { downloaded, total ->
                         val fraction = if (total != null && total > 0L) {
@@ -153,18 +170,28 @@ object DesktopDownloadQueue {
                         _active.update { current ->
                             // Only while it is still the running row: a cancel removes it, and
                             // putting it back here would resurrect a row nobody asked for.
-                            if (id !in current) current
+                            if (current[id]?.sequence != item.sequence) current
                             else current + (id to item.copy(state = DesktopDownloadState.Running(fraction)))
                         }
                     }
                 }
-                onIdle(id)
+                onIdle(id, job)
                 result.fold(
                     onSuccess = { outcome ->
                         outcome.fold(
                             onSuccess = { saved ->
-                                _active.update { it - id }
-                                _finished.tryEmit(saved)
+                                val removed = synchronized(lock) {
+                                    var matched = false
+                                    _active.update { current ->
+                                        if (current[id]?.sequence != item.sequence) current
+                                        else {
+                                            matched = true
+                                            current - id
+                                        }
+                                    }
+                                    matched
+                                }
+                                if (removed) _finished.tryEmit(saved)
                             },
                             onFailure = { failed(id, item, it) },
                         )
@@ -174,15 +201,20 @@ object DesktopDownloadQueue {
             }
         } finally {
             synchronized(lock) { workers-- }
+            // A new item may have arrived while this (cancelled) worker still
+            // counted toward the limit. Replace workers if pending items remain.
+            ensureWorkers()
         }
     }
 
     private fun failed(id: String, item: DesktopDownloadItem, cause: Throwable) {
         // A cancelled transfer already left the manager; it is not a failure to report.
         if (cause is kotlinx.coroutines.CancellationException) return
-        if (id !in _active.value) return
         val reason = cause.message?.takeIf(String::isNotBlank) ?: "The download did not finish"
-        _active.update { it + (id to item.copy(state = DesktopDownloadState.Failed(reason))) }
+        _active.update { current ->
+            if (current[id]?.sequence != item.sequence) current
+            else current + (id to item.copy(state = DesktopDownloadState.Failed(reason)))
+        }
         DesktopTrackLog.log("download failed for '${item.song.title}' — $reason")
     }
 
@@ -200,18 +232,20 @@ object DesktopDownloadQueue {
         entry.value
     }
 
-    /** Attaches the job fetching [videoId], unless it has been cancelled meanwhile. */
-    private fun onRunning(videoId: String, job: Job?) {
-        val cancelled = synchronized(lock) {
-            if (videoId !in running) return@synchronized true
-            running[videoId] = job
-            false
-        }
-        if (cancelled) job?.cancel()
+    /** Claim and publish in one critical section, so Cancel All cannot be undone. */
+    private fun onRunning(item: DesktopDownloadItem, job: Job?): Boolean = synchronized(lock) {
+        val id = item.song.videoId
+        if (id !in running || _active.value[id]?.sequence != item.sequence) return@synchronized false
+        running[id] = job
+        _active.update { it + (id to item.copy(state = DesktopDownloadState.Running(0f))) }
+        true
     }
 
-    private fun onIdle(videoId: String) {
-        synchronized(lock) { running.remove(videoId) }
+    private fun onIdle(videoId: String, job: Job?) {
+        synchronized(lock) {
+            // Do not remove a newer download of the same song.
+            if (videoId in running && running[videoId] === job) running.remove(videoId)
+        }
     }
 
     private suspend fun currentJob(): Job? = kotlin.coroutines.coroutineContext[Job]
