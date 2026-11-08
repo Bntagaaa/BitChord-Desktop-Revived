@@ -2,12 +2,15 @@ package com.music.bitchord.ui.player
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsSource
@@ -47,6 +50,12 @@ fun LyricsSidePanel(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Unlike the fullscreen player, this pane is drawn on Desktop's light/dark
+    // surface. Use its ink color only here so fullscreen artwork lyrics do not change.
+    val panelColors = lyricsSidePanelColors(
+        isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f,
+        onSurface = MaterialTheme.colorScheme.onSurface,
+    )
     val haptics = rememberHaptics()
     val lyricsOffsetMs by PlayerSettings.lyricsOffsetMs.collectAsStateWithLifecycle()
     val lyricsPlayhead = rememberLyricPlayhead(position)
@@ -69,67 +78,72 @@ fun LyricsSidePanel(
     val haze = remember { HazeState() }
     var showLyricsProviders by remember { mutableStateOf(false) }
 
-    Box(modifier) {
-        Box(Modifier.fillMaxSize().hazeSource(haze)) {
-            LandscapeLyricsPane(
-                hasLyrics = lyricsTranslation.displayedLyrics.isNotEmpty(),
-                placeholder = if (lyricsUnavailable) {
-                    stringResource(Res.string.lyrics_not_available)
-                } else {
-                    lyricsLoadingText
-                },
-                status = lyricsTranslation.status,
-                onStatusClick = { showLyricsProviders = true },
-                romanizationToggle = {
-                    RomanizationToggleButton(
-                        state = lyricsTranslation.romanizationState,
-                        showingRomanization = lyricsTranslation.showingRomanization,
-                        enabled = !lyrics.isNullOrEmpty(),
-                        onClick = lyricsTranslation.toggleRomanization,
-                    )
-                },
-                translationToggle = {
-                    TranslationToggleButton(
-                        state = lyricsTranslation.translationState,
-                        showingTranslation = lyricsTranslation.showingTranslation,
-                        enabled = !lyrics.isNullOrEmpty(),
-                        onClick = lyricsTranslation.toggleTranslation,
-                    )
-                },
-            ) { panelModifier ->
-                LyricsTranslationMotion(
-                    trigger = lyricsTranslation.transition,
-                    reduceMotion = lyricsTranslation.reduceMotion,
-                    modifier = panelModifier,
-                ) { particleProgress ->
-                    // Controls always open, as in the landscape player: there
-                    // is no transport hidden behind these lines for a tap to
-                    // bring back.
-                    LyricsPanel(
-                        lines = lyrics.orEmpty(),
-                        subLines = lyricsTranslation.subLines,
-                        trackKey = song.videoId,
-                        playhead = lyricsPlayhead,
-                        looking = !lyricsUnavailable,
-                        isPlaying = isPlaying && position.advancing,
-                        onSeekToLine = seekToLyric,
-                        controlsOpen = true,
-                        onRevealControls = {},
-                        onHideControls = {},
-                        translationProgress = particleProgress,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+    CompositionLocalProvider(
+        LocalLyricsPanelColors provides panelColors,
+        LocalPlayerTint provides panelColors.iconSurface,
+    ) {
+        Box(modifier) {
+            Box(Modifier.fillMaxSize().hazeSource(haze)) {
+                LandscapeLyricsPane(
+                    hasLyrics = lyricsTranslation.displayedLyrics.isNotEmpty(),
+                    placeholder = if (lyricsUnavailable) {
+                        stringResource(Res.string.lyrics_not_available)
+                    } else {
+                        lyricsLoadingText
+                    },
+                    status = lyricsTranslation.status,
+                    onStatusClick = { showLyricsProviders = true },
+                    romanizationToggle = {
+                        RomanizationToggleButton(
+                            state = lyricsTranslation.romanizationState,
+                            showingRomanization = lyricsTranslation.showingRomanization,
+                            enabled = !lyrics.isNullOrEmpty(),
+                            onClick = lyricsTranslation.toggleRomanization,
+                        )
+                    },
+                    translationToggle = {
+                        TranslationToggleButton(
+                            state = lyricsTranslation.translationState,
+                            showingTranslation = lyricsTranslation.showingTranslation,
+                            enabled = !lyrics.isNullOrEmpty(),
+                            onClick = lyricsTranslation.toggleTranslation,
+                        )
+                    },
+                ) { panelModifier ->
+                    LyricsTranslationMotion(
+                        trigger = lyricsTranslation.transition,
+                        reduceMotion = lyricsTranslation.reduceMotion,
+                        modifier = panelModifier,
+                    ) { particleProgress ->
+                        // Controls always open, as in the landscape player: there
+                        // is no transport hidden behind these lines for a tap to
+                        // bring back.
+                        LyricsPanel(
+                            lines = lyrics.orEmpty(),
+                            subLines = lyricsTranslation.subLines,
+                            trackKey = song.videoId,
+                            playhead = lyricsPlayhead,
+                            looking = !lyricsUnavailable,
+                            isPlaying = isPlaying && position.advancing,
+                            onSeekToLine = seekToLyric,
+                            controlsOpen = true,
+                            onRevealControls = {},
+                            onHideControls = {},
+                            translationProgress = particleProgress,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
-        }
-        if (showLyricsProviders) {
-            LyricsProviderSheet(
-                hazeState = haze,
-                currentSource = lyricsSource,
-                states = lyricsProviderStates,
-                onSelect = onSelectLyricsProvider,
-                onDismiss = { showLyricsProviders = false },
-            )
+            if (showLyricsProviders) {
+                LyricsProviderSheet(
+                    hazeState = haze,
+                    currentSource = lyricsSource,
+                    states = lyricsProviderStates,
+                    onSelect = onSelectLyricsProvider,
+                    onDismiss = { showLyricsProviders = false },
+                )
+            }
         }
     }
 }

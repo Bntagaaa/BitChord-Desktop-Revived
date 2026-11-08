@@ -523,7 +523,7 @@ internal fun LyricsStatusWithChange(
         Text(
             text = status,
             style = MaterialTheme.typography.titleMedium,
-            color = playerSecondaryColor(0.55f),
+            color = if (LocalLyricsPanelColors.current.isLight) LocalLyricsPanelColors.current.secondary else playerSecondaryColor(0.55f),
             textDecoration = if (onStatusClick != null) TextDecoration.Underline else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1659,6 +1659,7 @@ private fun Modifier.lyricParticles(
  */
 @Composable
 private fun LyricsSkeleton(modifier: Modifier = Modifier) {
+    val skeletonInk = LocalLyricsPanelColors.current.primary
     val sweep = rememberInfiniteTransition(label = "lyricsSkeleton").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -1697,9 +1698,9 @@ private fun LyricsSkeleton(modifier: Modifier = Modifier) {
                                     val startX = -band + sweep.value * (full + band * 2)
                                     val brush = Brush.horizontalGradient(
                                         colors = listOf(
-                                            Color.White.copy(alpha = 0.10f),
-                                            Color.White.copy(alpha = 0.26f),
-                                            Color.White.copy(alpha = 0.10f),
+                                            skeletonInk.copy(alpha = 0.10f),
+                                            skeletonInk.copy(alpha = 0.26f),
+                                            skeletonInk.copy(alpha = 0.10f),
                                         ),
                                         startX = startX,
                                         endX = startX + band,
@@ -1869,7 +1870,8 @@ internal fun LyricsPanel(
     val lyricsBlur by PlayerSettings.lyricsBlur.collectAsStateWithLifecycle()
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
 
-    val glowing = !reduceAnimation && !reduceDynamicBlur && lyricsBlur &&
+    val panelPalette = LocalLyricsPanelColors.current
+    val glowing = !panelPalette.isLight && !reduceAnimation && !reduceDynamicBlur && lyricsBlur &&
         renderEffectBlurSupported
 
     LaunchedEffect(listState) {
@@ -2042,7 +2044,7 @@ internal fun LyricsPanel(
                 Text(
                     text = stringResource(Res.string.no_lyrics_for_track),
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.6f),
+                    color = LocalLyricsPanelColors.current.secondary,
                 )
             }
         }
@@ -2090,7 +2092,7 @@ internal fun LyricsPanel(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(Color.White.copy(alpha = 0.14f))
+                            .background(panelPalette.selection.copy(alpha = 0.10f))
                             .padding(horizontal = 11.dp, vertical = 4.dp),
                     ) {
                         Text(
@@ -2100,7 +2102,7 @@ internal fun LyricsPanel(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.5.sp,
                             ),
-                            color = Color.White.copy(alpha = 0.9f),
+                            color = panelPalette.primary.copy(alpha = 0.9f),
                         )
                     }
                 }
@@ -2140,7 +2142,7 @@ internal fun LyricsPanel(
                     // Reading by hand is not following along: the stack flattens
                     // to one brightness so no row is being pointed at.
                     browsing -> BROWSING_ALPHA
-                    else -> LINE_FALLOFF_ALPHA[step]
+                    else -> if (panelPalette.isLight) maxOf(LINE_FALLOFF_ALPHA[step], 0.72f) else LINE_FALLOFF_ALPHA[step]
                 },
                 animationSpec = tween(LYRIC_SETTLE_MS, easing = LYRIC_EASING),
                 label = "lyricAlpha",
@@ -2219,7 +2221,7 @@ internal fun LyricsPanel(
                                 // fills across it, so they light left to right.
                                 val lit = (through * GAP_DOTS - dot).coerceIn(0f, 1f)
                                 drawCircle(
-                                    color = Color.White.copy(
+                                    color = panelPalette.primary.copy(
                                         alpha = GAP_DOT_REST + (1f - GAP_DOT_REST) * lit,
                                     ),
                                     radius = radius,
@@ -2337,8 +2339,8 @@ internal fun LyricsPanel(
                     // is picked is read against what isn't.
                     .background(
                         when {
-                            index in picked -> Color.White.copy(alpha = 0.16f)
-                            picking -> Color.White.copy(alpha = 0.05f)
+                            index in picked -> panelPalette.selection.copy(alpha = 0.16f)
+                            picking -> panelPalette.selection.copy(alpha = 0.05f)
                             else -> Color.Transparent
                         },
                     )
@@ -2587,7 +2589,7 @@ private fun PanelVoice(
     // line warms to white as it is reached and cools as it is left. Lyrics
     // with no timing have no line being sung, and stay white throughout.
     val color by animateColorAsState(
-        targetValue = if (isActive || !synced) Color.White else LocalPlayerTint.current,
+        targetValue = if (isActive || !synced) LocalLyricsPanelColors.current.primary else LocalLyricsPanelColors.current.inactive,
         label = "lyricLineColor",
     )
     if (line.isWordSynced && !browsing) {

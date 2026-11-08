@@ -124,6 +124,9 @@ internal fun DesktopNowPlayingDetailsPanel(
     val tile = if (DesktopTheme.isDark) Color(0xFF222222) else Color(0xFFE5E9F0)
     val foreground = DesktopForeground
     val secondary = DesktopSecondary
+    // The Canvas fades to the side-panel surface at both ends. On light surfaces
+    // white captions/icons disappear against that pale fade.
+    val canvasCaptionInk = detailsCanvasCaptionInk(DesktopTheme.isDark, foreground)
     // The first decoded Canvas frame is the best colour source. Until it exists, sample
     // the album artwork so the lyric card is never stuck on a hard-coded brand red.
     val canvasFrame = DesktopCanvasBackdrop.frameFor(spotifyCanvas?.url)
@@ -178,7 +181,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                 )
                 Text(
                     song.title,
-                    color = Color.White,
+                    color = canvasCaptionInk,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -195,7 +198,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                     Column(Modifier.weight(1f)) {
                         Text(
                             song.title,
-                            color = Color.White,
+                            color = canvasCaptionInk,
                             fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2,
@@ -203,7 +206,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                         )
                         Text(
                             song.artist,
-                            color = Color.White.copy(alpha = 0.82f),
+                            color = canvasCaptionInk.copy(alpha = 0.82f),
                             fontSize = 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -215,7 +218,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                             Icon(
                                 imageVector = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
                                 contentDescription = if (liked) "Remove from liked" else "Add to liked",
-                                tint = if (liked) DesktopAccent else Color.White,
+                                tint = if (liked) DesktopAccent else canvasCaptionInk,
                                 modifier = Modifier.size(19.dp),
                             )
                         }
@@ -227,7 +230,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                         Icon(
                             Icons.Rounded.Info,
                             "Artist details",
-                            tint = Color.White,
+                            tint = canvasCaptionInk,
                             modifier = Modifier.size(19.dp),
                         )
                     }
@@ -354,7 +357,9 @@ private fun LyricsPreviewCard(
     val panelBlurEnabled = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.SIDE_PANELS)
     val lyricsBlur by DesktopPlayerSettings.lyricsBlur.collectAsState()
     val reduceAnimation by DesktopAppearanceSettings.reduceAnimation.collectAsState()
-    val allowLineBlur = panelBlurEnabled && lyricsBlur
+    // Light-mode lyric text should stay crisp; the darker rows already supply
+    // depth through their alpha, without blurring fine dark lettering.
+    val allowLineBlur = dark && panelBlurEnabled && lyricsBlur
     val motionMs = if (reduceAnimation) 0 else LYRICS_PREVIEW_MOTION_MS
     val exitMs = if (reduceAnimation) 0 else LYRICS_PREVIEW_EXIT_MS
     val lines = detailsLyricWindow(lyrics, position.positionMs)
@@ -444,18 +449,21 @@ private fun LyricsPreviewCard(
                     }
                 }
             }
-                // A second, card-local fade lets the final lyric recede into the same
-                // surface, instead of leaving the last row visibly cut off.
-                Box(
-                    Modifier.matchParentSize().background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.58f to Color.Transparent,
-                            0.82f to cardColor.copy(alpha = 0.58f),
-                            1f to cardColor,
+                // The third line is already dimmed by its row alpha. An extra
+                // pale gradient over it makes light-mode ink almost disappear;
+                // retain the original atmospheric fade only on dark surfaces.
+                if (dark) {
+                    Box(
+                        Modifier.matchParentSize().background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.58f to Color.Transparent,
+                                0.82f to cardColor.copy(alpha = 0.58f),
+                                1f to cardColor,
+                            ),
                         ),
-                    ),
-                )
+                    )
+                }
             }
         }
     }
@@ -544,6 +552,10 @@ private fun CreditsPreviewCard(
         }
     }
 }
+
+/** Canvas captions must contrast with the surface fade that sits behind them. */
+internal fun detailsCanvasCaptionInk(dark: Boolean, lightForeground: Color): Color =
+    if (dark) Color.White else lightForeground
 
 internal fun lyricsPreviewSurfaceColor(artworkPalette: DesktopArtworkPalette, dark: Boolean): Color {
     val base = if (dark) Color(0xFF393939) else Color(0xFFE5E9F0)

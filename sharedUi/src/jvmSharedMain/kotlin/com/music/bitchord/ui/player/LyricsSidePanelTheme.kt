@@ -16,4 +16,23 @@ data class LyricsPanelColors(
     val isLight: Boolean = false,
 )
 
+/**
+ * The standalone desktop lyrics sidebar sits on the app theme surface instead of the
+ * artwork backdrop. Only that sidebar needs dark ink in light mode; the fullscreen
+ * player keeps the existing white/tinted lyrics palette.
+ */
+internal fun lyricsSidePanelColors(isLight: Boolean, onSurface: Color): LyricsPanelColors =
+    if (isLight) {
+        LyricsPanelColors(
+            primary = onSurface,
+            secondary = onSurface.copy(alpha = 0.76f),
+            inactive = onSurface,
+            iconSurface = onSurface,
+            selection = onSurface,
+            isLight = true,
+        )
+    } else {
+        LyricsPanelColors()
+    }
+
 val LocalLyricsPanelColors = staticCompositionLocalOf { LyricsPanelColors() }

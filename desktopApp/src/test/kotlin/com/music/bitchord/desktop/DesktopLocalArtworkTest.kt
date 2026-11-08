@@ -6,6 +6,7 @@ import java.net.URI
 import javax.imageio.ImageIO
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -62,13 +63,17 @@ class DesktopLocalArtworkTest {
         val song = Files.write(music.resolve("song.wav"), byteArrayOf(4))
         val cover = Files.write(music.resolve("folder.png"), png)
         val first = assertNotNull(DesktopLocalArtwork.artworkUri(song, cache))
-        val originalModified = Files.getLastModifiedTime(cover).toMillis()
-        Files.write(cover, makeImage("png", width = 8))
-        // Both PNGs can have the same length; rapid writes can also share a
-        // filesystem timestamp. Explicitly change the fingerprint under test.
-        Files.setLastModifiedTime(cover, java.nio.file.attribute.FileTime.fromMillis(originalModified + 1000))
+        val originalMtime = Files.getLastModifiedTime(cover)
+        val replacement = makeImage("png", width = 8)
+        Files.write(cover, replacement)
+        // A fast CI runner may record identical mtimes for both writes; these tiny
+        // solid-color PNGs can also have identical byte sizes. The production
+        // cache intentionally keys on size + mtime, so advance the timestamp
+        // explicitly instead of relying on a wall-clock delay or filesystem tick.
+        Files.setLastModifiedTime(cover, FileTime.fromMillis(originalMtime.toMillis() + 5_000L))
         val second = assertNotNull(DesktopLocalArtwork.artworkUri(song, cache))
         assertNotEquals(first, second)
+        assertTrue(Files.readAllBytes(Path.of(URI(second))).contentEquals(replacement))
         assertRealImage(second)
     }
 
