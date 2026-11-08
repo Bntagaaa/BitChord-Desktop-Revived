@@ -62,7 +62,11 @@ class DesktopLocalArtworkTest {
         val song = Files.write(music.resolve("song.wav"), byteArrayOf(4))
         val cover = Files.write(music.resolve("folder.png"), png)
         val first = assertNotNull(DesktopLocalArtwork.artworkUri(song, cache))
+        val originalModified = Files.getLastModifiedTime(cover).toMillis()
         Files.write(cover, makeImage("png", width = 8))
+        // Both PNGs can have the same length; rapid writes can also share a
+        // filesystem timestamp. Explicitly change the fingerprint under test.
+        Files.setLastModifiedTime(cover, java.nio.file.attribute.FileTime.fromMillis(originalModified + 1000))
         val second = assertNotNull(DesktopLocalArtwork.artworkUri(song, cache))
         assertNotEquals(first, second)
         assertRealImage(second)
