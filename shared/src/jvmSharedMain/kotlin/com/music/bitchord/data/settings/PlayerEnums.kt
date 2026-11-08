@@ -27,6 +27,16 @@ enum class AudioQuality(
     ;
 }
 
+/** The backdrop style for the expanded player, matching BitChord mobile. */
+enum class PlayerTheme {
+    /** A CPU-prepared mesh continuing the cover's lower edge. */
+    DEFAULT,
+    /** The original animated four-colour gradient. */
+    LEGACY,
+    /** A small, pre-blurred copy of the cover stretched across the player. */
+    SIMPLE,
+}
+
 /** The surface that was last open inside the expanded player. */
 enum class LastPlayerScreen {
     MAIN,

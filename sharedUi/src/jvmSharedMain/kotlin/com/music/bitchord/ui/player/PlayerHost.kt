@@ -11,6 +11,7 @@ import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AudioQuality
 import com.music.bitchord.data.settings.LastPlayerScreen
+import com.music.bitchord.data.settings.PlayerTheme
 import com.music.bitchord.data.settings.SmartAnalysis
 import com.music.bitchord.data.settings.MixBlend
 import com.music.bitchord.data.settings.MixTransitionView
@@ -146,6 +147,7 @@ interface PlayerHost {
 private val NoCast = MutableStateFlow(CastUi())
 
 private val DefaultHideStatusBar = MutableStateFlow(false)
+private val DefaultPlayerTheme = MutableStateFlow(PlayerTheme.DEFAULT)
 private val DefaultVideoAspect = MutableStateFlow(16f / 9f)
 
 private val NoVideoQuality = MutableStateFlow(MusicVideoQualityUi())
@@ -231,6 +233,8 @@ interface PlayerSettingsSource {
     val hideVolumeBar: StateFlow<Boolean>
     val lastPlayerScreen: StateFlow<LastPlayerScreen>
     val legacyMeshGradient: StateFlow<Boolean>
+    /** Desktop's three-way choice; Android's existing legacy switch remains compatible. */
+    val playerTheme: StateFlow<PlayerTheme> get() = DefaultPlayerTheme
     val lyricsBlur: StateFlow<Boolean>
     val lyricsOffsetMs: StateFlow<Int>
     val lyricsSourceOrder: StateFlow<List<LyricsSource>>
