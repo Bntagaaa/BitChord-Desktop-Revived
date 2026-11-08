@@ -2,14 +2,21 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
-    id("com.android.library")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+val androidEnabled = gradle.extra["bitchordAndroidEnabled"] as Boolean
+if (androidEnabled) {
+    apply(plugin = "com.android.library")
+    apply(from = "android.gradle.kts")
+}
+
 kotlin {
-    androidTarget {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
+    if (androidEnabled) {
+        androidTarget {
+            compilerOptions {
+                jvmTarget.set(JvmTarget.JVM_17)
+            }
         }
     }
 
@@ -47,7 +54,7 @@ kotlin {
                 compileOnly("com.github.TeamNewPipe:NewPipeExtractor:v0.26.3")
             }
         }
-        androidMain.get().dependsOn(jvmSharedMain)
+        if (androidEnabled) androidMain.get().dependsOn(jvmSharedMain)
         jvmMain.get().dependsOn(jvmSharedMain)
 
         commonMain.dependencies {
@@ -61,9 +68,4 @@ kotlin {
             implementation("com.squareup.okhttp3:mockwebserver:5.3.2")
         }
     }
-}
-
-android {
-    namespace = "com.music.bitchord.shared"
-    compileSdk = 36
 }

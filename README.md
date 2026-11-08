@@ -1,3 +1,25 @@
+# BitChord Desktop Reworked
+
+This branch, `bitchord-desktop-reworked`, builds a fresh **Windows and Linux x86_64** application from the original BitChord mobile stable **v1.9.1**. It uses the original shared UI, music clients, assets and playback algorithms with new desktop adapters, then recreates the non-optimization desktop features audited from Revived **1.9.2**.
+
+The desktop product is **BitChordReworked**, with a separate application profile and installer identity. This is a development branch: use the **Reworked desktop** Actions workflow's Windows/Linux artifacts after their jobs pass. The original mobile download links below still describe the upstream Android application.
+
+- [Feature coverage and verification boundaries](docs/REWORKED_FEATURES.md)
+- [Original-mobile source provenance](docs/REWORKED_PROVENANCE.md)
+- [Build, run, package and update instructions](docs/REWORKED_BUILD.md)
+- [Windows/Linux build workflow](.github/workflows/reworked-desktop.yml)
+
+With JDK 21, CMake and a C++ toolchain installed, the Linux development entry points are:
+
+```sh
+./gradlew -Pbitchord.android=false :shared:jvmTest :sharedUi:jvmTest :desktopApp:test
+./gradlew -Pbitchord.android=false :desktopApp:run
+```
+
+Windows uses `gradlew.bat` with the same tasks. CI produces a Windows installer and portable ZIP, plus Linux AppImage, DEB, RPM and portable ZIP, including a Java runtime and SHA-256 checksums. Reworked update releases use `reworked-v…` tags and `BitChordReworked-…` asset names. Live accounts, physical audio devices and packaged operating-system integration have separate verification requirements in the feature report.
+
+---
+
 <div align="center">
 
 <br/>

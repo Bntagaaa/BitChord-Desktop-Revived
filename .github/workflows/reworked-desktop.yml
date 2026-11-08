@@ -1,0 +1,119 @@
+name: Reworked desktop
+
+on:
+  push:
+    branches: [bitchord-desktop-reworked]
+  pull_request:
+    branches: [bitchord-desktop-reworked]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reworked-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: Reworked · ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Linux
+            runner: ubuntu-24.04
+            packages: ':desktopApp:packageDeb :desktopApp:packageRpm'
+          - platform: Windows
+            runner: windows-2022
+            packages: ':desktopApp:packageMsi :desktopApp:packageExe'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare Linux packaging
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm desktop-file-utils cmake g++
+          chmod +x gradlew
+
+      - name: Compile and test the new desktop host and shared mobile code
+        shell: bash
+        run: >-
+          ./gradlew --no-daemon --stacktrace --console=plain -Pbitchord.android=false
+          :shared:jvmTest :sharedUi:jvmTest :desktopApp:test
+
+      - name: Test Linux update replacement and rollback
+        if: runner.os == 'Linux'
+        run: python3 desktopApp/src/test/scripts/appimage-update.py
+
+      - name: Validate Windows update script syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($name in @('update-windows.ps1', 'update-portable.ps1')) {
+            $tokens = $null
+            $parseErrors = $null
+            $path = (Resolve-Path "desktopApp/src/main/resources/reworked/$name").Path
+            [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_ }
+              exit 1
+            }
+          }
+
+      - name: Test Windows portable replacement and rollback
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: python desktopApp/src/test/scripts/windows-portable-update.py
+
+      - name: Build desktop packages with their Java runtime
+        shell: bash
+        run: >-
+          ./gradlew --no-daemon --stacktrace --console=plain -Pbitchord.android=false
+          :desktopApp:portableDistribution ${{ matrix.packages }}
+
+      - name: Verify the packaged JAR and bundled runtime
+        shell: bash
+        run: python .github/scripts/reworked_verify_image.py
+
+      - name: Build the Linux AppImage
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/appimagetool.AppImage" \
+            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  $RUNNER_TEMP/appimagetool.AppImage" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/appimagetool.AppImage"
+          python3 .github/scripts/reworked_appimage.py \
+            desktopApp/build/compose/binaries/main/app/BitChordReworked \
+            desktopApp/build/reworked-appimage/BitChordReworked.AppImage \
+            "$RUNNER_TEMP/appimagetool.AppImage"
+
+      - name: Stage Reworked release assets and SHA-256 checksums
+        shell: bash
+        run: python .github/scripts/reworked_artifacts.py '${{ matrix.platform }}'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BitChordReworked-${{ matrix.platform }}-${{ github.sha }}
+          if-no-files-found: error
+          path: desktopApp/build/reworked-artifacts/
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Reworked-tests-${{ matrix.platform }}-${{ github.sha }}
+          if-no-files-found: ignore
+          path: |
+            shared/build/reports/tests/
+            sharedUi/build/reports/tests/
+            desktopApp/build/reports/tests/

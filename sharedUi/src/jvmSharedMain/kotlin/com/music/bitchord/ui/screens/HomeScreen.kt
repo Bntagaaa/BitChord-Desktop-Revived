@@ -845,7 +845,7 @@ internal fun NewShelfCard(
     label: String,
     subtitle: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier.width(SHELF_CARD_WIDTH),
+    modifier: Modifier = Modifier.width(LocalShelfCardWidth.current),
     /** A full-colour mark drawn in place of [icon], for a card that stands for a brand. */
     logo: DrawableResource? = null,
 ) {
@@ -926,13 +926,16 @@ private fun ServiceCard(colors: List<Color>, trackKey: String, icon: ImageVector
     }
 }
 
+/** Host-specific shelf sizing; the original mobile width remains the default. */
+val LocalShelfCardWidth = androidx.compose.runtime.staticCompositionLocalOf { SHELF_CARD_WIDTH }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ShelfCard(
     item: ShelfItem,
     onClick: () -> Unit,
     onLongPress: (() -> Unit)? = null,
-    modifier: Modifier = Modifier.width(SHELF_CARD_WIDTH),
+    modifier: Modifier = Modifier.width(LocalShelfCardWidth.current),
     /** Set on a Library playlist card that's in [AppSettings.pinnedPlaylists][com.music.bitchord.data.settings.AppSettings.pinnedPlaylists]. */
     isPinned: Boolean = false,
     isCurrent: Boolean = false,

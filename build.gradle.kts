@@ -1,6 +1,7 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
     repositories {
+        mavenCentral()
         google()
     }
     dependencies {
@@ -29,7 +30,10 @@ buildscript {
          * palette in place, which is why prod builds were fine and only dev
          * crashed. Removable once AGP itself bundles something past 8.11.32.
          */
-        classpath("com.android.tools:r8:8.13.23")
+        if (gradle.extra["bitchordAndroidEnabled"] as Boolean) {
+            classpath("com.android.tools.build:gradle:8.10.1")
+            classpath("com.android.tools:r8:8.13.23")
+        }
     }
 }
 /*
@@ -66,8 +70,6 @@ extra["bitchordVersionName"] = "1.9.1"
 extra["bitchordBetaSuffix"] = ""
 
 plugins {
-    id("com.android.application") version "8.10.1" apply false
-    id("com.android.library") version "8.10.1" apply false
     id("org.jetbrains.kotlin.android") version "2.3.20" apply false
     id("org.jetbrains.kotlin.multiplatform") version "2.3.20" apply false
     id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
