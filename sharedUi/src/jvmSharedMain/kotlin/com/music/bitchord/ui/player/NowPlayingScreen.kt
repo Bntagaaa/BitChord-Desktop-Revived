@@ -1773,26 +1773,24 @@ fun NowPlayingScreen(
         label = "playerTint",
     )
     CompositionLocalProvider(LocalPlayerTint provides playerTint) {
-        val landscapeTrackCredits: @Composable () -> Unit = {
-            LandscapeCredits(
-                song = song,
-                signedIn = signedIn,
-                likeStatus = likeStatus,
-                showRevertCue = showRevertCue,
-                onToggleLike = onToggleLike,
-                onOpenMenu = onOpenMenu,
-                onOpenAlbum = onOpenAlbum,
-                onOpenArtist = onOpenArtist,
-            )
-        }
-        val landscapeLyricsPane: @Composable (Boolean, Dp) -> Unit = { compact, headerInset ->
-            LandscapeLyricsPane(
+        val reducePlayerMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+        val landscapeTrackHeader: @Composable (Boolean, Boolean) -> Unit = { compact, active ->
+            LandscapeTrackHeader(
                 compact = compact,
-                trackKey = song.videoId,
-                headerTopInset = headerInset,
+                song = song,
                 caption = if (hideSongStatus) null else playbackOriginText(song, playedBy),
                 onOpenCaption = openPlaybackOrigin,
-                credits = landscapeTrackCredits,
+                onOpenAlbum = onOpenAlbum,
+                onOpenArtist = onOpenArtist,
+                active = active,
+                reduceMotion = reducePlayerMotion,
+                actions = {
+                    LandscapeTrackActions(song, signedIn, likeStatus, showRevertCue, onToggleLike, onOpenMenu)
+                },
+            )
+        }
+        val landscapeLyricsPane: @Composable () -> Unit = {
+            LandscapeLyricsPane(
                 hasLyrics = lyricsTranslation.displayedLyrics.isNotEmpty(),
                 placeholder = if (lyricsUnavailable) {
                     stringResource(Res.string.lyrics_not_available)
@@ -2112,13 +2110,10 @@ fun NowPlayingScreen(
                         }
                     },
                     actions = playerActions,
+                    header = landscapeTrackHeader,
                     mainPane = { compact ->
                         LandscapeMainPane(
                             compact = compact,
-                            trackKey = song.videoId,
-                            caption = if (hideSongStatus) null else playbackOriginText(song, playedBy),
-                            onOpenCaption = openPlaybackOrigin,
-                            credits = landscapeTrackCredits,
                             lyricStrip = if (syncedLyricsEnabled) {
                                 {
                                     CurrentLyricStrip(

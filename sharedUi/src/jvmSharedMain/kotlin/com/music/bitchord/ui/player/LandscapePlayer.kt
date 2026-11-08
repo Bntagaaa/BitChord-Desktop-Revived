@@ -1,22 +1,9 @@
 package com.music.bitchord.ui.player
 
-import androidx.compose.foundation.layout.union
 import com.music.bitchord.ui.components.ExplicitBadge
-import com.music.bitchord.ui.theme.stableStatusBarInsets
 
 import com.music.bitchord.sharedui.resources.*
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -24,9 +11,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,18 +31,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalDensity
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -66,10 +45,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -106,33 +83,6 @@ private val LANDSCAPE_COMPACT_HEIGHT = 440.dp
  * phone-height window, in place of [PLAYER_GUTTER].
  */
 private val LANDSCAPE_GUTTER_COMPACT = 20.dp
-
-/**
- * How the right column hands over between the player, the lyrics and the
- * queue. The left column never moves, so a crossfade is the whole transition —
- * the same page being turned, not a panel being opened.
- */
-private const val LANDSCAPE_PANE_FADE_IN_MS = 220
-private const val LANDSCAPE_PANE_FADE_IN_DELAY_MS = 90
-private const val LANDSCAPE_PANE_FADE_OUT_MS = 140
-
-/** Which of its three things the player's content column is showing. */
-internal enum class PlayerPane { Main, Lyrics, Queue }
-
-/** Vertically align the lyrics header with the cover's measured top edge. */
-internal fun landscapeHeaderAlignmentPx(
-    artworkTopPx: Int,
-    paneTopPx: Int,
-    compact: Boolean,
-): Int = if (compact || artworkTopPx == Int.MIN_VALUE || paneTopPx == Int.MIN_VALUE) {
-    0
-} else {
-    (artworkTopPx - paneTopPx).coerceAtLeast(0)
-}
-
-/** Desktop saves Likes on device even before YouTube sign-in. */
-internal fun landscapeLikeVisible(signedIn: Boolean, localSong: Boolean, desktop: Boolean): Boolean =
-    signedIn || localSong || desktop
 
 /** The landscape sleeve's corner radius, at rest. */
 internal val LANDSCAPE_ART_CORNER = 10.dp
@@ -172,9 +122,11 @@ internal fun LandscapePlayerLayout(
     artwork: @Composable (Modifier) -> Unit,
     /** The row under the sleeve, emitted into its column. */
     actions: @Composable () -> Unit,
+    /** Kept mounted across pane switches; its text moves independently of the controls. */
+    header: @Composable (compact: Boolean, active: Boolean) -> Unit,
     /** Credits and transport. [compact] is a phone-height window. */
     mainPane: @Composable (compact: Boolean) -> Unit,
-    lyricsPane: @Composable (compact: Boolean, headerInset: Dp) -> Unit,
+    lyricsPane: @Composable () -> Unit,
     queuePane: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -189,18 +141,18 @@ internal fun LandscapePlayerLayout(
         ) {
             val compact = maxHeight < LANDSCAPE_COMPACT_HEIGHT
             val gutter = if (compact) LANDSCAPE_GUTTER_COMPACT else PLAYER_GUTTER
-            val density = LocalDensity.current
-            var artworkTopPx by remember { mutableIntStateOf(Int.MIN_VALUE) }
-            var lyricsPaneTopPx by remember { mutableIntStateOf(Int.MIN_VALUE) }
-            // A centred cover changes its vertical start as the window is resized.
-            // Derive the offset from the actual measured cover and lyric pane positions.
-            val headerInset = if (compact) 0.dp else if (
-                artworkTopPx == Int.MIN_VALUE || lyricsPaneTopPx == Int.MIN_VALUE
-            ) 24.dp else with(density) {
-                landscapeHeaderAlignmentPx(artworkTopPx, lyricsPaneTopPx, compact).toDp()
-            } + 8.dp
-
-            Row(
+            val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+            LandscapePlayerColumns(
+                pane = pane,
+                compact = compact,
+                gutter = gutter,
+                reduceMotion = reduceMotion,
+                artwork = artwork,
+                actions = actions,
+                header = { active -> header(compact, active) },
+                mainPane = { mainPane(compact) },
+                lyricsPane = lyricsPane,
+                queuePane = queuePane,
                 modifier = Modifier
                     .widthIn(max = LANDSCAPE_PLAYER_MAX_WIDTH)
                     .fillMaxSize()
@@ -208,88 +160,7 @@ internal fun LandscapePlayerLayout(
                         top = LANDSCAPE_HANDLE_STRIP,
                         bottom = if (compact) 8.dp else 20.dp,
                     ),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .padding(horizontal = gutter),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    // The sleeve is square and takes whichever of the two axes
-                    // runs out first once the row below has had its height —
-                    // the column's width on a big tablet, the height on
-                    // anything shorter. Measured here rather than estimated,
-                    // so the row under it can never be pushed off the bottom.
-                    BoxWithConstraints(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        artwork(
-                            Modifier
-                                .size(minOf(maxWidth, maxHeight))
-                                .onGloballyPositioned {
-                                    artworkTopPx = it.positionInRoot().y.toInt()
-                                },
-                        )
-                    }
-                    Spacer(Modifier.height(if (compact) 12.dp else 24.dp))
-                    actions()
-                }
-
-                AnimatedContent(
-                    targetState = pane,
-                    transitionSpec = {
-                        fadeIn(
-                            tween(
-                                LANDSCAPE_PANE_FADE_IN_MS,
-                                delayMillis = LANDSCAPE_PANE_FADE_IN_DELAY_MS,
-                            ),
-                        ) togetherWith fadeOut(tween(LANDSCAPE_PANE_FADE_OUT_MS))
-                    },
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .padding(vertical = if (!drawerFollowsListScroll && pane == PlayerPane.Lyrics) 64.dp else 0.dp),
-                    label = "landscapePane",
-                ) { shown ->
-                    when (shown) {
-                        PlayerPane.Main -> Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = gutter),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            mainPane(compact)
-                        }
-                        // The lyric sheet and the queue both reach back across
-                        // [PLAYER_GUTTER] on their own (see
-                        // [bleedHorizontally]), so that is the padding they
-                        // get: their scroll areas then run exactly to the
-                        // column's edges.
-                        PlayerPane.Lyrics -> Box(
-                            Modifier
-                                .fillMaxSize()
-                                .onGloballyPositioned {
-                                    lyricsPaneTopPx = it.positionInRoot().y.toInt()
-                                }
-                                .padding(horizontal = PLAYER_GUTTER),
-                        ) {
-                            lyricsPane(compact, headerInset)
-                        }
-                        PlayerPane.Queue -> Box(
-                            Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = PLAYER_GUTTER),
-                        ) {
-                            queuePane()
-                        }
-                    }
-                }
-            }
+            )
 
             // The sheet closes from a downward drag anywhere nothing else
             // claims, as it does in portrait; this is only the promise.
@@ -403,17 +274,12 @@ internal fun LandscapeArtwork(
  * the volume bar — the portrait half-player, less the row the left column
  * already has.
  *
- * Centred in the column rather than pinned to its foot: there is no artwork
- * above it here to hand the spare height to.
+ * Its parent places it beneath the persistent track header, independently of
+ * the metadata's slide and the lyrics/queue transition.
  */
 @Composable
 internal fun LandscapeMainPane(
     compact: Boolean,
-    trackKey: String,
-    /** "Playing from …", or null where Settings hides it. */
-    caption: String?,
-    onOpenCaption: () -> Unit,
-    credits: @Composable () -> Unit,
     /** The one-line lyric over the scrubber; null where synced lyrics are off. */
     lyricStrip: (@Composable () -> Unit)?,
     scrubber: @Composable () -> Unit,
@@ -427,14 +293,6 @@ internal fun LandscapeMainPane(
             .widthIn(max = PLAYER_MAX_WIDTH)
             .fillMaxWidth(),
     ) {
-        LandscapeTrackHeader(
-            compact = compact,
-            trackKey = trackKey,
-            caption = caption,
-            onOpenCaption = onOpenCaption,
-            credits = credits,
-        )
-        Spacer(Modifier.height(if (compact) 2.dp else 10.dp))
         lyricStrip?.invoke()
         scrubber()
         Spacer(Modifier.height(if (compact) 0.dp else 8.dp))
@@ -446,145 +304,123 @@ internal fun LandscapeMainPane(
     }
 }
 
-/**
- * Playback origin, title, artist, and track actions shared by the landscape
- * player and lyrics views. Keeping one header ensures both views honor the
- * same spacing, marquee, buttons, and hidden-status setting.
- */
+/** A single snapshot keeps the playback origin and both credit lines on the same track. */
+private data class LandscapeTrackMetadata(val song: Song, val caption: String?)
+
 @Composable
 internal fun LandscapeTrackHeader(
     compact: Boolean,
-    trackKey: String,
+    song: Song,
     caption: String?,
     onOpenCaption: () -> Unit,
-    credits: @Composable () -> Unit,
+    onOpenAlbum: (String) -> Unit,
+    onOpenArtist: (browseId: String?, name: String) -> Unit,
+    active: Boolean,
+    reduceMotion: Boolean,
+    actions: @Composable () -> Unit,
 ) {
-    val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
-    // Moving to the lyrics view reveals the header by rising from below.
-    // Only the metadata moves: the album art and scrolling lyric rows stay put.
-    val entrance = remember { Animatable(if (reduceMotion) 1f else 0f) }
-    LaunchedEffect(reduceMotion) {
-        if (reduceMotion) entrance.snapTo(1f)
-        else entrance.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
-    }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                translationY = (1f - entrance.value) * 26.dp.toPx()
-                alpha = 0.6f + entrance.value * 0.4f
-            },
-    ) {
-        // Track identity is part of the key so the origin slides too when two
-        // consecutive tracks have the same "Playing from" label.
-        AnimatedContent(
-            targetState = trackKey to caption,
-            contentKey = { it.first },
-            transitionSpec = {
-                if (reduceMotion) {
-                    EnterTransition.None togetherWith ExitTransition.None
-                } else {
-                    (slideInVertically(tween(310, easing = FastOutSlowInEasing)) { it / 2 } +
-                        fadeIn(tween(260))) togetherWith
-                        (slideOutVertically(tween(230)) { -it / 2 } + fadeOut(tween(230)))
-                }
-            },
-            label = "landscapePlaybackOriginSlide",
-        ) { (_, displayedCaption) ->
-            if (displayedCaption != null) {
-                Column {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        LandscapeMetadataMotion(
+            value = LandscapeTrackMetadata(song, caption),
+            identity = { it.song.videoId },
+            animate = active && !reduceMotion,
+            modifier = Modifier.weight(1f),
+        ) { displayed, moving, interactive ->
+            Column {
+                displayed.caption?.let { label ->
                     PlaybackOriginCaption(
-                        text = displayedCaption,
-                        onClick = onOpenCaption,
+                        text = label,
+                        onClick = { if (interactive) onOpenCaption() },
                         textAlign = TextAlign.Start,
                         contentPadding = PaddingValues(vertical = 2.dp),
                     )
                     Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
                 }
+                LandscapeCreditsText(
+                    song = displayed.song,
+                    onOpenAlbum = { if (interactive) onOpenAlbum(it) },
+                    onOpenArtist = { id, name -> if (interactive) onOpenArtist(id, name) },
+                    marqueeEnabled = active && !reduceMotion,
+                    marqueePaused = moving,
+                )
             }
         }
-        credits()
+        // These callbacks and icons always belong to the live track. They are outside the
+        // moving/clipped metadata slot and never disappear with an outgoing title.
+        actions()
     }
 }
 
-/**
- * Title, artist, like and the three-dot menu, for the landscape player.
- *
- * Marquee rather than a plain ellipsis, matching the portrait player: a tablet
- * is wider, not infinitely wide, and a long title truncated on the one surface
- * with room to scroll it would be the odd one out.
- */
+/** Credits in the music-video layout use the same motion without a second nested transition. */
 @Composable
 internal fun LandscapeCredits(
     song: Song,
     signedIn: Boolean,
     likeStatus: LikeStatus,
-    /** The menu glyph is briefly the undo arrow after a quality upgrade. */
     showRevertCue: Boolean,
     onToggleLike: () -> Unit,
     onOpenMenu: () -> Unit,
     onOpenAlbum: (String) -> Unit,
-    /** Null browse id for anyone but the lead credit — see [NowPlayingScreen]. */
     onOpenArtist: (browseId: String?, name: String) -> Unit,
     modifier: Modifier = Modifier,
     showActions: Boolean = true,
 ) {
     val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        AnimatedContent(
-            targetState = song,
-            contentKey = { it.videoId },
-            transitionSpec = {
-                if (reduceMotion) {
-                    EnterTransition.None togetherWith ExitTransition.None
-                } else {
-                    (slideInVertically(tween(310, easing = FastOutSlowInEasing)) { it / 2 } +
-                        fadeIn(tween(260))) togetherWith
-                        (slideOutVertically(tween(230)) { -it / 2 } + fadeOut(tween(230)))
-                }
-            },
-            modifier = Modifier.weight(1f),
-            label = "landscapeCreditsSlide",
-        ) { displayedSong ->
-            Column {
-                var titleOverflowing by remember(displayedSong.videoId) { mutableStateOf(false) }
-                val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
-                MarqueeText(
-                    text = displayedSong.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    onOverflowChange = { titleOverflowing = it },
-                    // After the title, in the artist line's colour.
-                    trailing = if (displayedSong.isExplicit == true) {
-                        { ExplicitBadge(artistColor) }
-                    } else {
-                        null
-                    },
-                    modifier = Modifier.opensPage(displayedSong.albumId, onOpenAlbum),
-                )
-                Spacer(Modifier.height(2.dp))
-                ArtistCreditsMarquee(
-                    text = displayedSong.artist,
-                    credits = remember(displayedSong.artist, displayedSong.artists, displayedSong.artistId) {
-                        artistCredits(displayedSong.artist, displayedSong.artists, displayedSong.artistId)
-                    },
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W500),
-                    color = artistColor,
-
-                    // A title that's also scrolling gets to go first — starting
-                    // together reads as clutter, so the artist waits a beat.
-                    startDelayMillis = if (titleOverflowing) MARQUEE_ARTIST_STAGGER_MS else 0L,
-                    onOpenArtist = onOpenArtist,
-                )
-            }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        LandscapeMetadataMotion(song, { it.videoId }, !reduceMotion, Modifier.weight(1f)) { displayed, moving, interactive ->
+            LandscapeCreditsText(
+                song = displayed,
+                onOpenAlbum = { if (interactive) onOpenAlbum(it) },
+                onOpenArtist = { id, name -> if (interactive) onOpenArtist(id, name) },
+                marqueeEnabled = !reduceMotion,
+                marqueePaused = moving,
+            )
         }
         if (showActions) LandscapeTrackActions(song, signedIn, likeStatus, showRevertCue, onToggleLike, onOpenMenu)
     }
 }
 
 @Composable
+private fun LandscapeCreditsText(
+    song: Song,
+    onOpenAlbum: (String) -> Unit,
+    onOpenArtist: (String?, String) -> Unit,
+    marqueeEnabled: Boolean,
+    marqueePaused: Boolean,
+) {
+    Column {
+        var titleOverflowing by remember(song.videoId) { mutableStateOf(false) }
+        val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
+        MarqueeText(
+            text = song.title,
+            style = MaterialTheme.typography.titleLarge,
+            color = Color.White,
+            enabled = marqueeEnabled,
+            paused = marqueePaused,
+            onOverflowChange = { titleOverflowing = it },
+            trailing = if (song.isExplicit == true) ({ ExplicitBadge(artistColor) }) else null,
+            modifier = Modifier.opensPage(song.albumId, onOpenAlbum),
+        )
+        Spacer(Modifier.height(2.dp))
+        ArtistCreditsMarquee(
+            text = song.artist,
+            credits = remember(song.artist, song.artists, song.artistId) {
+                artistCredits(song.artist, song.artists, song.artistId)
+            },
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W500),
+            color = artistColor,
+            enabled = marqueeEnabled,
+            paused = marqueePaused,
+            startDelayMillis = if (titleOverflowing) MARQUEE_ARTIST_STAGGER_MS else 0L,
+            onOpenArtist = onOpenArtist,
+        )
+    }
+}
+
+@Composable
 internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: LikeStatus,
-    showRevertCue: Boolean, onToggleLike: () -> Unit, onOpenMenu: () -> Unit) {
+    showRevertCue: Boolean, onToggleLike: () -> Unit, onOpenMenu: () -> Unit,
+    desktop: Boolean = PlayerPlatform.host.musicVideoFullscreen != null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.width(10.dp))
         // The desktop keeps a local liked library even without YouTube sign-in.
@@ -592,7 +428,7 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
         if (landscapeLikeVisible(
                 signedIn = signedIn,
                 localSong = song.localUri != null,
-                desktop = PlayerPlatform.host.musicVideoFullscreen != null,
+                desktop = desktop,
             )) {
             val liked = likeStatus == LikeStatus.LIKE
             CircleGlyph(
@@ -625,14 +461,6 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
  */
 @Composable
 internal fun LandscapeLyricsPane(
-    compact: Boolean = false,
-    trackKey: String = "",
-    headerTopInset: Dp = 0.dp,
-    /** Match the main player's optional "Playing from" status. */
-    caption: String? = null,
-    onOpenCaption: () -> Unit = {},
-    /** Null for standalone sidebar lyrics, where the page already owns its header. */
-    credits: (@Composable () -> Unit)? = null,
     hasLyrics: Boolean,
     /** Shown in place of the sheet while there are no lines to draw. */
     placeholder: String,
@@ -648,19 +476,6 @@ internal fun LandscapeLyricsPane(
     panel: @Composable (Modifier) -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        // The Now Playing landscape view owns this header; the standalone sidebar has
-        // no playback header and must keep its original full-height lyrics layout.
-        if (credits != null) {
-            Spacer(Modifier.height(headerTopInset))
-            LandscapeTrackHeader(
-                compact = compact,
-                trackKey = trackKey,
-                caption = caption,
-                onOpenCaption = onOpenCaption,
-                credits = credits,
-            )
-            Spacer(Modifier.height(if (compact) 4.dp else 12.dp))
-        }
         Box(
             modifier = Modifier
                 .weight(1f)
