@@ -3,6 +3,7 @@ package com.music.bitchord.ui.screens
 import com.music.bitchord.data.settings.LibraryViewType
 
 import com.music.bitchord.ui.components.trackArtSize
+import com.music.bitchord.ui.components.VideoThumbnails
 import com.music.bitchord.ui.components.contextClick
 import com.music.bitchord.ui.AppUi
 import com.music.bitchord.sharedui.resources.*
@@ -1133,10 +1134,10 @@ fun VideoShelfCard(
 }
 
 /** A music video's frame. */
-const val VIDEO_ASPECT = 16f / 9f
+val VIDEO_ASPECT: Float get() = if (VideoThumbnails.square) 1f else 16f / 9f
 
 /** Wide enough that a 16:9 card stands about as tall as a square [SHELF_CARD_WIDTH] one. */
-val VIDEO_CARD_WIDTH = 248.dp
+val VIDEO_CARD_WIDTH get() = if (VideoThumbnails.square) SHELF_CARD_WIDTH else 248.dp
 
 /**
  * A card that isn't a thing yet — the dashed "New playlist" tile at the head
