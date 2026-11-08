@@ -17,14 +17,19 @@ jobs:
     container: archlinux:base-devel
 
     steps:
-      # Always update the active package recipe on main, not the release tag's
-      # historical snapshot. Never publish to the AUR without review.
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-
+      # checkout needs Git before it runs; otherwise this container falls back to
+      # an archive without .git, which create-pull-request cannot update.
       - name: Install updater prerequisites
         run: pacman -Syu --noconfirm --needed python git
+
+      # Update the active development recipe, not a historical release snapshot.
+      # Keep checkout and the PR base aligned. AUR publication still needs review.
+      - uses: actions/checkout@v4
+        with:
+          ref: '1.9.2'
+
+      - name: Verify Git checkout
+        run: git rev-parse --is-inside-work-tree
 
       - name: Read release metadata and verify SHA-256
         id: update
@@ -54,7 +59,7 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           branch: automation/update-aur-package
-          base: main
+          base: '1.9.2'
           delete-branch: true
           add-paths: |
             packaging/aur/PKGBUILD
