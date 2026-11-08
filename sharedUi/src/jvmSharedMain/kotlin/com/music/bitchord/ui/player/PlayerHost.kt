@@ -151,6 +151,8 @@ private val NoCast = MutableStateFlow(CastUi())
 
 private val DefaultHideStatusBar = MutableStateFlow(false)
 private val DefaultPlayerTheme = MutableStateFlow(PlayerTheme.DEFAULT)
+private val DefaultMenuTint = MutableStateFlow(0.55f)
+private val DefaultMenuBlur = MutableStateFlow(30f)
 private val DefaultVideoAspect = MutableStateFlow(16f / 9f)
 
 private val NoVideoQuality = MutableStateFlow(MusicVideoQualityUi())
@@ -246,6 +248,8 @@ interface PlayerSettingsSource {
     val prioritizeSpotifyCanvas: StateFlow<Boolean>
     val reduceAnimation: StateFlow<Boolean>
     val reduceDynamicBlur: StateFlow<Boolean>
+    val contextMenuTintAlpha: StateFlow<Float> get() = DefaultMenuTint
+    val contextMenuBlurDp: StateFlow<Float> get() = DefaultMenuBlur
     val showNerdStats: StateFlow<Boolean>
     val smartAnalysis: StateFlow<SmartAnalysis>
     /**

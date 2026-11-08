@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.player
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,11 +42,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.sharedui.resources.*
 import com.music.bitchord.data.lyrics.LyricsSource
@@ -71,19 +75,38 @@ internal fun LyricsProviderSheet(
     modifier: Modifier = Modifier,
 ) {
     val reduceBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val desktop = PlayerPlatform.host.mobileTextChrome
+    val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val menuTint by PlayerSettings.contextMenuTintAlpha.collectAsStateWithLifecycle()
+    val menuBlur by PlayerSettings.contextMenuBlurDp.collectAsStateWithLifecycle()
+    var closing by remember { mutableStateOf(false) }
+    var appeared by remember { mutableStateOf(false) }
+    val progress by animateFloatAsState(
+        targetValue = if (!desktop || (appeared && !closing)) 1f else 0f,
+        animationSpec = tween(if (!desktop || reduceMotion) 0 else if (closing) 170 else 190),
+        label = "lyrics-provider-menu-motion",
+    )
+    LaunchedEffect(Unit) { appeared = true }
+    LaunchedEffect(closing) {
+        if (desktop && closing) {
+            if (!reduceMotion) delay(170)
+            onDismiss()
+        }
+    }
+    val dismissAnimated: () -> Unit = { if (desktop) closing = true else onDismiss() }
     val savedOrder by PlayerSettings.lyricsSourceOrder.collectAsStateWithLifecycle()
     val sources = remember(savedOrder) { LyricsSource.ordered(savedOrder) }
     var requestedSource by remember { mutableStateOf<LyricsSource?>(null) }
     LaunchedEffect(currentSource, requestedSource) {
-        if (requestedSource != null && currentSource == requestedSource) onDismiss()
+        if (requestedSource != null && currentSource == requestedSource) dismissAnimated()
     }
 
     if (!drawerFollowsListScroll) {
-        PlayerBackHandler(enabled = true, onBack = onDismiss)
+        PlayerBackHandler(enabled = true, onBack = dismissAnimated)
         BoxWithConstraints(modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().clickable(
                 interactionSource = remember { MutableInteractionSource() }, indication = null,
-                onClick = onDismiss,
+                onClick = dismissAnimated,
             ))
             val shape = RoundedCornerShape(12.dp)
             Column(
@@ -91,11 +114,18 @@ internal fun LyricsProviderSheet(
                     .offset(x = if (LocalCenteredLyrics.current) maxWidth / 4 else 0.dp)
                     .padding(bottom = 42.dp)
                     .width(280.dp).heightIn(max = 420.dp).clip(shape)
+                    .graphicsLayer {
+                        alpha = progress
+                        val scale = if (!desktop || reduceMotion) 1f else 0.30f + 0.70f * progress
+                        scaleX = scale
+                        scaleY = scale
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                    }
                     .hazeEffect(hazeState) {
                         blurEnabled = !reduceBlur
-                        blurRadius = 30.dp
+                        blurRadius = if (desktop) menuBlur.dp else 30.dp
                         backgroundColor = Color(0xFF1C1C1E)
-                        tints = listOf(HazeTint(Color(0xFF1C1C1E).copy(alpha = 0.62f)))
+                        tints = listOf(HazeTint(Color(0xFF1C1C1E).copy(alpha = if (desktop) menuTint else 0.62f)))
                     }
                     .border(0.5.dp, Color.White.copy(alpha = 0.12f), shape)
                     .verticalScroll(rememberScrollState()).padding(vertical = 6.dp),
@@ -106,7 +136,7 @@ internal fun LyricsProviderSheet(
                         onClick = {
                             requestedSource = source
                             onSelect(source)
-                            if (states[source] == LyricsProviderState.FOUND) onDismiss()
+                            if (states[source] == LyricsProviderState.FOUND) dismissAnimated()
                         })
                 }
             }

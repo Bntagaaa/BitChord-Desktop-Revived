@@ -231,6 +231,8 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     override val prioritizeSpotifyCanvas = MutableStateFlow(false)
     override val reduceAnimation = DesktopAppearanceSettings.reduceAnimation
     override val reduceDynamicBlur = DesktopAppearanceSettings.reduceDynamicBlur
+    override val contextMenuTintAlpha = DesktopMenuTuning.tintAlpha
+    override val contextMenuBlurDp = DesktopMenuTuning.blurRadiusDp
     override val showNerdStats = MutableStateFlow(false)
     override val smartAnalysis = MutableStateFlow(SmartAnalysis())
     override val smartFadeEnabled = MutableStateFlow(false)
