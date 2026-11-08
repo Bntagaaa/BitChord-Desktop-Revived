@@ -7,7 +7,7 @@ root = Path(__file__).resolve().parents[2]
 classes = root / "sharedUi/build/classes/kotlin/jvm/main"
 app = Path(sys.argv[1])
 libraries = app / "lib/app" if (app / "lib/app").is_dir() else app / "app"
-families = ("LandscapePlayerColumnsKt", "LandscapeLyricsFrameKt", "LandscapePlayerKt", "NowPlayingScreenKt")
+families = ("LandscapePlayerColumnsKt", "LandscapeLyricsFrameKt", "LandscapeLyricEdgesKt", "LandscapePlayerKt", "NowPlayingScreenKt")
 expected = {
     path.relative_to(classes).as_posix(): path.read_bytes()
     for path in classes.rglob("*.class")

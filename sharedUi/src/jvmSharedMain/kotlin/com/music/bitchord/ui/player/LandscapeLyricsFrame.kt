@@ -21,7 +21,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.Layout
@@ -64,7 +63,7 @@ internal fun LandscapeLyricsFrame(
     )
     Layout(
         modifier = modifier.fillMaxSize().testTag("landscape-lyrics-frame").then(
-            if (revealControlsOnHover) Modifier.clipToBounds() else Modifier,
+            if (revealControlsOnHover) Modifier.clipLandscapeLyricsVertically() else Modifier,
         ).then(
             if (revealControlsOnHover) Modifier
                 .hoverable(interaction)
@@ -81,7 +80,7 @@ internal fun LandscapeLyricsFrame(
         content = {
             Layout(
                 modifier = Modifier.testTag("landscape-lyrics-viewport").then(
-                    if (revealControlsOnHover) Modifier.clipToBounds() else Modifier,
+                    if (revealControlsOnHover) Modifier.landscapeLyricEdges(fadeTop = false) else Modifier,
                 ),
                 content = { Box(Modifier.fillMaxSize(), content = lyrics) },
             ) { measurables, bounds ->

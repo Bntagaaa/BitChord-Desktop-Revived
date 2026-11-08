@@ -56,13 +56,14 @@ class DesktopLandscapePlayerTest {
             Song("landscape-b", "Landscape Track B", "Test Artist B", null),
         )
         val index = mutableStateOf(0)
+        val playhead = PlaybackPosition().apply { report(28_000) }
         try {
             setContent {
                 CompositionLocalProvider(LocalDensity provides Density(density, 1f)) {
                 if (mounted.value) MaterialTheme(colorScheme = darkColorScheme(primary = Color.White)) {
                     DesktopPlayerSheet(true, onDismiss = {}, dragToDismiss = false) { windowWidth, windowHeight ->
                         NowPlayingScreen(song = songs[index.value], isPlaying = false, isLoading = false,
-                            position = remember { PlaybackPosition().apply { report(28_000) } }, durationMs = 240_000,
+                            position = playhead, durationMs = 400_000,
                             audioVersionSwitching = false, qualityUpgraded = false,
                             queue = songs, queueIndex = index.value, hasPrevious = true, hasNext = true,
                             repeatMode = 0, shuffleEnabled = false, autoplayEnabled = false,
@@ -73,7 +74,8 @@ class DesktopLandscapePlayerTest {
                             onMoveInQueue = { _, _ -> }, onClearQueue = {}, onOpenMenu = {}, onOpenAlbum = {},
                             onOpenArtist = { _, _ -> }, onOpenPlaybackSource = {}, onListenTogether = {},
                             lyrics = listOf(LyricLine(0, "First lyric"), LyricLine(20_000, "Current lyric"),
-                                LyricLine(40_000, "Next lyric"), LyricLine(60_000, "Last lyric")),
+                                LyricLine(40_000, "Next lyric"), LyricLine(60_000, "Last lyric")) +
+                                (4..15).map { LyricLine(it * 20_000L, "Later lyric $it") },
                             lyricsSource = LyricsSource.KUGOU, lyricsProviderStates = emptyMap(),
                             onSelectLyricsProvider = {}, lyricsUnavailable = false, lyricsOffsetOpen = false,
                             onDismissLyricsOffset = {}, windowWidth = windowWidth, windowHeight = windowHeight)
@@ -175,6 +177,28 @@ class DesktopLandscapePlayerTest {
             onNodeWithText("Lyrics by KuGou").assertDoesNotExist()
             onNodeWithText("Landscape Track B").assertDoesNotExist()
             assertEquals(viewport, onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot())
+
+            runOnIdle { playhead.report(0) }
+            mainClock.advanceTimeBy(2000)
+            waitForIdle()
+            val firstRow = onNodeWithTag("lyrics-row-0").getUnclippedBoundsInRoot()
+            assertTrue((firstRow.top - frame.top).value in 0f..60f,
+                "The opening lyric starts at the top instead of leaving half the cover empty")
+            save(onRoot().captureToImage(), "$width-lyrics-start.png")
+            runOnIdle { playhead.report(200_000) }
+            mainClock.advanceTimeBy(2000)
+            waitForIdle()
+            val laterRow = onNodeWithTag("lyrics-row-10").getUnclippedBoundsInRoot()
+            assertEquals((frame.top.value + frame.bottom.value) / 2f,
+                (laterRow.top.value + laterRow.bottom.value) / 2f, 3f,
+                "Later lyrics settle in the center once preceding rows fill the upper half")
+            save(onRoot().captureToImage(), "$width-lyrics-later.png")
+            runOnIdle { playhead.report(0) }
+            mainClock.advanceTimeBy(2000)
+            waitForIdle()
+            assertEquals(firstRow.top.value,
+                onNodeWithTag("lyrics-row-0").getUnclippedBoundsInRoot().top.value, 1f,
+                "Seeking back to the opening returns to the top")
 
             onNodeWithContentDescription("Close lyrics").performClick()
             mainClock.advanceTimeBy(600)

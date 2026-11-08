@@ -1874,6 +1874,7 @@ fun NowPlayingScreen(
                         onPickLine = lyricPicker.pick,
                         onTogglePick = lyricPicker.toggle,
                         centerFocus = true,
+                        landscapeViewport = PlayerPlatform.host.musicVideoFullscreen != null,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

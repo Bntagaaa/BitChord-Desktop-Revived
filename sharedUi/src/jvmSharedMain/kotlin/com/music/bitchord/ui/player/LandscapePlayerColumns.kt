@@ -183,17 +183,17 @@ internal fun LandscapePlayerColumns(
                         if (boundLyricsToArtwork) geometry.artworkTop.toDp() else 0.dp
                     } else topInset,
                     bottom = if (shown != PlayerPane.Main) lyricsBottomInset else 0.dp,
-                ).testTag(if (shown == PlayerPane.Lyrics) "landscape-lyrics-body" else "landscape-other-pane").drawWithContent {
-                    // Desktop metadata overlays the full-cover lyric viewport. It never
-                    // reserves a blank strip or moves the lyric renderer when revealed.
-                    val clipTop = when {
-                        shown != PlayerPane.Lyrics -> 0f
-                        boundLyricsToArtwork ->
-                            (headerTop() + metadata.height - geometry.artworkTop).coerceAtLeast(0) * headerReveal
-                        else -> (headerTop() + metadata.height + headerGap - bodyTop).coerceAtLeast(0).toFloat()
+                ).testTag(if (shown == PlayerPane.Lyrics) "landscape-lyrics-body" else "landscape-other-pane").then(
+                    if (shown == PlayerPane.Lyrics && boundLyricsToArtwork) Modifier.landscapeLyricEdges(
+                        top = { (headerTop() + metadata.height - geometry.artworkTop).coerceAtLeast(0) * headerReveal },
+                        fadeBottom = false,
+                    ) else Modifier.drawWithContent {
+                        val clipTop = if (shown == PlayerPane.Lyrics)
+                            (headerTop() + metadata.height + headerGap - bodyTop).coerceAtLeast(0).toFloat()
+                        else 0f
+                        clipRect(top = clipTop.coerceAtMost(size.height)) { this@drawWithContent.drawContent() }
                     }
-                    clipRect(top = clipTop.coerceAtMost(size.height)) { this@drawWithContent.drawContent() }
-                }) {
+                })) {
                     when (shown) {
                         PlayerPane.Main -> Unit
                         PlayerPane.Lyrics -> lyricsPane()

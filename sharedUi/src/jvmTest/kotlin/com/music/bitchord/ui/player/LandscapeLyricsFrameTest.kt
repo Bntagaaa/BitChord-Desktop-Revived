@@ -1,11 +1,17 @@
 package com.music.bitchord.ui.player
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
@@ -16,6 +22,51 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class LandscapeLyricsFrameTest {
+    @Test fun visibleViewportFadesAtBothEdgesAndFollowsTheHeaderOverlay() =
+        runDesktopComposeUiTest(width = 160, height = 160) {
+            val covered = mutableStateOf(0f)
+            setContent {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    Box(Modifier.offset(30.dp, 30.dp).size(100.dp)
+                        .landscapeLyricEdges(top = { covered.value })) {
+                        Canvas(Modifier.fillMaxSize()) { drawRect(Color.White) }
+                    }
+                }
+            }
+            var pixels = onRoot().captureToImage().toPixelMap()
+            assertTrue(pixels[80, 30].red < .1f)
+            assertTrue(pixels[80, 44].red in .3f.. .7f)
+            assertTrue(pixels[80, 80].red > .95f)
+            assertTrue(pixels[80, 116].red in .3f.. .7f)
+            assertTrue(pixels[80, 129].red < .1f)
+            runOnIdle { covered.value = 20f }
+            pixels = onRoot().captureToImage().toPixelMap()
+            assertTrue(pixels[80, 45].red < .1f, "Lyrics behind the header stay hidden")
+            assertTrue(pixels[80, 64].red in .3f.. .7f, "Fade follows the revealed header edge")
+            assertTrue(pixels[80, 85].red > .95f)
+        }
+
+    @Test fun viewportPreservesAllFourRoundedCornersOfAHighlightBleedingIntoTheGutter() =
+        runDesktopComposeUiTest(width = 160, height = 160) {
+            setContent {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    Box(Modifier.offset(30.dp, 30.dp).size(100.dp)
+                        .clipLandscapeLyricsVertically().landscapeLyricEdges()) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            drawRoundRect(Color.White, topLeft = Offset(-10f, 30f),
+                                size = Size(120f, 40f), cornerRadius = CornerRadius(10f))
+                        }
+                    }
+                }
+            }
+            val pixels = onRoot().captureToImage().toPixelMap()
+            for (x in listOf(21, 138)) {
+                assertTrue(pixels[x, 80].red > .95f, "Both sides of the highlight remain visible")
+                assertTrue(pixels[x, 61].red < .1f, "Top corners remain rounded")
+                assertTrue(pixels[x, 98].red < .1f, "Bottom corners remain rounded")
+            }
+        }
+
     @Test fun hoverReservesFooterSpaceWithoutMovingOrRemountingTheLyricRenderer() =
         runDesktopComposeUiTest(width = 440, height = 420) {
             mainClock.autoAdvance = false
