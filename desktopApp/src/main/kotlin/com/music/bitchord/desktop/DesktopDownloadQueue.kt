@@ -124,7 +124,7 @@ object DesktopDownloadQueue {
             _active.value = emptyMap()
             ids to jobs
         }
-        jobs.forEach(Job::cancel)
+        jobs.forEach { it.cancel() }
         ids.forEach(DesktopDownloadManager::cancel)
     }
 
