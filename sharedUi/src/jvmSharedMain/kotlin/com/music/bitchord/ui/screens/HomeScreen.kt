@@ -408,6 +408,8 @@ fun CompactTrackRow(
     isPlaying: Boolean = false,
     /** A music video: its thumbnail at 16:9 rather than squared off. */
     isVideo: Boolean = false,
+    /** A host with its own trailing actions can keep gestures without a second button. */
+    showMenuButton: Boolean = true,
 ) {
     Row(
         modifier = Modifier
@@ -447,7 +449,7 @@ fun CompactTrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (onLongPress != null) {
+        if (showMenuButton && onLongPress != null) {
             RowMoreButton(onClick = onLongPress)
         }
     }

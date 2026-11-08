@@ -83,7 +83,8 @@ internal fun CollectionPage(page: DetailPage, session: MobileSession, onSongMenu
                                 subtitle = if (song.isMatchPending) "Finding a match…" else if (song.isMatchMissing) "No playable match · ${song.artist}" else song.artist,
                                 thumbnailUrl = song.thumbnailUrl,
                                 onClick = { if (!song.isUnresolvedSpotify) session.player.playSongs(playable.map { it.copy(playbackSource = page.title, playbackSourceType = PlaybackSourceType.BROWSE, playbackSourceId = page.browseId) }, playable.indexOf(song)) },
-                                onLongPress = { onSongMenu(song) }, isCurrent = playingRow(song), isPlaying = playback.isPlaying, isVideo = song.isVideo)
+                                onLongPress = { onSongMenu(song) }, isCurrent = playingRow(song), isPlaying = playback.isPlaying, isVideo = song.isVideo,
+                                showMenuButton = false)
                         }
                         Text(song.durationText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         IconButton(onClick = { onSongMenu(song) }) { Icon(Icons.Rounded.MoreHoriz, "Actions for ${song.title}") }

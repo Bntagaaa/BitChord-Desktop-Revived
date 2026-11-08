@@ -17,10 +17,12 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import uuid
 
 
 HELPER = Path(__file__).resolve().parents[2] / "main/resources/reworked/update-portable.ps1"
+REPORTS = Path(__file__).resolve().parents[3] / "build/windows-portable-tests"
 VERSION = "1.9.2-reworked.1"
 SOURCE = r"""
 using System;
@@ -79,7 +81,28 @@ def app_tree(directory: Path, executable: Path, version: str, crash: bool = Fals
         (directory / "crash.flag").write_text("fail before startup acknowledgment")
 
 
-def scenario(workspace: Path, executable: Path, crash: bool) -> None:
+def retain_diagnostics(operation: Path, destination: Path, details: dict, failure: str | None) -> None:
+    """Keep only this disposable fixture's records, even when its worker failed before accepting."""
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in ("install.log", "status", "phase", "operation.json", "staged-files.json", "accepted", "ready"):
+        source = operation / name
+        if source.is_file():
+            shutil.copyfile(source, destination / name)
+    (destination / "fixture.json").write_text(json.dumps(details, indent=2), encoding="utf-8")
+    if failure:
+        (destination / "failure.txt").write_text(failure, encoding="utf-8")
+        print("Portable updater failure diagnostics:", destination, file=sys.stderr, flush=True)
+        for name in ("phase", "status", "install.log"):
+            source = destination / name
+            if source.is_file():
+                data = source.read_bytes()
+                encoding = "utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
+                print(name + ":\n" + data.decode(encoding, errors="replace")[-24000:], file=sys.stderr, flush=True)
+
+
+def scenario(workspace: Path, executable: Path, case: str, reports: Path) -> None:
+    crash = case == "crash"
+    rejected = case == "tampered-stage"
     workspace.mkdir()
     target = workspace / "Portable player [test]"
     staging = workspace / ".BitChordReworked-next-fixture"
@@ -95,9 +118,14 @@ def scenario(workspace: Path, executable: Path, crash: bool) -> None:
     payload.write_bytes(b"archive contents are covered by the Kotlin extraction tests")
     manifest = {str(path.relative_to(candidate)).replace("\\", "/"): digest(path) for path in candidate.rglob("*") if path.is_file()}
     (operation / "staged-files.json").write_text(json.dumps(manifest))
+    if rejected:
+        (candidate / "runtime/bin/server/jvm.dll").write_bytes(b"modified after the verified manifest")
     environment = {key: value for key, value in os.environ.items() if not key.startswith("BITCHORD_REWORKED_UPDATE_")}
+    environment["BITCHORD_REWORKED_UPDATE_NO_UI"] = "1"
     parent = subprocess.Popen([str(target / "BitChordReworked.exe"), "parent"], env=environment)
     helper = None
+    failure = None
+    began = time.monotonic()
     try:
         job = dict(
             target=str(target / "BitChordReworked.exe"), payload=str(payload), sha256=digest(payload),
@@ -112,6 +140,15 @@ def scenario(workspace: Path, executable: Path, crash: bool) -> None:
             helper = subprocess.Popen(["powershell.exe", "-NoProfile", "-NonInteractive", "-STA", "-EncodedCommand", encoded],
                                       env=environment, cwd=operation, stdout=log, stderr=subprocess.STDOUT)
             wait_for(lambda: (operation / "accepted").exists() or helper.poll() is not None, 30, "helper failed to accept the staged update")
+            if rejected:
+                helper.wait(timeout=10)
+                assert helper.returncode != 0, "a modified staged runtime must fail"
+                assert not (operation / "accepted").exists(), "tampered staging must not be accepted"
+                assert not backup.exists() and not failed.exists(), "a preflight rejection must leave the installed tree in place"
+                assert "1.9.1-reworked.1" in (target / "app/BitChordReworked.cfg").read_text()
+                assert "Staged file changed" in (operation / "status").read_text(encoding="utf-8-sig"), "rejection must report the actual checksum failure"
+                print("PASS portable staged-file tampering rejected before handoff", flush=True)
+                return
             assert (operation / "accepted").exists(), (operation / "install.log").read_text()
             assert not backup.exists(), "must not replace a still-running portable application"
             assert "1.9.1-reworked.1" in (target / "app/BitChordReworked.cfg").read_text()
@@ -131,6 +168,9 @@ def scenario(workspace: Path, executable: Path, crash: bool) -> None:
             assert "1.9.1-reworked.1" in (backup / "app/BitChordReworked.cfg").read_text()
             assert not failed.exists()
         print("PASS", "portable early-crash rollback" if crash else "portable replacement + previous backup")
+    except BaseException:
+        failure = traceback.format_exc()
+        raise
     finally:
         if parent.poll() is None:
             parent.terminate()
@@ -138,6 +178,11 @@ def scenario(workspace: Path, executable: Path, crash: bool) -> None:
         if helper is not None and helper.poll() is None:
             helper.terminate()
             helper.wait(timeout=10)
+        retain_diagnostics(operation, reports / case, dict(
+            case=case, elapsed_seconds=round(time.monotonic() - began, 3),
+            parent_returncode=parent.returncode, helper_returncode=helper.returncode if helper is not None else None,
+            worker_sha256=digest(HELPER), expected_version=VERSION,
+        ), failure)
 
 
 def main() -> None:
@@ -146,14 +191,17 @@ def main() -> None:
         return
     with tempfile.TemporaryDirectory(prefix="reworked-portable-worker-test-") as raw:
         directory = Path(raw)
+        reports = REPORTS / str(uuid.uuid4())
+        reports.mkdir(parents=True)
         compiler = Path(os.environ["WINDIR"]) / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
         assert compiler.is_file(), "Windows .NET Framework C# compiler is required for this fixture"
         code = directory / "Fixture.cs"
         executable = directory / "Fixture.exe"
         code.write_text(SOURCE)
         subprocess.run([str(compiler), "/nologo", "/target:exe", "/out:" + str(executable), str(code)], check=True)
-        scenario(directory / "success", executable, False)
-        scenario(directory / "crash", executable, True)
+        scenario(directory / "success", executable, "success", reports)
+        scenario(directory / "crash", executable, "crash", reports)
+        scenario(directory / "tampered-stage", executable, "tampered-stage", reports)
         # Both launched replacement fixtures exit themselves; allow Windows to release PE handles.
         time.sleep(1)
 

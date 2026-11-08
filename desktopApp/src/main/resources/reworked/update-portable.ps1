@@ -8,6 +8,14 @@ $payloadLock = $null
 $swapped = $false
 $updated = $null
 $job = $null
+$accepted = $false
+
+function Write-Phase([string]$phase) {
+    Write-Output ('Portable updater: ' + $phase)
+    if ($operation -and [IO.Directory]::Exists($operation)) {
+        [IO.File]::WriteAllText((Join-Path $operation 'phase'), $phase)
+    }
+}
 
 function Require-RegularFile([string]$path) {
     $item = Get-Item -LiteralPath $path
@@ -55,9 +63,11 @@ function Restore-Previous {
 
 try {
     if (-not $operation -or -not [IO.Path]::IsPathRooted($operation)) { throw 'Missing update operation.' }
+    Write-Phase 'reading-operation'
     $job = Get-Content -LiteralPath (Join-Path $operation 'operation.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($job.operation -cne $operation -or $job.token -notmatch '^[a-f0-9-]{36}$') { throw 'Invalid update operation.' }
     if ($job.sha256 -notmatch '^[a-f0-9]{64}$' -or $job.oldSha256 -notmatch '^[a-f0-9]{64}$') { throw 'Invalid checksums.' }
+    Write-Phase 'checking-layout'
     $target = Require-RegularFile $job.target
     $root = Get-Item -LiteralPath $job.portableRoot
     $stage = Get-Item -LiteralPath $job.stagedRoot
@@ -71,19 +81,25 @@ try {
     [void](Require-RegularFile (Join-Path $root.FullName 'reworked-portable.marker'))
     $config = Get-Content -LiteralPath (Join-Path $root.FullName 'app\BitChordReworked.cfg') -Raw
     if ($config -notmatch '(?m)^java-options=-Dbitchord\.product=reworked\r?$') { throw 'The old application does not identify itself as Reworked.' }
+    Write-Phase 'taking-installation-lock'
     $identityHasher = [Security.Cryptography.SHA256]::Create()
     try { $identity = [BitConverter]::ToString($identityHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($target.FullName.ToLowerInvariant()))).Replace('-', '') }
     finally { $identityHasher.Dispose() }
     $lease = New-Object System.Threading.Mutex($false, ('Local\BitChordReworkedUpdate_' + $identity))
     try { $hasLease = $lease.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $hasLease = $true }
     if (-not $hasLease) { throw 'Another updater already owns this installation.' }
+    Write-Phase 'checking-archive'
     $payload = Require-RegularFile $job.payload
     $payloadLock = [IO.File]::Open($payload.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
     if ((Get-FileHash -LiteralPath $payload.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.sha256) { throw 'The portable archive changed after verification.' }
+    Write-Phase 'checking-original-launcher'
     if ((Get-FileHash -LiteralPath $target.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.oldSha256) { throw 'The running launcher changed before update.' }
+    Write-Phase 'checking-staged-tree'
     Verify-StagedTree
+    Write-Phase 'waiting-for-app'
     Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'waiting-for-app'
     [IO.File]::WriteAllText((Join-Path $operation 'accepted'), 'accepted')
+    $accepted = $true
     $deadline = [DateTime]::UtcNow.AddSeconds(120)
     while ($true) {
         $parentProcess = Get-Process -Id ([int]$job.pid) -ErrorAction SilentlyContinue
@@ -93,8 +109,10 @@ try {
         if ([DateTime]::UtcNow -ge $deadline) { throw 'The app did not exit; the portable folder has not been changed.' }
         Start-Sleep -Milliseconds 200
     }
+    Write-Phase 'verifying-handoff'
     if ((Get-FileHash -LiteralPath $target.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.oldSha256) { throw 'The installed launcher changed during handoff.' }
     Verify-StagedTree
+    Write-Phase 'replacing'
     Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'replacing'
     [IO.Directory]::Move($job.portableRoot, $job.backupRoot)
     try { [IO.Directory]::Move($job.stagedRoot, $job.portableRoot) }
@@ -105,6 +123,7 @@ try {
     $env:BITCHORD_REWORKED_UPDATE_TOKEN = [string]$job.token
     $env:BITCHORD_REWORKED_UPDATE_VERSION = [string]$job.version
     Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'starting'
+    Write-Phase 'starting'
     $updated = Start-Process -FilePath (Join-Path $job.portableRoot 'BitChordReworked.exe') -WorkingDirectory $job.portableRoot -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(75)
     while ([DateTime]::UtcNow -lt $deadline) {
@@ -113,6 +132,7 @@ try {
             $lines = @(Get-Content -LiteralPath $ready)
             if ($lines.Count -ge 2 -and $lines[0] -ceq $job.token -and $lines[1] -ceq $job.version) {
                 Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'complete'
+                Write-Phase 'complete'
                 Write-Output ('Previous portable version retained at ' + $job.backupRoot)
                 exit 0
             }
@@ -136,7 +156,12 @@ try {
         $status = Join-Path $operation 'status'
         if (-not (Test-Path -LiteralPath $status) -or (Get-Content -LiteralPath $status -Raw).Trim() -cne 'rolled-back') { Set-Content -LiteralPath $status -Value ('failed: ' + $message) }
     }
-    try { Add-Type -AssemblyName System.Windows.Forms; [void][Windows.Forms.MessageBox]::Show(($message + "`n`nLogs: " + $operation), 'BitChord Reworked portable update') } catch { }
+    # Before accepted, the original application is still open and reports this
+    # failure itself. A modal prompt here would leave prepare() waiting on a
+    # failed worker. Disposable CI fixtures explicitly disable post-handoff UI.
+    if ($accepted -and $env:BITCHORD_REWORKED_UPDATE_NO_UI -ne '1') {
+        try { Add-Type -AssemblyName System.Windows.Forms; [void][Windows.Forms.MessageBox]::Show(($message + "`n`nLogs: " + $operation), 'BitChord Reworked portable update') } catch { }
+    }
     exit 1
 } finally {
     if ($payloadLock) { $payloadLock.Dispose() }

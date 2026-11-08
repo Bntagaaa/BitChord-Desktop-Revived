@@ -396,32 +396,34 @@ private fun DesktopNavigation(route: Destination, playlists: List<LocalPlaylist>
                 Destination.EXPLORE to BitChordIcons.Explore, Destination.SEARCH to BitChordIcons.Search, Destination.LIBRARY to BitChordIcons.Library,
                 Destination.SPOTIFY to Icons.Rounded.LibraryMusic, Destination.LOCAL to Icons.Rounded.Folder, Destination.REMOTE to Icons.Rounded.Cloud,
                 Destination.DOWNLOADS to BitChordIcons.Download, Destination.HISTORY to BitChordIcons.Clock)
-            links.forEach { (destination, icon) ->
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                    .background(if (route == destination) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f) else androidx.compose.ui.graphics.Color.Transparent)
-                    .clickable { if (destination == Destination.SEARCH) onSearch() else session.navigate(destination) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(icon, destination.label, Modifier.size(20.dp), tint = if (route == destination) ReworkedAppearance.accent else MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (!collapsed) Text(destination.label, Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium)
+            val pinned by session.host.pinnedPlaylists.collectAsState()
+            val library by session.library.collectAsState()
+            val saved = (library as? UiState.Success)?.data?.shelves.orEmpty().flatMap { it.items }.filter { it.browseId != null && (it.browseId!!.startsWith("VL") || it.browseId in pinned) }.distinctBy { it.browseId }
+            // Routes and collections share the scroll area: large UI scaling or a
+            // short window must not consume the entire saved-playlist viewport.
+            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                items(links, key = { "route:${it.first.name}" }) { (destination, icon) ->
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                        .background(if (route == destination) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f) else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { if (destination == Destination.SEARCH) onSearch() else session.navigate(destination) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(icon, destination.label, Modifier.size(20.dp), tint = if (route == destination) ReworkedAppearance.accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (!collapsed) Text(destination.label, Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
-            }
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            if (!collapsed) {
-                TextButton(onClick = onNew) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Text(" New playlist") }
-                TextButton(onClick = onImport) { Text("Import Spotify playlist") }
-                val pinned by session.host.pinnedPlaylists.collectAsState()
-                val library by session.library.collectAsState()
-                val saved = (library as? UiState.Success)?.data?.shelves.orEmpty().flatMap { it.items }.filter { it.browseId != null && (it.browseId!!.startsWith("VL") || it.browseId in pinned) }.distinctBy { it.browseId }
-                LazyColumn(Modifier.weight(1f)) {
-                    items(saved.sortedBy { if (it.browseId in pinned) 0 else 1 }, key = { it.browseId!! }) { item ->
+                item("divider") { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+                if (!collapsed) {
+                    item("new-playlist") { TextButton(onClick = onNew) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Text(" New playlist") } }
+                    item("import-playlist") { TextButton(onClick = onImport) { Text("Import Spotify playlist") } }
+                    items(saved.sortedBy { if (it.browseId in pinned) 0 else 1 }, key = { "saved:${it.browseId}" }) { item ->
                         Text(item.title, Modifier.fillMaxWidth().clickable { session.openShelf(item) }.padding(vertical = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
                     }
-                    items(playlists.sortedBy { if (it.id in pinned) 0 else 1 }, key = { it.id }) { list ->
+                    items(playlists.sortedBy { if (it.id in pinned) 0 else 1 }, key = { "local:${it.id}" }) { list ->
                         Text(list.title, Modifier.fillMaxWidth().clickable { session.openBrowse(BrowseItem(list.id,list.title,"",null,BrowseType.PLAYLIST)) }
                             .contextClick { session.host.togglePin(list.id) }.padding(vertical = 8.dp, horizontal = 10.dp),
                             maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
                     }
                 }
-            } else Spacer(Modifier.weight(1f))
+            }
             IconButton(onClick = { session.navigate(Destination.SETTINGS) }) { Icon(Icons.Rounded.Settings, "Settings") }
         }
     }

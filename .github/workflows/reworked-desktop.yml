@@ -44,16 +44,6 @@ jobs:
           sudo apt-get install -y rpm desktop-file-utils cmake g++ dbus-daemon dbus-bin
           chmod +x gradlew
 
-      - name: Compile and test the new desktop host and shared mobile code
-        shell: bash
-        run: >-
-          ./gradlew --no-daemon --stacktrace --console=plain -Pbitchord.android=false
-          :shared:jvmTest :sharedUi:jvmTest :desktopApp:test
-
-      - name: Test Linux update replacement and rollback
-        if: runner.os == 'Linux'
-        run: python3 desktopApp/src/test/scripts/appimage-update.py
-
       - name: Validate Windows update script syntax
         if: runner.os == 'Windows'
         shell: pwsh
@@ -73,6 +63,16 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: python desktopApp/src/test/scripts/windows-portable-update.py
+
+      - name: Compile and test the new desktop host and shared mobile code
+        shell: bash
+        run: >-
+          ./gradlew --no-daemon --stacktrace --console=plain -Pbitchord.android=false
+          :shared:jvmTest :sharedUi:jvmTest :desktopApp:test
+
+      - name: Test Linux update replacement and rollback
+        if: runner.os == 'Linux'
+        run: python3 desktopApp/src/test/scripts/appimage-update.py
 
       - name: Finalize and verify the application archive
         shell: bash
@@ -127,5 +127,6 @@ jobs:
             shared/build/reports/tests/
             sharedUi/build/reports/tests/
             desktopApp/build/reports/tests/
+            desktopApp/build/windows-portable-tests/
             desktopApp/build/mpris-wire-tests/*.json
             desktopApp/build/mpris-wire-tests/*.log
