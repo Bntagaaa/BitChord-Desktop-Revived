@@ -153,6 +153,16 @@ private val DefaultHideStatusBar = MutableStateFlow(false)
 private val DefaultPlayerTheme = MutableStateFlow(PlayerTheme.DEFAULT)
 private val DefaultVideoAspect = MutableStateFlow(16f / 9f)
 
+/** Final calibrated desktop menu glass: fixed 47% tint and 35 dp blur.
+ * This is a style constant, not a persisted setting or debug control.
+ * Mobile menus retain their own independent material.
+ */
+object DesktopMenuGlassStyle {
+    const val TINT_ALPHA: Float = 0.47f
+    const val BLUR_RADIUS_DP: Int = 35
+}
+
+
 private val NoVideoQuality = MutableStateFlow(MusicVideoQualityUi())
 
 /** What the video quality box draws — the web player's VideoQuality, by the same rules. */

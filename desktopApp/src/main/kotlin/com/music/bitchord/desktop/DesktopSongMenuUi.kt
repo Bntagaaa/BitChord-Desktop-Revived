@@ -50,6 +50,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +59,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -256,27 +258,27 @@ internal fun DesktopSongMenu(
             DesktopMenuDivider()
             DesktopSleepTimer.presets.forEach { minutes ->
                 DesktopMenuRow(
-                    icon = Icons.Rounded.Bedtime,
+                    icon = DesktopPhoneMenuIcons.SleepTimer,
                     label = "$minutes minutes",
                     selected = sleepTimerMinutes == minutes && !sleepAfterTrack,
                 ) { onSleepTimer(minutes) }
             }
-            DesktopMenuRow(Icons.Rounded.Bedtime, "Custom duration…") { customTimer = true }
+            DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, "Custom duration…") { customTimer = true }
             DesktopMenuRow(
-                icon = Icons.Rounded.Bedtime,
+                icon = DesktopPhoneMenuIcons.SleepTimer,
                 label = DesktopStrings["d_end_of_this_track", "End of this track"],
                 selected = sleepAfterTrack,
                 onClick = onSleepAfterTrack,
             )
             if (sleepTimerMinutes != null || sleepAfterTrack) {
                 DesktopMenuDivider()
-                DesktopMenuRow(Icons.Rounded.Bedtime, DesktopStrings["d_turn_off", "Turn off"]) { onSleepTimer(null) }
+                DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, DesktopStrings["d_turn_off", "Turn off"]) { onSleepTimer(null) }
             }
             return@DesktopMenuSurface
         }
 
         onRemoveHistory?.let { remove ->
-            DesktopMenuRow(Icons.Rounded.Bedtime, "Remove from history", onClick = remove)
+            DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, "Remove from history", onClick = remove)
             DesktopMenuDivider()
         }
         onSwitchMediaVersion?.let { switch ->
@@ -313,20 +315,20 @@ internal fun DesktopSongMenu(
             DesktopMenuDivider()
         }
         run {
-            DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, DesktopStrings["add_to_playlist", "Add to playlist"], onClick = onAddToPlaylist)
+            DesktopMenuRow(DesktopPhoneMenuIcons.AddToPlaylist, DesktopStrings["add_to_playlist", "Add to playlist"], onClick = onAddToPlaylist)
         }
         if (signedIn || !isOffline) DesktopMenuDivider()
 
-        DesktopMenuRow(Icons.Rounded.Radio, DesktopStrings["start_radio", "Start radio"], onClick = onStartRadio)
-        DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistPlay, DesktopStrings["play_next", "Play next"], onClick = onPlayNext)
-        DesktopMenuRow(Icons.AutoMirrored.Rounded.QueueMusic, DesktopStrings["add_to_queue", "Add to queue"], onClick = onAddToQueue)
+        DesktopMenuRow(DesktopPhoneMenuIcons.Radio, DesktopStrings["start_radio", "Start radio"], onClick = onStartRadio)
+        DesktopMenuRow(DesktopPhoneMenuIcons.PlayNext, DesktopStrings["play_next", "Play next"], onClick = onPlayNext)
+        DesktopMenuRow(DesktopPhoneMenuIcons.AddToQueue, DesktopStrings["add_to_queue", "Add to queue"], onClick = onAddToQueue)
 
         // A saved copy is offered its own way out whatever the track is playing from — a download
         // being played *is* a local file, and hiding the row there left no way to remove it.
         // Only starting a new download needs a YouTube identity behind it.
         when {
             downloadInProgress -> DesktopMenuRow(
-                icon = BitChordIcons.Download,
+                icon = DesktopPhoneMenuIcons.Download,
                 label = DesktopStrings["cancel_download", "Cancel download"],
                 busy = true,
                 onClick = onDownload,
@@ -339,7 +341,7 @@ internal fun DesktopSongMenu(
                 onClick = onRemoveDownload,
             )
             !isOffline -> DesktopMenuRow(
-                icon = BitChordIcons.Download,
+                icon = DesktopPhoneMenuIcons.Download,
                 label = DesktopStrings["download", "Download"],
                 onClick = onDownload,
             )
@@ -349,10 +351,10 @@ internal fun DesktopSongMenu(
         if ((albumId != null && onOpenAlbum != null) || (artistId != null && onOpenArtist != null)) {
             DesktopMenuDivider()
             if (albumId != null && onOpenAlbum != null) {
-                DesktopMenuRow(Icons.Rounded.Album, DesktopStrings["open_album", "Open album"], description = song.albumName) { onOpenAlbum(albumId) }
+                DesktopMenuRow(DesktopPhoneMenuIcons.Album, DesktopStrings["open_album", "Open album"], description = song.albumName) { onOpenAlbum(albumId) }
             }
             if (artistId != null && onOpenArtist != null) {
-                DesktopMenuRow(Icons.Rounded.Person, DesktopStrings["open_artist", "Open artist"], description = song.artist) { onOpenArtist(artistId) }
+                DesktopMenuRow(DesktopPhoneMenuIcons.Artist, DesktopStrings["open_artist", "Open artist"], description = song.artist) { onOpenArtist(artistId) }
             }
         }
 
@@ -364,7 +366,7 @@ internal fun DesktopSongMenu(
         )
         DesktopMenuDivider()
         DesktopMenuRow(
-            icon = Icons.Rounded.Bedtime,
+            icon = DesktopPhoneMenuIcons.SleepTimer,
             label = DesktopStrings["sleep_timer", "Sleep timer"],
             value = sleepTimerLabel(sleepTimerMinutes, sleepAfterTrack),
         ) { pickingSleepTimer = true }
@@ -401,14 +403,14 @@ internal fun DesktopCollectionContextMenu(
         DesktopMenuRow(BitChordIcons.Shuffle, "Shuffle") { onDismiss(); actions.onShuffle() }
         DesktopMenuRow(BitChordIcons.Search, "Find in playlist") { onDismiss(); actions.onFind() }
         actions.onStartMix?.let { mix ->
-            DesktopMenuRow(Icons.Rounded.Radio, "Start mix") { onDismiss(); mix() }
+            DesktopMenuRow(DesktopPhoneMenuIcons.Radio, "Start mix") { onDismiss(); mix() }
         }
         DesktopMenuDivider()
         actions.onPlayNext?.let { next ->
-            DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistPlay, "Play next") { onDismiss(); next() }
+            DesktopMenuRow(DesktopPhoneMenuIcons.PlayNext, "Play next") { onDismiss(); next() }
         }
         actions.onAddToQueue?.let { queue ->
-            DesktopMenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue") { onDismiss(); queue() }
+            DesktopMenuRow(DesktopPhoneMenuIcons.AddToQueue, "Add to queue") { onDismiss(); queue() }
         }
         actions.onSaveToLibrary?.let { save ->
             DesktopMenuRow(
@@ -425,7 +427,7 @@ internal fun DesktopCollectionContextMenu(
         }
         DesktopMenuDivider()
         actions.onDownloadAll?.let { download ->
-            DesktopMenuRow(BitChordIcons.Download, "Download all") { onDismiss(); download() }
+            DesktopMenuRow(DesktopPhoneMenuIcons.Download, "Download all") { onDismiss(); download() }
         }
         actions.onShare?.let { share ->
             DesktopMenuRow(Icons.Rounded.Share, "Share") { onDismiss(); share() }
@@ -477,6 +479,9 @@ internal fun DesktopMenuSurface(onDismiss: () -> Unit, modifier: Modifier = Modi
     val menuScrollState = rememberScrollState()
     val portal = LocalDesktopMenuPortal.current
     val owner = remember { Any() }
+    val horizontalBias = LocalDesktopMenuHorizontalBias.current
+    val density = LocalDensity.current
+    val horizontalBiasPx = with(density) { horizontalBias.roundToPx() }
     val pressAnchor = remember(owner) { portal?.recentPress() }
     val latestContent = rememberUpdatedState(content)
     val latestDismiss = rememberUpdatedState(onDismiss)
@@ -484,8 +489,9 @@ internal fun DesktopMenuSurface(onDismiss: () -> Unit, modifier: Modifier = Modi
     if (portal != null) {
         Spacer(Modifier.size(1.dp).onGloballyPositioned {
             val bounds = pressAnchor ?: (it.parentLayoutCoordinates?.boundsInRoot() ?: it.boundsInRoot())
-            if (portal.entry.value?.owner !== owner || portal.entry.value?.anchor != bounds) {
-                portal.entry.value = DesktopMenuPortalEntry(owner, bounds, { latestDismiss.value() }, menuContent)
+            if (portal.entry.value?.owner !== owner || portal.entry.value?.anchor != bounds ||
+                portal.entry.value?.horizontalBiasPx != horizontalBiasPx) {
+                portal.entry.value = DesktopMenuPortalEntry(owner, horizontalBiasPx, bounds, { latestDismiss.value() }, menuContent)
             }
         })
         DisposableEffect(portal, owner) {
@@ -506,7 +512,7 @@ internal fun DesktopMenuSurface(onDismiss: () -> Unit, modifier: Modifier = Modi
 @Composable
 private fun MenuCard(menuScrollState: androidx.compose.foundation.ScrollState, modifier: Modifier, content: @Composable () -> Unit) {
     val shape = RoundedCornerShape(16.dp)
-    Box(modifier.widthIn(min = 276.dp, max = 306.dp).desktopMenuGlass(shape, tintAlpha = 0.82f)) {
+    Box(modifier.widthIn(min = 276.dp, max = 306.dp).desktopMenuGlass(shape)) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -586,7 +592,7 @@ private fun DesktopMenuDivider() {
     HorizontalDivider(
         Modifier.padding(vertical = 3.dp),
         thickness = 0.5.dp,
-        color = DesktopCardEdge,
+        color = DesktopBarEdge,
     )
 }
 
@@ -601,10 +607,15 @@ private fun DesktopMenuQuickAction(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val hoverFill by animateColorAsState(
+        targetValue = if (hovered) DesktopForeground.copy(alpha = 0.09f) else Color.Transparent,
+        animationSpec = tween(durationMillis = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 170),
+        label = "desktop-menu-quick-action-hover",
+    )
     Column(
         modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(if (hovered) DesktopRowHover else Color.Transparent)
+            .background(hoverFill)
             .hoverable(interaction)
             .clickable(onClick = onClick)
             .heightIn(min = 52.dp)
@@ -636,8 +647,8 @@ private fun DesktopMenuRow(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val hoverColor by animateColorAsState(
-        targetValue = if (hovered && enabled) DesktopRowHover else Color.Transparent,
-        animationSpec = tween(durationMillis = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 140),
+        targetValue = if (hovered && enabled) DesktopForeground.copy(alpha = 0.09f) else Color.Transparent,
+        animationSpec = tween(durationMillis = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 170),
         label = "desktop-context-menu-hover",
     )
     Row(

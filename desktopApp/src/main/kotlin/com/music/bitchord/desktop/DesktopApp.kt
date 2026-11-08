@@ -43,6 +43,7 @@ import com.music.bitchord.playback.QueueTimeline.asQueueEntry
 import com.music.bitchord.data.listentogether.partyQueueIndexOf
 import com.music.bitchord.data.listentogether.partyUpcomingAfter
 import com.music.bitchord.ui.LyricsProviderState
+import com.music.bitchord.ui.player.DesktopMenuGlassStyle
 import com.music.bitchord.ui.player.LyricsSidePanel
 import com.music.bitchord.ui.player.NowPlayingScreen
 import com.music.bitchord.ui.player.QueueSidePanel
@@ -4301,6 +4302,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                     .offset(x = columnEdge)
                                     .size(34.dp),
                             ) {
+                                CompositionLocalProvider(LocalDesktopMenuHorizontalBias provides (-220).dp) {
                                 DesktopSongMenuFor(
                                     song = playerSong,
                                     liked = current.videoId in likedIds,
@@ -4321,6 +4323,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                     }.takeIf { DesktopOriginalVersion.isPinned(current.videoId) },
                                     onDismiss = { playerMenuOpen = false },
                                 )
+                                }
                             }
                         }
                         val message by DesktopPlayerHost.messages.collectAsState()
@@ -9265,14 +9268,20 @@ internal fun Modifier.desktopBarGlass(
         allowBlur = DesktopAppearanceSettings.blurEnabled(area),
     ).border(0.5.dp, DesktopBarEdge, shape)
 
-/** Dense glass shared by desktop context menus and the account selector. */
+/**
+ * Menu glass shares Quick Search's exact frosted material, including tint,
+ * noise, blur radius and edge. Keep its separate MENUS_POPUPS blur preference:
+ * disabling Quick Search's blur must not unexpectedly disable every menu.
+ * DesktopMenuGlass owns only the visual surface, never menu dimensions.
+ */
 @Composable
-internal fun Modifier.desktopMenuGlass(shape: Shape, tintAlpha: Float = 0.82f): Modifier =
+internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier =
     clip(shape).desktopFrosted(
-        DesktopCardFill,
-        tintAlpha = tintAlpha,
+        DesktopBarGlass,
+        tintAlpha = DesktopMenuGlassStyle.TINT_ALPHA,
         allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.MENUS_POPUPS),
-    ).border(0.5.dp, DesktopCardEdge, shape)
+        blurRadius = DesktopMenuGlassStyle.BLUR_RADIUS_DP.dp,
+    ).border(0.5.dp, DesktopBarEdge, shape)
 
 /** The edge of a chrome pane that meets the page, and so has to dissolve into it. */
 internal enum class DesktopChromeEdge { NONE, BOTTOM, END }
@@ -9319,6 +9328,7 @@ private fun Modifier.desktopFrosted(
     allowBlur: Boolean,
     edge: DesktopChromeEdge = DesktopChromeEdge.NONE,
     fade: Float = 0f,
+    blurRadius: Dp = 30.dp,
 ): Modifier {
     val haze = LocalDesktopHaze.current
     if (haze == null || !allowBlur) {
@@ -9329,7 +9339,7 @@ private fun Modifier.desktopFrosted(
         // Spelled out rather than taken from a preset.
         blurEnabled = true
         backgroundColor = DesktopTheme.palette.chromeSurface
-        blurRadius = 30.dp
+        this.blurRadius = blurRadius
         // Dark enough that white text on the pane always wins, translucent enough that the
         // colour of what is behind it still comes through.
         tints = listOf(HazeTint(DesktopTheme.palette.chromeSurface.copy(alpha = tintAlpha)))

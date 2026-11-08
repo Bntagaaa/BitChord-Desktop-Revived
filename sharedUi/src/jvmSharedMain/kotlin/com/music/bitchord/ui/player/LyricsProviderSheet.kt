@@ -71,6 +71,7 @@ internal fun LyricsProviderSheet(
     modifier: Modifier = Modifier,
 ) {
     val reduceBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val desktop = PlayerPlatform.host.mobileTextChrome
     val savedOrder by PlayerSettings.lyricsSourceOrder.collectAsStateWithLifecycle()
     val sources = remember(savedOrder) { LyricsSource.ordered(savedOrder) }
     var requestedSource by remember { mutableStateOf<LyricsSource?>(null) }
@@ -93,9 +94,9 @@ internal fun LyricsProviderSheet(
                     .width(280.dp).heightIn(max = 420.dp).clip(shape)
                     .hazeEffect(hazeState) {
                         blurEnabled = !reduceBlur
-                        blurRadius = 30.dp
+                        blurRadius = if (desktop) DesktopMenuGlassStyle.BLUR_RADIUS_DP.dp else 30.dp
                         backgroundColor = Color(0xFF1C1C1E)
-                        tints = listOf(HazeTint(Color(0xFF1C1C1E).copy(alpha = 0.62f)))
+                        tints = listOf(HazeTint(Color(0xFF1C1C1E).copy(alpha = if (desktop) DesktopMenuGlassStyle.TINT_ALPHA else 0.62f)))
                     }
                     .border(0.5.dp, Color.White.copy(alpha = 0.12f), shape)
                     .verticalScroll(rememberScrollState()).padding(vertical = 6.dp),

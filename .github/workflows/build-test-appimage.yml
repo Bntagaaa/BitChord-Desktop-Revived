@@ -262,32 +262,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends desktop-file-utils
           command -v desktop-file-validate
 
-      # appimagetool continuous fetches its runtime during SquashFS packaging; that
-      # downloader may fail with HTTP status 0 even when the binary built correctly.
-      # Keep a verified local copy so the package step never performs that download.
-      - name: Cache x86_64 AppImage runtime
-        uses: actions/cache@v4
-        with:
-          path: .cache/appimage/runtime-x86_64
-          key: appimage-type2-runtime-x86_64-2026-11-v1
-
-      - name: Download and validate AppImage runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          runtime="$PWD/.cache/appimage/runtime-x86_64"
-          mkdir -p "$(dirname "$runtime")"
-          if [ ! -s "$runtime" ]; then
-            curl -fL --retry 8 --retry-all-errors --retry-delay 5 \
-              --connect-timeout 20 --max-time 120 --retry-max-time 360 \
-              --output "$runtime.tmp" \
-              https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64
-            mv "$runtime.tmp" "$runtime"
-          fi
-          test -s "$runtime"
-          file "$runtime"
-          file -b "$runtime" | grep -q '^ELF 64-bit'
-
       - name: Native package tools for updater audit
         if: ${{ inputs.audit_packages }}
         run: |
@@ -332,7 +306,7 @@ jobs:
       - name: Build AppImage
         shell: bash
         env:
-          APPIMAGETOOL_RUNTIME_FILE: ${{ github.workspace }}/.cache/appimage/runtime-x86_64
+          APPIMAGETOOL_RUNTIME_FILE: ${{ github.workspace }}/runtime-x86_64
         run: |
           set -euo pipefail
           desktopApp/packaging/appimage.sh \

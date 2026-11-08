@@ -135,7 +135,7 @@ internal fun DesktopAccountSelector(
                 .widthIn(max = 292.dp)
                 .fillMaxWidth()
                 .clip(shape)
-                .desktopMenuGlass(shape, tintAlpha = 0.82f),
+                .desktopMenuGlass(shape),
         ) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 13.dp, bottom = 5.dp),

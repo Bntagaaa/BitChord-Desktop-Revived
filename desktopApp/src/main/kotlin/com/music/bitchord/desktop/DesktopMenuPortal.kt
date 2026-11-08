@@ -19,16 +19,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -66,26 +66,37 @@ internal fun Modifier.desktopMenuPointer(state: DesktopMenuPortalState): Modifie
 
 internal data class DesktopMenuPortalEntry(
     val owner: Any,
+    val horizontalBiasPx: Int = 0,
     val anchor: Rect,
     val onDismiss: () -> Unit,
     val content: @Composable () -> Unit,
 )
 
 internal val LocalDesktopMenuPortal = staticCompositionLocalOf<DesktopMenuPortalState?> { null }
+/** Only the fullscreen player's popup needs a negative placement bias. */
+internal val LocalDesktopMenuHorizontalBias = staticCompositionLocalOf { 0.dp }
 
+/**
+ * Immediate, un-dimmed context menu. Keep the existing transparent full-screen
+ * hit target for outside-click/Escape dismissal and scrolling protection.
+ * Only the menu card uses Haze; nothing draws over the page behind it.
+ */
 @Composable
 internal fun DesktopMenuPortal(state: DesktopMenuPortalState) {
-    val entry = state.entry.value ?: return
-    val focusRequester = remember(entry.owner) { FocusRequester() }
-    LaunchedEffect(entry.owner) { focusRequester.requestFocus() }
+    val shown = state.entry.value ?: return
+    val focusRequester = remember(shown.owner) { FocusRequester() }
+    LaunchedEffect(shown.owner) { focusRequester.requestFocus() }
+
     Box(
-        Modifier.fillMaxSize().focusRequester(focusRequester)
+        Modifier.fillMaxSize()
+            .focusRequester(focusRequester)
             .onPreviewKeyEvent {
                 if (it.key == Key.Escape && it.type == KeyEventType.KeyDown) {
-                    entry.onDismiss()
+                    shown.onDismiss()
                     true
                 } else false
-            }.focusable(),
+            }
+            .focusable(),
     ) {
         val density = LocalDensity.current
         Box(
@@ -94,33 +105,42 @@ internal fun DesktopMenuPortal(state: DesktopMenuPortalState) {
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) { entry.onDismiss() }
+                ) { shown.onDismiss() }
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent()
-                            if (event.type == PointerEventType.Scroll) event.changes.forEach { it.consume() }
+                            if (event.type == PointerEventType.Scroll) {
+                                event.changes.forEach { it.consume() }
+                            }
                         }
                     }
                 },
         )
         val margin = with(density) { 12.dp.roundToPx() }
-        Layout(content = entry.content, modifier = Modifier.fillMaxSize()) { measurables, constraints ->
+        Layout(
+            content = { Box { shown.content() } },
+            modifier = Modifier.fillMaxSize(),
+        ) { measurables, constraints ->
             val child = measurables.first().measure(constraints.copy(
                 minWidth = 0,
                 minHeight = 0,
                 maxWidth = (constraints.maxWidth - 2 * margin).coerceAtLeast(0),
                 maxHeight = (constraints.maxHeight - 2 * margin).coerceAtLeast(0),
             ))
-            val anchor = entry.anchor.translate(-state.originInRoot)
+            val anchor = shown.anchor.translate(-state.originInRoot)
             val below = anchor.bottom.roundToInt() + margin
             val above = anchor.top.roundToInt() - child.height - margin
-            val y = if (below + child.height + margin <= constraints.maxHeight || above < margin) below else above
-            val x = anchor.left.roundToInt().coerceIn(
+            val placeAbove = below + child.height + margin > constraints.maxHeight && above >= margin
+            val y = if (placeAbove) above else below
+            val x = (anchor.left.roundToInt() + shown.horizontalBiasPx).coerceIn(
                 margin, (constraints.maxWidth - child.width - margin).coerceAtLeast(margin),
             )
+            val finalY = y.coerceIn(
+                margin, (constraints.maxHeight - child.height - margin).coerceAtLeast(margin),
+            )
             layout(constraints.maxWidth, constraints.maxHeight) {
-                child.place(x, y.coerceIn(margin, (constraints.maxHeight - child.height - margin).coerceAtLeast(margin)))
+                child.place(x, finalY)
             }
         }
     }

@@ -102,4 +102,115 @@ internal object DesktopPhoneMenuIcons {
             }
         }.build()
     }
+
+    // Original Compose vectors inspired by the mobile menu glyph vocabulary.
+    // Not redistributed Apple SF Symbols; these are desktop-native path drawings.
+    // Vectors are lazy-built once, never parsed or rasterized per recomposition.
+    private fun vector(name: String, draw: ImageVector.Builder.() -> Unit): ImageVector =
+        ImageVector.Builder(
+            name = name,
+            defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply(draw).build()
+
+    val AddToPlaylist: ImageVector by lazy {
+        vector("desktop_mobile_playlist_add") {
+            path(stroke = ink, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round) {
+                moveTo(3f, 7f); lineTo(15f, 7f)
+                moveTo(3f, 11.5f); lineTo(15f, 11.5f)
+                moveTo(3f, 16f); lineTo(10f, 16f)
+                moveTo(18f, 14f); lineTo(18f, 21f)
+                moveTo(14.5f, 17.5f); lineTo(21.5f, 17.5f)
+            }
+        }
+    }
+    val Radio: ImageVector by lazy {
+        vector("desktop_mobile_radio_waves") {
+            path(stroke = ink, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round) {
+                moveTo(12f, 8f); lineTo(12f, 16f)
+                moveTo(9.2f, 6.2f); curveTo(6.8f, 9f, 6.8f, 15f, 9.2f, 17.8f)
+                moveTo(14.8f, 6.2f); curveTo(17.2f, 9f, 17.2f, 15f, 14.8f, 17.8f)
+                moveTo(6.1f, 3.4f); curveTo(1.7f, 8f, 1.7f, 16f, 6.1f, 20.6f)
+                moveTo(17.9f, 3.4f); curveTo(22.3f, 8f, 22.3f, 16f, 17.9f, 20.6f)
+            }
+        }
+    }
+    private fun queue(first: Boolean): ImageVector =
+        vector(if (first) "desktop_mobile_play_next" else "desktop_mobile_add_queue") {
+            path(stroke = ink, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round) {
+                for (y in listOf(5.5f, 10f, 14.5f, 19f)) {
+                    moveTo(7.5f, y); lineTo(21f, y)
+                }
+            }
+            path(fill = ink) {
+                if (first) {
+                    moveTo(3f, 3f); lineTo(3f, 10f); lineTo(7f, 6.5f)
+                } else {
+                    moveTo(3f, 14f); lineTo(3f, 21f); lineTo(7f, 17.5f)
+                }
+                close()
+            }
+        }
+    val PlayNext: ImageVector by lazy { queue(true) }
+    val AddToQueue: ImageVector by lazy { queue(false) }
+
+    val Download: ImageVector by lazy {
+        vector("desktop_mobile_download_circle") {
+            path(stroke = ink, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round) {
+                moveTo(21f, 12f)
+                curveTo(21f, 17f, 17f, 21f, 12f, 21f)
+                curveTo(7f, 21f, 3f, 17f, 3f, 12f)
+                curveTo(3f, 7f, 7f, 3f, 12f, 3f)
+                curveTo(17f, 3f, 21f, 7f, 21f, 12f)
+                moveTo(12f, 7f); lineTo(12f, 16f)
+                moveTo(8.5f, 12.5f); lineTo(12f, 16f); lineTo(15.5f, 12.5f)
+            }
+        }
+    }
+    val Album: ImageVector by lazy {
+        vector("desktop_mobile_album_stack") {
+            path(stroke = ink, strokeLineWidth = 2f, strokeLineJoin = StrokeJoin.Round,
+                strokeLineCap = StrokeCap.Round) {
+                moveTo(5.5f, 5f); lineTo(18.5f, 5f)
+                moveTo(4.5f, 8f); lineTo(19.5f, 8f)
+                moveTo(5f, 11f); lineTo(19f, 11f)
+                curveTo(20f, 11f, 20.5f, 11.7f, 20.5f, 12.7f)
+                lineTo(20.5f, 20f); lineTo(3.5f, 20f); lineTo(3.5f, 12.7f)
+                curveTo(3.5f, 11.7f, 4f, 11f, 5f, 11f)
+                close()
+            }
+        }
+    }
+    val Artist: ImageVector by lazy {
+        vector("desktop_mobile_artist_mic") {
+            path(stroke = ink, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round) {
+                moveTo(11f, 16f); lineTo(6f, 21f)
+                moveTo(13.5f, 18.3f); lineTo(10.5f, 21.3f)
+                moveTo(8f, 14f); lineTo(12f, 18f)
+                moveTo(8f, 14f); lineTo(14.5f, 6.7f)
+                moveTo(12f, 18f); lineTo(19.3f, 11.5f)
+                moveTo(14.5f, 6.7f)
+                curveTo(17f, 4f, 21f, 5f, 21f, 8.4f)
+                curveTo(21f, 10f, 20.2f, 11f, 19.3f, 11.5f)
+            }
+        }
+    }
+    val SleepTimer: ImageVector by lazy {
+        vector("desktop_mobile_sleep_timer") {
+            path(stroke = ink, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round) {
+                moveTo(17.5f, 19.5f)
+                curveTo(11f, 22f, 4f, 17f, 5f, 9f)
+                curveTo(5.5f, 6f, 7f, 4.5f, 9f, 3f)
+                curveTo(8f, 10f, 12.5f, 15f, 19.5f, 14f)
+            }
+            path(stroke = ink, strokeLineWidth = 1.7f, strokeLineCap = StrokeCap.Round) {
+                moveTo(15f, 5f); lineTo(19f, 5f); lineTo(15f, 8f); lineTo(19f, 8f)
+                moveTo(19f, 2.5f); lineTo(22f, 2.5f); lineTo(19f, 4.5f); lineTo(22f, 4.5f)
+            }
+        }
+    }
+
 }
