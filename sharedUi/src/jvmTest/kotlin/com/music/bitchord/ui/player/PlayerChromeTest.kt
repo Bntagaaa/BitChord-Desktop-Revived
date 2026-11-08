@@ -49,6 +49,15 @@ class PlayerChromeTest {
     }
 
     @Test
+    fun `vibrant desktop layers are restricted by support and chrome mode`() {
+        assertEquals(true, canUseDesktopVibrantChrome(true, true, true, true))
+        assertEquals(false, canUseDesktopVibrantChrome(true, false, true, true))
+        assertEquals(false, canUseDesktopVibrantChrome(true, true, false, true))
+        assertEquals(false, canUseDesktopVibrantChrome(true, true, true, false))
+        assertEquals(false, canUseDesktopVibrantChrome(false, true, true, true))
+    }
+
+    @Test
     fun `desktop text never goes through a recorded additive layer`() {
         assertFalse(shouldUseOffscreenChromeLayer(false, true, true))
         assertFalse(shouldUseOffscreenChromeLayer(true, true, true))

@@ -552,6 +552,15 @@ internal fun VolumeRow(
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit,
 ) {
+    // The small volume glyphs are vibrant in mobile; the desktop only uses
+    // two cached 20dp icon layers when the render backend supports ColorDodge.
+    val desktop = PlayerPlatform.host.mobileTextChrome
+    val vibrant = desktopVibrantChromeEnabled(LocalPlayerChrome.current)
+    val volumeTint = when {
+        vibrant -> VibrantDiscInk
+        desktop -> playerSecondaryColor(0.5f)
+        else -> LocalPlayerTint.current.copy(alpha = 0.5f)
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -559,8 +568,8 @@ internal fun VolumeRow(
         Icon(
             Icons.AutoMirrored.Rounded.VolumeDown,
             contentDescription = null,
-            tint = LocalPlayerTint.current.copy(alpha = 0.5f),
-            modifier = Modifier.size(20.dp),
+            tint = volumeTint,
+            modifier = Modifier.size(20.dp).vibrantDiscChrome(vibrant),
         )
         Spacer(Modifier.width(10.dp))
         ThinSlider(
@@ -575,8 +584,8 @@ internal fun VolumeRow(
         Icon(
             Icons.AutoMirrored.Rounded.VolumeUp,
             contentDescription = null,
-            tint = LocalPlayerTint.current.copy(alpha = 0.5f),
-            modifier = Modifier.size(20.dp),
+            tint = volumeTint,
+            modifier = Modifier.size(20.dp).vibrantDiscChrome(vibrant),
         )
     }
 }
@@ -625,6 +634,7 @@ internal fun PlayerActionRow(
                     // opening either closes the other; lit to say which is up.
                     onClick = onToggleLyrics,
                     highlighted = lyricsOpen,
+                    vibrant = true,
                 )
             }
             AnimatedContent(
@@ -700,6 +710,7 @@ internal fun PlayerActionRow(
                     onClick = onToggleQueue,
                     highlighted = queueOpen,
                     haptic = if (queueOpen) Haptic.Tap else Haptic.Expand,
+                    vibrant = true,
                 )
             }
         }
@@ -731,8 +742,7 @@ internal fun CircleGlyph(
     // white glyph. Restrict the offscreen layer to the 34dp disc: drawing the
     // glyph (or any text) in that layer would soften Skia antialiasing on desktop.
     val desktop = PlayerPlatform.host.mobileTextChrome
-    val vibrantDisc = desktop && LocalPlayerChrome.current &&
-        BlendMode.ColorDodge.isSupported() && BlendMode.Plus.isSupported()
+    val vibrantDisc = desktopVibrantChromeEnabled(LocalPlayerChrome.current)
     Box(
         modifier = Modifier
             .size(34.dp)
@@ -895,7 +905,10 @@ private fun Pill(
         modifier = modifier
             .height(BOTTOM_ACTION_SIZE)
             .clip(CircleShape)
-            .background(LocalPlayerTint.current.copy(alpha = 0.12f))
+            .background(
+                if (PlayerPlatform.host.mobileTextChrome) Color.White.copy(alpha = 0.12f)
+                else LocalPlayerTint.current.copy(alpha = 0.12f),
+            )
             .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = 0.82f,
@@ -913,7 +926,10 @@ private fun PillDivider() {
         Modifier
             .width(1.dp)
             .fillMaxHeight()
-            .background(LocalPlayerTint.current.copy(alpha = 0.20f)),
+            .background(
+                if (PlayerPlatform.host.mobileTextChrome) Color.White.copy(alpha = 0.20f)
+                else LocalPlayerTint.current.copy(alpha = 0.20f),
+            ),
     )
 }
 
@@ -944,6 +960,7 @@ private fun OutputPartyPill(
             iconSize = output.size,
             contentDescription = stringResource(Res.string.audio_output),
             onClick = onOutput,
+            vibrant = true,
         )
         PillDivider()
         PillSegment(
@@ -1031,14 +1048,22 @@ private fun PillSegment(
     tapWindowMs: Long = 0L,
     /** Per-segment override — see [OutputPartyPill]'s three-up capsule. */
     width: Dp = PILL_SEGMENT_WIDTH,
+    /** Only the output icon is dodge-blended, as in mobile. */
+    vibrant: Boolean = false,
 ) {
     val haptics = rememberHaptics()
     val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
+    val desktop = PlayerPlatform.host.mobileTextChrome
+    val vibrantIcon = vibrant && desktopVibrantChromeEnabled(LocalPlayerChrome.current)
     Box(
         modifier = Modifier
             .width(width)
             .height(BOTTOM_ACTION_SIZE)
-            .background(if (highlighted) LocalPlayerTint.current.copy(alpha = 0.14f) else Color.Transparent)
+            .background(
+                if (!highlighted) Color.Transparent
+                else if (desktop) Color.White.copy(alpha = 0.14f)
+                else LocalPlayerTint.current.copy(alpha = 0.14f),
+            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -1054,7 +1079,12 @@ private fun PillSegment(
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        val tint = LocalPlayerTint.current.copy(alpha = if (highlighted) 1f else 0.75f)
+        val tint = when {
+            vibrantIcon -> VibrantDiscInk
+            desktop && highlighted -> Color.White
+            desktop -> playerSecondaryColor(0.75f)
+            else -> LocalPlayerTint.current.copy(alpha = if (highlighted) 1f else 0.75f)
+        }
         Crossfade(
             targetState = loading,
             animationSpec = tween(durationMillis = 200),
@@ -1063,7 +1093,7 @@ private fun PillSegment(
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(17.dp),
-                    color = LocalPlayerTint.current,
+                    color = if (desktop) Color.White else LocalPlayerTint.current,
                     strokeWidth = 2.dp,
                 )
             } else if (icon != null) {
@@ -1079,7 +1109,8 @@ private fun PillSegment(
                             imageVector = currentIcon,
                             contentDescription = null,
                             tint = tint,
-                            modifier = Modifier.size(currentSize),
+                            // No text is recorded; only the small icon is dodged.
+                            modifier = Modifier.size(currentSize).vibrantDiscChrome(vibrantIcon),
                         )
                     }
                     if (trailingLabel != null) {
@@ -1248,13 +1279,18 @@ private fun BottomGlyph(
      * ask for a window.
      */
     tapWindowMs: Long = 0L,
+    /** Lyrics, queue and standalone output use mobile's vibrant glyph ink. */
+    vibrant: Boolean = false,
 ) {
     val haptics = rememberHaptics()
     // Read only from the click handler, never during composition, so writing it
     // costs no recomposition. Starts a full window in the past so the first tap
     // is never the one that gets swallowed.
     val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
-    val tileColor = LocalPlayerTint.current.copy(alpha = BOTTOM_ACTIVE_TILE_ALPHA)
+    val desktop = PlayerPlatform.host.mobileTextChrome
+    val vibrantIcon = vibrant && !highlighted && desktopVibrantChromeEnabled(LocalPlayerChrome.current)
+    val tileColor = if (desktop) playerSecondaryColor(BOTTOM_ACTIVE_TILE_ALPHA)
+        else LocalPlayerTint.current.copy(alpha = BOTTOM_ACTIVE_TILE_ALPHA)
     Box(
         modifier = Modifier
             .size(BOTTOM_ACTION_SIZE)
@@ -1296,13 +1332,18 @@ private fun BottomGlyph(
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        val tint = LocalPlayerTint.current.copy(alpha = if (highlighted) 1f else 0.75f)
+        val tint = when {
+            vibrantIcon -> VibrantDiscInk
+            desktop && highlighted -> Color.White
+            desktop -> playerSecondaryColor(0.75f)
+            else -> LocalPlayerTint.current.copy(alpha = if (highlighted) 1f else 0.75f)
+        }
         if (icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(26.dp).vibrantDiscChrome(vibrantIcon),
             )
         } else if (label != null) {
             Text(

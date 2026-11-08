@@ -35,6 +35,26 @@ private const val VIBRANT_DISC_GAIN = 2.5f
 internal fun playerDiscPaintAlpha(alpha: Float, blended: Boolean): Float =
     if (blended) (alpha * VIBRANT_DISC_GAIN).coerceIn(0f, 1f)
     else desktopDirectChromeAlpha(alpha)
+
+/**
+ * Desktop uses a tiny 20-34dp cached ColorDodge layer for icons only.
+ * Respect Reduce Blur (LocalPlayerChrome false), software/unsupported renderers
+ * and video mode without recomputing a full-screen backdrop.
+ */
+internal fun canUseDesktopVibrantChrome(
+    desktop: Boolean,
+    chrome: Boolean,
+    dodgeSupported: Boolean,
+    plusSupported: Boolean,
+): Boolean = desktop && chrome && dodgeSupported && plusSupported
+
+internal fun desktopVibrantChromeEnabled(chrome: Boolean): Boolean =
+    canUseDesktopVibrantChrome(
+        desktop = PlayerPlatform.host.mobileTextChrome,
+        chrome = chrome,
+        dodgeSupported = BlendMode.ColorDodge.isSupported(),
+        plusSupported = BlendMode.Plus.isSupported(),
+    )
 private const val CHROME_ALPHA_DROP = 0.15f
 
 /** The same opacity values as mobile's PlayerChrome, independently testable. */
