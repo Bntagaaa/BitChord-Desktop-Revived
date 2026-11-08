@@ -92,6 +92,9 @@ class LandscapePlayerMotionTest {
             runOnIdle { track.value = Track("b") }
             mainClock.advanceTimeBy(900)
             waitForIdle()
+            onNodeWithTag("title-b").assertIsDisplayed()
+            mainClock.advanceTimeBy(1400)
+            waitForIdle()
             onNodeWithTag("title-b").assertDoesNotExist()
             onNodeWithTag("landscape-lyrics-frame").performMouseInput { enter(center) }
             mainClock.advanceTimeBy(300)
@@ -104,6 +107,31 @@ class LandscapePlayerMotionTest {
             waitForIdle()
             onNodeWithTag("title-b").assertDoesNotExist()
             onNodeWithTag("fixture-footer").assertDoesNotExist()
+        }
+
+    @Test fun aNewTrackRevealsAnIdleHeaderAndRapidSkipsRestartOnlyTheLatestTracksTimer() =
+        runDesktopComposeUiTest(width = 1100, height = 800) {
+            mainClock.autoAdvance = false
+            val track = mutableStateOf(Track("a"))
+            setContent { Fixture(track.value, PlayerPane.Lyrics) }
+            mainClock.advanceTimeBy(2400)
+            onNodeWithTag("title-a").assertDoesNotExist()
+            val lyrics = onNodeWithTag("lyrics").getUnclippedBoundsInRoot()
+            runOnIdle { track.value = Track("b") }
+            mainClock.advanceTimeBy(300)
+            onNodeWithTag("title-b").assertIsDisplayed()
+            onNodeWithTag("origin-b").assertIsDisplayed()
+            onNodeWithTag("artist-b").assertIsDisplayed()
+            onNodeWithTag("fixture-footer").assertDoesNotExist()
+            mainClock.advanceTimeBy(1500)
+            runOnIdle { track.value = Track("c") }
+            mainClock.advanceTimeBy(600)
+            onNodeWithTag("title-c").assertIsDisplayed()
+            // Correcting metadata on the same track must not extend its timer.
+            runOnIdle { track.value = track.value.copy(title = "Corrected title") }
+            mainClock.advanceTimeBy(1700)
+            onNodeWithTag("title-c").assertDoesNotExist()
+            assertEquals(lyrics, onNodeWithTag("lyrics").getUnclippedBoundsInRoot())
         }
 
     @Test fun songChangeSlidesEveryMetadataLineUpWithoutMovingHeaderActionsOrLyrics() =
@@ -332,6 +360,7 @@ class LandscapePlayerMotionTest {
                 LandscapePlayerColumns(
                     pane, compact = height < 440, gutter = 24.dp, reduceMotion = reduceMotion,
                     boundLyricsToArtwork = true,
+                    trackKey = track.id,
                     artwork = { Box(it.background(Color.DarkGray).testTag("artwork")) },
                     actions = {
                         Box(Modifier.fillMaxWidth().height(34.dp).testTag("output-buttons")) { Text("Lyrics   Output   Queue") }

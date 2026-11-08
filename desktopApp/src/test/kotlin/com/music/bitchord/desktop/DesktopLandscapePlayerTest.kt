@@ -182,6 +182,7 @@ class DesktopLandscapePlayerTest {
             mainClock.advanceTimeBy(2000)
             waitForIdle()
             val firstRow = onNodeWithTag("lyrics-row-0").getUnclippedBoundsInRoot()
+            onNodeWithText("Landscape Track B").assertDoesNotExist()
             assertTrue((firstRow.top - frame.top).value in 0f..60f,
                 "The opening lyric starts at the top instead of leaving half the cover empty")
             save(onRoot().captureToImage(), "$width-lyrics-start.png")
@@ -199,6 +200,20 @@ class DesktopLandscapePlayerTest {
             assertEquals(firstRow.top.value,
                 onNodeWithTag("lyrics-row-0").getUnclippedBoundsInRoot().top.value, 1f,
                 "Seeking back to the opening returns to the top")
+
+            runOnIdle { index.value = 0 }
+            mainClock.advanceTimeBy(400)
+            waitForIdle()
+            onNodeWithText("Landscape Track A").assertIsDisplayed()
+            onNodeWithText("Test Artist").assertIsDisplayed()
+            onNodeWithText("Lyrics by KuGou").assertDoesNotExist()
+            mainClock.advanceTimeBy(1400)
+            onNodeWithText("Landscape Track A").assertIsDisplayed()
+            mainClock.advanceTimeBy(500)
+            waitForIdle()
+            onNodeWithText("Landscape Track A").assertDoesNotExist()
+            onNodeWithText("Test Artist").assertDoesNotExist()
+            assertEquals(viewport, onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot())
 
             onNodeWithContentDescription("Close lyrics").performClick()
             mainClock.advanceTimeBy(600)

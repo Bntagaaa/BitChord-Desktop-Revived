@@ -119,6 +119,7 @@ private val LANDSCAPE_HANDLE_STRIP = 24.dp
 @Composable
 internal fun LandscapePlayerLayout(
     pane: PlayerPane,
+    trackKey: String,
     background: @Composable (Modifier) -> Unit,
     /** The sleeve; handed a modifier that already fixes its square size. */
     artwork: @Composable (Modifier) -> Unit,
@@ -146,6 +147,7 @@ internal fun LandscapePlayerLayout(
             val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
             LandscapePlayerColumns(
                 pane = pane,
+                trackKey = trackKey,
                 compact = compact,
                 gutter = gutter,
                 reduceMotion = reduceMotion,

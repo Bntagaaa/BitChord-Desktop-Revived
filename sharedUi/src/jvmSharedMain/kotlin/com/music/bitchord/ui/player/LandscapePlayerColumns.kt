@@ -68,14 +68,14 @@ internal fun LandscapePlayerColumns(
     queuePane: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     boundLyricsToArtwork: Boolean = false,
+    trackKey: String? = null,
 ) {
     val chrome = remember { LandscapeLyricsChrome() }
     val headerInteraction = remember { MutableInteractionSource() }
     val headerHovered by headerInteraction.collectIsHoveredAsState()
     SideEffect { chrome.headerHovered = headerHovered && pane == PlayerPane.Lyrics }
-    var introductoryHeader by remember { mutableStateOf(true) }
-    LaunchedEffect(pane, boundLyricsToArtwork) {
-        introductoryHeader = true
+    var introductoryHeader by remember(pane, boundLyricsToArtwork, trackKey) { mutableStateOf(true) }
+    LaunchedEffect(pane, boundLyricsToArtwork, trackKey) {
         if (pane == PlayerPane.Lyrics && boundLyricsToArtwork) {
             delay(2000)
             introductoryHeader = false
