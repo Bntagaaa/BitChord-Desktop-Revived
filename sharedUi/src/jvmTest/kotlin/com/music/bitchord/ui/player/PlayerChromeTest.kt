@@ -2,6 +2,8 @@ package com.music.bitchord.ui.player
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class PlayerChromeTest {
     @Test
@@ -22,4 +24,18 @@ class PlayerChromeTest {
         assertEquals(0f, mobileChromeAlpha(0.05f, blended = true))
         assertEquals(1f, mobileChromeAlpha(2f, blended = false))
     }
+    @Test
+    fun `desktop text never goes through a recorded additive layer`() {
+        assertFalse(shouldUseOffscreenChromeLayer(false, true, true))
+        assertFalse(shouldUseOffscreenChromeLayer(true, true, true))
+        assertFalse(shouldUseOffscreenChromeLayer(true, true, false))
+    }
+
+    @Test
+    fun `non-desktop chrome keeps capability gated additive rendering`() {
+        assertTrue(shouldUseOffscreenChromeLayer(true, false, true))
+        assertFalse(shouldUseOffscreenChromeLayer(true, false, false))
+        assertFalse(shouldUseOffscreenChromeLayer(false, false, true))
+    }
+
 }

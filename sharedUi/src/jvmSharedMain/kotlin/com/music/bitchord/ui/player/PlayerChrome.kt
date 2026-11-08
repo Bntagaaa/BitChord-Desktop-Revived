@@ -15,8 +15,9 @@ import androidx.compose.ui.graphics.layer.drawLayer
  * album colours instead of tinting the glyphs from a second palette sample.
  *
  * Enabled by the desktop host only. Android retains the existing fork's look.
- * Reduce Blur and video mode disable the blend, so there is no full-screen
- * offscreen compositing and normal white text remains readable.
+ * On desktop the white/alpha palette is drawn directly, never in an offscreen
+ * additive layer: Skia's offscreen layer loses native glyph edge antialiasing
+ * and makes song titles and captions look jagged on HiDPI and fractional scaling.
  */
 internal val LocalPlayerChrome = compositionLocalOf { false }
 
@@ -40,11 +41,27 @@ internal fun playerSecondaryColor(alpha: Float): Color =
     else LocalPlayerTint.current.copy(alpha = alpha)
 
 /**
- * Cache the glyph layer and blend only the element asking for it.
- * Nothing ever requests a full-window layer just to blend a caption.
+ * Only use an offscreen additive layer on platforms that can preserve its
+ * native glyph rasterization. Desktop Skia loses subpixel/text edge smoothing
+ * when white SF Pro glyphs are drawn into a recorded layer and composited back
+ * with BlendMode.Plus. Keep their mobile opacity values but draw them directly.
+ *
+ * Desktop must not make another offscreen bitmap for every text label; this
+ * also avoids blurry text when the application uses fractional display scaling.
  */
+internal fun shouldUseOffscreenChromeLayer(
+    enabled: Boolean,
+    desktopTextChrome: Boolean,
+    blendSupported: Boolean,
+): Boolean = enabled && !desktopTextChrome && blendSupported
+
 internal fun Modifier.additiveChrome(enabled: Boolean): Modifier =
-    if (!enabled || !BlendMode.Plus.isSupported()) this
+    if (!enabled || !shouldUseOffscreenChromeLayer(
+            enabled = enabled,
+            desktopTextChrome = PlayerPlatform.host.mobileTextChrome,
+            blendSupported = BlendMode.Plus.isSupported(),
+        )
+    ) this
     else drawWithCache {
         val layer = obtainGraphicsLayer().apply { blendMode = BlendMode.Plus }
         onDrawWithContent {
