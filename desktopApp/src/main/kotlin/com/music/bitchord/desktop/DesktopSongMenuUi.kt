@@ -258,27 +258,27 @@ internal fun DesktopSongMenu(
             DesktopMenuDivider()
             DesktopSleepTimer.presets.forEach { minutes ->
                 DesktopMenuRow(
-                    icon = Icons.Rounded.Bedtime,
+                    icon = DesktopPhoneMenuIcons.SleepTimer,
                     label = "$minutes minutes",
                     selected = sleepTimerMinutes == minutes && !sleepAfterTrack,
                 ) { onSleepTimer(minutes) }
             }
-            DesktopMenuRow(Icons.Rounded.Bedtime, "Custom duration…") { customTimer = true }
+            DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, "Custom duration…") { customTimer = true }
             DesktopMenuRow(
-                icon = Icons.Rounded.Bedtime,
+                icon = DesktopPhoneMenuIcons.SleepTimer,
                 label = DesktopStrings["d_end_of_this_track", "End of this track"],
                 selected = sleepAfterTrack,
                 onClick = onSleepAfterTrack,
             )
             if (sleepTimerMinutes != null || sleepAfterTrack) {
                 DesktopMenuDivider()
-                DesktopMenuRow(Icons.Rounded.Bedtime, DesktopStrings["d_turn_off", "Turn off"]) { onSleepTimer(null) }
+                DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, DesktopStrings["d_turn_off", "Turn off"]) { onSleepTimer(null) }
             }
             return@DesktopMenuSurface
         }
 
         onRemoveHistory?.let { remove ->
-            DesktopMenuRow(Icons.Rounded.Bedtime, "Remove from history", onClick = remove)
+            DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, "Remove from history", onClick = remove)
             DesktopMenuDivider()
         }
         onSwitchMediaVersion?.let { switch ->
@@ -315,20 +315,20 @@ internal fun DesktopSongMenu(
             DesktopMenuDivider()
         }
         run {
-            DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, DesktopStrings["add_to_playlist", "Add to playlist"], onClick = onAddToPlaylist)
+            DesktopMenuRow(DesktopPhoneMenuIcons.AddToPlaylist, DesktopStrings["add_to_playlist", "Add to playlist"], onClick = onAddToPlaylist)
         }
         if (signedIn || !isOffline) DesktopMenuDivider()
 
-        DesktopMenuRow(Icons.Rounded.Radio, DesktopStrings["start_radio", "Start radio"], onClick = onStartRadio)
-        DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistPlay, DesktopStrings["play_next", "Play next"], onClick = onPlayNext)
-        DesktopMenuRow(Icons.AutoMirrored.Rounded.QueueMusic, DesktopStrings["add_to_queue", "Add to queue"], onClick = onAddToQueue)
+        DesktopMenuRow(DesktopPhoneMenuIcons.Radio, DesktopStrings["start_radio", "Start radio"], onClick = onStartRadio)
+        DesktopMenuRow(DesktopPhoneMenuIcons.PlayNext, DesktopStrings["play_next", "Play next"], onClick = onPlayNext)
+        DesktopMenuRow(DesktopPhoneMenuIcons.AddToQueue, DesktopStrings["add_to_queue", "Add to queue"], onClick = onAddToQueue)
 
         // A saved copy is offered its own way out whatever the track is playing from — a download
         // being played *is* a local file, and hiding the row there left no way to remove it.
         // Only starting a new download needs a YouTube identity behind it.
         when {
             downloadInProgress -> DesktopMenuRow(
-                icon = BitChordIcons.Download,
+                icon = DesktopPhoneMenuIcons.Download,
                 label = DesktopStrings["cancel_download", "Cancel download"],
                 busy = true,
                 onClick = onDownload,
@@ -341,7 +341,7 @@ internal fun DesktopSongMenu(
                 onClick = onRemoveDownload,
             )
             !isOffline -> DesktopMenuRow(
-                icon = BitChordIcons.Download,
+                icon = DesktopPhoneMenuIcons.Download,
                 label = DesktopStrings["download", "Download"],
                 onClick = onDownload,
             )
@@ -351,10 +351,10 @@ internal fun DesktopSongMenu(
         if ((albumId != null && onOpenAlbum != null) || (artistId != null && onOpenArtist != null)) {
             DesktopMenuDivider()
             if (albumId != null && onOpenAlbum != null) {
-                DesktopMenuRow(Icons.Rounded.Album, DesktopStrings["open_album", "Open album"], description = song.albumName) { onOpenAlbum(albumId) }
+                DesktopMenuRow(DesktopPhoneMenuIcons.Album, DesktopStrings["open_album", "Open album"], description = song.albumName) { onOpenAlbum(albumId) }
             }
             if (artistId != null && onOpenArtist != null) {
-                DesktopMenuRow(Icons.Rounded.Person, DesktopStrings["open_artist", "Open artist"], description = song.artist) { onOpenArtist(artistId) }
+                DesktopMenuRow(DesktopPhoneMenuIcons.Artist, DesktopStrings["open_artist", "Open artist"], description = song.artist) { onOpenArtist(artistId) }
             }
         }
 
@@ -366,7 +366,7 @@ internal fun DesktopSongMenu(
         )
         DesktopMenuDivider()
         DesktopMenuRow(
-            icon = Icons.Rounded.Bedtime,
+            icon = DesktopPhoneMenuIcons.SleepTimer,
             label = DesktopStrings["sleep_timer", "Sleep timer"],
             value = sleepTimerLabel(sleepTimerMinutes, sleepAfterTrack),
         ) { pickingSleepTimer = true }
@@ -403,14 +403,14 @@ internal fun DesktopCollectionContextMenu(
         DesktopMenuRow(BitChordIcons.Shuffle, "Shuffle") { onDismiss(); actions.onShuffle() }
         DesktopMenuRow(BitChordIcons.Search, "Find in playlist") { onDismiss(); actions.onFind() }
         actions.onStartMix?.let { mix ->
-            DesktopMenuRow(Icons.Rounded.Radio, "Start mix") { onDismiss(); mix() }
+            DesktopMenuRow(DesktopPhoneMenuIcons.Radio, "Start mix") { onDismiss(); mix() }
         }
         DesktopMenuDivider()
         actions.onPlayNext?.let { next ->
-            DesktopMenuRow(Icons.AutoMirrored.Rounded.PlaylistPlay, "Play next") { onDismiss(); next() }
+            DesktopMenuRow(DesktopPhoneMenuIcons.PlayNext, "Play next") { onDismiss(); next() }
         }
         actions.onAddToQueue?.let { queue ->
-            DesktopMenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue") { onDismiss(); queue() }
+            DesktopMenuRow(DesktopPhoneMenuIcons.AddToQueue, "Add to queue") { onDismiss(); queue() }
         }
         actions.onSaveToLibrary?.let { save ->
             DesktopMenuRow(
@@ -427,7 +427,7 @@ internal fun DesktopCollectionContextMenu(
         }
         DesktopMenuDivider()
         actions.onDownloadAll?.let { download ->
-            DesktopMenuRow(BitChordIcons.Download, "Download all") { onDismiss(); download() }
+            DesktopMenuRow(DesktopPhoneMenuIcons.Download, "Download all") { onDismiss(); download() }
         }
         actions.onShare?.let { share ->
             DesktopMenuRow(Icons.Rounded.Share, "Share") { onDismiss(); share() }
