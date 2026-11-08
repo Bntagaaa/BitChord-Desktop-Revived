@@ -53,6 +53,7 @@ internal object DesktopPlayerHost : PlayerHost {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override val settings: DesktopPlayerSettings = DesktopPlayerSettings
+    override val mobileTextChrome: Boolean = true
 
     var mixViewOpen: (Boolean) -> Unit = {}
     override fun onMixViewOpen(open: Boolean) = mixViewOpen(open)

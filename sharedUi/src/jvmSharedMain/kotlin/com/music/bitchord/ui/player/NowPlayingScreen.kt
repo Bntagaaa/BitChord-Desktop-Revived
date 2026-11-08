@@ -765,7 +765,10 @@ fun NowPlayingScreen(
     // The sleeve's own colour, lifted pale, read off the decode the scrim above
     // already made. Plain white until it is known, and for a sleeve with no
     // colour to give.
-    val artworkTint = rememberPlayerTint(remoteArt, ART_PX) ?: Color.White
+    // The newer mobile player draws secondary text in white chrome rather than a
+    // second sampled artwork tint. Desktop can skip that extra artwork decode.
+    val mobileTextChrome = PlayerPlatform.host.mobileTextChrome
+    val artworkTint = if (mobileTextChrome) Color.White else rememberPlayerTint(remoteArt, ART_PX) ?: Color.White
 
     // Media-player convention: the player always owns light status icons. The
     // top treatment below, rather than a window-flag flip per cover, provides
@@ -1777,7 +1780,15 @@ fun NowPlayingScreen(
         animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
         label = "playerTint",
     )
-    CompositionLocalProvider(LocalPlayerTint provides playerTint) {
+    val reduceBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    // Mobile uses additive white chrome for titles, artists and captions. Keep it
+    // scoped to the player and avoid extra graphics layers when Reduce Blur is on
+    // or a full-screen music video is the backdrop.
+    val chrome = mobileTextChrome && !reduceBlur && !videoMode
+    CompositionLocalProvider(
+        LocalPlayerTint provides if (mobileTextChrome) Color.White else playerTint,
+        LocalPlayerChrome provides chrome,
+    ) {
         val videoLyricsPane: @Composable () -> Unit = {
             LandscapeLyricsPane(
                 hasLyrics = lyricsTranslation.displayedLyrics.isNotEmpty(),
@@ -2589,7 +2600,8 @@ fun NowPlayingScreen(
                                 .graphicsLayer { alpha = spotifyChromeAlpha }
                                 .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(LocalPlayerTint.current.copy(alpha = 0.70f)),
+                                .additiveChrome(LocalPlayerChrome.current)
+                                .background(playerSecondaryColor(0.70f)),
                         )
                         // [p] is the shared album-to-panel transition. Keeping this in
                         // composition until its final frame gives the caption a real
@@ -3539,11 +3551,12 @@ fun NowPlayingScreen(
                                 // it.
                                 Crossfade(
                                     targetState = song.title to song.artist,
+                                    modifier = Modifier.additiveChrome(LocalPlayerChrome.current),
                                     animationSpec = tween(durationMillis = 300),
                                     label = "playerCredits",
                                 ) {
                                     val scrolling = scrolls()
-                                    val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
+                                    val artistColor = playerSecondaryColor(0.55f)
                                     Column {
                                         MarqueeText(
                                             text = song.title,

@@ -37,6 +37,9 @@ interface PlayerHost {
 
     val settings: PlayerSettingsSource
 
+    /** Enable the current mobile player's white/additive text treatment on desktop only. */
+    val mobileTextChrome: Boolean get() = false
+
     /** A Canvas already settled for [song], without a lookup. */
     fun cachedCanvas(song: Song): CanvasArtwork?
 
