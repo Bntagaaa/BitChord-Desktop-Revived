@@ -160,7 +160,7 @@ class DesktopLandscapePlayerTest {
             waitForIdle()
             assertEquals(header, onNodeWithTag("landscape-track-header").getUnclippedBoundsInRoot())
             assertEquals(controls, onNodeWithTag("landscape-main-controls").getUnclippedBoundsInRoot())
-            onNodeWithContentDescription("Queue").performClick()
+            onNodeWithContentDescription("Up next").performClick()
             mainClock.advanceTimeBy(600)
             waitForIdle()
             val queueBounds = onNodeWithTag("landscape-other-pane").getUnclippedBoundsInRoot()
