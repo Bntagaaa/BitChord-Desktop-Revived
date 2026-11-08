@@ -31,7 +31,11 @@ class DesktopLandscapePlayerTest {
     @Test fun scaledLinuxScreenshotSizeCentersVisibleButtonsAndKeepsLyricsControlsUnclipped() =
         verify(1920, 1010, density = 1.25f, reduceBlur = false)
 
-    private fun verify(width: Int, height: Int, density: Float = 1f, reduceBlur: Boolean = true) = runDesktopComposeUiTest(width = width, height = height) {
+    @Test fun changingTracksWithLyricsOpenRevealsTheRealMetadataForTwoSeconds() =
+        verify(1000, 600, verifyTrackChange = true)
+
+    private fun verify(width: Int, height: Int, density: Float = 1f, reduceBlur: Boolean = true,
+        verifyTrackChange: Boolean = false) = runDesktopComposeUiTest(width = width, height = height) {
         mainClock.autoAdvance = false
         val lastScreen = MutableStateFlow(LastPlayerScreen.MAIN)
         val host = object : PlayerHost by DesktopPlayerHost {
@@ -147,6 +151,23 @@ class DesktopLandscapePlayerTest {
             onNodeWithText("Test Artist B").assertDoesNotExist()
             assertEquals(viewport, onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot())
 
+            if (verifyTrackChange) {
+                runOnIdle { index.value = 0 }
+                mainClock.advanceTimeBy(400)
+                waitForIdle()
+                onNodeWithText("Landscape Track A").assertIsDisplayed()
+                onNodeWithText("Test Artist").assertIsDisplayed()
+                onNodeWithText("Lyrics by KuGou").assertDoesNotExist()
+                mainClock.advanceTimeBy(1400)
+                onNodeWithText("Landscape Track A").assertIsDisplayed()
+                mainClock.advanceTimeBy(500)
+                waitForIdle()
+                onNodeWithText("Landscape Track A").assertDoesNotExist()
+                onNodeWithText("Test Artist").assertDoesNotExist()
+                assertEquals(viewport, onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot())
+                return@runDesktopComposeUiTest
+            }
+
             onNodeWithTag("landscape-lyrics-frame").performMouseInput { enter(center) }
             mainClock.advanceTimeBy(300)
             waitForIdle()
@@ -201,20 +222,6 @@ class DesktopLandscapePlayerTest {
                 onNodeWithTag("lyrics-row-0").getUnclippedBoundsInRoot().top.value, 1f,
                 "Seeking back to the opening returns to the top")
 
-            runOnIdle { index.value = 0 }
-            mainClock.advanceTimeBy(400)
-            waitForIdle()
-            onNodeWithText("Landscape Track A").assertIsDisplayed()
-            onNodeWithText("Test Artist").assertIsDisplayed()
-            onNodeWithText("Lyrics by KuGou").assertDoesNotExist()
-            mainClock.advanceTimeBy(1400)
-            onNodeWithText("Landscape Track A").assertIsDisplayed()
-            mainClock.advanceTimeBy(500)
-            waitForIdle()
-            onNodeWithText("Landscape Track A").assertDoesNotExist()
-            onNodeWithText("Test Artist").assertDoesNotExist()
-            assertEquals(viewport, onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot())
-
             onNodeWithContentDescription("Close lyrics").performClick()
             mainClock.advanceTimeBy(600)
             waitForIdle()
@@ -236,7 +243,10 @@ class DesktopLandscapePlayerTest {
     private fun save(bitmap: androidx.compose.ui.graphics.ImageBitmap, name: String) {
         val pixels = bitmap.toPixelMap()
         val output = java.awt.image.BufferedImage(bitmap.width, bitmap.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
-        for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) output.setRGB(x, y, pixels[x, y].toArgb())
+        val argb = IntArray(bitmap.width * bitmap.height) {
+            pixels[it % bitmap.width, it / bitmap.width].toArgb()
+        }
+        output.setRGB(0, 0, bitmap.width, bitmap.height, argb, 0, bitmap.width)
         val target = java.io.File("build/reports/landscape-player/$name")
         target.parentFile.mkdirs()
         javax.imageio.ImageIO.write(output, "png", target)

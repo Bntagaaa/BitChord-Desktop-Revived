@@ -21,4 +21,5 @@ for module in ("sharedUi", "shared", "desktopApp"):
         for case in ET.parse(report).getroot().iter("testcase"):
             for failure in (*case.findall("failure"), *case.findall("error")):
                 annotate(f"{case.get('classname')}.{case.get('name')}",
+                         f"{case.get('classname')}.{case.get('name')}\n" +
                          failure.get("message", "") + "\n" + "\n".join((failure.text or "").splitlines()[:12]))
