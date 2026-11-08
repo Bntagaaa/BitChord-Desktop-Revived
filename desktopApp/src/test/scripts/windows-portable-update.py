@@ -22,6 +22,7 @@ import uuid
 
 
 HELPER = Path(__file__).resolve().parents[2] / "main/resources/reworked/update-portable.ps1"
+INSTALLED_HELPER = HELPER.with_name("update-windows.ps1")
 REPORTS = Path(__file__).resolve().parents[3] / "build/windows-portable-tests"
 VERSION = "1.9.2-reworked.1"
 SOURCE = r"""
@@ -46,6 +47,40 @@ public static class Fixture {
 
 def digest(file: Path) -> str:
     return hashlib.sha256(file.read_bytes()).hexdigest()
+
+
+def verify_worker_hashes(directory: Path, reports: Path) -> None:
+    """Execute only each real worker's hash function; never run the installed updater."""
+    binary = directory / "binary hash [test].bin"
+    binary.write_bytes(bytes(range(256)) * 4096 + b"\x00\xff\x80end")
+    source = r"""
+$ErrorActionPreference = 'Stop'
+$tokens = $null; $parseErrors = $null
+$ast = [Management.Automation.Language.Parser]::ParseFile($env:REWORKED_HASH_TEST_SCRIPT, [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) { throw 'The production worker has syntax errors.' }
+$function = $ast.Find({ param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'File-Sha256'
+}, $true)
+if (-not $function) { throw 'The production worker is missing File-Sha256.' }
+. ([ScriptBlock]::Create($function.Extent.Text))
+$lock = [IO.File]::Open($env:REWORKED_HASH_TEST_FILE, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+try { File-Sha256 $env:REWORKED_HASH_TEST_FILE } finally { $lock.Dispose() }
+$released = [IO.File]::Open($env:REWORKED_HASH_TEST_FILE, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+$released.Dispose()
+"""
+    encoded = base64.b64encode(source.encode("utf-16le")).decode("ascii")
+    for worker in (HELPER, INSTALLED_HELPER):
+        environment = os.environ.copy()
+        environment["REWORKED_HASH_TEST_SCRIPT"] = str(worker)
+        environment["REWORKED_HASH_TEST_FILE"] = str(binary)
+        output = reports / ("hash-" + worker.stem + ".log")
+        with output.open("w") as log:
+            result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                                    env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=30)
+        actual = output.read_text(encoding="utf-8-sig", errors="replace").strip()
+        assert result.returncode == 0, (worker.name, actual)
+        assert actual == digest(binary), (worker.name, "production SHA256 disagrees with the binary fixture", actual)
+        print("PASS streaming SHA256 + shared read lock + handle release:", worker.name, flush=True)
 
 
 def created_milliseconds(process: subprocess.Popen) -> int:
@@ -193,6 +228,7 @@ def main() -> None:
         directory = Path(raw)
         reports = REPORTS / str(uuid.uuid4())
         reports.mkdir(parents=True)
+        verify_worker_hashes(directory, reports)
         compiler = Path(os.environ["WINDIR"]) / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
         assert compiler.is_file(), "Windows .NET Framework C# compiler is required for this fixture"
         code = directory / "Fixture.cs"

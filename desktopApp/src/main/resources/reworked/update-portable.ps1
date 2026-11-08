@@ -10,6 +10,15 @@ $updated = $null
 $job = $null
 $accepted = $false
 
+function File-Sha256([string]$path) {
+    $hash = [Security.Cryptography.SHA256]::Create()
+    $reader = $null
+    try {
+        $reader = [IO.File]::OpenRead($path)
+        return [BitConverter]::ToString($hash.ComputeHash($reader)).Replace('-', '').ToLowerInvariant()
+    } finally { if ($reader) { $reader.Dispose() }; $hash.Dispose() }
+}
+
 function Write-Phase([string]$phase) {
     Write-Output ('Portable updater: ' + $phase)
     if ($operation -and [IO.Directory]::Exists($operation)) {
@@ -33,7 +42,7 @@ function Verify-StagedTree {
         $file = [IO.Path]::GetFullPath((Join-Path $root $entry.Name))
         if (-not $file.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw 'A staged file escaped the application folder.' }
         [void](Require-RegularFile $file)
-        if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -cne $entry.Value) { throw ('Staged file changed: ' + $entry.Name) }
+        if ((File-Sha256 $file) -cne $entry.Value) { throw ('Staged file changed: ' + $entry.Name) }
     }
     $actual = @(Get-ChildItem -LiteralPath $job.stagedRoot -File -Recurse -Force)
     if ($actual.Count -ne $properties.Count) { throw 'The staged application has unexpected files.' }
@@ -49,7 +58,7 @@ function Restore-Previous {
     if (-not $swapped) { return }
     if ($updated -and -not $updated.HasExited) { throw 'The replacement is still running; its backup has been retained.' }
     $backupLauncher = Join-Path $job.backupRoot 'BitChordReworked.exe'
-    if ((Get-FileHash -LiteralPath $backupLauncher -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.oldSha256) { throw 'The previous launcher changed; automatic rollback was stopped.' }
+    if ((File-Sha256 $backupLauncher) -cne $job.oldSha256) { throw 'The previous launcher changed; automatic rollback was stopped.' }
     if (Test-Path -LiteralPath $job.failedRoot) { throw 'The failed-update recovery path already exists.' }
     if (Test-Path -LiteralPath $job.portableRoot) { [IO.Directory]::Move($job.portableRoot, $job.failedRoot) }
     [IO.Directory]::Move($job.backupRoot, $job.portableRoot)
@@ -91,9 +100,9 @@ try {
     Write-Phase 'checking-archive'
     $payload = Require-RegularFile $job.payload
     $payloadLock = [IO.File]::Open($payload.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
-    if ((Get-FileHash -LiteralPath $payload.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.sha256) { throw 'The portable archive changed after verification.' }
+    if ((File-Sha256 $payload.FullName) -cne $job.sha256) { throw 'The portable archive changed after verification.' }
     Write-Phase 'checking-original-launcher'
-    if ((Get-FileHash -LiteralPath $target.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.oldSha256) { throw 'The running launcher changed before update.' }
+    if ((File-Sha256 $target.FullName) -cne $job.oldSha256) { throw 'The running launcher changed before update.' }
     Write-Phase 'checking-staged-tree'
     Verify-StagedTree
     Write-Phase 'waiting-for-app'
@@ -110,7 +119,7 @@ try {
         Start-Sleep -Milliseconds 200
     }
     Write-Phase 'verifying-handoff'
-    if ((Get-FileHash -LiteralPath $target.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.oldSha256) { throw 'The installed launcher changed during handoff.' }
+    if ((File-Sha256 $target.FullName) -cne $job.oldSha256) { throw 'The installed launcher changed during handoff.' }
     Verify-StagedTree
     Write-Phase 'replacing'
     Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'replacing'

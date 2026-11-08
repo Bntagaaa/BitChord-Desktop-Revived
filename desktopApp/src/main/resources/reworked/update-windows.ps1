@@ -4,6 +4,17 @@ $operation = $env:BITCHORD_REWORKED_UPDATE_OPERATION
 $lease = $null
 $payloadLock = $null
 $hasLease = $false
+$accepted = $false
+
+function File-Sha256([string]$path) {
+    $hash = [Security.Cryptography.SHA256]::Create()
+    $reader = $null
+    try {
+        $reader = [IO.File]::OpenRead($path)
+        return [BitConverter]::ToString($hash.ComputeHash($reader)).Replace('-', '').ToLowerInvariant()
+    } finally { if ($reader) { $reader.Dispose() }; $hash.Dispose() }
+}
+
 try {
     if (-not $operation -or -not [System.IO.Path]::IsPathRooted($operation)) { throw 'Missing update operation.' }
     $job = Get-Content -LiteralPath (Join-Path $operation 'operation.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -22,10 +33,11 @@ try {
     try { $hasLease = $lease.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $hasLease = $true }
     if (-not $hasLease) { throw 'Another updater already owns this installation.' }
     $payloadLock = [IO.File]::Open($payload.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
-    if ((Get-FileHash -LiteralPath $payload.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.sha256) { throw 'Package changed after verification.' }
-    if ((Get-FileHash -LiteralPath $target.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.oldSha256) { throw 'Installed launcher changed before update.' }
+    if ((File-Sha256 $payload.FullName) -cne $job.sha256) { throw 'Package changed after verification.' }
+    if ((File-Sha256 $target.FullName) -cne $job.oldSha256) { throw 'Installed launcher changed before update.' }
     Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'waiting-for-app'
     [IO.File]::WriteAllText((Join-Path $operation 'accepted'), 'accepted')
+    $accepted = $true
     $deadline = [DateTime]::UtcNow.AddSeconds(120)
     while ($true) {
         $parentProcess = Get-Process -Id ([int]$job.pid) -ErrorAction SilentlyContinue
@@ -35,7 +47,7 @@ try {
         if ([DateTime]::UtcNow -ge $deadline) { throw 'The app did not exit; installation was not started.' }
         Start-Sleep -Milliseconds 200
     }
-    if ((Get-FileHash -LiteralPath $target.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $job.oldSha256) { throw 'Installed launcher changed during handoff.' }
+    if ((File-Sha256 $target.FullName) -cne $job.oldSha256) { throw 'Installed launcher changed during handoff.' }
     Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'installing'
     $installer = Start-Process -FilePath $payload.FullName -Wait -PassThru
     if ($installer.ExitCode -eq 3010 -or $installer.ExitCode -eq 1641) { throw 'Windows requires a restart to finish installation. Reopen Reworked after restarting.' }
@@ -70,10 +82,12 @@ try {
     if ($operation -and (Test-Path -LiteralPath $operation -PathType Container)) {
         Set-Content -LiteralPath (Join-Path $operation 'status') -Value ('failed: ' + $message)
     }
-    try {
-        Add-Type -AssemblyName System.Windows.Forms
-        [void][System.Windows.Forms.MessageBox]::Show(($message + "`n`nLogs: " + $operation), 'BitChord Reworked update')
-    } catch { }
+    if ($accepted -and $env:BITCHORD_REWORKED_UPDATE_NO_UI -ne '1') {
+        try {
+            Add-Type -AssemblyName System.Windows.Forms
+            [void][System.Windows.Forms.MessageBox]::Show(($message + "`n`nLogs: " + $operation), 'BitChord Reworked update')
+        } catch { }
+    }
     exit 1
 } finally {
     if ($payloadLock) { $payloadLock.Dispose() }

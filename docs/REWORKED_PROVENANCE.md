@@ -39,6 +39,8 @@ Paths in the middle column are relative to `app/src/main/java/com/music/bitchord
 
 Consult the comments at each destination for localized modifications. The integration package groups should be reviewed with their individual filenames when changing those services.
 
+The original shared `CompactTrackRow` has one optional `showMenuButton` parameter, defaulting to `true`. The new desktop collection host sets it to `false` because it supplies its own trailing actions beside the duration. Original mobile callers retain their menu and gestures; this small host seam avoids rendering duplicate controls without replacing the original row implementation.
+
 ## Newly written platform boundaries
 
 All files in `desktopApp/src/main/kotlin/com/music/bitchord/reworked/` are new platform host or feature implementations. In particular:

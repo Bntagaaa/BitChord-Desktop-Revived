@@ -46,7 +46,7 @@ python3 desktopApp/src/test/scripts/appimage-update.py
 python desktopApp/src/test/scripts/windows-portable-update.py
 ```
 
-The Windows fixture requires Windows PowerShell and the .NET Framework C# compiler provided on the Windows CI runner. CI separately parses both production PowerShell helpers. The Linux fixture reports any environment-specific process-identity skip rather than counting it as a pass.
+The Windows fixture requires Windows PowerShell and the .NET Framework C# compiler provided on the Windows CI runner. It checks replacement, retained backup, early-crash rollback and rejection of a tampered staged runtime, with the original process still running during preflight. It also executes each production worker's .NET hashing function against a locked binary fixture and verifies the digest and handle release. Diagnostic phase/status/worker logs are retained under `desktopApp/build/windows-portable-tests/` and included in the CI test-report artifact. CI parses both production PowerShell helpers and runs this disposable fixture before the longer Windows compilation. The Linux fixture reports any environment-specific process-identity skip rather than counting it as a pass.
 
 ## Run from source
 
