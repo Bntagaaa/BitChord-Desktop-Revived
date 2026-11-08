@@ -34,6 +34,21 @@ class PlayerChromeTest {
     }
 
     @Test
+    fun `mobile disc shade matches active and inactive dodge gain`() {
+        // At rest the disc is 18% white; when liked it is 34%.
+        // Mobile's ColorDodge ink uses a 2.5x gain on those values.
+        assertEquals(0.45f, playerDiscPaintAlpha(0.18f, blended = true), 0.00001f)
+        assertEquals(0.85f, playerDiscPaintAlpha(0.34f, blended = true), 0.00001f)
+    }
+
+    @Test
+    fun `desktop fallback paints soft discs without recorded layer`() {
+        assertEquals(0.279f, playerDiscPaintAlpha(0.18f, blended = false), 0.00001f)
+        assertEquals(0.527f, playerDiscPaintAlpha(0.34f, blended = false), 0.00001f)
+        assertEquals(0.88f, DESKTOP_PLAYER_HANDLE_ALPHA, 0.00001f)
+    }
+
+    @Test
     fun `desktop text never goes through a recorded additive layer`() {
         assertFalse(shouldUseOffscreenChromeLayer(false, true, true))
         assertFalse(shouldUseOffscreenChromeLayer(true, true, true))

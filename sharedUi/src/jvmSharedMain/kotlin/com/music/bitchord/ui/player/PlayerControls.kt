@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.isSupported
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.isSpecified
@@ -726,11 +727,16 @@ internal fun CircleGlyph(
         targetValue = if (active) 0.34f else 0.18f,
         label = "glyphDisc",
     )
+    // The current mobile player has an artwork-reactive ColorDodge disc and a
+    // white glyph. Restrict the offscreen layer to the 34dp disc: drawing the
+    // glyph (or any text) in that layer would soften Skia antialiasing on desktop.
+    val desktop = PlayerPlatform.host.mobileTextChrome
+    val vibrantDisc = desktop && LocalPlayerChrome.current &&
+        BlendMode.ColorDodge.isSupported() && BlendMode.Plus.isSupported()
     Box(
         modifier = Modifier
             .size(34.dp)
             .clip(CircleShape)
-            .background(LocalPlayerTint.current.copy(alpha = discAlpha))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -740,6 +746,21 @@ internal fun CircleGlyph(
             },
         contentAlignment = Alignment.Center,
     ) {
+        Box(
+            modifier = Modifier.matchParentSize()
+                .vibrantDiscChrome(vibrantDisc)
+                .background(
+                    if (!desktop) {
+                        LocalPlayerTint.current.copy(alpha = discAlpha)
+                    } else if (vibrantDisc) {
+                        VibrantDiscInk.copy(alpha = playerDiscPaintAlpha(discAlpha, blended = true))
+                    } else {
+                        // Software/unsupported-blend fallback retains the mobile
+                        // brightness while avoiding an extra GPU render layer.
+                        Color.White.copy(alpha = playerDiscPaintAlpha(discAlpha, blended = false))
+                    },
+                ),
+        )
         Crossfade(
             targetState = icon,
             animationSpec = tween(durationMillis = 180),
@@ -748,7 +769,7 @@ internal fun CircleGlyph(
             Icon(
                 imageVector = glyph,
                 contentDescription = contentDescription,
-                tint = LocalPlayerTint.current,
+                tint = if (desktop) Color.White else LocalPlayerTint.current,
                 modifier = Modifier.size(19.dp),
             )
         }

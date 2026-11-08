@@ -2603,7 +2603,13 @@ fun NowPlayingScreen(
                                 .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
                                 .clip(RoundedCornerShape(3.dp))
                                 .additiveChrome(LocalPlayerChrome.current)
-                                .background(playerSecondaryColor(0.70f)),
+                                .background(
+                                    if (mobileTextChrome) {
+                                        Color.White.copy(alpha = DESKTOP_PLAYER_HANDLE_ALPHA)
+                                    } else {
+                                        playerSecondaryColor(0.70f)
+                                    },
+                                ),
                         )
                         // [p] is the shared album-to-panel transition. Keeping this in
                         // composition until its final frame gives the caption a real

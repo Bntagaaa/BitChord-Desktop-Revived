@@ -256,7 +256,13 @@ internal fun LandscapePlayerLayout(
                     .height(5.dp)
                     .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(Color.White.copy(alpha = 0.70f)),
+                    .background(
+                        Color.White.copy(
+                            alpha = if (PlayerPlatform.host.mobileTextChrome) {
+                                DESKTOP_PLAYER_HANDLE_ALPHA
+                            } else 0.70f,
+                        ),
+                    ),
             )
         }
     }
@@ -495,7 +501,14 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
         if (signedIn || song.localUri != null) {
             val liked = likeStatus == LikeStatus.LIKE
             CircleGlyph(
-                icon = if (liked) BitChordIcons.HeartFilled else BitChordIcons.Heart,
+                // Desktop follows the current mobile star for the Liked
+                // playlist; retain the fork's old heart on Android.
+                icon = when {
+                    PlayerPlatform.host.mobileTextChrome && liked -> BitChordIcons.StarFilled
+                    PlayerPlatform.host.mobileTextChrome -> BitChordIcons.Star
+                    liked -> BitChordIcons.HeartFilled
+                    else -> BitChordIcons.Heart
+                },
                 contentDescription = stringResource(
                     if (liked) Res.string.remove_from_liked else Res.string.like,
                 ),

@@ -22,6 +22,19 @@ import androidx.compose.ui.graphics.layer.drawLayer
 internal val LocalPlayerChrome = compositionLocalOf { false }
 
 internal const val CHROME_FULL_ALPHA = 0.73f
+
+/** Desktop's direct-rendered equivalent of mobile's bright, blended grab handle. */
+internal const val DESKTOP_PLAYER_HANDLE_ALPHA = 0.88f
+
+/** The mobile disc's neutral ink before the small ColorDodge layer is applied. */
+internal val VibrantDiscInk = Color(0xFF999999).copy(alpha = 0.85f)
+private const val VIBRANT_DISC_FLOOR = 0.12f
+private const val VIBRANT_DISC_GAIN = 2.5f
+
+/** Active/inactive disc animation uses mobile's 0.34/0.18 alpha values. */
+internal fun playerDiscPaintAlpha(alpha: Float, blended: Boolean): Float =
+    if (blended) (alpha * VIBRANT_DISC_GAIN).coerceIn(0f, 1f)
+    else desktopDirectChromeAlpha(alpha)
 private const val CHROME_ALPHA_DROP = 0.15f
 
 /** The same opacity values as mobile's PlayerChrome, independently testable. */
@@ -87,5 +100,28 @@ internal fun Modifier.additiveChrome(enabled: Boolean): Modifier =
         onDrawWithContent {
             layer.record { this@onDrawWithContent.drawContent() }
             drawLayer(layer)
+        }
+    }
+
+/**
+ * Mobile's vibrant disc blend, isolated to the button background.
+ *
+ * Unlike the old fullscreen text chrome, no text or vector icon is recorded
+ * here; the white 19dp icon stays in Compose's native antialiased draw path.
+ * Only two 34dp circles can create these cached layers.
+ */
+internal fun Modifier.vibrantDiscChrome(enabled: Boolean): Modifier =
+    if (!enabled) this
+    else drawWithCache {
+        val floor = obtainGraphicsLayer().apply {
+            blendMode = BlendMode.Plus
+            alpha = VIBRANT_DISC_FLOOR
+        }
+        val dodge = obtainGraphicsLayer().apply { blendMode = BlendMode.ColorDodge }
+        onDrawWithContent {
+            floor.record { this@onDrawWithContent.drawContent() }
+            dodge.record { this@onDrawWithContent.drawContent() }
+            drawLayer(floor)
+            drawLayer(dodge)
         }
     }
