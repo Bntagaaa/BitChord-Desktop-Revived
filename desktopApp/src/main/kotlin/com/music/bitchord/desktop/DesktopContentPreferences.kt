@@ -59,12 +59,12 @@ internal object DesktopContentPreferences {
     var squareVideos by mutableStateOf(persistence.boolean("content_square_video_thumbnails", false))
         private set
 
-    fun setPreferMusicOnly(value: Boolean) { preferMusicOnly = value; persistence.saveBoolean("content_prefer_music_only", value) }
-    fun setHideRecents(value: Boolean) { hideRecents = value; persistence.saveBoolean("content_hide_recents", value) }
-    fun setHideHomeVideos(value: Boolean) { hideHomeVideos = value; persistence.saveBoolean("content_hide_home_videos", value) }
-    fun setHideTopPicks(value: Boolean) { hideTopPicks = value; persistence.saveBoolean("content_hide_top_picks", value) }
-    fun setHideHomeMoods(value: Boolean) { hideHomeMoods = value; persistence.saveBoolean("content_hide_home_moods", value) }
-    fun setSquareVideos(value: Boolean) { squareVideos = value; persistence.saveBoolean("content_square_video_thumbnails", value) }
+    fun updatePreferMusicOnly(value: Boolean) { preferMusicOnly = value; persistence.saveBoolean("content_prefer_music_only", value) }
+    fun updateHideRecents(value: Boolean) { hideRecents = value; persistence.saveBoolean("content_hide_recents", value) }
+    fun updateHideHomeVideos(value: Boolean) { hideHomeVideos = value; persistence.saveBoolean("content_hide_home_videos", value) }
+    fun updateHideTopPicks(value: Boolean) { hideTopPicks = value; persistence.saveBoolean("content_hide_top_picks", value) }
+    fun updateHideHomeMoods(value: Boolean) { hideHomeMoods = value; persistence.saveBoolean("content_hide_home_moods", value) }
+    fun updateSquareVideos(value: Boolean) { squareVideos = value; persistence.saveBoolean("content_square_video_thumbnails", value) }
 }
 
 @Composable
@@ -80,21 +80,21 @@ internal fun DesktopContentPreferencesPage(onBack: () -> Unit) {
                 Column {
                     PreferenceOption(Icons.Rounded.Videocam, "Prefer music-only version",
                         "Music videos play as their audio version; the next queue item is resolved ahead of time for smoother transitions.",
-                        prefs.preferMusicOnly, prefs::setPreferMusicOnly)
+                        prefs.preferMusicOnly, prefs::updatePreferMusicOnly)
                     PreferenceSeparator()
-                    PreferenceOption(Icons.Rounded.VisibilityOff, "Hide Recents", null, prefs.hideRecents, prefs::setHideRecents)
+                    PreferenceOption(Icons.Rounded.VisibilityOff, "Hide Recents", null, prefs.hideRecents, prefs::updateHideRecents)
                     PreferenceSeparator()
                     PreferenceOption(Icons.Rounded.VisibilityOff, "Hide videos from Home",
                         "Video-only shelves are hidden. Search, artists and playlists remain unchanged.",
-                        prefs.hideHomeVideos, prefs::setHideHomeVideos)
+                        prefs.hideHomeVideos, prefs::updateHideHomeVideos)
                     PreferenceSeparator()
-                    PreferenceOption(Icons.Rounded.AutoAwesome, "Hide Top Picks for You", null, prefs.hideTopPicks, prefs::setHideTopPicks)
+                    PreferenceOption(Icons.Rounded.AutoAwesome, "Hide Top Picks for You", null, prefs.hideTopPicks, prefs::updateHideTopPicks)
                     PreferenceSeparator()
-                    PreferenceOption(Icons.Rounded.StarBorder, "Hide Find Your Mood", null, prefs.hideHomeMoods, prefs::setHideHomeMoods)
+                    PreferenceOption(Icons.Rounded.StarBorder, "Hide Find Your Mood", null, prefs.hideHomeMoods, prefs::updateHideHomeMoods)
                     PreferenceSeparator()
                     PreferenceOption(Icons.Rounded.GridView, "Square video thumbnails",
                         "Display music videos with square covers wherever thumbnail layout supports it.",
-                        prefs.squareVideos, prefs::setSquareVideos)
+                        prefs.squareVideos, prefs::updateSquareVideos)
                 }
             }
         }
