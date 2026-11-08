@@ -19,7 +19,7 @@
 #include <unordered_map>
 
 using namespace winrt;
-using namespace Windows::Media;
+using namespace winrt::Windows::Media;
 
 namespace {
 struct Apartment {
@@ -119,7 +119,7 @@ Java_com_music_bitchord_reworked_WindowsMediaNative_update(JNIEnv* env, jobject,
             display.MusicProperties().Title(t); display.MusicProperties().Artist(a); display.MusicProperties().AlbumTitle(b);
             try {
                 if (cover.empty()) display.Thumbnail(nullptr);
-                else display.Thumbnail(Windows::Storage::Streams::RandomAccessStreamReference::CreateFromUri(Windows::Foundation::Uri(cover)));
+                else display.Thumbnail(winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromUri(winrt::Windows::Foundation::Uri(cover)));
             } catch (...) { display.Thumbnail(nullptr); }
             display.Update();
             session->title = t; session->artist = a; session->album = b; session->artwork = cover;
@@ -127,9 +127,9 @@ Java_com_music_bitchord_reworked_WindowsMediaNative_update(JNIEnv* env, jobject,
         duration = std::max<jlong>(0, duration); position = std::clamp<jlong>(position, 0, duration);
         if (duration > 0) {
             SystemMediaTransportControlsTimelineProperties timeline;
-            timeline.StartTime(Windows::Foundation::TimeSpan{0}); timeline.MinSeekTime(Windows::Foundation::TimeSpan{0});
-            timeline.EndTime(Windows::Foundation::TimeSpan{duration * 10000}); timeline.MaxSeekTime(Windows::Foundation::TimeSpan{duration * 10000});
-            timeline.Position(Windows::Foundation::TimeSpan{position * 10000});
+            timeline.StartTime(winrt::Windows::Foundation::TimeSpan{0}); timeline.MinSeekTime(winrt::Windows::Foundation::TimeSpan{0});
+            timeline.EndTime(winrt::Windows::Foundation::TimeSpan{duration * 10000}); timeline.MaxSeekTime(winrt::Windows::Foundation::TimeSpan{duration * 10000});
+            timeline.Position(winrt::Windows::Foundation::TimeSpan{position * 10000});
             session->controls.UpdateTimelineProperties(timeline);
         }
         return JNI_TRUE;
