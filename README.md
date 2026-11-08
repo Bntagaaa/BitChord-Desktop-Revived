@@ -6,13 +6,14 @@
 <br>
 <br>
 
-<img width="577" height="41" alt="Asset-2" src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" />
-
+<img width="577" height="41"
+     alt="BitChord Desktop Revived - YouTube Music Desktop App for Windows and Linux"
+     src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" />
 
 
 **A desktop music experience, refined.**
 
-**BitChord Desktop** is an independent, community-maintained continuation of the original BitChord desktop app. It brings together a polished interface, immersive playback, and desktop-first controls for Windows and Linux.
+**BitChord-Desktop-Revived** is an independent, community-maintained continuation of the original BitChord desktop app. It brings together a polished interface, immersive playback, and desktop-first controls for Windows and Linux.
 
 
 ![Status](https://img.shields.io/badge/status-revival%20in%20progress-DAA520?style=flat-square)
