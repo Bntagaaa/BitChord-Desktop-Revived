@@ -94,6 +94,7 @@ internal object DesktopAppearanceSettings {
         MutableStateFlow(DesktopPersistence().boolean(key, default))
 
     private val _reduceAnimation = flag(KEY_REDUCE_ANIMATION, false)
+    private val _animateLyricsWhileUnfocused = flag(KEY_ANIMATE_LYRICS_WHILE_UNFOCUSED, false)
     private val _reduceDynamicBlur = flag(KEY_REDUCE_DYNAMIC_BLUR, false)
     private val _blurPreferences = DesktopBlurArea.entries.associateWith { flag(it.preferenceKey, true) }
     private val _performanceProfile = MutableStateFlow(
@@ -111,6 +112,9 @@ internal object DesktopAppearanceSettings {
 
     /** Freezes the main player's gradient instead of drifting. */
     val reduceAnimation: StateFlow<Boolean> = _reduceAnimation
+
+    /** Keep synced lyrics moving on a visible, unfocused desktop window when enabled. */
+    val animateLyricsWhileUnfocused: StateFlow<Boolean> = _animateLyricsWhileUnfocused
 
     /** Swaps frosted glass for solid fills across the app. */
     val reduceDynamicBlur: StateFlow<Boolean> = _reduceDynamicBlur
@@ -146,6 +150,9 @@ internal object DesktopAppearanceSettings {
 
     fun setReduceAnimation(value: Boolean) = write(KEY_REDUCE_ANIMATION, value, _reduceAnimation)
 
+    fun setAnimateLyricsWhileUnfocused(value: Boolean) =
+        write(KEY_ANIMATE_LYRICS_WHILE_UNFOCUSED, value, _animateLyricsWhileUnfocused)
+
     fun setReduceDynamicBlur(value: Boolean) = write(KEY_REDUCE_DYNAMIC_BLUR, value, _reduceDynamicBlur)
 
     fun setPerformanceProfile(profile: DesktopPerformanceProfile) {
@@ -173,6 +180,7 @@ internal object DesktopAppearanceSettings {
     }
 
     internal const val KEY_REDUCE_ANIMATION = "reduce_animation"
+    internal const val KEY_ANIMATE_LYRICS_WHILE_UNFOCUSED = "animate_lyrics_while_unfocused"
     internal const val KEY_REDUCE_DYNAMIC_BLUR = "reduce_dynamic_blur"
     internal const val KEY_PERFORMANCE_PROFILE = "performance_profile"
     internal const val KEY_MICA_SIDEBAR = "mica_sidebar"

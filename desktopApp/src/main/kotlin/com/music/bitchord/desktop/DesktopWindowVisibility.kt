@@ -66,3 +66,14 @@ internal object DesktopWindowVisibility {
         return false
     }
 }
+
+/**
+ * A focus change alone should not stop the lyric clock when the listener has explicitly opted in.
+ * Never spend continuous frames on a minimized or hidden main window, even with the override.
+ */
+internal fun shouldAnimateDesktopLyrics(
+    windowVisible: Boolean,
+    windowMinimized: Boolean,
+    windowFocused: Boolean,
+    animateWhenUnfocused: Boolean,
+): Boolean = windowVisible && !windowMinimized && (windowFocused || animateWhenUnfocused)
