@@ -34,6 +34,15 @@ class DesktopNowPlayingDetailsTest {
         assertTrue(detailsLyricWindow(emptyList(), 1000L).isEmpty())
     }
 
+    @Test fun lightCanvasCaptionUsesDarkThemeForeground() {
+        val foreground = Color(0xFF1B1C20)
+        assertEquals(foreground, detailsCanvasCaptionInk(dark = false, lightForeground = foreground))
+    }
+
+    @Test fun darkCanvasCaptionRemainsWhite() {
+        assertEquals(Color.White, detailsCanvasCaptionInk(dark = true, lightForeground = Color.Black))
+    }
+
     @Test fun grayscaleCanvasKeepsLyricsSurfaceNeutral() {
         val base = Color(0xFF393939)
         assertEquals(base, tintSurfaceFromArtwork(base, Color(0xFF808080), 0.28f))
