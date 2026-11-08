@@ -6,21 +6,21 @@
 <br>
 <br>
 
-<img width="577" height="41"
+<h1><img width="577" height="41"
      alt="BitChord Desktop Revived - YouTube Music Desktop App for Windows and Linux"
-     src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" />
+     src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" /></h1>
 
 
 **A desktop music experience, refined.**
 
-**BitChord-Desktop-Revived** is an independent, community-maintained continuation of the original BitChord desktop app. It brings together a polished interface, immersive playback, and desktop-first controls for Windows and Linux.
+**BitChord Desktop Revived** is a community-maintained BitChord PC and YouTube Music desktop app, continuing development of the original BitChord desktop experience. It brings together a polished interface, immersive playback, and desktop-first controls for Windows and Linux.
 
 
 ![Status](https://img.shields.io/badge/status-revival%20in%20progress-DAA520?style=flat-square)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux-6677AA?style=flat-square)
 [![GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-555555?style=flat-square)](LICENSE)
 
-[**Downloads**](#downloads) · [**Features**](#features) · [**Build**](#building-from-source) · [**Roadmap**](#roadmap) · [**Credits**](#credits--upstream)
+[**Downloads**](#downloads) · [**Features**](#features) · [**Build**](#building-from-source) · [**Credits**](#credits--upstream)
 
 </div>
 
@@ -32,7 +32,7 @@
 
 <div align="center">
 
-<h2><a id="download"></a>✨ Highlights</h2>
+<h2 id="features">✨ Highlights</h2>
 
 
 - **Apple Music Experience** - A refined, modern interface featuring elegant frosted surfaces, adaptive blur, a Mica-inspired sidebar, smooth animations, and seamless light/dark themes.
@@ -46,10 +46,10 @@
 
 <div align="center">
 
-<h2><a id="download"></a>Download</h2>
+<h2 id="downloads">Download BitChord Desktop Revived for Windows and Linux</h2>
 
-<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/main/yeyyeyyyyeyey-Artboard-1.svg" alt="Download for Android" height="55"/></a>
-<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/main/yeyyeyyyyeyey-Artboard-1-copy.svg" alt="Download for Android" height="55"/></a>
+<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/1.9.1/yeyyeyyyyeyey-Artboard-1.svg" alt="Download BitChord Desktop Revived for Windows and Linux" height="55"/></a>
+<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/main/yeyyeyyyyeyey-Artboard-1-copy.svg" alt="Download BitChord Desktop Revived for Windows and Linux" height="55"/></a>
 
 **Note:** If you're looking for the Android APK, please download it from the [original BitChord repository](https://github.com/kushagrasinghx/BitChord/releases). This fork is focused on the desktop experience.
 
@@ -59,7 +59,7 @@
 </div>
 <div align="center">
 
-<h2><a id="download"></a>⚙️ Build from source</h2>
+<h2 id="building-from-source">⚙️ Build from source</h2>
 
 </div>
 
@@ -80,7 +80,7 @@ Linux:
 </div>
 <div align="center">
 
-<h2><a id="download"></a>📜 Credits and license</h2>
+<h2 id="credits--upstream">📜 Credits and license</h2>
 
 </div>
 
