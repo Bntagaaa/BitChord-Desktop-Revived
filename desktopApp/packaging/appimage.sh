@@ -10,8 +10,8 @@ APP_DIR_SRC=${1:?usage: appimage.sh <app-image-dir> <out.AppImage> [appimagetool
 OUT=${2:?usage: appimage.sh <app-image-dir> <out.AppImage> [appimagetool]}
 TOOL=${3:-appimagetool}
 # A local verified type-2 runtime keeps CI independent of GitHub Releases CDN.
-# The fourth argument is optional for existing manual/packaging callers.
-RUNTIME_FILE=${4:-}
+# Can be supplied as the 4th argument or via APPIMAGETOOL_RUNTIME_FILE environment variable.
+RUNTIME_FILE=${4:-${APPIMAGETOOL_RUNTIME_FILE:-}}
 
 [ -x "$APP_DIR_SRC/bin/BitChord" ] || { echo "no launcher in $APP_DIR_SRC" >&2; exit 1; }
 

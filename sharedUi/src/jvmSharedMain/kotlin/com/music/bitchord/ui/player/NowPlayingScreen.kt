@@ -3406,7 +3406,7 @@ fun NowPlayingScreen(
                             WhileShown({ !collapsePastHalf && !docking() }) {
                                 val videoAspect by PlayerPlatform.host.musicVideoAspect
                                     .collectAsStateWithLifecycle()
-                                val aspect = videoAspect.coerceIn(1f, 2.4f)
+                                val aspect = if (com.music.bitchord.ui.components.VideoThumbnails.square) 1f else videoAspect.coerceIn(1f, 2.4f)
                                 Box(
                                     modifier = Modifier
                                         .offset {
