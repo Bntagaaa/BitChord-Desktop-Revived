@@ -9217,14 +9217,19 @@ internal fun Modifier.desktopBarGlass(
         allowBlur = DesktopAppearanceSettings.blurEnabled(area),
     ).border(0.5.dp, DesktopBarEdge, shape)
 
-/** Dense glass shared by desktop context menus and the account selector. */
+/**
+ * Menu glass shares Quick Search's exact frosted material, including tint,
+ * noise, blur radius and edge. Keep its separate MENUS_POPUPS blur preference:
+ * disabling Quick Search's blur must not unexpectedly disable every menu.
+ * DesktopMenuGlass owns only the visual surface, never menu dimensions.
+ */
 @Composable
-internal fun Modifier.desktopMenuGlass(shape: Shape, tintAlpha: Float = 0.82f): Modifier =
+internal fun Modifier.desktopMenuGlass(shape: Shape, tintAlpha: Float = 0.55f): Modifier =
     clip(shape).desktopFrosted(
-        DesktopCardFill,
+        DesktopBarGlass,
         tintAlpha = tintAlpha,
         allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.MENUS_POPUPS),
-    ).border(0.5.dp, DesktopCardEdge, shape)
+    ).border(0.5.dp, DesktopBarEdge, shape)
 
 /** The edge of a chrome pane that meets the page, and so has to dissolve into it. */
 internal enum class DesktopChromeEdge { NONE, BOTTOM, END }

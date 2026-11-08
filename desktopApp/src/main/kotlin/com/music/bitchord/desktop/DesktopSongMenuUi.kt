@@ -506,7 +506,7 @@ internal fun DesktopMenuSurface(onDismiss: () -> Unit, modifier: Modifier = Modi
 @Composable
 private fun MenuCard(menuScrollState: androidx.compose.foundation.ScrollState, modifier: Modifier, content: @Composable () -> Unit) {
     val shape = RoundedCornerShape(16.dp)
-    Box(modifier.widthIn(min = 276.dp, max = 306.dp).desktopMenuGlass(shape, tintAlpha = 0.82f)) {
+    Box(modifier.widthIn(min = 276.dp, max = 306.dp).desktopMenuGlass(shape)) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -586,7 +586,7 @@ private fun DesktopMenuDivider() {
     HorizontalDivider(
         Modifier.padding(vertical = 3.dp),
         thickness = 0.5.dp,
-        color = DesktopCardEdge,
+        color = DesktopBarEdge,
     )
 }
 
@@ -601,10 +601,15 @@ private fun DesktopMenuQuickAction(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val hoverFill by animateColorAsState(
+        targetValue = if (hovered) DesktopForeground.copy(alpha = 0.09f) else Color.Transparent,
+        animationSpec = tween(durationMillis = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 170),
+        label = "desktop-menu-quick-action-hover",
+    )
     Column(
         modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(if (hovered) DesktopRowHover else Color.Transparent)
+            .background(hoverFill)
             .hoverable(interaction)
             .clickable(onClick = onClick)
             .heightIn(min = 52.dp)
@@ -636,8 +641,8 @@ private fun DesktopMenuRow(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val hoverColor by animateColorAsState(
-        targetValue = if (hovered && enabled) DesktopRowHover else Color.Transparent,
-        animationSpec = tween(durationMillis = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 140),
+        targetValue = if (hovered && enabled) DesktopForeground.copy(alpha = 0.09f) else Color.Transparent,
+        animationSpec = tween(durationMillis = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 170),
         label = "desktop-context-menu-hover",
     )
     Row(

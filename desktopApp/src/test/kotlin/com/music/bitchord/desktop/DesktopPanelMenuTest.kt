@@ -192,6 +192,8 @@ class DesktopPanelMenuTest {
             val before = compose.onNodeWithTag("player").fetchSemanticsNode().boundsInRoot
             val anchor = compose.onNodeWithTag("anchor").fetchSemanticsNode().boundsInRoot
             compose.onNodeWithTag("anchor").performMouseInput { click(center) }
+            compose.mainClock.advanceTimeBy(260)
+            compose.waitForIdle()
             val after = compose.onNodeWithTag("player").fetchSemanticsNode().boundsInRoot
             val menu = compose.onNodeWithTag("menu").fetchSemanticsNode().boundsInRoot
             assertEquals(before, after, "Opening the menu must not consume the player's layout space")
@@ -214,6 +216,8 @@ class DesktopPanelMenuTest {
             }
             if (edge) compose.onNodeWithTag("menu").performKeyInput { pressKey(Key.Escape) }
             else compose.onNodeWithText("Action").performMouseInput { click(center) }
+            compose.mainClock.advanceTimeBy(240)
+            compose.waitForIdle()
             compose.onNodeWithTag("menu").assertDoesNotExist()
             compose.runOnIdle {
                 assertEquals(if (edge) 0 else 1, actions)

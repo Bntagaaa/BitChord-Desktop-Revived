@@ -1,5 +1,8 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -7,11 +10,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -73,16 +84,60 @@ internal data class DesktopMenuPortalEntry(
 
 internal val LocalDesktopMenuPortal = staticCompositionLocalOf<DesktopMenuPortalState?> { null }
 
+/**
+ * Anchor-aware compact-menu motion. Only the popup's draw layer changes during
+ * the transition: measured dimensions, pointer targets and layout stay intact.
+ */
+internal object DesktopContextMenuMotion {
+    const val OPEN_MS = 190
+    const val CLOSE_MS = 145
+    private const val INITIAL_SCALE = 0.94f
+
+    fun scale(progress: Float, reduceMotion: Boolean): Float =
+        if (reduceMotion) 1f else INITIAL_SCALE + (1f - INITIAL_SCALE) * progress.coerceIn(0f, 1f)
+
+    fun scrimAlpha(progress: Float, dark: Boolean): Float =
+        progress.coerceIn(0f, 1f) * if (dark) 0.16f else 0.10f
+}
+
+/**
+ * An action disposes its menu immediately, but the portal retains its content
+ * long enough to animate out. A transparent hit target protects against double
+ * actions during the exit; after it completes the content is released.
+ *
+ * Haze samples only the card from the page behind it. The dimming scrim draws
+ * a solid rectangle and adds no full-screen offscreen texture.
+ */
 @Composable
 internal fun DesktopMenuPortal(state: DesktopMenuPortalState) {
-    val entry = state.entry.value ?: return
-    val focusRequester = remember(entry.owner) { FocusRequester() }
-    LaunchedEffect(entry.owner) { focusRequester.requestFocus() }
+    val active = state.entry.value
+    var retained by remember { mutableStateOf<DesktopMenuPortalEntry?>(null) }
+    if (active != null) SideEffect { retained = active }
+    val shown = active ?: retained ?: return
+    val reduceMotion by DesktopAppearanceSettings.reduceAnimation.collectAsState()
+    val progress = remember { Animatable(0f) }
+
+    LaunchedEffect(active?.owner, active != null, reduceMotion) {
+        if (active != null) {
+            if (reduceMotion) progress.snapTo(1f)
+            else progress.animateTo(1f, tween(DesktopContextMenuMotion.OPEN_MS, easing = FastOutSlowInEasing))
+        } else {
+            if (reduceMotion) progress.snapTo(0f)
+            else progress.animateTo(0f, tween(DesktopContextMenuMotion.CLOSE_MS, easing = FastOutSlowInEasing))
+            if (state.entry.value == null) retained = null
+        }
+    }
+
+    val focusRequester = remember(shown.owner) { FocusRequester() }
+    LaunchedEffect(active?.owner) {
+        if (active != null) focusRequester.requestFocus()
+    }
+    val dark = DesktopTheme.isDark
     Box(
         Modifier.fillMaxSize().focusRequester(focusRequester)
             .onPreviewKeyEvent {
-                if (it.key == Key.Escape && it.type == KeyEventType.KeyDown) {
-                    entry.onDismiss()
+                if (active != null && it.key == Key.Escape && it.type == KeyEventType.KeyDown) {
+                    active.onDismiss()
                     true
                 } else false
             }.focusable(),
@@ -90,11 +145,15 @@ internal fun DesktopMenuPortal(state: DesktopMenuPortalState) {
         val density = LocalDensity.current
         Box(
             Modifier.fillMaxSize()
+                .drawBehind {
+                    drawRect(Color.Black.copy(alpha = DesktopContextMenuMotion.scrimAlpha(progress.value, dark)))
+                }
                 .focusProperties { canFocus = false }
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) { entry.onDismiss() }
+                    enabled = active != null,
+                ) { active?.onDismiss() }
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
@@ -105,22 +164,51 @@ internal fun DesktopMenuPortal(state: DesktopMenuPortalState) {
                 },
         )
         val margin = with(density) { 12.dp.roundToPx() }
-        Layout(content = entry.content, modifier = Modifier.fillMaxSize()) { measurables, constraints ->
+        Layout(
+            content = {
+                Box {
+                    shown.content()
+                    if (active == null) {
+                        Box(
+                            Modifier.matchParentSize().clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {},
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        ) { measurables, constraints ->
             val child = measurables.first().measure(constraints.copy(
                 minWidth = 0,
                 minHeight = 0,
                 maxWidth = (constraints.maxWidth - 2 * margin).coerceAtLeast(0),
                 maxHeight = (constraints.maxHeight - 2 * margin).coerceAtLeast(0),
             ))
-            val anchor = entry.anchor.translate(-state.originInRoot)
+            val anchor = shown.anchor.translate(-state.originInRoot)
             val below = anchor.bottom.roundToInt() + margin
             val above = anchor.top.roundToInt() - child.height - margin
-            val y = if (below + child.height + margin <= constraints.maxHeight || above < margin) below else above
+            val placeAbove = below + child.height + margin > constraints.maxHeight && above >= margin
+            val y = if (placeAbove) above else below
             val x = anchor.left.roundToInt().coerceIn(
                 margin, (constraints.maxWidth - child.width - margin).coerceAtLeast(margin),
             )
+            val finalY = y.coerceIn(
+                margin, (constraints.maxHeight - child.height - margin).coerceAtLeast(margin),
+            )
+            val pivotX = if (anchor.center.x > constraints.maxWidth * 0.5f) 1f else 0f
             layout(constraints.maxWidth, constraints.maxHeight) {
-                child.place(x, y.coerceIn(margin, (constraints.maxHeight - child.height - margin).coerceAtLeast(margin)))
+                child.placeWithLayer(x, finalY) {
+                    val p = progress.value.coerceIn(0f, 1f)
+                    alpha = p
+                    val scale = DesktopContextMenuMotion.scale(p, reduceMotion)
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(pivotX, if (placeAbove) 1f else 0f)
+                    // A direct layer alpha; no extra full-screen framebuffer.
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                }
             }
         }
     }
