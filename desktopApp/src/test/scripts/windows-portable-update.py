@@ -50,6 +50,17 @@ def digest(file: Path) -> str:
     return hashlib.sha256(file.read_bytes()).hexdigest()
 
 
+def verify_working_directory(target: Path, report: Path) -> None:
+    observed = (target / "working-directory.txt").read_text()
+    evidence = {"requested_directory": str(target), "observed_directory": observed}
+    try:
+        evidence["same_directory"] = os.path.samefile(observed, target)
+    except OSError as error:
+        evidence.update(same_directory=False, identity_error=str(error))
+    report.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    assert evidence["same_directory"], "The application's working directory differs: " + json.dumps(evidence)
+
+
 def verify_worker_hashes(directory: Path, reports: Path) -> None:
     """Execute only each real worker's hash function; never run the installed updater."""
     binary = directory / "binary hash [test].bin"
@@ -117,7 +128,7 @@ try {
                                 env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=30)
     assert result.returncode == 0, output.read_text(encoding="utf-8-sig", errors="replace")
     assert (target / "ready").read_text().splitlines() == [token, VERSION], "startup environment must reach the application"
-    assert os.path.normcase((target / "working-directory.txt").read_text()) == os.path.normcase(str(target))
+    verify_working_directory(target, reports / "installed-app-working-directory.json")
     print("PASS installed application literal path + working directory + inherited startup environment", flush=True)
 
 
@@ -240,7 +251,7 @@ def scenario(workspace: Path, executable: Path, case: str, reports: Path) -> Non
             assert VERSION in (target / "app/BitChordReworked.cfg").read_text()
             assert "1.9.1-reworked.1" in (backup / "app/BitChordReworked.cfg").read_text()
             assert not failed.exists()
-        assert os.path.normcase((target / "working-directory.txt").read_text()) == os.path.normcase(str(target))
+        verify_working_directory(target, reports / (case + "-working-directory.json"))
         print("PASS", "portable early-crash rollback" if crash else "portable replacement + previous backup")
     except BaseException:
         failure = traceback.format_exc()
