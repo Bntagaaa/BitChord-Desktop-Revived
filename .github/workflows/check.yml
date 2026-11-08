@@ -56,6 +56,9 @@ jobs:
       - name: Build the distributable
         run: ./gradlew :desktopApp:createDistributable "-Pbitchord.version=test-visua"
 
+      - name: Verify packaged player matches compiled UI
+        run: python3 .github/scripts/check-packaged-player-ui.py desktopApp/build/compose/binaries/main/app/BitChord
+
       - name: Linux packaged AutoMix JNI and model regression
         run: bash desktopApp/packaging/tests/linux-automix-check.sh
 
@@ -156,6 +159,9 @@ jobs:
 
       - name: Build the distributable
         run: .\gradlew.bat :desktopApp:createDistributable "-Pbitchord.version=test-visua"
+
+      - name: Verify packaged player matches compiled UI
+        run: python .github/scripts/check-packaged-player-ui.py desktopApp/build/compose/binaries/main/app/BitChord
 
       - name: Windows packaged AutoMix JNI and dependency regression
         shell: pwsh
