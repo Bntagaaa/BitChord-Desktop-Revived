@@ -5,8 +5,8 @@ import kotlin.test.assertEquals
 
 class DesktopContextMenuMotionTest {
     @Test fun popupScaleIsBounded() {
-        assertEquals(0.94f, DesktopContextMenuMotion.scale(0f, false), 0.00001f)
-        assertEquals(0.97f, DesktopContextMenuMotion.scale(0.5f, false), 0.00001f)
+        assertEquals(0.30f, DesktopContextMenuMotion.scale(0f, false), 0.00001f)
+        assertEquals(0.65f, DesktopContextMenuMotion.scale(0.5f, false), 0.00001f)
         assertEquals(1f, DesktopContextMenuMotion.scale(1f, false), 0.00001f)
         assertEquals(1f, DesktopContextMenuMotion.scale(1.5f, false), 0.00001f)
     }
@@ -25,6 +25,6 @@ class DesktopContextMenuMotionTest {
 
     @Test fun animationDurationsAreCompact() {
         assertEquals(190, DesktopContextMenuMotion.OPEN_MS)
-        assertEquals(145, DesktopContextMenuMotion.CLOSE_MS)
+        assertEquals(170, DesktopContextMenuMotion.CLOSE_MS)
     }
 }

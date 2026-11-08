@@ -8110,6 +8110,9 @@ private fun DesktopSettingsScreen(
                     if (settingsRowVisible("Graphics profile & blur", "Graphics profile, reduce dynamic blur and customize blur")) {
                         DesktopUnifiedGraphicsAndBlurSettings()
                     }
+                    if (settingsRowVisible("Context menu glass", "Temporary opacity and blur debug sliders")) {
+                        DesktopMenuDebugSettings()
+                    }
                     if (DesktopSidebarMica.isSupported) {
                         val micaSidebar by DesktopAppearanceSettings.micaSidebar.collectAsState()
                         SettingsToggle(
@@ -9224,12 +9227,15 @@ internal fun Modifier.desktopBarGlass(
  * DesktopMenuGlass owns only the visual surface, never menu dimensions.
  */
 @Composable
-internal fun Modifier.desktopMenuGlass(shape: Shape, tintAlpha: Float = 0.55f): Modifier =
-    clip(shape).desktopFrosted(
-        DesktopBarGlass,
-        tintAlpha = tintAlpha,
+internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier {
+    val tint by DesktopMenuTuning.tintAlpha.collectAsState()
+    val blur by DesktopMenuTuning.blurRadiusDp.collectAsState()
+    return clip(shape).desktopFrosted(
+        DesktopBarGlass, tintAlpha = tint,
         allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.MENUS_POPUPS),
+        blurRadius = blur.dp,
     ).border(0.5.dp, DesktopBarEdge, shape)
+}
 
 /** The edge of a chrome pane that meets the page, and so has to dissolve into it. */
 internal enum class DesktopChromeEdge { NONE, BOTTOM, END }
@@ -9276,6 +9282,7 @@ private fun Modifier.desktopFrosted(
     allowBlur: Boolean,
     edge: DesktopChromeEdge = DesktopChromeEdge.NONE,
     fade: Float = 0f,
+    blurRadius: Dp = 30.dp,
 ): Modifier {
     val haze = LocalDesktopHaze.current
     if (haze == null || !allowBlur) {
@@ -9286,7 +9293,7 @@ private fun Modifier.desktopFrosted(
         // Spelled out rather than taken from a preset.
         blurEnabled = true
         backgroundColor = DesktopTheme.palette.chromeSurface
-        blurRadius = 30.dp
+        this.blurRadius = blurRadius
         // Dark enough that white text on the pane always wins, translucent enough that the
         // colour of what is behind it still comes through.
         tints = listOf(HazeTint(DesktopTheme.palette.chromeSurface.copy(alpha = tintAlpha)))

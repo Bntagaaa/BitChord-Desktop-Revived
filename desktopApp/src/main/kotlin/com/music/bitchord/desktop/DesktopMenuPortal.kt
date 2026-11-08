@@ -3,6 +3,7 @@ package com.music.bitchord.desktop
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -90,8 +91,8 @@ internal val LocalDesktopMenuPortal = staticCompositionLocalOf<DesktopMenuPortal
  */
 internal object DesktopContextMenuMotion {
     const val OPEN_MS = 190
-    const val CLOSE_MS = 145
-    private const val INITIAL_SCALE = 0.94f
+    const val CLOSE_MS = 170
+    private const val INITIAL_SCALE = 0.30f
 
     fun scale(progress: Float, reduceMotion: Boolean): Float =
         if (reduceMotion) 1f else INITIAL_SCALE + (1f - INITIAL_SCALE) * progress.coerceIn(0f, 1f)
@@ -120,7 +121,7 @@ internal fun DesktopMenuPortal(state: DesktopMenuPortalState) {
     LaunchedEffect(active?.owner, active != null, reduceMotion) {
         if (active != null) {
             if (reduceMotion) progress.snapTo(1f)
-            else progress.animateTo(1f, tween(DesktopContextMenuMotion.OPEN_MS, easing = FastOutSlowInEasing))
+            else progress.animateTo(1f, spring(dampingRatio = 1f, stiffness = 470f))
         } else {
             if (reduceMotion) progress.snapTo(0f)
             else progress.animateTo(0f, tween(DesktopContextMenuMotion.CLOSE_MS, easing = FastOutSlowInEasing))
