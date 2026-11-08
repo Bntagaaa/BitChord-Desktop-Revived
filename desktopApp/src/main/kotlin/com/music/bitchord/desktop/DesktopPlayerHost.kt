@@ -12,6 +12,7 @@ import com.music.bitchord.data.lyrics.LyricsTranslation
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AudioQuality
 import com.music.bitchord.data.settings.LastPlayerScreen
+import com.music.bitchord.data.settings.PlayerTheme
 import com.music.bitchord.data.settings.MixBlend
 import com.music.bitchord.data.settings.SmartAnalysis
 import com.music.bitchord.data.settings.TransitionWindow
@@ -52,6 +53,7 @@ internal object DesktopPlayerHost : PlayerHost {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override val settings: DesktopPlayerSettings = DesktopPlayerSettings
+    override val mobileTextChrome: Boolean = true
 
     var mixViewOpen: (Boolean) -> Unit = {}
     override fun onMixViewOpen(open: Boolean) = mixViewOpen(open)
@@ -216,6 +218,7 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
             .getOrDefault(LastPlayerScreen.MAIN),
     )
     override val legacyMeshGradient = MutableStateFlow(false)
+    override val playerTheme = DesktopPlayerThemeSettings.theme
     override val lyricsBlur = MutableStateFlow(true)
     override val lyricsOffsetMs = MutableStateFlow(
         persistence.int(KEY_LYRICS_OFFSET, 0).coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS),

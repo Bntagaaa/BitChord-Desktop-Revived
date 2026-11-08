@@ -333,6 +333,7 @@ import com.music.bitchord.data.model.isSameTrackAs
 import com.music.bitchord.data.model.withoutRepeatsOf
 import com.music.bitchord.data.settings.AutomixPerformanceMode
 import com.music.bitchord.data.settings.LastPlayerScreen
+import com.music.bitchord.data.settings.PlayerTheme
 import com.music.bitchord.data.settings.SmartAnalysis
 import com.music.bitchord.data.settings.TrackAnalysisState
 import com.music.bitchord.data.settings.TransitionWindow
@@ -730,8 +731,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var dolbyAtmos by remember { mutableStateOf(persistence.boolean("dolby_atmos", true)) }
     var skipSilence by remember { mutableStateOf(persistence.boolean("skip_silence", false)) }
     var outputPrecision by remember { mutableStateOf(persistence.string("output_precision", "PCM_16")) }
-    // The blob backdrop the mesh replaced, kept as an opt-out.
-    var legacyMeshGradient by remember { mutableStateOf(persistence.boolean("legacy_mesh_gradient", false)) }
     var animatedCanvas by remember { mutableStateOf(persistence.boolean("animated_canvas", true)) }
     var spotifyCanvasCookie by remember { mutableStateOf(DesktopSpotifyToken.cookie()) }
     var spotifyPlaylists by remember { mutableStateOf<List<SpotifyPlaylist>>(emptyList()) }
@@ -3379,7 +3378,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         DesktopPlayerHost.videoSpeed = playbackSpeed
         DesktopPlayerSettings.animatedCanvas.value = animatedCanvas
         DesktopPlayerSettings.fullBleedArtwork.value = fullBleedArtwork
-        DesktopPlayerSettings.legacyMeshGradient.value = legacyMeshGradient
         DesktopPlayerSettings.lyricsBlur.value = lyricsBlur
         DesktopPlayerSettings.syncedLyrics.value = syncedLyrics
         DesktopPlayerSettings.showNerdStats.value = showNerdStats
@@ -4731,11 +4729,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                     onFullBleedArtworkChange = {
                                         fullBleedArtwork = it
                                         persistence.saveBoolean("full_bleed_artwork", it)
-                                    },
-                                    legacyMeshGradient = legacyMeshGradient,
-                                    onLegacyMeshGradientChange = {
-                                        legacyMeshGradient = it
-                                        persistence.saveBoolean("legacy_mesh_gradient", it)
                                     },
                                     spatialAudio = spatialAudio,
                                     onSpatialAudioChange = {
@@ -7577,8 +7570,6 @@ private fun DesktopSettingsScreen(
     onShowNerdStatsChange: (Boolean) -> Unit,
     fullBleedArtwork: Boolean,
     onFullBleedArtworkChange: (Boolean) -> Unit,
-    legacyMeshGradient: Boolean,
-    onLegacyMeshGradientChange: (Boolean) -> Unit,
     trayIconEnabled: Boolean,
     closeToTray: Boolean,
     onCloseToTrayChange: (Boolean) -> Unit,
@@ -8171,12 +8162,58 @@ private fun DesktopSettingsScreen(
                         fullBleedArtwork,
                         onFullBleedArtworkChange,
                     )
-                    SettingsToggle(
-                        DesktopStrings["legacy_mesh_gradient", "Legacy mesh gradient"],
-                        DesktopStrings["d_use_the_older_blob_backdrop_behind_the_player", "Use the older blob backdrop behind the player"],
-                        legacyMeshGradient,
-                        onLegacyMeshGradientChange,
-                    )
+                    // Like the mobile segmented setting; preserve all three backdrop implementations.
+                    val playerTheme by DesktopPlayerThemeSettings.theme.collectAsState()
+                    if (settingsRowVisible("Player theme", "Default Legacy Simple background mesh gradient blur")) {
+                        val playerThemeDescription = when (playerTheme) {
+                            PlayerTheme.DEFAULT -> "The cover's own colours carry on below it."
+                            PlayerTheme.LEGACY -> "Animated colours from the cover drift behind the player."
+                            PlayerTheme.SIMPLE -> "A soft blur of the cover fills the player."
+                        }
+                        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                            Text("Player theme", fontWeight = FontWeight.Medium)
+                            Text(
+                                playerThemeDescription,
+                                color = DesktopSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(if (DesktopTheme.isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.08f))
+                                    .padding(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                PlayerTheme.entries.forEach { option ->
+                                    val selected = playerTheme == option
+                                    val optionLabel = when (option) {
+                                        PlayerTheme.DEFAULT -> "Default"
+                                        PlayerTheme.LEGACY -> "Legacy"
+                                        PlayerTheme.SIMPLE -> "Simple"
+                                    }
+                                    Box(
+                                        modifier = Modifier.weight(1f)
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(
+                                                if (selected) {
+                                                    if (DesktopTheme.isDark) Color.White.copy(alpha = 0.24f) else Color.White
+                                                } else Color.Transparent,
+                                            )
+                                            .clickable { DesktopPlayerThemeSettings.setTheme(option) }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            optionLabel,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                     SettingsToggle(
                         DesktopStrings["d_animated_canvas", "Animated canvas"],
                         DesktopStrings["d_show_motion_artwork_when_it_is_available", "Show motion artwork when it is available"],
