@@ -95,7 +95,7 @@ internal fun MobileLocalLibrary(session: MobileSession, downloaded: Boolean, onM
     fun toggle(song: Song) { selection = if (song.videoId in selection) selection - song.videoId else selection + song.videoId }
     fun open(group: LocalGroup) { chosenGroup = group.browseId; query = ""; selection = emptySet() }
     fun play(rows: List<Song>, index: Int = 0) {
-        session.player.playSongs(rows.map { it.copy(playbackSource = group?.title ?: title) }, index)
+        session.player.playSongs(rows.map { it.copy(playbackSource = group?.title ?: title, playbackSourceType = com.music.bitchord.data.model.PlaybackSourceType.BROWSE, playbackSourceId = group?.browseId ?: folderId) }, index)
     }
 
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

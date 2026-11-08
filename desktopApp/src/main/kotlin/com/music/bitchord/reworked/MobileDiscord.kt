@@ -186,7 +186,9 @@ internal class MobileDiscordService(
     private val worker = scope.launch {
         try {
             combine(playback, settings, ::Snapshot).distinctUntilChangedBy { it.key }.collectLatest { current ->
-                val desiredToken = current.settings.token.takeIf { current.settings.enabled && it.isNotBlank() }
+                val desiredToken = current.settings.token.takeIf {
+                    !OfflineSmoke.active && current.settings.enabled && it.isNotBlank()
+                }
                 if (desiredToken != activeToken) {
                     retire()
                     activeToken = desiredToken
@@ -194,7 +196,8 @@ internal class MobileDiscordService(
                 }
                 val connection = gateway
                 if (connection == null) {
-                    mutableStatus.value = if (current.settings.token.isBlank()) "Connect an account to share your music" else "Presence is off"
+                    mutableStatus.value = if (OfflineSmoke.active) "Presence is unavailable during the offline app check"
+                        else if (current.settings.token.isBlank()) "Connect an account to share your music" else "Presence is off"
                     return@collectLatest
                 }
                 val card = discordPresence(current.playback, current.settings, System.currentTimeMillis())

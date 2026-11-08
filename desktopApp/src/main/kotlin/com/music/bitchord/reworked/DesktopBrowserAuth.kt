@@ -36,6 +36,7 @@ internal object DesktopBrowserAuth {
     }
 
     private fun start() {
+        OfflineSmoke.requireNetwork()
         if (!started.compareAndSet(false, true)) return
         CookieHandler.setDefault(cookies)
         val initialize = Runnable { JFXPanel(); Platform.setImplicitExit(false) }
@@ -47,11 +48,30 @@ internal object DesktopBrowserAuth {
         }
     }
 
-    fun youtube(onConnected: (String) -> Unit) = signIn("YouTube Music", "https://music.youtube.com", "youtube.com") { values ->
-        require(values.contains("SAPISID=")) { "Finish signing in to YouTube Music first" }
-        DesktopStore.writeText("youtube-cookie.txt", values)
-        onConnected(values)
+    fun youtubeSession(
+        mode: YouTubeSessionMode = YouTubeSessionMode.SIGN_IN,
+        accountId: String? = MobileYouTubeAccounts.state.value.activeAccountId,
+        onConnected: () -> Unit = {},
+        onError: (String) -> Unit = { message -> SwingUtilities.invokeLater {
+            javax.swing.JOptionPane.showMessageDialog(null, message, "YouTube Music account", javax.swing.JOptionPane.INFORMATION_MESSAGE)
+        } },
+    ) {
+        scope.launch {
+            try {
+                MobileYouTubeAccounts.restore().getOrThrow()
+                start()
+                val snapshot = if (mode == YouTubeSessionMode.SWITCH_CHANNEL) {
+                    accountId?.let { MobileYouTubeAccounts.browserSnapshot(it) }
+                        ?: error("Select a saved Google account before choosing its channel")
+                } else null
+                DesktopYouTubeBrowser.launch(cookies, mode, snapshot, scope, onConnected, onError)
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) { onError(error.message ?: "Could not open the YouTube Music account window") }
+        }
     }
+
+    /** Local Google/YouTube browser data only; never contacts Google's logout endpoint. */
+    internal fun clearGoogleSession() = DesktopYouTubeBrowser.clearGoogleCookies(cookies)
 
     fun spotify(onConnected: () -> Unit) = signIn("Spotify", "https://open.spotify.com", "spotify.com") { _ ->
         val value = cookies.cookieStore.cookies.firstOrNull { it.name == "sp_dc" && !it.hasExpired() }?.value

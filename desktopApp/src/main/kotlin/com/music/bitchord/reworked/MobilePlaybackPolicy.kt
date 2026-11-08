@@ -12,10 +12,14 @@ internal object MobilePlaybackPolicy {
     val preferMusicOnly = MutableStateFlow(DesktopStore.preferences.getBoolean("prefer_music_only", false))
     fun setPreferMusicOnly(value: Boolean) { preferMusicOnly.value = value; DesktopStore.preferences.putBoolean("prefer_music_only", value) }
     suspend fun prepare(song: Song): Song {
-        if (!preferMusicOnly.value || !song.isVideo || song.localUri != null || ListenTogether.state.value.inParty) return song
-        val audio = try { withTimeoutOrNull(15_000) { YtMusicRepository.resolveAudio(song) } ?: song }
+        if (OfflineSmoke.active || !preferMusicOnly.value || !song.isVideo || song.localUri != null || song.localPath != null || ListenTogether.state.value.inParty) return song
+        val revision = MobileYouTubeAccounts.state.value.revision
+        val audio = try { withTimeoutOrNull(15_000) {
+            MobileYouTubeAccounts.withListener(revision) { YtMusicRepository.resolveAudio(song) }
+        } ?: song }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { song }
+        if (revision != MobileYouTubeAccounts.state.value.revision) throw CancellationException("The YouTube profile changed during the audio lookup")
         return audio.copy(isVideoOrigin = audio.isVideo, queueTier = song.queueTier, queueEntryId = song.queueEntryId,
             radioName = song.radioName, playbackSource = song.playbackSource, playbackSourceType = song.playbackSourceType, playbackSourceId = song.playbackSourceId)
     }

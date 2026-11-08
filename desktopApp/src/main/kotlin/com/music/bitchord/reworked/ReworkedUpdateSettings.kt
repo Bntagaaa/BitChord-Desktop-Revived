@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun ReworkedUpdateSettings(onExitForUpdate: (() -> Unit)? = null) {
+    if (OfflineSmoke.active) { Text("Updates are disabled in the offline smoke test."); return }
     var open by remember { mutableStateOf(false) }
     val state by ReworkedUpdates.status.collectAsState()
     val previews by ReworkedUpdates.previews.collectAsState()

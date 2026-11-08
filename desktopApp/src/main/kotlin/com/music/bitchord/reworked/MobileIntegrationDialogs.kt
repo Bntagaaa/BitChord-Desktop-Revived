@@ -33,6 +33,12 @@ import javax.swing.filechooser.FileNameExtensionFilter
 /** New desktop presentation of the original mobile room and membership state. */
 @Composable
 internal fun MobileListenTogetherDialog(integrations: MobileIntegrations, onDismiss: () -> Unit) {
+    if (OfflineSmoke.active) {
+        IntegrationDialog("Listen Together", onDismiss) {
+            Text("Listen Together is unavailable during the offline app check. Restart normally to connect to a party.")
+        }
+        return
+    }
     val party by integrations.party.collectAsState()
     val busy by integrations.busy.collectAsState()
     val message by integrations.message.collectAsState()
@@ -54,7 +60,7 @@ internal fun MobileListenTogetherDialog(integrations: MobileIntegrations, onDism
             Text("Share a queue and listen in sync with up to five signed-in devices.")
             if (!signedIn) {
                 Text("Connect YouTube Music to create or join a party.", color = MaterialTheme.colorScheme.primary)
-                OutlinedButton(onClick = { DesktopBrowserAuth.youtube(integrations.session::connected) }) { Text("Sign in to YouTube Music") }
+                OutlinedButton(onClick = { integrations.session.signIn() }) { Text("Sign in to YouTube Music") }
             }
             OutlinedTextField(nickname, { nickname = it.take(80) }, label = { Text("Nickname (optional)") },
                 singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -147,6 +153,12 @@ internal fun MobileListenTogetherDialog(integrations: MobileIntegrations, onDism
 
 @Composable
 internal fun MobileScrobbleDialog(integrations: MobileIntegrations, onDismiss: () -> Unit) {
+    if (OfflineSmoke.active) {
+        IntegrationDialog("Scrobbling", onDismiss) {
+            Text("Account connections and scrobbling are unavailable during the offline app check. Local Replay history remains available.")
+        }
+        return
+    }
     val settings by MobileIntegrationSettings.values.collectAsState()
     val busy by integrations.busy.collectAsState()
     val message by integrations.message.collectAsState()

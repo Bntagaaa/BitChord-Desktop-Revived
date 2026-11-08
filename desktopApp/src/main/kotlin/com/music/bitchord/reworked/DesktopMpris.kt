@@ -115,8 +115,7 @@ internal class DesktopMpris(
             }
             "LoopStatus" -> {
                 val requested = when (unwrapped) { "None" -> 0; "Track" -> 1; "Playlist" -> 2; else -> throw InvalidMethodArgument("Invalid loop status") }
-                val steps = (requested - player.state.value.repeat + 3) % 3
-                repeat(steps) { player.cycleRepeat() }
+                player.setRepeat(requested)
             }
             else -> throw PropertyReadOnly(propertyName)
         }

@@ -31,12 +31,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.URI
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -82,6 +85,7 @@ sealed interface PlaybackCommand {
     data object Clear : PlaybackCommand
     data object ToggleShuffle : PlaybackCommand
     data object CycleRepeat : PlaybackCommand
+    data class SetRepeat(val mode: Int) : PlaybackCommand
     data class SetSpeed(val speed: Float) : PlaybackCommand
 }
 
@@ -147,9 +151,10 @@ class DesktopPlayback(
 ) : AutoCloseable {
     private val lock = Any()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val audioWorker = Executors.newFixedThreadPool(2) { work ->
+    private val audioExecutor = Executors.newFixedThreadPool(2) { work ->
         Thread(work, "Reworked-Playback").apply { isDaemon = true }
-    }.asCoroutineDispatcher()
+    }
+    private val audioWorker = audioExecutor.asCoroutineDispatcher()
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
     private val _mixUi = MutableStateFlow(MixUiState())
@@ -426,6 +431,14 @@ class DesktopPlayback(
         _state.value = _state.value.copy(repeat = (_state.value.repeat + 1) % 3)
     }
 
+    /** Absolute external setting: a single intent even when a party owns transport changes. */
+    fun setRepeat(mode: Int) = synchronized(lock) {
+        val requested = mode.coerceIn(0, 2)
+        if (intercepted(PlaybackCommand.SetRepeat(requested)) || _state.value.repeat == requested) return@synchronized
+        cancelLoop(); cancelBlend()
+        _state.value = _state.value.copy(repeat = requested)
+    }
+
     fun addToQueue(song: Song) = synchronized(lock) {
         if (intercepted(PlaybackCommand.Add(song, false))) return@synchronized
         _state.value = _state.value.copy(queue = _state.value.queue + queueEntry(song))
@@ -496,12 +509,28 @@ class DesktopPlayback(
         )
     }
 
-    override fun close() = synchronized(lock) {
-        if (closed) return@synchronized
-        withRemoteCommands { clearQueue() }
-        closed = true
-        scope.cancel()
-        audioWorker.close()
+    override fun close() {
+        synchronized(lock) {
+            if (closed) return
+            withRemoteCommands { clearQueue() }
+            closed = true
+            scope.cancel()
+            audioWorker.close()
+        }
+        // Cancellation releases output writes and interrupts network reads, but native
+        // decoder handles are closed by their owning render/prepare jobs in finally.
+        // Wait outside the playback lock: those jobs may need it while retiring.
+        // In particular, Windows cannot replace/delete a local file until this ends.
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        try {
+            runBlocking {
+                withTimeoutOrNull(10_000) { scope.coroutineContext[Job]?.join() }
+            }
+            // Gapless handoff also schedules a plain executor task, outside the scope.
+            audioExecutor.awaitTermination((deadline - System.nanoTime()).coerceAtLeast(0), TimeUnit.NANOSECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
     /** Called with [lock] held. Changing generation retires both the resolver and the decoder. */
@@ -1153,6 +1182,7 @@ class DesktopPlayback(
                 line = output
                 val loopPcm = MobileLoopPcm(output.format, loopPort)
                 val silence = MobileSilence(output.format)
+                val silenceDiscontinuities = AudibleDiscontinuities()
                 val filters = (reusedFilters ?: MobileMixDsp(output.format, song.videoId)).also { dsp = it }
                 if (prepared == null) audio.configureOutput(output.format)
                 var speed = (_state.value.speed * tempoMultiplier).coerceIn(0.5f, 2f)
@@ -1191,6 +1221,7 @@ class DesktopPlayback(
                     if (seek >= 0) {
                         primed = null
                         silence.reset()
+                        silenceDiscontinuities.clear()
                         filters.reset()
                         output.flush()
                         audio.seek(seek)
@@ -1223,6 +1254,7 @@ class DesktopPlayback(
                     if (packet.timelineJumpFrames != 0L || silenceSkip != 0L) {
                         writePosition += (packet.timelineJumpFrames + silenceSkip * speed) * 1_000.0 / output.format.sampleRate
                         clock.mark(writtenFrames, writePosition, speed.toDouble())
+                        if (silenceSkip > 0) silenceDiscontinuities.mark(writtenFrames)
                     }
                     val pcm = packet.floats?.let { samples ->
                         filters.process(samples, packet.frames)
@@ -1244,6 +1276,12 @@ class DesktopPlayback(
                     writePosition += accepted * 1_000.0 / output.format.sampleRate * speed
                     if (accepted < frames && !stopped() && seekTo.get() < 0) error("The audio output stopped accepting samples")
                     position = clock.position(output.longFramePosition).toLong()
+                    if (silenceDiscontinuities.consume(output.longFramePosition)) synchronized(lock) {
+                        if (!stopped() && session === this) _state.value = _state.value.copy(
+                            positionMs = position.coerceAtLeast(0), sampledAtNanos = System.nanoTime(),
+                            discontinuity = _state.value.discontinuity + 1,
+                        )
+                    }
                     loopPort.positionUs = (clock.position(output.longFramePosition) * 1_000).roundToLong()
                     loopPort.positionNanos = System.nanoTime()
                     renderAheadMs = (writePosition - position).coerceAtLeast(0.0)
@@ -1410,5 +1448,17 @@ internal class AudioDeviceClock(private val sampleRate: Double) {
         while (segments.size > 1 && segments.elementAt(1).frame <= playedFrame) segments.removeFirst()
         val segment = segments.firstOrNull() ?: return 0.0
         return segment.milliseconds + (playedFrame - segment.frame).coerceAtLeast(0) * 1_000 / sampleRate * segment.speed
+    }
+}
+
+/** A skipped media interval is announced when its output boundary is heard, not when decoded. */
+internal class AudibleDiscontinuities {
+    private val frames = ArrayDeque<Long>()
+    fun mark(frame: Long) { if (frames.lastOrNull() != frame) frames.addLast(frame) }
+    fun clear() = frames.clear()
+    fun consume(playedFrame: Long): Boolean {
+        var changed = false
+        while (frames.firstOrNull()?.let { it <= playedFrame } == true) { frames.removeFirst(); changed = true }
+        return changed
     }
 }

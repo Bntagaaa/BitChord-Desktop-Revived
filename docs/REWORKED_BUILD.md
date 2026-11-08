@@ -58,9 +58,20 @@ Use `gradlew.bat` on Windows. A graphical desktop session is required for the wi
 
 A packaged launcher accepts `--check-platform` to verify the Java process and FFmpeg native loading without opening the application window. This smoke check does not exercise an output device or account authentication.
 
+For a local-only graphical smoke test, start the packaged launcher with `--offline-smoke /absolute/path/to/test.wav`. This explicit test mode creates a new empty temporary profile and a unique preferences node, does not restore accounts, and disables outbound catalog/lyrics/artwork/party initialization. The shared HTTP client rejects requests before its credential interceptor or transport runs. The window still uses the real mobile-derived screens and native local-file decoder; a same-name `.lrc` file can exercise timed lyrics. Do not use this mode as evidence that an online provider or login flow works. Normal launches do not enable this policy.
+
 ## Build application images and packages
 
 Build on the operating system the package is intended to run on.
+
+Finalize and verify the main application JAR in a separate invocation before packaging. CI applies this check so an incomplete or corrupt archive cannot become an installer:
+
+```sh
+./gradlew --no-daemon -Pbitchord.android=false :desktopApp:jar
+python3 .github/scripts/reworked_verify_image.py --archive desktopApp/build/libs/desktopApp-*.jar
+```
+
+On Windows, use `gradlew.bat` and `python`, and pass the produced JAR path to `--archive` (or use the Git Bash commands in CI).
 
 ```sh
 # Linux: bundled-runtime image/portable ZIP, DEB and RPM
@@ -73,6 +84,20 @@ Build on the operating system the package is intended to run on.
 ```
 
 The application image is created in `desktopApp/build/compose/binaries/main/app/BitChordReworked/`. Its launcher is `BitChordReworked.exe` on Windows and `bin/BitChordReworked` on Linux. Portable ZIPs are written to `desktopApp/build/distributions/`; they contain the complete application image and Java runtime. The `reworked-portable.marker` stays beside the launcher, at the Windows package root or the Linux `bin` directory.
+
+Validate the completed image and bundled launcher after packaging:
+
+```sh
+python3 .github/scripts/reworked_verify_image.py
+```
+
+On Linux, the native media-control wire test uses an isolated session bus and a paused synthetic queue. It does not resolve media or require a sound device:
+
+```sh
+dbus-run-session -- python3 desktopApp/src/test/scripts/mpris-wire-smoke.py
+```
+
+The fixture checks actual MPRIS properties, seeking, repeat/rate controls, errors, and release of the bus name. `dbus-daemon`, `dbus-bin`, and a JDK must be installed; environments that prohibit private Unix sockets cannot run this fixture locally.
 
 Linux AppImage packaging wraps that image with the original mobile icon and a new launcher:
 

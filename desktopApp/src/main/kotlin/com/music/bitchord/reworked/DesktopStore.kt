@@ -13,15 +13,18 @@ internal object DesktopStore {
     private val userDirectory get() = Path.of(System.getProperty("user.home"))
     private val windows get() = System.getProperty("os.name").contains("Windows", ignoreCase = true)
     val root: Path by lazy {
-        if (windows) environment("LOCALAPPDATA", userDirectory.resolve("AppData/Local")).resolve("BitChordReworked")
+        if (OfflineSmoke.active) checkNotNull(OfflineSmoke.profile).resolve("data")
+        else if (windows) environment("LOCALAPPDATA", userDirectory.resolve("AppData/Local")).resolve("BitChordReworked")
         else environment("XDG_DATA_HOME", userDirectory.resolve(".local/share")).resolve("bitchord-reworked")
     }
     val cache: Path by lazy {
-        if (windows) root.resolve("cache")
+        if (OfflineSmoke.active) checkNotNull(OfflineSmoke.profile).resolve("cache")
+        else if (windows) root.resolve("cache")
         else environment("XDG_CACHE_HOME", userDirectory.resolve(".cache")).resolve("bitchord-reworked")
     }
     val state: Path by lazy {
-        if (windows) root.resolve("state")
+        if (OfflineSmoke.active) checkNotNull(OfflineSmoke.profile).resolve("state")
+        else if (windows) root.resolve("state")
         else environment("XDG_STATE_HOME", userDirectory.resolve(".local/state")).resolve("bitchord-reworked")
     }
     val preferences: Preferences by lazy {

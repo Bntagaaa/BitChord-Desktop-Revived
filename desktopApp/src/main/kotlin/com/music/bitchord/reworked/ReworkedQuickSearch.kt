@@ -20,7 +20,9 @@ import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 
 /** Five mixed upstream results, with every action routed into the existing app queue/navigation. */
 @Composable
@@ -30,20 +32,29 @@ internal fun ReworkedQuickSearch(
     onBrowse: (BrowseItem) -> Unit,
     onFullSearch: (String) -> Unit,
 ) {
+    val listener by MobileYouTubeAccounts.state.collectAsState()
+    val revision = listener.revision
     var query by remember { mutableStateOf("") }
-    var rows by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
-    var selected by remember { mutableStateOf(0) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var rows by remember(revision) { mutableStateOf<List<SearchResult>>(emptyList()) }
+    var selected by remember(revision) { mutableStateOf(0) }
+    var loading by remember(revision) { mutableStateOf(false) }
+    var error by remember(revision) { mutableStateOf<String?>(null) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
-    LaunchedEffect(query) {
+    LaunchedEffect(query, revision) {
         rows = emptyList(); selected = 0; error = null
+        if (OfflineSmoke.active) { loading = false; error = "Online search is disabled in the offline smoke test"; return@LaunchedEffect }
         if (query.isBlank()) { loading = false; return@LaunchedEffect }
+        val term = query
         loading = true
         delay(250)
         try {
-            com.music.bitchord.data.YtMusicRepository.search(query, SearchFilter.ALL).fold(
+            val answer = MobileYouTubeAccounts.withListener(revision) {
+                com.music.bitchord.data.YtMusicRepository.search(term, SearchFilter.ALL)
+            }
+            currentCoroutineContext().ensureActive()
+            if (revision != MobileYouTubeAccounts.state.value.revision) return@LaunchedEffect
+            answer.fold(
                 onSuccess = { results ->
                     val first = results.take(5).toMutableList()
                     val playlist = results.firstOrNull { it is SearchResult.Browse && it.item.type == BrowseType.PLAYLIST }
@@ -55,6 +66,7 @@ internal fun ReworkedQuickSearch(
         } finally { loading = false }
     }
     fun activate(row: SearchResult) {
+        if (OfflineSmoke.active || revision != MobileYouTubeAccounts.state.value.revision) return
         onDismiss()
         when (row) {
             is SearchResult.TopTrack -> onPlay(row.song)
@@ -73,7 +85,7 @@ internal fun ReworkedQuickSearch(
                     Key.DirectionUp -> { selected = (selected - 1).coerceAtLeast(0); true }
                     Key.Enter -> {
                         val row = if (event.isShiftPressed) rows.firstOrNull { it is SearchResult.Track || it is SearchResult.TopTrack } else rows.getOrNull(selected)
-                        if (row != null) activate(row) else if (query.isNotBlank()) { onDismiss(); onFullSearch(query) }
+                        if (row != null) activate(row) else if (!OfflineSmoke.active && query.isNotBlank()) { onDismiss(); onFullSearch(query) }
                         true
                     }
                     else -> false
@@ -99,7 +111,7 @@ internal fun ReworkedQuickSearch(
                     }
                 }
                 if (!loading && query.isNotBlank() && rows.isEmpty() && error == null) Text("No results", Modifier.padding(8.dp))
-                TextButton(onClick = { onDismiss(); onFullSearch(query) }, enabled = query.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = { onDismiss(); onFullSearch(query) }, enabled = !OfflineSmoke.active && query.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
                     Text("Search all results  ·  Enter")
                 }
                 Text("↑ ↓ Choose    Shift+Enter Play first song    Esc Close", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

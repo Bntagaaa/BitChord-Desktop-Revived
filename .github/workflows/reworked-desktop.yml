@@ -41,7 +41,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm desktop-file-utils cmake g++
+          sudo apt-get install -y rpm desktop-file-utils cmake g++ dbus-daemon dbus-bin
           chmod +x gradlew
 
       - name: Compile and test the new desktop host and shared mobile code
@@ -74,6 +74,12 @@ jobs:
         shell: pwsh
         run: python desktopApp/src/test/scripts/windows-portable-update.py
 
+      - name: Finalize and verify the application archive
+        shell: bash
+        run: |
+          ./gradlew --no-daemon --stacktrace --console=plain -Pbitchord.android=false :desktopApp:jar
+          python .github/scripts/reworked_verify_image.py --archive desktopApp/build/libs/desktopApp-*.jar
+
       - name: Build desktop packages with their Java runtime
         shell: bash
         run: >-
@@ -83,6 +89,10 @@ jobs:
       - name: Verify the packaged JAR and bundled runtime
         shell: bash
         run: python .github/scripts/reworked_verify_image.py
+
+      - name: Check Linux media controls on a private session bus
+        if: runner.os == 'Linux'
+        run: dbus-run-session -- python3 desktopApp/src/test/scripts/mpris-wire-smoke.py
 
       - name: Build the Linux AppImage
         if: runner.os == 'Linux'
@@ -117,3 +127,5 @@ jobs:
             shared/build/reports/tests/
             sharedUi/build/reports/tests/
             desktopApp/build/reports/tests/
+            desktopApp/build/mpris-wire-tests/*.json
+            desktopApp/build/mpris-wire-tests/*.log

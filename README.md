@@ -7,6 +7,7 @@ The desktop product is **BitChordReworked**, with a separate application profile
 - [Feature coverage and verification boundaries](docs/REWORKED_FEATURES.md)
 - [Original-mobile source provenance](docs/REWORKED_PROVENANCE.md)
 - [Build, run, package and update instructions](docs/REWORKED_BUILD.md)
+- [Mobile account/profile port and session isolation](docs/REWORKED_ACCOUNTS.md)
 - [Windows/Linux build workflow](.github/workflows/reworked-desktop.yml)
 
 With JDK 21, CMake and a C++ toolchain installed, the Linux development entry points are:

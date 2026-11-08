@@ -38,6 +38,9 @@ import java.util.concurrent.atomic.AtomicLong
  */
 object Http {
 
+    /** Optional host policy. False rejects a call before credentials, DNS or a socket are used. */
+    @Volatile var networkAllowed: Boolean = true
+
     // ---- Temporary data-usage instrumentation --------------------------
     //
     // Added to answer, with real numbers instead of code-reading, which of
@@ -131,6 +134,10 @@ object Http {
     }
 
     val client: OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            if (!networkAllowed) throw java.io.IOException("Networking is disabled for this application run")
+            chain.proceed(chain.request())
+        }
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)

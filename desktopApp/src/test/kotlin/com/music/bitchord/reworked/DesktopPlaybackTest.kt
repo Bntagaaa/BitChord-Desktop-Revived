@@ -16,6 +16,36 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DesktopPlaybackTest {
+    @Test fun absoluteRepeatIsOneInterceptedIntentAndRemoteApplicationDoesNotCycle() {
+        waitingPlayer().use { player ->
+            val commands = mutableListOf<PlaybackCommand>()
+            player.commandInterceptor = { commands += it; true }
+            player.setRepeat(2)
+            assertEquals(listOf<PlaybackCommand>(PlaybackCommand.SetRepeat(2)), commands)
+            assertEquals(0, player.state.value.repeat)
+            player.withRemoteCommands { player.setRepeat(2) }
+            assertEquals(2, player.state.value.repeat)
+            assertEquals(1, commands.size)
+        }
+    }
+
+    @Test fun silenceDiscontinuityIsAnnouncedAtTheHeardFrameAndClearedBySeek() {
+        val clock = AudioDeviceClock(48_000.0)
+        val jumps = AudibleDiscontinuities()
+        clock.reset(0, 0.0)
+        clock.mark(9_600, 1_000.0, 1.0)
+        jumps.mark(9_600)
+        assertEquals(100.0, clock.position(4_800), 0.001)
+        assertFalse(jumps.consume(4_800))
+        assertEquals(1_000.0, clock.position(9_600), 0.001)
+        assertTrue(jumps.consume(9_600))
+        assertFalse(jumps.consume(9_600))
+        jumps.mark(12_000)
+        jumps.clear()
+        clock.reset(12_000, 5_000.0)
+        assertFalse(jumps.consume(12_000), "A seek must discard the old queued skip notification")
+    }
+
     @Test fun manualVersionSwapPreservesPausedQueueOccurrenceAndBypassesMusicOnly() = runBlocking {
         val policyCalls = java.util.concurrent.CopyOnWriteArrayList<String>()
         val first = CompletableDeferred<Unit>()

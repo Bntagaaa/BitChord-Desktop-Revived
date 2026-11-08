@@ -69,15 +69,16 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
     private val ledger = ListeningLedger()
     private val extraMetadata = mutableMapOf<String, Song>()
     private val requestedMetadata = mutableSetOf<String>()
+    private var metadataRevision = Long.MIN_VALUE
     val discord = MobileDiscordService(session.player.state)
     private val partySync: MobilePartySync
     private var lastFlushMs = 0L
     private var closed = false
 
     init {
-        ListenTogether.init()
+        if (!OfflineSmoke.active) ListenTogether.init()
         ListeningStats.init(DesktopStore.root.toFile())
-        ArtistFacts.init(DesktopStore.root.toFile())
+        if (!OfflineSmoke.active) ArtistFacts.init(DesktopStore.root.toFile())
         partySync = MobilePartySync(session.player, scope, ::notice)
         scope.launch {
             MobileIntegrationSettings.values.collect { settings ->
@@ -88,12 +89,20 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
         }
         scope.launch { session.autoplay.collect { ListenTogether.autoplayEnabled = it } }
         scope.launch {
-            session.signedIn.collectLatest { signedIn ->
-                if (signedIn) refreshPartyIdentity() else {
-                    ListenTogether.setAccount(null)
-                    if (party.value.inParty) ListenTogether.leaveParty()
+            var previousListenerKey: String? = null
+            MobileYouTubeAccounts.state.map { Triple(it.revision, it.listenerKey, it.signedIn) }
+                .distinctUntilChanged().collectLatest { (_, listenerKey, signedIn) ->
+                    if (OfflineSmoke.active) return@collectLatest
+                    if (previousListenerKey != null && previousListenerKey != listenerKey) {
+                        ListenTogether.setAccount(null)
+                        if (party.value.inParty) ListenTogether.leaveParty()
+                    }
+                    previousListenerKey = listenerKey
+                    if (signedIn) refreshPartyIdentity() else {
+                        ListenTogether.setAccount(null)
+                        if (party.value.inParty) ListenTogether.leaveParty()
+                    }
                 }
-            }
         }
         scope.launch {
             session.player.state.collect { state ->
@@ -107,8 +116,12 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
     fun notice(text: String) { message.value = text; session.notice(text) }
 
     private suspend fun refreshPartyIdentity(): Boolean {
-        if (!session.signedIn.value) return false
-        val account = YtMusicRepository.account().getOrNull() ?: return false
+        val listener = MobileYouTubeAccounts.state.value
+        if (OfflineSmoke.active || !listener.signedIn) return false
+        val account = MobileYouTubeAccounts.withListener(listener.revision) {
+            YtMusicRepository.account()
+        }.getOrNull() ?: return false
+        if (MobileYouTubeAccounts.state.value.revision != listener.revision) return false
         // Identity comes from the authenticated mobile account endpoint. Raw identifiers never
         // leave this client: the unchanged mobile transport hashes this value before joining.
         val accountKey = account.email.takeIf(String::isNotBlank) ?: return false
@@ -117,6 +130,7 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
     }
 
     fun createParty(nickname: String, members: Int) = perform {
+        OfflineSmoke.requireNetwork()
         check(refreshPartyIdentity()) { "Sign in to YouTube Music before creating a party." }
         ListenTogether.setNickname(nickname)
         val code = ListenTogether.createParty(nickname, members.coerceIn(2, 5)).getOrThrow()
@@ -124,6 +138,7 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
     }
 
     fun joinParty(invite: String, nickname: String) = perform {
+        OfflineSmoke.requireNetwork()
         check(refreshPartyIdentity()) { "Sign in to YouTube Music before joining a party." }
         val code = parsePartyCode(invite) ?: error("Enter a six-character party code or a BitChord invite link.")
         ListenTogether.setNickname(nickname)
@@ -141,9 +156,13 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
         }
     }
 
-    fun leaveParty() = perform { ListenTogether.leaveParty(); message.value = "You left the party." }
+    fun leaveParty() = perform {
+        OfflineSmoke.requireNetwork()
+        ListenTogether.leaveParty(); message.value = "You left the party."
+    }
 
     fun savePartyServer(value: String) = perform {
+        OfflineSmoke.requireNetwork()
         val parsed = ListenTogether.parseAndNormalizeServerUrl(value)
         require(parsed is ServerUrlValidationResult.Valid) { "Enter an HTTP or HTTPS server address without a query or fragment." }
         val result = ListenTogether.setCustomServerUrl(parsed.normalizedUrl)
@@ -155,6 +174,7 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
     }
 
     fun startLastFmSignIn() = perform {
+        OfflineSmoke.requireNetwork()
         val settings = MobileIntegrationSettings.values.value
         require(settings.lastFmApiKey.isNotBlank() && settings.lastFmSecret.isNotBlank()) { "Save your API key and API secret first." }
         LastFM.configure(settings.lastFmEndpoint, settings.lastFmApiKey, settings.lastFmSecret,
@@ -167,6 +187,7 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
     }
 
     fun finishLastFmSignIn() = perform {
+        OfflineSmoke.requireNetwork()
         val token = lastFmToken ?: error("Start browser sign in first.")
         val account = LastFM.getSession(token).getOrThrow().session
         MobileIntegrationSettings.update { it.copy(lastFmSession = account.key, lastFmAccount = account.name, lastFmEnabled = true) }
@@ -191,12 +212,26 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
     }
 
     private fun enriched(song: Song): Song {
+        if (OfflineSmoke.active) return song
+        val revision = MobileYouTubeAccounts.state.value.revision
+        if (metadataRevision != revision) {
+            extraMetadata.clear()
+            requestedMetadata.clear()
+            metadataRevision = revision
+        }
         extraMetadata[song.videoId]?.let { extra ->
             return song.copy(artistId = song.artistId ?: extra.artistId,
                 albumId = song.albumId ?: extra.albumId, albumName = song.albumName ?: extra.albumName)
         }
         if (song.localUri == null && song.videoId.length == 11 && requestedMetadata.add(song.videoId)) {
-            scope.launch { YtMusicRepository.trackLinks(song.videoId).getOrNull()?.let { extraMetadata[song.videoId] = it } }
+            scope.launch {
+                val extra = MobileYouTubeAccounts.withListener(revision) {
+                    YtMusicRepository.trackLinks(song.videoId)
+                }.getOrNull()
+                if (extra != null && MobileYouTubeAccounts.state.value.revision == revision) {
+                    extraMetadata[song.videoId] = extra
+                }
+            }
         }
         return song
     }
@@ -215,6 +250,7 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
                 lastFlushMs = sample.monotonicMs; ListeningStats.flush()
             }
         }
+        if (OfflineSmoke.active) return
         if (sample.becameAudible && config.nowPlaying) {
             if (config.lastFmEnabled && config.lastFmSession.isNotBlank()) scope.launch {
                 LastFM.updateNowPlaying(if (config.primaryArtistOnly) song.artist.primaryArtist() else song.artist,
@@ -259,7 +295,7 @@ internal class MobileIntegrations(val session: MobileSession) : AutoCloseable {
             withTimeoutOrNull(2_000L) {
                 coroutineScope {
                     launch { ListeningStats.flushForShutdown() }
-                    launch { ListenTogether.leaveParty() }
+                    if (!OfflineSmoke.active) launch { ListenTogether.leaveParty() }
                 }
             }
         }
@@ -315,6 +351,8 @@ internal class MobilePartySync(
     private val player: DesktopPlayback,
     private val scope: CoroutineScope,
     private val notice: (String) -> Unit,
+    private val partyState: StateFlow<ListenTogether.State> = ListenTogether.state,
+    private val refreshConnection: () -> Unit = { ListenTogether.ensureConnected() },
 ) : AutoCloseable {
     private val jobs = mutableListOf<Job>()
     private var personal: PlaybackState? = null
@@ -334,7 +372,7 @@ internal class MobilePartySync(
     init {
         player.commandInterceptor = ::intercept
         player.completionInterceptor = {
-            val party = ListenTogether.state.value
+            val party = partyState.value
             if (party.inParty) {
                 scope.launch {
                     if (party.you?.isHost == true && completedSeq != party.playback.seq) {
@@ -344,22 +382,26 @@ internal class MobilePartySync(
                 true
             } else false
         }
-        jobs += scope.launch { ListenTogether.state.collect { reconcile(it) } }
+        jobs += scope.launch { partyState.collect { reconcile(it) } }
         jobs += scope.launch {
-            ListenTogether.state.map { party ->
+            partyState.map { party ->
                 AutoplayKey(party.code, party.you?.isHost == true,
                     party.connection == ListenTogether.Connection.LIVE,
                     party.playback.autoplayEnabled, party.playback.track?.videoId, party.queue.seq)
             }.distinctUntilChanged().collectLatest { key ->
                 val seed = key.trackId ?: return@collectLatest
                 val identity = "${key.code}:$seed"
-                val party = ListenTogether.state.value
+                val party = partyState.value
                 val at = partyQueueIndexOf(party.queue, party.playback, seed)
-                if (!key.host || !key.live || !key.enabled || key.code == null ||
+                if (OfflineSmoke.active || !key.host || !key.live || !key.enabled || key.code == null ||
                     party.queue.items.size - at - 1 > 4 || autoplaySeed == identity) return@collectLatest
-                val radio = YtMusicRepository.radio(seed).getOrNull() ?: return@collectLatest
-                val current = ListenTogether.state.value
-                if (current.code != key.code || current.you?.isHost != true ||
+                val revision = MobileYouTubeAccounts.state.value.revision
+                val radio = MobileYouTubeAccounts.withListener(revision) {
+                    YtMusicRepository.radio(seed)
+                }.getOrNull() ?: return@collectLatest
+                val current = partyState.value
+                if (MobileYouTubeAccounts.state.value.revision != revision ||
+                    current.code != key.code || current.you?.isHost != true ||
                     !current.playback.autoplayEnabled || current.playback.track?.videoId != seed) return@collectLatest
                 val known = current.queue.items.map(PartyTrack::videoId).toSet()
                 val next = radio.filter { it.canShare() && it.videoId !in known }.distinctBy(Song::videoId).take(25)
@@ -370,16 +412,16 @@ internal class MobilePartySync(
         jobs += scope.launch {
             while (isActive) {
                 delay(700L)
-                if (ListenTogether.state.value.inParty) ListenTogether.ensureConnected()
-                reconcile(ListenTogether.state.value)
+                if (partyState.value.inParty) refreshConnection()
+                reconcile(partyState.value)
             }
         }
     }
 
     private fun intercept(command: PlaybackCommand): Boolean {
-        val party = ListenTogether.state.value
+        val party = partyState.value
         if (!party.inParty) return false
-        scope.launch { sendCommand(command, ListenTogether.state.value) }
+        scope.launch { sendCommand(command, partyState.value) }
         return true
     }
 
@@ -420,7 +462,8 @@ internal class MobilePartySync(
             is PlaybackCommand.Remove -> party.queue.items.getOrNull(command.index)?.let { ListenTogether.queueRemove(it.videoId) }
             is PlaybackCommand.Move -> ListenTogether.queueMove(command.from, command.to, party.queue.items.getOrNull(command.from)?.videoId)
             PlaybackCommand.Clear -> ListenTogether.queueClear()
-            PlaybackCommand.ToggleShuffle, PlaybackCommand.CycleRepeat, is PlaybackCommand.SetSpeed ->
+            PlaybackCommand.ToggleShuffle, PlaybackCommand.CycleRepeat,
+            is PlaybackCommand.SetRepeat, is PlaybackCommand.SetSpeed ->
                 notice("The party uses one shared running order at normal speed.")
         }
     }
@@ -433,7 +476,11 @@ internal class MobilePartySync(
             seedSent = false; lastAnchor = null; localPaused = false; completedSeq = -1; autoplaySeed = null
         }
         if (!party.inParty) return
-        player.withRemoteCommands { if (player.state.value.speed != 1f) player.setSpeed(1f) }
+        player.withRemoteCommands {
+            if (player.state.value.speed != 1f) player.setSpeed(1f)
+            if (player.state.value.repeat != 0) player.setRepeat(0)
+            if (player.state.value.shuffle) player.toggleShuffle()
+        }
         if (!party.controlsLocked) localPaused = false
         if (party.connection != ListenTogether.Connection.LIVE) return
         val target = party.playback
@@ -492,20 +539,21 @@ internal class MobilePartySync(
             startJob?.cancel()
             if (wait > 0 && !localPaused) {
                 ListenTogether.setAwaitingStart(true)
-                startJob = scope.launch { delay(wait); reconcile(ListenTogether.state.value) }
+                startJob = scope.launch { delay(wait); reconcile(partyState.value) }
             }
         }
         if (wait <= 0 || !target.isPlaying || localPaused) ListenTogether.setAwaitingStart(false)
         appliedSeq = target.seq; lastAnchor = anchor
     }
 
-    private fun restorePersonal() {
+    private fun restorePersonal(resume: Boolean = true) {
         startJob?.cancel(); ListenTogether.setAwaitingStart(false)
         personal?.let { own ->
             player.withRemoteCommands {
-                player.replaceQueue(own.queue, own.queueIndex)
-                player.seek(own.positionMs); player.setSpeed(own.speed)
-                if (own.isPlaying) player.resume() else player.pause()
+                player.restoreQueue(own.queue, own.queueIndex, own.positionMs)
+                player.setSpeed(own.speed); player.setRepeat(own.repeat)
+                if (player.state.value.shuffle != own.shuffle) player.toggleShuffle()
+                if (resume && own.isPlaying) player.resume()
             }
         }
         personal = null
@@ -513,6 +561,9 @@ internal class MobilePartySync(
 
     override fun close() {
         jobs.forEach(Job::cancel); startJob?.cancel()
+        // Session persistence runs immediately afterward. Preserve the listener's own
+        // queue while avoiding new source resolution or output during shutdown.
+        restorePersonal(resume = false)
         player.commandInterceptor = null; player.completionInterceptor = null
     }
 

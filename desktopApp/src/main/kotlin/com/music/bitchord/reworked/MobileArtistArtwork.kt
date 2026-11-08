@@ -30,6 +30,7 @@ internal fun rememberMobileArtistArt(page: DetailPage): AppleArtistArt? {
     var art by remember(page.browseId) { mutableStateOf(AppleArtistArtRepository.cached(page.browseId)) }
     val loading = page.songs is UiState.Loading
     LaunchedEffect(page.browseId, page.title, loading) {
+        if (OfflineSmoke.active) return@LaunchedEffect
         if (page.type == BrowseType.ARTIST && !loading) art = AppleArtistArtRepository.artFor(page.browseId, page.title) {
             (page.songs as? UiState.Success)?.data.orEmpty().map(Song::title) + page.sections.flatMap { shelf -> shelf.items.map(ShelfItem::title) }
         } ?: art
@@ -43,6 +44,7 @@ internal fun MobileArtistName(page: DetailPage, art: AppleArtistArt?) {
     val base by MobileArtistArtworkSettings.url.collectAsState()
     var signature by remember(page.browseId) { mutableStateOf<ArtistSignature?>(null) }
     LaunchedEffect(page.browseId, page.title, enabled, base, art?.logoUrl) {
+        if (OfflineSmoke.active) return@LaunchedEffect
         signature = null
         if (page.type != BrowseType.ARTIST || art?.logoUrl != null || page.songs is UiState.Loading) return@LaunchedEffect
         val effective = ArtistSignatureRepository.effectiveBaseUrl(enabled, base) ?: return@LaunchedEffect

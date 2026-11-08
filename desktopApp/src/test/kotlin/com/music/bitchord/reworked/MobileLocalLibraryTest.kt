@@ -9,6 +9,7 @@ import com.music.bitchord.data.settings.LocalMusicSort
 import com.music.bitchord.data.sources.addon.AddonStream
 import com.music.bitchord.download.DownloadedCollection
 import com.music.bitchord.download.SavedCollection
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
@@ -60,6 +61,24 @@ class MobileLocalLibraryTest {
         )
         assertFalse(listing.complete)
         assertEquals(listOf("first"), listing.songs.map { it.videoId })
+    }
+
+    @Test fun accountCancellationNeverTurnsIntoAPartialPlaylistForDownload() = runBlocking {
+        var continuations = 0
+        assertFailsWith<CancellationException> {
+            MobilePlaylistRules.readWholePlaylist(
+                first = { Result.failure(CancellationException("The listener changed before the first page")) },
+                more = { continuations++; Result.success(YtMusicRepository.SongPage(emptyList(), null)) }, pause = {},
+            )
+        }
+        assertEquals(0, continuations)
+        assertFailsWith<CancellationException> {
+            MobilePlaylistRules.readWholePlaylist(
+                first = { Result.success(YtMusicRepository.SongPage(listOf(song("private-row")), "continuation")) },
+                more = { continuations++; Result.failure(CancellationException("The listener changed between pages")) }, pause = {},
+            )
+        }
+        assertEquals(1, continuations)
     }
 
     @Test fun playlistPagingPreservesOrderAndStopsRepeatedTokens() = runBlocking {

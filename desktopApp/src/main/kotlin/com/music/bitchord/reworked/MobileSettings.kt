@@ -23,11 +23,10 @@ internal fun MobileSettingsPage(session: MobileSession, onExit: () -> Unit, onPa
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineLarge)
         SettingsSection("Accounts") {
-            Text(if (signedIn) "YouTube Music connected" else "Connect your account for your library and playlists.")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { DesktopBrowserAuth.youtube(session::connected) }) { Text(if (signedIn) "Change YouTube account" else "Connect YouTube Music") }
-                if (signedIn) TextButton(onClick = session::signOut) { Text("Sign out") }
-            }
+            MobileYouTubeAccountSettings(onAddAccount = session::signIn, onChooseInYouTube = { id ->
+                DesktopBrowserAuth.youtubeSession(YouTubeSessionMode.SWITCH_CHANNEL, id, onError = session::notice)
+            })
+            if (signedIn) TextButton(onClick = session::signOut) { Text("Remove current saved account") }
             OutlinedButton(onClick = { DesktopBrowserAuth.spotify { session.notice("Spotify connected") } }) { Text("Connect Spotify") }
         }
         SettingsSection("Appearance") {

@@ -46,22 +46,31 @@ fun main(args: Array<String>) {
         println("FFmpeg native decoder loaded")
         return
     }
+    if (args.contains("--offline-smoke")) OfflineSmoke.install()
     coil3.SingletonImageLoader.setSafe { context ->
         coil3.ImageLoader.Builder(context).components {
             add(coil3.svg.SvgDecoder.Factory())
             add(coil3.network.okhttp.OkHttpNetworkFetcherFactory(callFactory = { com.music.bitchord.data.Http.client }))
         }.build()
     }
-    InnerTubeXResolver.init(DesktopStore.cache.toFile(), object : InnerTubeXResolver.ConfigStore {
+    // This only reads this Reworked profile. OfflineSmoke explicitly installs an
+    // empty guest registry and never opens saved account files or an auth client.
+    runBlocking(Dispatchers.IO) { MobileYouTubeAccounts.restore() }
+    if (!OfflineSmoke.active) InnerTubeXResolver.init(DesktopStore.cache.toFile(), object : InnerTubeXResolver.ConfigStore {
         override fun getString(key: String) = DesktopStore.readText("extractor-${safeKey(key)}.json")
         override fun getLong(key: String) = DesktopStore.preferences.get(key, null)?.toLongOrNull()
         override fun putString(key: String, value: String) = DesktopStore.writeText("extractor-${safeKey(key)}.json", value)
         override fun putLong(key: String, value: Long) = DesktopStore.preferences.putLong(key, value)
     }, poTokenProvider = com.music.bitchord.data.innertube.potoken.PoTokenGenerator(createMinter = { MobilePoToken.create() }).asTokenProvider())
     val analyzer = MobileTrackAnalyzer(resolve = MobileSources::resolve, allowed = { DesktopStore.preferences.getBoolean("automix", false) })
-    val player = DesktopPlayback(resolve = MobileSources::resolve, analysisFor = analyzer::analysisFor, requestAnalysis = analyzer::request, analysisStateFor = analyzer::analysisState,
+    val player = DesktopPlayback(resolve = { song ->
+        if (OfflineSmoke.active) {
+            require(song.localUri?.startsWith("file:") == true || song.localPath != null) { "The offline smoke test plays local fixture files only" }
+            resolveMobileStream(song)
+        } else MobileSources.resolve(song)
+    }, analysisFor = analyzer::analysisFor, requestAnalysis = analyzer::request, analysisStateFor = analyzer::analysisState,
         prepareSong = MobilePlaybackPolicy::prepare, mixingAllowed = { !com.music.bitchord.data.listentogether.ListenTogether.state.value.inParty },
-        syncedLyrics = { song -> MobileFiles.lyricsFor(song) ?: withTimeoutOrNull(15_000) {
+        syncedLyrics = { song -> MobileFiles.lyricsFor(song) ?: if (OfflineSmoke.active) null else withTimeoutOrNull(15_000) {
             com.music.bitchord.data.lyrics.LyricsRepository.lyrics(song.videoId, song.title, song.artist,
                 song.durationText.orEmpty().split(':').fold(0L) { seconds, part -> seconds * 60 + (part.toLongOrNull() ?: 0) } * 1000,
                 album = song.albumName, order = MobilePlayerSettings.lyricsSourceOrder.value,
@@ -70,6 +79,7 @@ fun main(args: Array<String>) {
     val host = MobilePlayerHost(player)
     PlayerPlatform.install(host); AppUi.install(host)
     val session = MobileSession(player, host, analyzer)
+    MobileYouTubeAccounts.state.value.error?.let(session::notice)
     MobileFiles.start()
     application {
         var mainVisible by remember { mutableStateOf(true) }
@@ -91,7 +101,7 @@ fun main(args: Array<String>) {
                 } else if (hasTray && DesktopWindowOptions.keepPlaying) mainVisible = false else exit()
             },
             visible = mainVisible,
-            title = "BitChord Desktop Reworked",
+            title = "BitChord Desktop Reworked" + if (OfflineSmoke.active) " · Offline smoke test" else "",
             state = windowState,
             icon = reworkedAppIcon(),
         ) {
@@ -148,6 +158,8 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
     val liked by session.liked.collectAsState()
     val ratings by com.music.bitchord.data.LikeState.overrides.collectAsState()
     val signedIn by session.signedIn.collectAsState()
+    val accountState by session.accounts.collectAsState()
+    val listenerRevision by session.listenerRevision.collectAsState()
     val playlists by session.playlists.collectAsState()
     val detail by session.detail.collectAsState()
     val fetchedLyrics by session.lyrics.collectAsState()
@@ -155,6 +167,7 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
     val lyricsLoading by session.lyricsLoading.collectAsState()
     val providers by session.providerStates.collectAsState()
     var expandedPlayer by remember { mutableStateOf(false) }
+    var lyricsOffsetOpen by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(DesktopStore.preferences.getBoolean("details_open", false)) }
     var quickSearch by remember { mutableStateOf(false) }
     var shortcuts by remember { mutableStateOf(false) }
@@ -166,6 +179,10 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
     var playlistSong by remember { mutableStateOf<Song?>(null) }
     var menuSong by remember { mutableStateOf<Song?>(null) }
     var collectionMenu by remember { mutableStateOf<DetailPage?>(null) }
+    LaunchedEffect(listenerRevision) {
+        menuSong = null; collectionMenu = null; playlistDialog = false; playlistSong = null
+        importSpotify = false; quickSearch = false; librarySortOpen = false
+    }
     val homeState = rememberLazyListState()
     val newState = rememberLazyListState()
     val exploreState = rememberLazyListState()
@@ -176,6 +193,7 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
     val notice by session.host.messages.collectAsState()
     LaunchedEffect(notice) { notice?.let { snackbar.showSnackbar(it); session.host.messages.value = null } }
     LaunchedEffect(playback.error) { playback.error?.let(session::notice) }
+    LaunchedEffect(expandedPlayer) { if (!expandedPlayer) lyricsOffsetOpen = false }
 
     Surface(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -217,6 +235,7 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
                         val canBack by session.canGoBack.collectAsState()
                         IconButton(session::back, enabled = canBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
                         Text(route.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        MobileYouTubeProfileButton(Modifier.widthIn(max = 180.dp))
                         TextButton(onClick = { quickSearch = true }) { Icon(BitChordIcons.Search, null, Modifier.size(18.dp)); Text("  Search · Ctrl+K") }
                         if (route == Destination.SEARCH) {
                             val sourceSearch by session.sourceSearch.collectAsState()
@@ -252,7 +271,7 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
                                 val recentLoading by session.loadingRecents.collectAsState()
                                 HomeScreen(visibleHome, homeState, session::openShelf, session::refreshHome, false, session::refreshHome,
                                     rememberPullToRefreshState(), contentPadding = padding, title = "Listen now", signedIn = signedIn,
-                                    onSignIn = { DesktopBrowserAuth.youtube(session::connected) }, onItemLongPress = { item ->
+                                    onSignIn = session::signIn, onItemLongPress = { item ->
                                         if (item.videoId != null) menuSong = item.toSong() else collectionMenu = item.collectionPreview()
                                     }, onLoadMore = session::moreHome, loadingMore = more, recentlyPlayedLoading = recentLoading && !hideRecents, currentSong = playback.song, isPlaying = playback.isPlaying,
                                     topPicks = picks, topPicksLoading = picksLoading, onTopPickClick = if (hidePicks) null else session::topPick,
@@ -267,7 +286,7 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
                             Destination.EXPLORE -> {
                                 val state by session.explore.collectAsState()
                                 val openMood: (MoodGenre) -> Unit = { mood ->
-                                    session.scope.launch { YtMusicRepository.moodGenreShelves(mood.browseId, mood.params).onSuccess { shelves ->
+                                    session.scope.launch { session.accountRead(listenerRevision) { YtMusicRepository.moodGenreShelves(mood.browseId, mood.params) }.onSuccess { shelves ->
                                         session.showCollection(DetailPage(mood.browseId, mood.title, "", mood.thumbnailUrl, UiState.Success(emptyList()), sections = shelves))
                                     }.onFailure { session.notice(it.message ?: "Could not load this mood") } }
                                 }
@@ -300,7 +319,7 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
                                 CompositionLocalProvider(LocalShelfCardWidth provides 112.dp) { LibraryScreen(signedIn, library, libraryState, onShelfItemClick = { session.openShelf(it) }, onShelfItemLongPress = { collectionMenu = it.collectionPreview() },
                                     onNewPlaylist = { playlistDialog = true }, onImportSpotifyPlaylist = { importSpotify = true },
                                     onShowAll = { shelf -> session.showCollection(DetailPage("shelf:${shelf.title}", shelf.title, "", null, UiState.Success(emptyList()), sections = listOf(shelf))) },
-                                    replay = { TextButton(onClick = { showReplay = true }) { Icon(Icons.Rounded.BarChart, null); Text("  Your Replay") } }, onSignIn = { DesktopBrowserAuth.youtube(session::connected) }, onRetry = session::refreshLibrary,
+                                    replay = { TextButton(onClick = { showReplay = true }) { Icon(Icons.Rounded.BarChart, null); Text("  Your Replay") } }, onSignIn = session::signIn, onRetry = session::refreshLibrary,
                                     refreshing = false, onRefresh = session::refreshLibrary, pullState = rememberPullToRefreshState(), contentPadding = padding,
                                     links = emptyList(), deviceItems = deviceItems) }
                             }
@@ -325,7 +344,7 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
                         position = session.position, durationMs = playback.durationMs, audioVersionSwitching = switchingVersion, qualityUpgraded = false,
                         queue = playback.queue, queueIndex = playback.queueIndex, hasPrevious = playback.queueIndex > 0 || playback.positionMs > 0,
                         hasNext = playback.queueIndex < playback.queue.lastIndex, repeatMode = playback.repeat, shuffleEnabled = playback.shuffle,
-                        autoplayEnabled = autoplay, signedIn = signedIn, accountName = null,
+                        autoplayEnabled = autoplay, signedIn = signedIn, accountName = accountState.activeProfile?.name,
                         likeStatus = ratings[song.videoId] ?: if (liked.any { it.videoId == song.videoId }) LikeStatus.LIKE else LikeStatus.INDIFFERENT,
                         onToggleLike = { session.toggleLike(song) }, onPlayPause = session.player::toggle, onNext = session.player::next,
                         onPrevious = session.player::previous, onBlockedControl = { session.notice("Playback controls are locked by the party host") },
@@ -336,10 +355,10 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
                         onClearQueue = session.player::clearQueue, onOpenMenu = { menuSong = song },
                         onOpenAlbum = { id -> expandedPlayer = false; session.openBrowse(BrowseItem(id, song.albumName.orEmpty(), song.artist, song.thumbnailUrl, BrowseType.ALBUM)) },
                         onOpenArtist = { id, name -> expandedPlayer = false; if (id != null) session.openBrowse(BrowseItem(id, name, "", null, BrowseType.ARTIST)) else session.search(name) },
-                        onOpenPlaybackSource = { expandedPlayer = false }, onListenTogether = { showParty = true },
+                        onOpenPlaybackSource = { expandedPlayer = false; session.openPlaybackSource(song) { showReplay = true } }, onListenTogether = { showParty = true },
                         lyrics = lyrics?.lines, lyricsSource = lyrics?.source, lyricsProviderStates = providers,
                         onSelectLyricsProvider = { session.lyricsProvider.value = it }, lyricsUnavailable = !lyricsLoading && lyrics == null,
-                        lyricsOffsetOpen = false, onDismissLyricsOffset = {}, windowWidth = maxWidth, windowHeight = maxHeight,
+                        lyricsOffsetOpen = lyricsOffsetOpen, onDismissLyricsOffset = { lyricsOffsetOpen = false }, windowWidth = maxWidth, windowHeight = maxHeight,
                         menuOpen = { menuSong != null }, modifier = Modifier.fillMaxSize())
                     IconButton(onClick = { expandedPlayer = false }, modifier = Modifier.align(Alignment.TopStart).padding(12.dp)) { Icon(Icons.Rounded.KeyboardArrowDown, "Close player", tint = androidx.compose.ui.graphics.Color.White) }
                     IconButton(onClick = onFullscreen, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)) { Icon(Icons.Rounded.Fullscreen, "Fullscreen", tint = androidx.compose.ui.graphics.Color.White) }
@@ -358,7 +377,8 @@ private fun MobileDesktopApp(session: MobileSession, onExit: () -> Unit, onFulls
         confirmButton = { TextButton(onClick = { shortcuts = false }) { Text("Close") } })
     if (importSpotify) ReworkedSpotifyImportDialog(signedIn, { importSpotify = false }, session::savePlaylist)
     if (playlistDialog) PlaylistDialog(session, playlistSong, { playlistDialog = false; playlistSong = null }, { playlistDialog = false; importSpotify = true })
-    menuSong?.let { song -> SongMenu(song, session, { menuSong = null }, { playlistSong = song; playlistDialog = true; menuSong = null }) }
+    menuSong?.let { song -> SongMenu(song, session, { menuSong = null }, { playlistSong = song; playlistDialog = true; menuSong = null },
+        onLyricsTiming = { expandedPlayer = true; lyricsOffsetOpen = true }) }
     collectionMenu?.let { page -> CollectionMenu(page, session, { collectionMenu = null }) }
 }
 
@@ -443,7 +463,9 @@ internal fun SongListPage(title: String, songs: List<Song>, session: MobileSessi
         if (songs.isEmpty()) Text("No songs yet", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 24.dp))
         LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
             itemsIndexed(songs, key = { index,song -> "${song.videoId}:$index" }) { index, song ->
-                CompactTrackRow(song.title, song.artist, song.thumbnailUrl, { session.player.playSongs(songs,index) }, { onMenu(song) },
+                CompactTrackRow(song.title, song.artist, song.thumbnailUrl, { session.player.playSongs(songs.map { track ->
+                    if (session.route.value == Destination.HISTORY) track.copy(playbackSource = title, playbackSourceType = PlaybackSourceType.HISTORY) else track
+                },index) }, { onMenu(song) },
                     isCurrent = playback.song?.videoId == song.videoId, isPlaying = playback.isPlaying, isVideo = song.isVideo)
             }
         }

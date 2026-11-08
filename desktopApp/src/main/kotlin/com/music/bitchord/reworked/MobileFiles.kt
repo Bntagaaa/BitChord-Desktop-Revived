@@ -77,9 +77,9 @@ internal object MobileFiles {
         MobileDownloadedCollections.download(DownloadTarget(id, title, subtitle, thumbnailUrl, playlist), songs)
     }
 
-    internal suspend fun downloadBatch(songs: List<Song>): Set<String> {
+    internal suspend fun downloadBatch(songs: List<Song>, expectedListenerRevision: Long? = null): Set<String> {
         val unique = songs.distinctBy { it.videoId }
-        val queued = unique.mapNotNull(::enqueue)
+        val queued = unique.mapNotNull { enqueue(it, expectedListenerRevision) }
         queued.joinAll()
         currentCoroutineContext().ensureActive()
         return unique.filter { downloadedSong(it.videoId) != null }.mapTo(HashSet()) { it.videoId }
@@ -173,7 +173,7 @@ internal object MobileFiles {
 
     fun download(song: Song) { enqueue(song) }
 
-    private fun enqueue(song: Song): Job? {
+    private fun enqueue(song: Song, expectedListenerRevision: Long? = null): Job? {
         if (localFileExists(song) || downloadedSong(song.videoId) != null) {
             messageState.value = "This track is already available offline"
             return null
@@ -189,7 +189,10 @@ internal object MobileFiles {
                     downloadSlots.withPermit {
                         // Pin this track's settings once, independently of the streaming ceiling.
                         val options = MobileFileOptions.state.value
-                        val source = MobileSources.resolveForDownload(song, options.quality, options.export)
+                        val source = if (expectedListenerRevision == null) MobileSources.resolveForDownload(song, options.quality, options.export)
+                            else MobileYouTubeAccounts.withListener(expectedListenerRevision) {
+                                MobileSources.resolveForDownload(song, options.quality, options.export)
+                            }
                         currentCoroutineContext().ensureActive()
                         val requestedDirectory = if (options.export) Path.of(options.exportDirectory) else filesDirectory
                         Files.createDirectories(requestedDirectory)
@@ -225,6 +228,7 @@ internal object MobileFiles {
                         messageState.value = "Downloaded ${song.title}"
                         // Lyrics are optional metadata. Their failure cannot revoke complete audio.
                         runCatching {
+                            if (expectedListenerRevision != null && expectedListenerRevision != MobileYouTubeAccounts.state.value.revision) return@runCatching
                             val words = lyricsFor(song) ?: withTimeoutOrNull(20_000) {
                                 LyricsRepository.lyrics(song.videoId, song.title, song.artist,
                                     (TrackMatcher.secondsOf(song.durationText)?.toLong() ?: 0L) * 1000,
@@ -240,7 +244,11 @@ internal object MobileFiles {
                             }
                         }.onFailure { if (it is CancellationException) throw it }
                     }
-                } catch (cancelled: CancellationException) { throw cancelled }
+                } catch (cancelled: CancellationException) {
+                    if (expectedListenerRevision != null && expectedListenerRevision != MobileYouTubeAccounts.state.value.revision)
+                        messageState.value = "A queued collection download stopped because the YouTube profile changed"
+                    throw cancelled
+                }
                 catch (error: Exception) {
                     errorState.update { it + (song.videoId to (error.message?.take(240) ?: "Download failed")) }
                 } finally {

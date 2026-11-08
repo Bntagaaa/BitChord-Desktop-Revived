@@ -46,10 +46,12 @@ All files in `desktopApp/src/main/kotlin/com/music/bitchord/reworked/` are new p
 | New boundary | Original contracts/behavior it hosts |
 | --- | --- |
 | `Main.kt`, `MobileSession.kt`, `MobilePlayerHost.kt` | Mobile repositories and unchanged shared UI host contracts, windows and navigation. |
+| `MobileYouTubeAccounts.kt`, `MobileYouTubeAccountModels.kt`, `MobileYouTubeAccountSettings.kt`, `DesktopYouTubeAccountStore.kt`, `DesktopYouTubeBrowser.kt`, `YouTubeCapturedSessionValidator.kt`, `DesktopBrowserAuth.kt` | Original mobile `auth/AccountSessions.kt` and `AuthStore` account/profile/channel contracts, captured YouTube configuration and original shared Innertube request/parser semantics. Fresh JVM account vault, isolated candidate validation and revision-fenced session lifecycle; no old desktop or web account implementation. |
 | `DesktopPlayback.kt`, `MobileAudioDecoder.kt`, `RangedMediaInput.kt` and mobile DSP/analyzer adapters | Mobile queue/audio/analysis semantics, FFmpeg/Java Sound on the JVM, original shared musical planner/models. |
 | `MobileSources.kt`, `MobileModuleSources.kt`, `MobileJioSaavn.kt` | Mobile source IDs, `TrackMatcher`, source order, protocol policies and the above direct mobile clients. |
 | `MobileFiles.kt`, `MobileDownloadWriter.kt`, `MobileFileSettings.kt` | Mobile local-file metadata, independent download quality/export semantics, native codec-preserving packet remux and atomic file publication. |
 | `MobileDownloadedCollections.kt`, `MobileLocalLibrary.kt` | Mobile `PlaylistSync` additive/paging/approval rules and `LocalFolder` views; direct pure `LocalGroups`/collection models with new desktop lifecycle, selection and settings. |
+| `MobilePlaylistEditor.kt` | Original mobile `ui/components/ReorderPlaylistPage.kt` drag/edge-scroll behavior and `ui/MainViewModel.kt` exact-entry removal/reorder sequence. Original shared complete-entry loading and move planning; new desktop controls, local occurrence identities and profile/revision boundary. |
 | `MobileVersionAligner.kt`, `MobileSilence.kt` | Original mobile `playback/smart/VersionAudioAligner.kt` FFT/envelope algorithm and playback service conservative Media3 silence policy, with fresh FFmpeg/Java Sound boundaries. |
 | `MobileDiscord.kt`, `MobileDiscordSettings.kt` | Original mobile/shared Discord gateway/settings contract, desktop opt-in lifecycle and UI. |
 | `MobileRemote.kt`, `MobileRemoteBridge.kt` | Mobile WebDAV/SMB clients; fresh native desktop settings, browse UI, tokenized loopback seekable transport. No web application is hosted. |
@@ -63,6 +65,8 @@ All files in `desktopApp/src/main/kotlin/com/music/bitchord/reworked/` are new p
 The desktop uses Compose/JVM, Java 21, FFmpeg/JavaCPP/JavaCV, Java Sound, JavaFX for the explicit sign-in/PoToken boundary, QuickJS JVM for original mobile modules, SMBJ for the original mobile file-share client, and platform libraries for native media controls. Versions are declared in `desktopApp/build.gradle.kts`. Native installer versions map the public patch/Reworked revision into a monotonic numeric package field; full public versions remain unchanged in JVM properties, update tags and assets. [REWORKED_BUILD.md](REWORKED_BUILD.md) documents that mapping and the build commands.
 
 The product is `BitChordReworked`, with a separate installer identity, Java Preferences node `com.music.bitchord.reworked`, and separate `BitChordReworked`/`bitchord-reworked` data directories. Existing Revived profiles are not read or overwritten. Test tasks use a separate preference node and temporary data roots.
+
+The explicit `--offline-smoke` entry point creates a new empty temporary profile and preferences node before initializing the mobile host. Its shared HTTP policy and client/lifecycle guards are test isolation, not Revived performance features. It does not load existing account credentials or prove live service interoperability.
 
 Updater candidates must belong to the same repository's **`reworked-v…` tag namespace** and carry exact **`BitChordReworked-…` asset names**, byte counts and SHA-256. A normal Revived or Android release cannot become a Reworked updater candidate. Windows portable replacement retains the previous application directory; AppImage replacement retains the previous image. Native package installs are managed through their package workflow.
 

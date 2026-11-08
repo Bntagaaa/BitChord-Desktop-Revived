@@ -13,6 +13,7 @@ import java.nio.file.Path
 /** Original mobile MusicLink path rules, with JVM URI and desktop file handling. */
 internal object MobileLinks {
     fun open(session: MobileSession, input: String) {
+        val revision = MobileYouTubeAccounts.state.value.revision
         session.scope.launch {
             try {
                 val text = input.trim()
@@ -21,6 +22,7 @@ internal object MobileLinks {
                     val song = withContext(Dispatchers.IO) { MobileFiles.inspect(file.toRealPath()) }
                     session.player.play(song); return@launch
                 }
+                OfflineSmoke.requireNetwork()
                 val uri = URI(text)
                 require(uri.scheme in setOf("http", "https")) { "Open a YouTube Music link or an audio file" }
                 val host = uri.host?.lowercase()?.removePrefix("www.")
@@ -32,8 +34,11 @@ internal object MobileLinks {
                 val videoId = if (host == "youtu.be") paths.firstOrNull() else when (paths.firstOrNull()) {
                     "watch" -> query["v"]; "shorts", "embed", "v" -> paths.getOrNull(1); else -> null
                 }
+                if (revision != MobileYouTubeAccounts.state.value.revision) throw CancellationException("The YouTube profile changed before opening this link")
                 if (!videoId.isNullOrBlank()) {
-                    val song = YtMusicRepository.trackLinks(videoId).getOrThrow()
+                    val song = MobileYouTubeAccounts.withListener(revision) { YtMusicRepository.trackLinks(videoId).getOrThrow() }
+                    currentCoroutineContext().ensureActive()
+                    if (revision != MobileYouTubeAccounts.state.value.revision) throw CancellationException("The YouTube profile changed while opening this link")
                     session.player.play(song.copy(playbackSource = "Shared link", playbackSourceType = PlaybackSourceType.SHARED_LINK))
                 } else if (paths.firstOrNull() == "search" && !query["q"].isNullOrBlank()) session.search(query.getValue("q"))
                 else {

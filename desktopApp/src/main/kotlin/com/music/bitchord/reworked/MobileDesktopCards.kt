@@ -20,6 +20,9 @@ import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.data.model.*
 import com.music.bitchord.ui.player.CanvasArtworkPlayer
 import com.music.bitchord.ui.player.artistCredits
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /** The classic card option consumes the same mobile mood endpoints and identities. */
 @Composable
@@ -46,18 +49,29 @@ internal fun ClassicExplorePage(state: UiState<List<MoodGenreSection>>, onOpen: 
 /** New desktop presentation of the mobile Canvas, lyrics, artist and queue data. */
 @Composable
 internal fun MobileNowPlayingDetails(session: MobileSession, onLyrics: () -> Unit, modifier: Modifier = Modifier) {
+    val listener by MobileYouTubeAccounts.state.collectAsState()
+    val revision = listener.revision
     val state by session.player.state.collectAsState()
     val fetchedLyrics by session.lyrics.collectAsState()
     val lyrics = fetchedLyrics?.takeIf { it.ownerId == state.song?.videoId }
     val loading by session.lyricsLoading.collectAsState()
     val song = state.song ?: return
-    var canvas by remember(song.videoId) { mutableStateOf<CanvasArtwork?>(session.host.cachedCanvas(song)) }
-    var linked by remember(song.videoId) { mutableStateOf(song) }
-    var artist by remember(song.videoId) { mutableStateOf<ArtistPage?>(null) }
-    LaunchedEffect(song.videoId) {
-        canvas = session.host.canvasFor(song)
-        if (song.localUri == null && !song.videoId.contains(':')) linked = YtMusicRepository.trackLinks(song.videoId).getOrNull() ?: song
-        linked.artistId?.let { artist = YtMusicRepository.artistPage(it).getOrNull() }
+    var canvas by remember(song.videoId, revision) { mutableStateOf<CanvasArtwork?>(session.host.cachedCanvas(song)) }
+    var linked by remember(song.videoId, revision) { mutableStateOf(song) }
+    var artist by remember(song.videoId, revision) { mutableStateOf<ArtistPage?>(null) }
+    LaunchedEffect(song.videoId, revision) {
+        if (OfflineSmoke.active) return@LaunchedEffect
+        val motion = session.host.canvasFor(song)
+        val details = MobileYouTubeAccounts.withListener(revision) {
+            val enriched = if (song.localUri == null && song.localPath == null && !song.videoId.contains(':'))
+                YtMusicRepository.trackLinks(song.videoId).onFailure { if (it is CancellationException) throw it }.getOrNull() ?: song else song
+            enriched to enriched.artistId?.let {
+                YtMusicRepository.artistPage(it).onFailure { error -> if (error is CancellationException) throw error }.getOrNull()
+            }
+        }
+        currentCoroutineContext().ensureActive()
+        if (revision != MobileYouTubeAccounts.state.value.revision) return@LaunchedEffect
+        canvas = motion; linked = details.first; artist = details.second
     }
     Surface(modifier.fillMaxHeight(), color = MaterialTheme.colorScheme.surface) {
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {

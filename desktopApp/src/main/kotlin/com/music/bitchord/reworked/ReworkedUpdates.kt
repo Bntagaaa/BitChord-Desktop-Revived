@@ -211,6 +211,7 @@ internal object ReworkedUpdates {
     }
 
     private fun openConnection(url: String, metadata: Boolean): HttpURLConnection {
+        OfflineSmoke.requireNetwork()
         var next = url
         repeat(6) { hop ->
             val allowed = if (metadata) next == "https://api.github.com/repos/$REWORKED_REPOSITORY/releases?per_page=100"

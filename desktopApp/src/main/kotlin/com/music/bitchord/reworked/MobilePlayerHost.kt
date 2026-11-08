@@ -11,6 +11,9 @@ import com.music.bitchord.data.settings.*
 import com.music.bitchord.ui.AppUiHost
 import com.music.bitchord.ui.player.*
 import dev.chrisbanes.haze.HazeState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.*
 
 /** Desktop persistence for exactly the settings read by the mobile shared player. */
@@ -80,9 +83,9 @@ internal class MobilePlayerHost(private val player: DesktopPlayback) : PlayerHos
     val messages = MutableStateFlow<String?>(null)
     override fun cachedCanvas(song: Song): CanvasArtwork? = CanvasRepository.cached(song)
     override suspend fun canvasFor(song: Song): CanvasArtwork? =
-        if (settings.animatedCanvas.value) CanvasRepository.canvasFor(song) else null
+        if (!OfflineSmoke.active && settings.animatedCanvas.value) CanvasRepository.canvasFor(song) else null
     @Composable override fun CanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) = MobileCanvasVideo(spec, modifier)
-    override val musicVideoSupported = true
+    override val musicVideoSupported = !OfflineSmoke.active
     override val musicVideoAspect = MutableStateFlow(16f / 9f)
     override val musicVideoQuality = MutableStateFlow(MusicVideoQualityUi())
     val showVideo = mutableStateOf(true)
@@ -133,12 +136,21 @@ internal class MobilePlayerHost(private val player: DesktopPlayback) : PlayerHos
     val downloaded = MutableStateFlow<Set<String>>(emptySet())
     @Composable override fun downloadedIds(): Set<String> { val ids by downloaded.collectAsState(); return ids }
     override suspend fun releaseMotion(album: String, artist: String): CanvasArtwork? =
-        if (settings.animatedCanvas.value) CanvasRepository.canvasForAlbum(album, artist) else null
+        if (!OfflineSmoke.active && settings.animatedCanvas.value) CanvasRepository.canvasForAlbum(album, artist) else null
     override suspend fun artistMotion(browseId: String, artistName: String): CanvasArtwork? {
-        if (!settings.animatedCanvas.value) return null
-        return AppleArtistArtRepository.artFor(browseId, artistName) {
-            YtMusicRepository.artistPage(browseId).getOrNull()?.let { page -> page.songs.map { it.title } + page.sections.flatMap { it.items }.map { it.title } }.orEmpty()
-        }?.videoUrl?.let { CanvasArtwork(it, artist = artistName) }
+        if (OfflineSmoke.active || !settings.animatedCanvas.value) return null
+        val revision = MobileYouTubeAccounts.state.value.revision
+        val art = MobileYouTubeAccounts.withListener(revision) {
+            val answer = AppleArtistArtRepository.artFor(browseId, artistName) {
+                YtMusicRepository.artistPage(browseId).getOrNull()?.let { page -> page.songs.map { it.title } + page.sections.flatMap { it.items }.map { it.title } }.orEmpty()
+            }
+            // The original provider treats catalogue errors as misses; cancellation must
+            // still leave this listener before a profile switch may publish its result.
+            currentCoroutineContext().ensureActive()
+            answer
+        }
+        if (revision != MobileYouTubeAccounts.state.value.revision) throw CancellationException("The YouTube profile changed during the artist lookup")
+        return art?.videoUrl?.let { CanvasArtwork(it, artist = artistName) }
     }
     fun togglePin(id: String) {
         pinnedPlaylists.update { if (id in it) it - id else listOf(id) + it }
