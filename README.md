@@ -5,7 +5,7 @@
 <br>
 <br>
 
-<img width="577" height="41" alt="Asset-2" src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" />
+<h1><img width="577" height="41" alt="BitChord Desktop Revived" src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" /></h1>
 
 
 **A desktop music experience, refined.**
