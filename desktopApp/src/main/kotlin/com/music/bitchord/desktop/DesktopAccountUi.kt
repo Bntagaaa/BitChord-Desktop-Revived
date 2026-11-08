@@ -2,9 +2,6 @@ package com.music.bitchord.desktop
 
 import com.music.bitchord.ui.screens.desktopTopScrollFade
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,7 +34,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -55,7 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.ui.icons.BitChordIcons
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
@@ -116,26 +110,7 @@ internal fun DesktopAccountSelector(
     onRemoveAccount: (DesktopGoogleAccount) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var closing by remember { mutableStateOf(false) }
-    var appeared by remember { mutableStateOf(false) }
-    val reduceMotion by DesktopAppearanceSettings.reduceAnimation.collectAsState()
-    val progress by animateFloatAsState(
-        targetValue = if (appeared && !closing) 1f else 0f,
-        animationSpec = when {
-            reduceMotion -> tween(0)
-            closing -> tween(170)
-            else -> spring(dampingRatio = 1f, stiffness = 470f)
-        },
-        label = "profile-context-menu-motion",
-    )
-    LaunchedEffect(Unit) { appeared = true }
-    LaunchedEffect(closing) {
-        if (closing) {
-            if (!reduceMotion) delay(170)
-            onDismiss()
-        }
-    }
-    DesktopRegisterFlyout(DesktopFlyoutLayer.ACCOUNT, onDismiss = { closing = true })
+    DesktopRegisterFlyout(DesktopFlyoutLayer.ACCOUNT, onDismiss = onDismiss)
     var managing by remember { mutableStateOf(false) }
     val accountsListState = rememberLazyListState()
     val activeAccount = accounts.firstOrNull { it.accountId == activeAccountId } ?: accounts.firstOrNull()
@@ -149,7 +124,7 @@ internal fun DesktopAccountSelector(
             Modifier.fillMaxSize().clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = { closing = true },
+                onClick = onDismiss,
             ),
         )
         val shape = RoundedCornerShape(16.dp)
@@ -160,14 +135,7 @@ internal fun DesktopAccountSelector(
                 .widthIn(max = 292.dp)
                 .fillMaxWidth()
                 .clip(shape)
-                .desktopMenuGlass(shape)
-                .graphicsLayer {
-                    alpha = progress
-                    val scale = if (reduceMotion) 1f else 0.30f + 0.70f * progress
-                    scaleX = scale
-                    scaleY = scale
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 1f)
-                },
+                .desktopMenuGlass(shape),
         ) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 13.dp, bottom = 5.dp),

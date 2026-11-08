@@ -43,6 +43,7 @@ import com.music.bitchord.playback.QueueTimeline.asQueueEntry
 import com.music.bitchord.data.listentogether.partyQueueIndexOf
 import com.music.bitchord.data.listentogether.partyUpcomingAfter
 import com.music.bitchord.ui.LyricsProviderState
+import com.music.bitchord.ui.player.DesktopMenuGlassStyle
 import com.music.bitchord.ui.player.LyricsSidePanel
 import com.music.bitchord.ui.player.NowPlayingScreen
 import com.music.bitchord.ui.player.QueueSidePanel
@@ -8112,9 +8113,6 @@ private fun DesktopSettingsScreen(
                     if (settingsRowVisible("Graphics profile & blur", "Graphics profile, reduce dynamic blur and customize blur")) {
                         DesktopUnifiedGraphicsAndBlurSettings()
                     }
-                    if (settingsRowVisible("Context menu glass", "Temporary opacity and blur debug sliders")) {
-                        DesktopMenuDebugSettings()
-                    }
                     if (DesktopSidebarMica.isSupported) {
                         val micaSidebar by DesktopAppearanceSettings.micaSidebar.collectAsState()
                         SettingsToggle(
@@ -9229,15 +9227,13 @@ internal fun Modifier.desktopBarGlass(
  * DesktopMenuGlass owns only the visual surface, never menu dimensions.
  */
 @Composable
-internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier {
-    val tint by DesktopMenuTuning.tintAlpha.collectAsState()
-    val blur by DesktopMenuTuning.blurRadiusDp.collectAsState()
-    return clip(shape).desktopFrosted(
-        DesktopBarGlass, tintAlpha = tint,
+internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier =
+    clip(shape).desktopFrosted(
+        DesktopBarGlass,
+        tintAlpha = DesktopMenuGlassStyle.TINT_ALPHA,
         allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.MENUS_POPUPS),
-        blurRadius = blur.dp,
+        blurRadius = DesktopMenuGlassStyle.BLUR_RADIUS_DP.dp,
     ).border(0.5.dp, DesktopBarEdge, shape)
-}
 
 /** The edge of a chrome pane that meets the page, and so has to dissolve into it. */
 internal enum class DesktopChromeEdge { NONE, BOTTOM, END }
