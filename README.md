@@ -1,11 +1,13 @@
 <div align="center">
 
-<img width="1920" height="1080" alt="Dekstop (1)" src="https://github.com/user-attachments/assets/724e80d6-61ab-4152-81dc-a1884c485f0c" />
+<img width="1920" height="1080" alt="Dekstop(5)" src="https://github.com/user-attachments/assets/29025934-6e9a-4ed1-8f36-8065a95d4b40" />
+
 <br>
 <br>
 <br>
 
 <img width="577" height="41" alt="Asset-2" src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" />
+
 
 
 **A desktop music experience, refined.**
