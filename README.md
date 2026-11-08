@@ -1,23 +1,25 @@
 <div align="center">
 
-<img width="1920" height="1080" alt="Dekstop (1)" src="https://github.com/user-attachments/assets/724e80d6-61ab-4152-81dc-a1884c485f0c" />
+<img width="1920" height="1080" alt="BitChord Desktop Revived music player for Windows and Linux" src="https://github.com/user-attachments/assets/724e80d6-61ab-4152-81dc-a1884c485f0c" />
 <br>
 <br>
 <br>
 
-<h1><img width="577" height="41" alt="BitChord Desktop Revived" src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" /></h1>
+<img width="577" height="41" alt="BitChord Desktop Revived wordmark" src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" />
+
+<h1>BitChord Desktop Revived</h1>
 
 
 **A desktop music experience, refined.**
 
-**BitChord Desktop - Revived** is an independent, community-maintained continuation of the original BitChord desktop app. It brings together a polished interface, immersive playback, and desktop-first controls for Windows and Linux.
+**BitChord Desktop Revived** is an independent, community-maintained YouTube Music desktop client for **Windows and Linux**. Enjoy immersive lyrics, music videos, local music, Spotify playlist import, and desktop media controls in a customizable interface.
 
 
 ![Status](https://img.shields.io/badge/status-revival%20in%20progress-DAA520?style=flat-square)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux-6677AA?style=flat-square)
 [![GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-555555?style=flat-square)](LICENSE)
 
-[**Downloads**](#downloads) · [**Features**](#features) · [**Build**](#building-from-source) · [**Roadmap**](#roadmap) · [**Credits**](#credits--upstream)
+[**Downloads**](#downloads) · [**Features**](#features) · [**Build**](#building-from-source) · [**Roadmap**](docs/strategy/roadmap-2026-11.md) · [**Credits**](#credits--upstream)
 
 </div>
 
@@ -29,7 +31,7 @@
 
 <div align="center">
 
-<h2><a id="download"></a>✨ Highlights</h2>
+<h2 id="features">✨ Highlights</h2>
 
 
 - **Apple Music Experience** - A refined, modern interface featuring elegant frosted surfaces, adaptive blur, a Mica-inspired sidebar, smooth animations, and seamless light/dark themes.
@@ -43,24 +45,38 @@
 
 <div align="center">
 
-<h2><a id="download"></a>Download</h2>
+<h2 id="downloads">Download</h2>
 
-<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/main/yeyyeyyyyeyey-Artboard-1.svg" alt="Download for Android" height="55"/></a>
-<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/main/yeyyeyyyyeyey-Artboard-1-copy.svg" alt="Download for Android" height="55"/></a>
+<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="yeyyeyyyyeyey-Artboard-1.svg" alt="Download for Windows" height="55"/></a>
+<a href="https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases" target="_blank" rel="noopener noreferrer"><img src="yeyyeyyyyeyey-Artboard-1-copy.svg" alt="Download for Linux" height="55"/></a>
+
+[**Download the latest release**](https://github.com/Bntagaaa/BitChord-Desktop-Revived/releases/latest)
+
+- **Windows x64:** choose the setup `.exe`, `.msi`, or portable `.zip`.
+- **Linux x86_64:** choose AppImage, `.deb`, `.rpm`, or the Arch/CachyOS package. For AppImage, run `chmod +x BitChord-*-linux-x86_64.AppImage` before opening it.
+- **macOS:** no supported Revived release is currently provided.
 
 **Note:** If you're looking for the Android APK, please download it from the [original BitChord repository](https://github.com/kushagrasinghx/BitChord/releases). This fork is focused on the desktop experience.
 
 
 </div>
 
-</div>
 <div align="center">
 
-<h2><a id="download"></a>⚙️ Build from source</h2>
+<h2 id="building-from-source">⚙️ Build from source</h2>
 
 </div>
 
-**Requirements:** Java 21 and Git.
+**Requirements:** JDK 21 and Git. See [DESKTOP.md](DESKTOP.md) for native build prerequisites and packaging.
+
+Development targets **`1.9.2`**. The **`bitchord-desktop-reworked`** branch is experimental and follows a separate development track.
+
+```bash
+git clone --branch 1.9.2 https://github.com/Bntagaaa/BitChord-Desktop-Revived.git
+cd BitChord-Desktop-Revived
+```
+
+See the [development roadmap](docs/strategy/roadmap-2026-11.md), [technical audit](docs/strategy/competitive-audit-2026-11.md), and [contribution guide](CONTRIBUTING.md).
 
 Windows (PowerShell):
 
@@ -74,10 +90,9 @@ Linux:
 ./gradlew :desktopApp:run
 ```
 
-</div>
 <div align="center">
 
-<h2><a id="download"></a>📜 Credits and license</h2>
+<h2 id="credits--upstream">📜 Credits and license</h2>
 
 </div>
 
@@ -101,7 +116,7 @@ We sincerely appreciate the work and dedication of all developers whose contribu
 
 ### License
 
-BitChord Desktop — Revived is distributed under the **[GNU General Public License v3.0](https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/main/LICENSE)**.
+BitChord Desktop — Revived is distributed under the **[GNU General Public License v3.0](LICENSE)**.
 
 This project builds upon GPL-licensed source code from the original BitChord repository and compatible community forks. Original copyright notices and applicable license terms remain in effect.
 
