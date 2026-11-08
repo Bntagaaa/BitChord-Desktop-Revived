@@ -141,10 +141,20 @@ jobs:
           chmod +x "$tool_path" gradlew desktopApp/packaging/appimage.sh
           sha256sum "$tool_path"
 
+      # appimagetool 1.9.x invokes desktop-file-validate while packaging.
+      # The Ubuntu 22.04 runner does not guarantee that binary is preinstalled.
+      # Required for both the manual AppImage build and updater audit workflow.
+      - name: Install AppImage desktop-entry validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends desktop-file-utils
+          command -v desktop-file-validate
+
       - name: Native package tools for updater audit
         if: ${{ inputs.audit_packages }}
         run: |
-          sudo apt-get update
           sudo apt-get install -y rpm fakeroot
 
       - name: Run tests
