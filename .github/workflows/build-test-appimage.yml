@@ -77,15 +77,69 @@ jobs:
           printf 'LASTFM_API_KEY=%s\n' "$LASTFM_API_KEY" > local.properties
           printf 'LASTFM_SECRET=%s\n' "$LASTFM_SECRET" >> local.properties
 
-      - name: Download AppImage packaging tool
+      # Keep the verified stable tool in the Actions cache. The old workflow
+      # fetched the mutable "continuous" release on every run; a GitHub CDN 504
+      # then failed AppImage builds before Gradle could even start.
+      - name: Cache stable AppImage packaging tool
+        uses: actions/cache@v4
+        with:
+          path: appimagetool.AppImage
+          key: appimagetool-x86_64-1.9.1-ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+
+      - name: Download and verify AppImage packaging tool
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 --silent --show-error \
-            -o appimagetool.AppImage \
-            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool.AppImage
-          chmod +x gradlew desktopApp/packaging/appimage.sh
+          # Official, fixed AppImage/appimagetool release. Its SHA-256 is taken
+          # from the release asset metadata, not the mutable "continuous" tag.
+          expected_sha="ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+          tool_path="appimagetool.AppImage"
+          stable_url="https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
+          fallback_url="https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage"
+
+          if [[ -s "$tool_path" ]] && echo "$expected_sha  $tool_path" | sha256sum --check --status; then
+            echo "Using SHA-256 verified cached appimagetool 1.9.1"
+          else
+            rm -f "$tool_path"
+            downloaded=false
+            for release in 1.9.1 1.9.0; do
+              if [[ "$release" == "1.9.1" ]]; then
+                url="$stable_url"
+              else
+                url="$fallback_url"
+              fi
+              tmp="$(mktemp)"
+              echo "Fetching official appimagetool $release"
+              if curl --fail --location --silent --show-error \
+                  --connect-timeout 20 --max-time 180 \
+                  --retry 4 --retry-all-errors --retry-delay 3 \
+                  --output "$tmp" "$url"; then
+                size="$(wc -c < "$tmp")"
+                # Type-2 AppImages have the magic bytes 'AI' + 02 at offset 8.
+                magic="$(od -An -tx1 -j8 -N3 "$tmp" | tr -d '[:space:]')"
+                if [[ "$size" -ge 10000000 && "$magic" == "414902" ]]; then
+                  if [[ "$release" != "1.9.1" ]] || echo "$expected_sha  $tmp" | sha256sum --check --status; then
+                    mv "$tmp" "$tool_path"
+                    downloaded=true
+                    echo "Validated official appimagetool $release (bytes=$size)"
+                    break
+                  fi
+                  echo "::warning::appimagetool 1.9.1 checksum mismatch; rejecting download"
+                else
+                  echo "::warning::Invalid appimagetool $release (bytes=$size, type2 magic=$magic)"
+                fi
+              else
+                echo "::warning::Could not fetch official appimagetool $release; trying fallback"
+              fi
+              rm -f "$tmp"
+            done
+            if [[ "$downloaded" != true ]]; then
+              echo "::error::All official AppImage packaging tool sources failed"
+              exit 1
+            fi
+          fi
+          chmod +x "$tool_path" gradlew desktopApp/packaging/appimage.sh
+          sha256sum "$tool_path"
 
       - name: Native package tools for updater audit
         if: ${{ inputs.audit_packages }}
