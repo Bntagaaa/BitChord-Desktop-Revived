@@ -231,6 +231,20 @@ object PlayerPlatform {
     fun install(host: PlayerHost) {
         installed = host
     }
+
+    /**
+     * Let isolated Compose tests render player controls with a minimal platform host.
+     * Always restore the previous host, even when a test fails.
+     */
+    internal fun <T> withHostForTest(testHost: PlayerHost, test: () -> T): T {
+        val previous = installed
+        installed = testHost
+        return try {
+            test()
+        } finally {
+            installed = previous
+        }
+    }
 }
 
 /** The settings the player reads, named and typed as the phone's AppSettings has them. */
