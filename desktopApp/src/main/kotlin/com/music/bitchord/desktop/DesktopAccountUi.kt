@@ -4,6 +4,7 @@ import com.music.bitchord.ui.screens.desktopTopScrollFade
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -120,7 +121,11 @@ internal fun DesktopAccountSelector(
     val reduceMotion by DesktopAppearanceSettings.reduceAnimation.collectAsState()
     val progress by animateFloatAsState(
         targetValue = if (appeared && !closing) 1f else 0f,
-        animationSpec = tween(if (reduceMotion) 0 else if (closing) 170 else 190),
+        animationSpec = when {
+            reduceMotion -> tween(0)
+            closing -> tween(170)
+            else -> spring(dampingRatio = 1f, stiffness = 470f)
+        },
         label = "profile-context-menu-motion",
     )
     LaunchedEffect(Unit) { appeared = true }
