@@ -4,7 +4,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.extension
 
 /**
@@ -24,8 +23,6 @@ internal object DesktopMediaCache {
         Path.of(state, "bitchord", "media").also { runCatching { Files.createDirectories(it) } }
     }
 
-    private val known = ConcurrentHashMap<String, Path>()
-
     /** The cached file for [url], or null when nothing has been kept for it. */
     fun existing(url: String, extension: String): Path? {
         val target = pathFor(url, extension)
@@ -33,8 +30,10 @@ internal object DesktopMediaCache {
     }
 
     /** Where [url] would be written, whether or not it has been. */
+    // Derive the path without retaining every URL encountered for the process lifetime.
+    // Disk eviction cannot bound a URL-to-path map, and signed clip URLs keep changing.
     fun pathFor(url: String, extension: String): Path =
-        known.getOrPut("$url|$extension") { directory.resolve("${digest(url)}.$extension") }
+        directory.resolve("${digest(url)}.$extension")
 
     /** What the cache is currently holding, in bytes. */
     fun sizeBytes(): Long = files().sumOf { runCatching { Files.size(it) }.getOrDefault(0L) }
@@ -43,7 +42,6 @@ internal object DesktopMediaCache {
     fun clear(): Long {
         val freed = sizeBytes()
         files().forEach { runCatching { Files.deleteIfExists(it) } }
-        known.clear()
         return freed
     }
 
