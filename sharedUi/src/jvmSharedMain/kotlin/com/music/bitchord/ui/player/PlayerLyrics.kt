@@ -1957,6 +1957,10 @@ internal fun LyricsPanel(
             snapshotFlow { listState.layoutInfo }.first {
                 it.viewportSize.height > 0 && (!centered || it.beforeContentPadding > 0)
             }
+            // LayoutInfo can wake this coroutine from a SubcomposeLayout measure.
+            // Imperative scroll forces another measure, so wait for the next frame
+            // before placing the initial line or adjusting its scroll position.
+            withFrameNanos { }
             // Keep the same anchor whether the playback controls are visible or hidden.
             val visible = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == focusLine }
             when {
