@@ -58,5 +58,12 @@ mkdir -p "$(dirname "$OUT")"
 # APPIMAGE_EXTRACT_AND_RUN rather than the flag of the same name: it is read by the AppImage
 # runtime, so it covers a CI runner with no FUSE, and a natively built appimagetool — which has
 # no such flag and would refuse to start — simply ignores it.
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" "$APPDIR" "$OUT"
+# CI supplies a downloaded runtime via APPIMAGETOOL_RUNTIME_FILE.  The option is
+# supported by modern appimagetool and avoids its fragile internal network fetch.
+if [ -n "${APPIMAGETOOL_RUNTIME_FILE:-}" ]; then
+    [ -s "$APPIMAGETOOL_RUNTIME_FILE" ] || { echo "missing AppImage runtime: $APPIMAGETOOL_RUNTIME_FILE" >&2; exit 1; }
+    ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" --runtime-file "$APPIMAGETOOL_RUNTIME_FILE" "$APPDIR" "$OUT"
+else
+    ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" "$APPDIR" "$OUT"
+fi
 echo "appimage: $OUT"
