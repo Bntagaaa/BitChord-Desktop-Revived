@@ -21,6 +21,7 @@ import com.music.bitchord.data.sources.TrackMatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -1248,7 +1249,9 @@ class SourcesTest {
      * between two that answered at the same moment.
      */
     @Test
-    fun `prefers the better of two answers that arrive together`() = runBlocking {
+    fun `prefers the better of two answers that arrive together`() = runTest {
+        // Equal wall-clock delays are not simultaneous on a loaded runner. The test
+        // scheduler completes both answers at virtual time 5 before resuming selection.
         val worse = FakeSource("Ricky's Addon", answerAfterMs = 5, format = StreamFormat("mp3", kbps = 128))
         val better = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
         val (source, stream) = SourceResolver.bestAcross(
