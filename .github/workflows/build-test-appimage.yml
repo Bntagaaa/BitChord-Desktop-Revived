@@ -174,6 +174,77 @@ jobs:
           path: appimagetool.AppImage
           key: appimagetool-x86_64-verified-stable-v2
 
+      # appimagetool downloads the AppImage runtime itself if --runtime-file is
+      # omitted. That internal download failed with CDN 504 on AppImage build #177.
+      # Pin the upstream asset by immutable release asset ID + official SHA-256.
+      - name: Restore verified AppImage type-2 runtime
+        id: appimage-runtime-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: runtime-x86_64
+          key: appimage-runtime-x86_64-657374641-617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46
+
+      - name: Download and verify AppImage type-2 runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="runtime-x86_64"
+          expected_sha="617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46"
+          expected_size=944632
+          valid_runtime() {
+            [[ -s "$1" ]] &&
+              [[ "$(wc -c < "$1")" -eq "$expected_size" ]] &&
+              [[ "$(od -An -tx1 -N4 "$1" | tr -d '[:space:]')" == "7f454c46" ]] &&
+              echo "$expected_sha  $1" | sha256sum --check --status
+          }
+
+          if valid_runtime "$runtime"; then
+            echo "Using verified cached AppImage type-2 runtime"
+          else
+            rm -f "$runtime"
+            urls=(
+              "https://api.github.com/repos/AppImage/type2-runtime/releases/assets/657374641"
+              "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64"
+            )
+            tmp="$(mktemp)"
+            trap 'rm -f "$tmp"' EXIT
+            for idx in "${!urls[@]}"; do
+              url="${urls[$idx]}"
+              curl_args=(
+                --fail --location --silent --show-error
+                --connect-timeout 20 --max-time 120
+                --retry 2 --retry-all-errors --retry-delay 3
+              )
+              if [[ "$url" == https://api.github.com/* ]]; then
+                curl_args+=(--header "Accept: application/octet-stream"
+                            --header "X-GitHub-Api-Version: 2022-11-28")
+              fi
+              rm -f "$tmp"
+              echo "Fetching verified AppImage runtime source $((idx + 1))/${#urls[@]}"
+              if curl "${curl_args[@]}" --output "$tmp" "$url" && valid_runtime "$tmp"; then
+                mv "$tmp" "$runtime"
+                echo "AppImage runtime validated (source $((idx + 1)), size=$expected_size)"
+                break
+              fi
+              echo "::warning::AppImage runtime source $((idx + 1)) failed verification/download"
+            done
+            if ! valid_runtime "$runtime"; then
+              echo "::error::All verified AppImage runtime sources failed"
+              exit 1
+            fi
+          fi
+          chmod +x "$runtime"
+          sha256sum "$runtime"
+
+      # Save before the expensive build, so a later packaging/test failure
+      # does not discard the successfully verified runtime download.
+      - name: Save verified AppImage type-2 runtime
+        if: steps.appimage-runtime-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: runtime-x86_64
+          key: appimage-runtime-x86_64-657374641-617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46
+
       # appimagetool 1.9.x invokes desktop-file-validate while packaging.
       # The Ubuntu 22.04 runner does not guarantee that binary is preinstalled.
       # Required for both the manual AppImage build and updater audit workflow.
@@ -230,7 +301,8 @@ jobs:
           desktopApp/packaging/appimage.sh \
             desktopApp/build/compose/binaries/main/app/BitChord \
             "dist/BitChord-${{ steps.meta.outputs.version }}-linux-x86_64.AppImage" \
-            "$PWD/appimagetool.AppImage"
+            "$PWD/appimagetool.AppImage" \
+            "$PWD/runtime-x86_64"
 
       - name: Verify portable AppImage without FUSE
         shell: bash
