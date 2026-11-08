@@ -3,6 +3,9 @@ name: Build tes Appimage
 # One-click portable Linux build from the branch selected in Actions.
 # This workflow does NOT publish a release or modify the AUR.
 on:
+  # Keep the landscape PR's downloadable binary tied to its latest commit.
+  push:
+    branches: [fix/1.9.2-landscape-lyrics-track-header]
   workflow_call:
     inputs:
       version:
@@ -52,6 +55,9 @@ jobs:
         run: |
           set -euo pipefail
           version="${INPUT_VERSION:-1.8.2-test}"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            version="1.9.2-landscape-${GITHUB_SHA:0:8}"
+          fi
           if [[ ! "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
             echo "::error::Version label may only contain letters, digits, '.', '_' and '-' (max 64 characters)."
             exit 1
@@ -77,20 +83,188 @@ jobs:
           printf 'LASTFM_API_KEY=%s\n' "$LASTFM_API_KEY" > local.properties
           printf 'LASTFM_SECRET=%s\n' "$LASTFM_SECRET" >> local.properties
 
-      - name: Download AppImage packaging tool
+      # Restore a verified packaging binary before trying the network. A regular
+      # cache action saves only at the end of a successful job; on #173 the tool
+      # downloaded correctly, but the later packaging error prevented caching.
+      # Split restore/save so successful downloads survive subsequent failures.
+      - name: Restore verified AppImage tool cache
+        id: appimagetool-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: appimagetool.AppImage
+          key: appimagetool-x86_64-verified-stable-v2
+
+      - name: Download and verify AppImage packaging tool
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 --silent --show-error \
-            -o appimagetool.AppImage \
-            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool.AppImage
-          chmod +x gradlew desktopApp/packaging/appimage.sh
+          expected_191="ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+          # 1.9.0 fallback digest recorded by successful download in CI #173.
+          expected_190="46fdd785094c7f6e545b61afcfb0f3d98d8eab243f644b4b17698c01d06083d1"
+          # Additional pinned official release, if both stable release assets
+          # are temporarily unavailable through GitHub's downloads CDN.
+          expected_continuous="e8c1169c4af66c3184d7ee110713d4be04befe671fa358e2c1591ee840553b03"
+          tool_path="appimagetool.AppImage"
+
+          checksum_valid() {
+            local sha
+            [[ -s "$1" ]] || return 1
+            sha="$(sha256sum "$1" | cut -d ' ' -f 1)"
+            [[ "$sha" == "$expected_191" || "$sha" == "$expected_190" || "$sha" == "$expected_continuous" ]]
+          }
+          valid_appimage() {
+            [[ "$(wc -c < "$1")" -ge 10000000 ]] &&
+              [[ "$(od -An -tx1 -j8 -N3 "$1" | tr -d '[:space:]')" == "414902" ]]
+          }
+
+          if checksum_valid "$tool_path" && valid_appimage "$tool_path"; then
+            echo "Reusing checksum-verified cached appimagetool"
+          else
+            rm -f "$tool_path"
+            urls=(
+              # The GitHub Releases *API* asset endpoint can stream bytes or
+              # redirect to object storage, independently of the /download URL
+              # which intermittently returned HTTP 504 on CI runs #172/#174.
+              "https://api.github.com/repos/AppImage/appimagetool/releases/assets/324406736"
+              "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
+              "https://api.github.com/repos/AppImage/appimagetool/releases/assets/184558942"
+              "https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage"
+              "https://api.github.com/repos/AppImage/appimagetool/releases/assets/715388534"
+            )
+            digests=(
+              "$expected_191" "$expected_191"
+              "$expected_190" "$expected_190"
+              "$expected_continuous"
+            )
+            tmp="$(mktemp)"
+            trap 'rm -f "$tmp"' EXIT
+            for idx in "${!urls[@]}"; do
+              url="${urls[$idx]}"
+              rm -f "$tmp"
+              curl_args=(
+                --fail --location --silent --show-error
+                --connect-timeout 20 --max-time 120
+                --retry 2 --retry-all-errors --retry-delay 3
+              )
+              if [[ "$url" == https://api.github.com/* ]]; then
+                curl_args+=(--header "Accept: application/octet-stream"
+                            --header "X-GitHub-Api-Version: 2022-11-28")
+              fi
+              echo "Trying appimagetool source $((idx + 1))/${#urls[@]}"
+              if curl "${curl_args[@]}" --output "$tmp" "$url"; then
+                if valid_appimage "$tmp" &&
+                   echo "${digests[$idx]}  $tmp" | sha256sum --check --status; then
+                  mv "$tmp" "$tool_path"
+                  echo "Accepted and SHA-256 verified appimagetool source $((idx + 1))"
+                  break
+                fi
+                echo "::warning::Rejected non-AppImage or checksum mismatch from source $((idx + 1))"
+              else
+                echo "::warning::Download source $((idx + 1)) unavailable; trying the next source"
+              fi
+            done
+            if ! checksum_valid "$tool_path" || ! valid_appimage "$tool_path"; then
+              echo "::error::All verified appimagetool sources failed (GitHub asset API and release URLs)"
+              exit 1
+            fi
+          fi
+          chmod +x "$tool_path" gradlew desktopApp/packaging/appimage.sh
+          sha256sum "$tool_path"
+
+      # Save immediately after a validated download, not at the end of the
+      # entire packaging job, so unrelated packaging/tests cannot erase the cache.
+      - name: Save verified AppImage tool cache
+        if: steps.appimagetool-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: appimagetool.AppImage
+          key: appimagetool-x86_64-verified-stable-v2
+
+      # appimagetool downloads the AppImage runtime itself if --runtime-file is
+      # omitted. That internal download failed with CDN 504 on AppImage build #177.
+      # Pin the upstream asset by immutable release asset ID + official SHA-256.
+      - name: Restore verified AppImage type-2 runtime
+        id: appimage-runtime-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: runtime-x86_64
+          key: appimage-runtime-x86_64-657374641-617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46
+
+      - name: Download and verify AppImage type-2 runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="runtime-x86_64"
+          expected_sha="617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46"
+          expected_size=944632
+          valid_runtime() {
+            [[ -s "$1" ]] &&
+              [[ "$(wc -c < "$1")" -eq "$expected_size" ]] &&
+              [[ "$(od -An -tx1 -N4 "$1" | tr -d '[:space:]')" == "7f454c46" ]] &&
+              echo "$expected_sha  $1" | sha256sum --check --status
+          }
+
+          if valid_runtime "$runtime"; then
+            echo "Using verified cached AppImage type-2 runtime"
+          else
+            rm -f "$runtime"
+            urls=(
+              "https://api.github.com/repos/AppImage/type2-runtime/releases/assets/657374641"
+              "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64"
+            )
+            tmp="$(mktemp)"
+            trap 'rm -f "$tmp"' EXIT
+            for idx in "${!urls[@]}"; do
+              url="${urls[$idx]}"
+              curl_args=(
+                --fail --location --silent --show-error
+                --connect-timeout 20 --max-time 120
+                --retry 2 --retry-all-errors --retry-delay 3
+              )
+              if [[ "$url" == https://api.github.com/* ]]; then
+                curl_args+=(--header "Accept: application/octet-stream"
+                            --header "X-GitHub-Api-Version: 2022-11-28")
+              fi
+              rm -f "$tmp"
+              echo "Fetching verified AppImage runtime source $((idx + 1))/${#urls[@]}"
+              if curl "${curl_args[@]}" --output "$tmp" "$url" && valid_runtime "$tmp"; then
+                mv "$tmp" "$runtime"
+                echo "AppImage runtime validated (source $((idx + 1)), size=$expected_size)"
+                break
+              fi
+              echo "::warning::AppImage runtime source $((idx + 1)) failed verification/download"
+            done
+            if ! valid_runtime "$runtime"; then
+              echo "::error::All verified AppImage runtime sources failed"
+              exit 1
+            fi
+          fi
+          chmod +x "$runtime"
+          sha256sum "$runtime"
+
+      # Save before the expensive build, so a later packaging/test failure
+      # does not discard the successfully verified runtime download.
+      - name: Save verified AppImage type-2 runtime
+        if: steps.appimage-runtime-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: runtime-x86_64
+          key: appimage-runtime-x86_64-657374641-617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46
+
+      # appimagetool 1.9.x invokes desktop-file-validate while packaging.
+      # The Ubuntu 22.04 runner does not guarantee that binary is preinstalled.
+      # Required for both the manual AppImage build and updater audit workflow.
+      - name: Install AppImage desktop-entry validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends desktop-file-utils
+          command -v desktop-file-validate
 
       - name: Native package tools for updater audit
         if: ${{ inputs.audit_packages }}
         run: |
-          sudo apt-get update
           sudo apt-get install -y rpm fakeroot
 
       - name: Run tests
@@ -100,6 +274,9 @@ jobs:
       # Manual quick builds wrap jpackage once; the reusable audit also checks native packages.
       - name: Build portable Linux application
         run: ./gradlew :desktopApp:createDistributable "-Pbitchord.version=${{ steps.meta.outputs.version }}" --build-cache
+
+      - name: Verify packaged player matches compiled UI
+        run: python3 .github/scripts/check-packaged-player-ui.py desktopApp/build/compose/binaries/main/app/BitChord
 
       - name: Build and inspect DEB/RPM for updater audit
         if: ${{ inputs.audit_packages }}
@@ -133,7 +310,8 @@ jobs:
           desktopApp/packaging/appimage.sh \
             desktopApp/build/compose/binaries/main/app/BitChord \
             "dist/BitChord-${{ steps.meta.outputs.version }}-linux-x86_64.AppImage" \
-            "$PWD/appimagetool.AppImage"
+            "$PWD/appimagetool.AppImage" \
+            "$PWD/runtime-x86_64"
 
       - name: Verify portable AppImage without FUSE
         shell: bash
@@ -147,6 +325,7 @@ jobs:
           test -x squashfs-root/usr/bin/BitChord
           test -f squashfs-root/bitchord.desktop
           test -f squashfs-root/bitchord.png
+          python3 .github/scripts/check-packaged-player-ui.py squashfs-root/usr
           bash desktopApp/packaging/tests/linux-automix-check.sh squashfs-root/usr
           sha256sum "$appimage"
           ls -lh "$appimage"

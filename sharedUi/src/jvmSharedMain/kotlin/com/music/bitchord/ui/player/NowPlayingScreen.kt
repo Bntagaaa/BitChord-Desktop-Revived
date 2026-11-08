@@ -132,6 +132,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -1555,7 +1556,7 @@ fun NowPlayingScreen(
         // Keep the current output caption visible in every state.
         Spacer(Modifier.height(18.dp))
         Box(
-            modifier = Modifier.fillMaxWidth().height(20.dp),
+            modifier = Modifier.fillMaxWidth().height(20.dp).testTag("player-output-caption"),
             contentAlignment = Alignment.TopCenter,
         ) {
             OutputCaption(
@@ -1789,8 +1790,27 @@ fun NowPlayingScreen(
         LocalPlayerTint provides if (mobileTextChrome) Color.White else playerTint,
         LocalPlayerChrome provides chrome,
     ) {
-        val videoLyricsPane: @Composable () -> Unit = {
+        val reducePlayerMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+        val landscapeTrackHeader: @Composable (Boolean, Boolean) -> Unit = { compact, active ->
+            LandscapeTrackHeader(
+                compact = compact,
+                song = song,
+                caption = if (hideSongStatus) null else playbackOriginText(song, playedBy),
+                onOpenCaption = openPlaybackOrigin,
+                onOpenAlbum = onOpenAlbum,
+                onOpenArtist = onOpenArtist,
+                active = active,
+                reduceMotion = reducePlayerMotion,
+                actions = {
+                    LandscapeTrackActions(song, signedIn, likeStatus, showRevertCue, onToggleLike, onOpenMenu)
+                },
+            )
+        }
+        val landscapeLyricsPane: @Composable () -> Unit = {
             LandscapeLyricsPane(
+                revealControlsOnHover = PlayerPlatform.host.musicVideoFullscreen != null,
+                controlsPinned = showLyricsProviders,
+                reduceMotion = reducePlayerMotion,
                 hasLyrics = lyricsTranslation.displayedLyrics.isNotEmpty(),
                 placeholder = if (lyricsUnavailable) {
                     stringResource(Res.string.lyrics_not_available)
@@ -1854,6 +1874,7 @@ fun NowPlayingScreen(
                         onPickLine = lyricPicker.pick,
                         onTogglePick = lyricPicker.toggle,
                         centerFocus = true,
+                        landscapeViewport = PlayerPlatform.host.musicVideoFullscreen != null,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -2019,6 +2040,7 @@ fun NowPlayingScreen(
 
             Box(modifier = modifier.fillMaxSize().then(dockHost)) {
                 LandscapePlayerLayout(
+                    trackKey = song.videoId,
                     pane = when {
                         lyricsOpen -> PlayerPane.Lyrics
                         queueOpen -> PlayerPane.Queue
@@ -2127,30 +2149,17 @@ fun NowPlayingScreen(
                         }
                     },
                     actions = playerActions,
+                    header = landscapeTrackHeader,
                     mainPane = { compact ->
                         LandscapeMainPane(
                             compact = compact,
-                            caption = if (hideSongStatus) null else playbackOriginText(song, playedBy),
-                            onOpenCaption = openPlaybackOrigin,
-                            credits = {
-                                LandscapeCredits(
-                                    song = song,
-                                    signedIn = signedIn,
-                                    likeStatus = likeStatus,
-                                    showRevertCue = showRevertCue,
-                                    onToggleLike = onToggleLike,
-                                    onOpenMenu = onOpenMenu,
-                                    onOpenAlbum = onOpenAlbum,
-                                    onOpenArtist = onOpenArtist,
-                                )
-                            },
                             lyricStrip = if (syncedLyricsEnabled) {
                                 {
                                     CurrentLyricStrip(
                                         lines = lyricsTranslation.displayedLyrics,
                                         trackKey = song.videoId,
                                         playhead = lyricsPlayhead,
-                                        isPlaying = isPlaying && position.advancing,
+                                        isPlaying = isPlaying && position.advancing && !panelOpen,
                                         durationMs = durationMs,
                                         lyricsUnavailable = lyricsUnavailable,
                                         loadingText = lyricsLoadingText,
@@ -2207,7 +2216,7 @@ fun NowPlayingScreen(
                             },
                         )
                     },
-                    lyricsPane = videoLyricsPane,
+                    lyricsPane = landscapeLyricsPane,
                     queuePane = {
                         InlineQueue(
                             queue = queue,

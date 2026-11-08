@@ -46,10 +46,18 @@ jobs:
       - name: Tests
         env:
           BITCHORD_PIP_NATIVE_TEST: '1'
-        run: xvfb-run -a ./gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua"
+        shell: bash
+        run: xvfb-run -a ./gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | tee desktop-tests.log
+
+      - name: Report test failures
+        if: failure()
+        run: python .github/scripts/report-desktop-test-failures.py
 
       - name: Build the distributable
         run: ./gradlew :desktopApp:createDistributable "-Pbitchord.version=test-visua"
+
+      - name: Verify packaged player matches compiled UI
+        run: python3 .github/scripts/check-packaged-player-ui.py desktopApp/build/compose/binaries/main/app/BitChord
 
       - name: Linux packaged AutoMix JNI and model regression
         run: bash desktopApp/packaging/tests/linux-automix-check.sh
@@ -68,6 +76,16 @@ jobs:
           path: desktopApp/build/reports/pip-rebuild/
           if-no-files-found: ignore
 
+      - name: Upload landscape player render evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: landscape-player-linux-render-evidence
+          path: |
+            sharedUi/build/reports/landscape-player/
+            desktopApp/build/reports/landscape-player/
+          if-no-files-found: ignore
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
@@ -76,6 +94,7 @@ jobs:
           path: |
             desktopApp/build/reports/tests/
             shared/build/reports/tests/
+            sharedUi/build/reports/tests/
 
   desktop-windows:
     name: Desktop · Windows
@@ -100,12 +119,49 @@ jobs:
       - name: CMake version
         run: cmake --version
 
+      # Compose Desktop honors WIX_PATH and skips the unreliable downloadWix
+      # GitHub Releases request. windows-latest ships WiX Toolset 3.14.
+      - name: Use preinstalled WiX Toolset 3
+        shell: pwsh
+        run: |
+          $wixBin = $null
+          $fromPath = Get-Command candle.exe -ErrorAction SilentlyContinue
+          if ($fromPath) {
+            $candidate = Split-Path -Parent $fromPath.Source
+            if (Test-Path (Join-Path $candidate 'light.exe')) { $wixBin = $candidate }
+          }
+          if (-not $wixBin) {
+            $roots = @(${env:ProgramFiles(x86)}, $env:ProgramFiles) | Where-Object { $_ -and (Test-Path $_) }
+            $candidates = @(
+              foreach ($root in $roots) {
+                Get-ChildItem -Path $root -Directory -Filter 'WiX Toolset v3*' -ErrorAction SilentlyContinue |
+                  ForEach-Object { Join-Path $_.FullName 'bin' }
+              }
+            )
+            $wixBin = $candidates | Where-Object {
+              (Test-Path (Join-Path $_ 'candle.exe')) -and (Test-Path (Join-Path $_ 'light.exe'))
+            } | Select-Object -First 1
+          }
+          if (-not $wixBin) { throw 'WiX 3.x not found on Windows runner; cannot build MSI without it' }
+          "WIX_PATH=$wixBin" >> $env:GITHUB_ENV
+          "$wixBin" >> $env:GITHUB_PATH
+          Write-Host "WiX Toolset: $wixBin"
+
       # Keep Windows' EXE/MSI metadata valid for the same descriptive build labels.
       - name: Tests
-        run: .\gradlew.bat :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua"
+        run: |
+          .\gradlew.bat :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | Tee-Object -FilePath desktop-tests.log
+          exit $LASTEXITCODE
+
+      - name: Report test failures
+        if: failure()
+        run: python .github/scripts/report-desktop-test-failures.py
 
       - name: Build the distributable
         run: .\gradlew.bat :desktopApp:createDistributable "-Pbitchord.version=test-visua"
+
+      - name: Verify packaged player matches compiled UI
+        run: python .github/scripts/check-packaged-player-ui.py desktopApp/build/compose/binaries/main/app/BitChord
 
       - name: Windows packaged AutoMix JNI and dependency regression
         shell: pwsh
@@ -128,6 +184,16 @@ jobs:
           path: desktopApp/build/reports/pip-rebuild/
           if-no-files-found: ignore
 
+      - name: Upload landscape player render evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: landscape-player-windows-render-evidence
+          path: |
+            sharedUi/build/reports/landscape-player/
+            desktopApp/build/reports/landscape-player/
+          if-no-files-found: ignore
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
@@ -136,6 +202,7 @@ jobs:
           path: |
             desktopApp/build/reports/tests/
             shared/build/reports/tests/
+            sharedUi/build/reports/tests/
 
   android:
     name: Android

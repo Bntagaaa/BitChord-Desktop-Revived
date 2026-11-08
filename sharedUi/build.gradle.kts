@@ -91,6 +91,8 @@ kotlin {
         jvmTest.dependencies {
             implementation(kotlin("test"))
             implementation("junit:junit:4.13.2")
+            implementation(compose.desktop.uiTestJUnit4)
+            implementation(compose.desktop.currentOs)
         }
         androidMain.dependencies {
             // The phone's own versions, so nothing here moves them.

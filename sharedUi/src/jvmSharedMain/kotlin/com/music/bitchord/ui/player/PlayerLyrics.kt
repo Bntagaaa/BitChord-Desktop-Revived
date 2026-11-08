@@ -106,6 +106,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -1784,6 +1785,8 @@ internal fun LyricsPanel(
      * read from its top edge leaves most of the screen below the words.
      */
     centerFocus: Boolean = LocalCenteredLyrics.current,
+    /** Desktop landscape owns the visible fades and lets early lines start at the top. */
+    landscapeViewport: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val panelPlaying = isPlaying && active
@@ -1951,12 +1954,16 @@ internal fun LyricsPanel(
         if (active && isSynced && !browsing &&
             focusLine >= 0 && focusLine in lines.indices
         ) {
-            // Centred, the top padding is half the viewport, and it only exists
-            // a frame after the viewport does. Placing against the frame before
-            // it lands would leave the line that whole padding off centre.
+            // Wait for the viewport and its padding before computing the anchor.
+            // Desktop landscape uses a small opening inset: the list clamps at
+            // its start until enough preceding rows exist to center the active one.
             snapshotFlow { listState.layoutInfo }.first {
                 it.viewportSize.height > 0 && (!centered || it.beforeContentPadding > 0)
             }
+            // LayoutInfo can wake this coroutine from a SubcomposeLayout measure.
+            // Imperative scroll forces another measure, so wait for the next frame
+            // before placing the initial line or adjusting its scroll position.
+            withFrameNanos { }
             // Keep the same anchor whether the playback controls are visible or hidden.
             val visible = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == focusLine }
             when {
@@ -2039,14 +2046,14 @@ internal fun LyricsPanel(
             // below takes taps at the initial pass, so while a pick is open it
             // would swallow every choice before the row ever saw it.
             .revealLyricsControlsOnTap(!controlsOpen && !picking, onBottomHalfTap)
-            .fadingEdges(),
+            .then(if (landscapeViewport) Modifier else Modifier.fadingEdges()),
         // Each row carries GLOW_ROOM of its own inset for the halo, so the
         // list hands that much back — otherwise the lines would sit a glow's
         // width further apart and further in than they used to.
-        // Centred, half the viewport above the first line, so that it too can
-        // be brought to the middle.
+        // Other centered layouts retain their half-viewport opening padding.
+        // Desktop landscape fills the top immediately and centers naturally later.
         contentPadding = PaddingValues(
-            top = if (centered) {
+            top = if (centered && !landscapeViewport) {
                 with(LocalDensity.current) { viewportHeight.toDp() } * 0.5f
             } else {
                 40.dp - GLOW_ROOM
@@ -2408,7 +2415,7 @@ internal fun LyricsPanel(
                     )
                 }
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                Column(modifier = shape) {
+                Column(modifier = shape.testTag("lyrics-row-$index")) {
                     PanelVoice(
                         line = line,
                         clock = clock,

@@ -22,7 +22,6 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -45,7 +44,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.draw.alpha
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -1354,13 +1352,14 @@ internal fun MarqueeText(
     startDelayMillis: Long = 0L,
     trailing: (@Composable () -> Unit)? = null,
     onOverflowChange: (Boolean) -> Unit = {},
+    paused: Boolean = false,
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         BoxWithConstraints(Modifier.weight(1f, fill = false).clipToBounds()) {
             val maxWidthPx = constraints.maxWidth
-            val layout = remember(text, style, maxWidthPx) {
+            val layout = remember(text, style, maxWidthPx, textMeasurer) {
                 textMeasurer.measure(text = text, style = style, maxLines = 1, softWrap = false)
             }
             val overflowing = layout.size.width > maxWidthPx
@@ -1375,22 +1374,10 @@ internal fun MarqueeText(
                 0
             }
 
-            val offsetX = remember { Animatable(0f) }
-            LaunchedEffect(text, travelPx, startDelayMillis) {
-                offsetX.snapTo(0f)
-                if (travelPx <= 0) return@LaunchedEffect
-                val pxPerMs = with(density) { MARQUEE_DP_PER_SEC.dp.toPx() } / 1000f
-                val scrollMs = (travelPx / pxPerMs).roundToInt().coerceAtLeast(400)
-                delay(startDelayMillis)
-                while (true) {
-                    offsetX.animateTo(-travelPx.toFloat(), tween(scrollMs, easing = LinearEasing))
-                    // Invisible: the trailing copy has arrived at the leading
-                    // one's starting mark, so the line is already back where
-                    // this puts it.
-                    offsetX.snapTo(0f)
-                    delay(MARQUEE_REST_MS)
-                }
-            }
+            val offsetX = rememberPlayerMarqueeOffset(
+                text, travelPx, startDelayMillis, paused,
+                with(density) { MARQUEE_DP_PER_SEC.dp.toPx() } / 1000f, MARQUEE_REST_MS,
+            )
 
             Row(
                 // Measured unbounded so the copies actually lay out at their
@@ -1491,6 +1478,7 @@ internal fun ArtistCreditsMarquee(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     startDelayMillis: Long = 0L,
+    paused: Boolean = false,
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
@@ -1502,7 +1490,7 @@ internal fun ArtistCreditsMarquee(
             // Measured as one string, exactly as the single-line version measured
             // it, so the line starts crawling at the same moment and travels the
             // same distance.
-            val layout = remember(text, style, maxWidthPx) {
+            val layout = remember(text, style, maxWidthPx, textMeasurer) {
                 textMeasurer.measure(text = text, style = style, maxLines = 1, softWrap = false)
             }
             val overflowing = layout.size.width > maxWidthPx
@@ -1513,21 +1501,10 @@ internal fun ArtistCreditsMarquee(
                 0
             }
 
-            val offsetX = remember { Animatable(0f) }
-            LaunchedEffect(text, travelPx, startDelayMillis) {
-                offsetX.snapTo(0f)
-                if (travelPx <= 0) return@LaunchedEffect
-                val pxPerMs = with(density) { MARQUEE_DP_PER_SEC.dp.toPx() } / 1000f
-                val scrollMs = (travelPx / pxPerMs).roundToInt().coerceAtLeast(400)
-                delay(startDelayMillis)
-                while (true) {
-                    offsetX.animateTo(-travelPx.toFloat(), tween(scrollMs, easing = LinearEasing))
-                    // Invisible, for the reason the single-line version's is: the
-                    // trailing copy has arrived where the leading one started.
-                    offsetX.snapTo(0f)
-                    delay(MARQUEE_REST_MS)
-                }
-            }
+            val offsetX = rememberPlayerMarqueeOffset(
+                text, travelPx, startDelayMillis, paused,
+                with(density) { MARQUEE_DP_PER_SEC.dp.toPx() } / 1000f, MARQUEE_REST_MS,
+            )
 
             Row(
                 modifier = Modifier
