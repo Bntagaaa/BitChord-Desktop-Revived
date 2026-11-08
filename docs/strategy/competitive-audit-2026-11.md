@@ -145,7 +145,7 @@ Recent evidence is more nuanced than “Windows CI is broken”:
 
 The audit does not attribute every earlier Windows failure to the same root cause. Current build files already contain WiX discovery, installer version normalization, native-library checks and Windows Compose/Haze accommodations. Preserve those checks. Add a small failure taxonomy (dependency resolution, Kotlin/Compose ABI, native compile, test isolation, WiX/packaging, download integrity, installed-app runtime) and record the actual failed step rather than changing tests at random.
 
-PR #134 adds active-branch push coverage, installs Git before AUR checkout, verifies the worktree, and aligns the generated AUR PR with 1.9.2. **Release-event workflows come from the default branch:** merging only into 1.9.2 will not update that release handler while 1.9.1 stays default. A separate deliberate backport/default-branch decision is still required; none was performed here.
+PR #134 adds active-branch push coverage, installs Git before AUR checkout, verifies the worktree, and aligns the generated AUR PR with 1.9.2. Its first new CI run also exposed an existing Android SourcesTest tie scenario that assumed two wall-clock delays would complete simultaneously. The test now uses the existing coroutines-test virtual scheduler and keeps both quality/winner assertions. An isolated harness using the production collection loop passed 1,000 virtual-time ties; actual Android CI remains the project-level check. **Release-event workflows come from the default branch:** merging only into 1.9.2 will not update that release handler while 1.9.1 stays default. A separate deliberate backport/default-branch decision is still required; none was performed here.
 
 Updater code already checks release URL association, published SHA-256, size/free space, isolated partial files, cancellation, relaunch identity/version, and GUI readiness [R35]. Improve its test matrix and actionable stage errors; do not replace it wholesale. Validate real upgrades with an old installed version, stale installer cache, portable paths with spaces, interruption, low disk space, and failed relaunch. Package version monotonicity and displayed release version are separate contracts.
 
@@ -182,9 +182,9 @@ Completed implementation so far:
 
 | PR | Branch | Commit | Scope |
 | --- | --- | --- | --- |
-| [#134](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/134) | `fix/1.9.2-ci-branch-and-aur-checkout` | `95329dfd8c9b054a39621e4ab54ab7720ba98fc4` | Three workflow files; no runtime or tests disabled |
+| [#134](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/134) | `fix/1.9.2-ci-branch-and-aur-checkout` | `4b533811207c6fe235a1e1ca1a0303dbbdf9f77e` | Three workflow files plus a deterministic existing Android tie test; no runtime changes or tests disabled |
 | [#135](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/135) | `perf/1.9.2-release-media-path-metadata` | `6066ea0d4edc4c7f14af669546b05c99b7ae997e` | Remove one unbounded metadata map |
-| Documentation PR containing this audit | `docs/1.9.2-product-discovery-and-audit` | See PR head | README, audit, protocol and roadmap |
+| [#136](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/136) | `docs/1.9.2-product-discovery-and-audit` | See PR head | README, audit, protocol and roadmap |
 
 All target 1.9.2 and remain for human review. No automatic merge, force push, protected-branch mutation, dependency migration or experimental-branch edit. The competitor and upstream checkouts were read-only.
 
@@ -192,7 +192,7 @@ Local validation: 9 existing AUR tests passed; YAML/branch/prerequisite-order/ba
 
 Full Gradle test attempt failed during resolution of Android Gradle plugin 8.10.1 before tests executed. The environment initially has JDK17 rather than JDK21; system installation failed due setgroups/setuid restrictions. Rust/cargo, Xvfb and a usable comparative desktop/audio setup are absent. Gradle was obtained through the existing proxy, but project dependency resolution remained blocked. No escalation or configuration bypass was attempted. Application startup/playback/rendering, real Google sign-in, live party service, addon source uptime and cross-platform runtime acceptance remain unverified.
 
-CI results are time-sensitive: use the PR checks and the final implementation-results artifact for the latest observed state. A green run proves only the checks it actually ran. The proposed optimization and discovery work must not be described as already merged or released.
+PR #135 Check run [42532298688](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/42532298688) completed successfully, including Windows and Linux desktop jobs, Android and Go. This validates that PR head in the listed CI environment; it is not a head-to-head benchmark. Other CI results are time-sensitive: use the PR checks and the final implementation-results artifact for the latest observed state. A green run proves only the checks it actually ran. The proposed optimization and discovery work must not be described as already merged or released.
 
 ## Source index
 
