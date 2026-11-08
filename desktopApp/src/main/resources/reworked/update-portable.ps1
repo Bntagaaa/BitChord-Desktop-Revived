@@ -19,6 +19,14 @@ function File-Sha256([string]$path) {
     } finally { if ($reader) { $reader.Dispose() }; $hash.Dispose() }
 }
 
+function Start-App([string]$dir) {
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = [IO.Path]::Combine($dir, 'BitChordReworked.exe')
+    $info.WorkingDirectory = $dir
+    $info.UseShellExecute = $false
+    return [Diagnostics.Process]::Start($info)
+}
+
 function Write-Phase([string]$phase) {
     Write-Output ('Portable updater: ' + $phase)
     if ($operation -and [IO.Directory]::Exists($operation)) {
@@ -66,7 +74,7 @@ function Restore-Previous {
     Remove-Item Env:BITCHORD_REWORKED_UPDATE_ACK -ErrorAction SilentlyContinue
     Remove-Item Env:BITCHORD_REWORKED_UPDATE_TOKEN -ErrorAction SilentlyContinue
     Remove-Item Env:BITCHORD_REWORKED_UPDATE_VERSION -ErrorAction SilentlyContinue
-    [void](Start-Process -FilePath (Join-Path $job.portableRoot 'BitChordReworked.exe') -WorkingDirectory $job.portableRoot -PassThru)
+    [void](Start-App $job.portableRoot)
     Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'rolled-back'
 }
 
@@ -133,7 +141,7 @@ try {
     $env:BITCHORD_REWORKED_UPDATE_VERSION = [string]$job.version
     Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'starting'
     Write-Phase 'starting'
-    $updated = Start-Process -FilePath (Join-Path $job.portableRoot 'BitChordReworked.exe') -WorkingDirectory $job.portableRoot -PassThru
+    $updated = Start-App $job.portableRoot
     $deadline = [DateTime]::UtcNow.AddSeconds(75)
     while ([DateTime]::UtcNow -lt $deadline) {
         $ready = Join-Path $operation 'ready'
@@ -165,9 +173,7 @@ try {
         $status = Join-Path $operation 'status'
         if (-not (Test-Path -LiteralPath $status) -or (Get-Content -LiteralPath $status -Raw).Trim() -cne 'rolled-back') { Set-Content -LiteralPath $status -Value ('failed: ' + $message) }
     }
-    # Before accepted, the original application is still open and reports this
-    # failure itself. A modal prompt here would leave prepare() waiting on a
-    # failed worker. Disposable CI fixtures explicitly disable post-handoff UI.
+    # The running app reports preflight errors; only handoff failures need a dialog.
     if ($accepted -and $env:BITCHORD_REWORKED_UPDATE_NO_UI -ne '1') {
         try { Add-Type -AssemblyName System.Windows.Forms; [void][Windows.Forms.MessageBox]::Show(($message + "`n`nLogs: " + $operation), 'BitChord Reworked portable update') } catch { }
     }

@@ -15,6 +15,14 @@ function File-Sha256([string]$path) {
     } finally { if ($reader) { $reader.Dispose() }; $hash.Dispose() }
 }
 
+function Start-App([string]$dir) {
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = [IO.Path]::Combine($dir, 'BitChordReworked.exe')
+    $info.WorkingDirectory = $dir
+    $info.UseShellExecute = $false
+    return [Diagnostics.Process]::Start($info)
+}
+
 try {
     if (-not $operation -or -not [System.IO.Path]::IsPathRooted($operation)) { throw 'Missing update operation.' }
     $job = Get-Content -LiteralPath (Join-Path $operation 'operation.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -60,7 +68,7 @@ try {
     $env:BITCHORD_REWORKED_UPDATE_TOKEN = [string]$job.token
     $env:BITCHORD_REWORKED_UPDATE_VERSION = [string]$job.version
     Set-Content -LiteralPath (Join-Path $operation 'status') -Value 'starting'
-    $updated = Start-Process -FilePath $target.FullName -WorkingDirectory $target.DirectoryName -PassThru
+    $updated = Start-App $target.DirectoryName
     $deadline = [DateTime]::UtcNow.AddSeconds(75)
     while ([DateTime]::UtcNow -lt $deadline) {
         $ready = Join-Path $operation 'ready'

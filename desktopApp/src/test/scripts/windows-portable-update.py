@@ -33,6 +33,7 @@ public static class Fixture {
     public static int Main(string[] args) {
         string root = AppDomain.CurrentDomain.BaseDirectory;
         if (args.Length > 0 && args[0] == "parent") { Thread.Sleep(120000); return 0; }
+        File.WriteAllText(Path.Combine(root, "working-directory.txt"), Environment.CurrentDirectory);
         string ack = Environment.GetEnvironmentVariable("BITCHORD_REWORKED_UPDATE_ACK");
         if (ack == null) { File.WriteAllText(Path.Combine(root, "restored.txt"), "running"); Thread.Sleep(500); return 0; }
         if (File.Exists(Path.Combine(root, "crash.flag"))) return 23;
@@ -81,6 +82,43 @@ $released.Dispose()
         assert result.returncode == 0, (worker.name, actual)
         assert actual == digest(binary), (worker.name, "production SHA256 disagrees with the binary fixture", actual)
         print("PASS streaming SHA256 + shared read lock + handle release:", worker.name, flush=True)
+
+
+def verify_installed_app_launch(directory: Path, executable: Path, reports: Path) -> None:
+    """Run only the installed worker's application launch, preserving literal paths and ACK env."""
+    target = directory / "Installed player [test]"
+    target.mkdir()
+    shutil.copyfile(executable, target / "BitChordReworked.exe")
+    token = str(uuid.uuid4())
+    source = r"""
+$ErrorActionPreference = 'Stop'
+$tokens = $null; $parseErrors = $null
+$ast = [Management.Automation.Language.Parser]::ParseFile($env:REWORKED_LAUNCH_TEST_SCRIPT, [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) { throw 'The production worker has syntax errors.' }
+$function = $ast.Find({ param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Start-App'
+}, $true)
+if (-not $function) { throw 'The production worker is missing Start-App.' }
+. ([ScriptBlock]::Create($function.Extent.Text))
+$app = Start-App $env:REWORKED_LAUNCH_TEST_DIR
+try {
+    if (-not $app.WaitForExit(10000)) { $app.Kill(); throw 'The disposable application did not exit.' }
+    if ($app.ExitCode -ne 0) { throw 'The disposable application failed.' }
+} finally { $app.Dispose() }
+"""
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("BITCHORD_REWORKED_UPDATE_")}
+    environment.update(REWORKED_LAUNCH_TEST_SCRIPT=str(INSTALLED_HELPER), REWORKED_LAUNCH_TEST_DIR=str(target),
+                       BITCHORD_REWORKED_UPDATE_ACK=str(target / "ready"),
+                       BITCHORD_REWORKED_UPDATE_TOKEN=token, BITCHORD_REWORKED_UPDATE_VERSION=VERSION)
+    encoded = base64.b64encode(source.encode("utf-16le")).decode("ascii")
+    output = reports / "installed-app-launch.log"
+    with output.open("w") as log:
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                                env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=30)
+    assert result.returncode == 0, output.read_text(encoding="utf-8-sig", errors="replace")
+    assert (target / "ready").read_text().splitlines() == [token, VERSION], "startup environment must reach the application"
+    assert os.path.normcase((target / "working-directory.txt").read_text()) == os.path.normcase(str(target))
+    print("PASS installed application literal path + working directory + inherited startup environment", flush=True)
 
 
 def created_milliseconds(process: subprocess.Popen) -> int:
@@ -202,6 +240,7 @@ def scenario(workspace: Path, executable: Path, case: str, reports: Path) -> Non
             assert VERSION in (target / "app/BitChordReworked.cfg").read_text()
             assert "1.9.1-reworked.1" in (backup / "app/BitChordReworked.cfg").read_text()
             assert not failed.exists()
+        assert os.path.normcase((target / "working-directory.txt").read_text()) == os.path.normcase(str(target))
         print("PASS", "portable early-crash rollback" if crash else "portable replacement + previous backup")
     except BaseException:
         failure = traceback.format_exc()
@@ -235,6 +274,7 @@ def main() -> None:
         executable = directory / "Fixture.exe"
         code.write_text(SOURCE)
         subprocess.run([str(compiler), "/nologo", "/target:exe", "/out:" + str(executable), str(code)], check=True)
+        verify_installed_app_launch(directory, executable, reports)
         scenario(directory / "success", executable, "success", reports)
         scenario(directory / "crash", executable, "crash", reports)
         scenario(directory / "tampered-stage", executable, "tampered-stage", reports)
