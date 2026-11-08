@@ -193,7 +193,7 @@ internal fun LandscapePlayerColumns(
                         else 0f
                         clipRect(top = clipTop.coerceAtMost(size.height)) { this@drawWithContent.drawContent() }
                     }
-                })) {
+                )) {
                     when (shown) {
                         PlayerPane.Main -> Unit
                         PlayerPane.Lyrics -> lyricsPane()
