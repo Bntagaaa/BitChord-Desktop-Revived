@@ -78,12 +78,15 @@ internal fun Modifier.desktopMenuPointer(state: DesktopMenuPortalState): Modifie
 
 internal data class DesktopMenuPortalEntry(
     val owner: Any,
+    val horizontalBiasPx: Int = 0,
     val anchor: Rect,
     val onDismiss: () -> Unit,
     val content: @Composable () -> Unit,
 )
 
 internal val LocalDesktopMenuPortal = staticCompositionLocalOf<DesktopMenuPortalState?> { null }
+/** Only the fullscreen player's popup needs a negative placement bias. */
+internal val LocalDesktopMenuHorizontalBias = staticCompositionLocalOf { 0.dp }
 
 /**
  * Anchor-aware compact-menu motion. Only the popup's draw layer changes during
@@ -192,7 +195,7 @@ internal fun DesktopMenuPortal(state: DesktopMenuPortalState) {
             val above = anchor.top.roundToInt() - child.height - margin
             val placeAbove = below + child.height + margin > constraints.maxHeight && above >= margin
             val y = if (placeAbove) above else below
-            val x = anchor.left.roundToInt().coerceIn(
+            val x = (anchor.left.roundToInt() + shown.horizontalBiasPx).coerceIn(
                 margin, (constraints.maxWidth - child.width - margin).coerceAtLeast(margin),
             )
             val finalY = y.coerceIn(

@@ -4276,6 +4276,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                     .offset(x = columnEdge)
                                     .size(34.dp),
                             ) {
+                                CompositionLocalProvider(LocalDesktopMenuHorizontalBias provides (-220).dp) {
                                 DesktopSongMenuFor(
                                     song = playerSong,
                                     liked = current.videoId in likedIds,
@@ -4296,6 +4297,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                     }.takeIf { DesktopOriginalVersion.isPinned(current.videoId) },
                                     onDismiss = { playerMenuOpen = false },
                                 )
+                                }
                             }
                         }
                         val message by DesktopPlayerHost.messages.collectAsState()
