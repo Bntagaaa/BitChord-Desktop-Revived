@@ -782,6 +782,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var lyricsOrder by remember { mutableStateOf(persistence.lyricsSourceOrder()) }
     var lyricsOn by remember { mutableStateOf(persistence.lyricsEnabledSources()) }
     val videoBetaEnabled by DesktopVideoBeta.enabled.collectAsState()
+    val squareVideos = DesktopContentPreferences.squareVideos
+    SideEffect { com.music.bitchord.ui.components.VideoThumbnails.square = squareVideos }
     var fullBleedArtwork by remember { mutableStateOf(persistence.boolean("full_bleed_artwork", false)) }
     var accounts by remember { mutableStateOf(DesktopAccounts.accounts()) }
     var activeAccountId by remember { mutableStateOf(DesktopAccounts.activeAccountId()) }
@@ -3341,6 +3343,29 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         }
     }
 
+    // Convert video renditions to catalogue audio when the listener asks for music only.
+    LaunchedEffect(DesktopContentPreferences.preferMusicOnly, selectedSong?.videoId, selectedSong?.isVideo, activeAccountId, videoBetaEnabled) {
+        if (DesktopContentPreferences.preferMusicOnly && videoBetaEnabled && selectedSong?.isVideo == true &&
+            !DesktopListenTogether.state.value.inParty) switchMediaVersion()
+    }
+    // Look up the following queue row ahead of the actual crossfade/AutoMix handoff.
+    LaunchedEffect(DesktopContentPreferences.preferMusicOnly, liveQueue.songs, liveQueue.index, activeAccountId) {
+        if (!DesktopContentPreferences.preferMusicOnly || DesktopListenTogether.state.value.inParty) return@LaunchedEffect
+        val nextIndex = liveQueue.index + 1
+        val next = liveQueue.songs.getOrNull(nextIndex)?.takeIf { it.isVideo && it.localUri == null && it.localPath == null } ?: return@LaunchedEffect
+        val expectedAccount = activeAccountId
+        val converted = withContext(Dispatchers.IO) { runCatching { YtMusicRepository.resolveAudio(next) }.getOrNull() }
+            ?.takeUnless { it.isVideo } ?: return@LaunchedEffect
+        if (!DesktopContentPreferences.preferMusicOnly || expectedAccount != activeAccountId ||
+            liveQueue.songs.getOrNull(nextIndex) !== next || liveQueue.index >= nextIndex) return@LaunchedEffect
+        liveQueue = liveQueue.copy(songs = liveQueue.songs.toMutableList().also { rows ->
+            rows[nextIndex] = converted.copy(queueEntryId = next.queueEntryId, queueTier = next.queueTier,
+                radioName = next.radioName, playbackSource = next.playbackSource,
+                playbackSourceType = next.playbackSourceType, playbackSourceId = next.playbackSourceId)
+        })
+        saveQueue()
+    }
+
     /** The song menu's verbs for [song], as the player sheet offers them. */
     fun playerSongActions(song: Song) = DesktopSongActions(
         onSwitchMediaVersion = (::switchMediaVersion).takeIf { videoBetaEnabled && !mediaVersionSwitching && !DesktopListenTogether.state.value.inParty && song.localUri == null && song.localPath == null },
@@ -4717,6 +4742,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                         persistence.saveBoolean(DesktopLyricsClient.KEY_LYRICS_BLUR, it)
                                     },
                                     enabledLyricsSources = DesktopLyricsClient.enabledSources(lyricsOrder, lyricsOn),
+                                    onOpenContentPreferences = { overlays.settingsPage = DesktopSettingsPage.CONTENT_PREFERENCES },
                                     onOpenLyricsSources = { overlays.settingsPage = DesktopSettingsPage.LYRICS_SOURCES },
                                     onOpenTranslationLanguage = { overlays.settingsPage = DesktopSettingsPage.TRANSLATION_LANGUAGE },
                                     onOpenEqualizer = { overlays.settingsPage = DesktopSettingsPage.EQUALIZER },
@@ -4838,6 +4864,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                     onOpenIntegrations = { overlays.settingsPage = DesktopSettingsPage.INTEGRATIONS },
                                     onOpenLicenses = { overlays.settingsPage = DesktopSettingsPage.LICENSES },
                                 )
+                                DesktopSettingsPage.CONTENT_PREFERENCES -> DesktopContentPreferencesPage(onBack = { overlays.settingsPage = DesktopSettingsPage.MAIN })
                                 DesktopSettingsPage.EQUALIZER -> DesktopEqualizerDialog(onDismiss = ::goBack)
                                 DesktopSettingsPage.AUDIO_OUTPUT -> DesktopAudioOutputDialog(onDismiss = ::goBack)
                                 DesktopSettingsPage.LISTEN_TOGETHER -> DesktopListenTogetherDialog(
@@ -5001,7 +5028,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             downloadInProgress = downloadInProgress,
                             contentPadding = contentPadding,
                         )
-                        destination == DesktopDestination.LISTEN_NOW && showMoodGrid -> Column(Modifier.fillMaxSize()) {
+                        destination == DesktopDestination.LISTEN_NOW && showMoodGrid && !DesktopContentPreferences.hideHomeMoods -> Column(Modifier.fillMaxSize()) {
                             TextButton(onClick = { showMoodGrid = false }) { Text("Back to Home") }
                             MoodGridPage(
                                 gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
@@ -5011,14 +5038,24 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             )
                         }
                         destination == DesktopDestination.LISTEN_NOW -> HomeScreen(
-                            topPicks = topPicks,
-                            topPicksLoading = topPicksLoading,
+                            topPicks = if (DesktopContentPreferences.hideTopPicks) null else topPicks,
+                            topPicksLoading = topPicksLoading && !DesktopContentPreferences.hideTopPicks,
                             listenerName = DesktopAccounts.active()?.name,
-                            onTopPickClick = ::openTopPick,
-                            onMoodClick = { mood, label -> openTopPick(TopPicks.moodStation(mood), label) },
+                            onTopPickClick = if (DesktopContentPreferences.hideTopPicks) null else ::openTopPick,
+                            onMoodClick = if (DesktopContentPreferences.hideHomeMoods) null else { mood, label -> openTopPick(TopPicks.moodStation(mood), label) },
                             onMoodsShowAll = { showMoodGrid = true },
                             artworkMotion = !overlays.nowPlaying && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
-                            state = homeState,
+                            state = (homeState as? UiState.Success<List<HomeShelf>>)?.let { loaded ->
+                                val prefs = DesktopContentPreferences
+                                val trimmed = loaded.data.mapNotNull { shelf ->
+                                    if (prefs.hideRecents && (shelf.title.equals("Recents", true) || shelf.title.equals("Recently played", true) || shelf.title.equals(YtMusicRepository.RECENT_TITLE, true))) return@mapNotNull null
+                                    if (!prefs.hideHomeVideos) return@mapNotNull shelf
+                                    if (shelf.layout == com.music.bitchord.data.model.ShelfLayout.VIDEO) return@mapNotNull null
+                                    val kept = shelf.items.filterNot { it.isVideo }
+                                    if (kept.isEmpty()) null else shelf.copy(items = kept)
+                                }
+                                UiState.Success(trimmed)
+                            } ?: homeState,
                             listState = homeListState,
                             onItemClick = { item, shelfTitle -> openShelfItem(item, shelfTitle) },
                             onRetry = ::loadHome,
@@ -5031,7 +5068,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             onItemLongPress = { item -> if (item.videoId != null) openMenu(item.toSong()) },
                             onLoadMore = ::loadMoreHome,
                             loadingMore = homeLoadingMore,
-                            recentlyPlayedLoading = homeRecentsLoading,
+                            recentlyPlayedLoading = homeRecentsLoading && !DesktopContentPreferences.hideRecents,
                             leadHero = false,
                             onShelfOpen = ::openShelfDestination,
                         )
@@ -7505,6 +7542,7 @@ private enum class DesktopSettingsSection {
     OUTPUT_PRECISION,
     AUDIO_OUTPUT,
     PLAYBACK,
+    CONTENT,
     DESKTOP_PLAYBACK,
     APPEARANCE,
     LYRICS,
@@ -7560,6 +7598,7 @@ private fun DesktopSettingsScreen(
     /** The sources that will actually be asked, in the order they are asked. */
     enabledLyricsSources: List<String>,
     onOpenLyricsSources: () -> Unit,
+    onOpenContentPreferences: () -> Unit,
     onOpenTranslationLanguage: () -> Unit,
     onOpenEqualizer: () -> Unit,
     /** Opens the output-device picker. */
@@ -7638,6 +7677,15 @@ private fun DesktopSettingsScreen(
                     contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp),
                 ) {
             DesktopSettingsSection.entries.forEach { section ->
+            if (section == DesktopSettingsSection.CONTENT) item {
+                SettingsGroup("Content") {
+                    SettingsNavigationRow(
+                        "Content Preferences",
+                        "Customize Home recommendations, music-only playback and video thumbnail shapes",
+                        onOpenContentPreferences,
+                    )
+                }
+            }
             if (section == DesktopSettingsSection.PLAYBACK) item {
                     SettingsGroup(DesktopStrings["playback", "Playback"]) {
                     val videoBeta by DesktopVideoBeta.enabled.collectAsState()
@@ -9468,7 +9516,7 @@ internal fun BoxScope.DesktopShelfArrow(
 
 @Composable
 internal fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
-    val width = if (item.isVideo) 252.dp else 158.dp
+    val width = if (item.isVideo && !DesktopContentPreferences.squareVideos) 252.dp else 158.dp
     val shape = RoundedCornerShape(12.dp)
     val artworkHoverInteraction = remember { MutableInteractionSource() }
     val artworkHovered by artworkHoverInteraction.collectIsHoveredAsState()
@@ -9484,7 +9532,7 @@ internal fun DesktopShelfCard(item: ShelfItem, onClick: (ShelfItem) -> Unit) {
     ) {
         Box(
             Modifier
-                .width(width).aspectRatio(if (item.isVideo) 16f / 9f else 1f)
+                .width(width).aspectRatio(if (item.isVideo && !DesktopContentPreferences.squareVideos) 16f / 9f else 1f)
                 .testTag("shelf-art-${item.videoId ?: item.browseId}")
                 .clip(shape)
                 .background(DesktopGlass)
