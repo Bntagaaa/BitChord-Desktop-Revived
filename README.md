@@ -10,7 +10,7 @@
 
 **A desktop music experience, refined.**
 
-**BitChord Desktop - Revived** is an independent, community-maintained continuation of the original BitChord desktop app. It brings together a polished interface, immersive playback, and desktop-first controls for Windows and Linux.
+**BitChord Desktop** is an independent, community-maintained continuation of the original BitChord desktop app. It brings together a polished interface, immersive playback, and desktop-first controls for Windows and Linux.
 
 
 ![Status](https://img.shields.io/badge/status-revival%20in%20progress-DAA520?style=flat-square)
