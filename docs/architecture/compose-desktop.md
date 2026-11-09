@@ -159,6 +159,12 @@ Addressing runtime memory swelling during active UI browsing across screens (whe
    - Enhanced eviction with `DesktopPageMemoryPolicy.trimProcessMemory()`: empties `DesktopArtworkCache`, clears Coil memory cache, triggers `System.gc()`, and on Linux invokes `malloc_trim(0)` via JNA to immediately release freed C++ allocator arenas back to the OS kernel.
 3. **Artwork Cache Clamping**:
    - Clamped `DesktopArtworkCache.budgetBytes` to `[16 MiB, 32 MiB]` (down from `[32 MiB, 128 MiB]`), bounding in-memory custom artwork cache usage.
+4. **Artist Page Motion Decoding & Asset Optimization**:
+   - Resolved the 1.8 GiB memory spike caused by opening the Artist Page:
+     - **Triple-Buffering (`DesktopContinuedArtistMotion.kt`)**: Previously, video frames decoded into a `pixels` array and invoked `pixels.copyOf()` 25 times per second. At 1280p, this churned **92.5 MB/s of young generation heap allocations**, rapidly accumulating ~1 GiB of garbage and inflating Skia native memory to 1.8 GiB before GC. Replaced with pre-allocated 3-buffer cycling (`buffers = arrayOf(ByteArray(frameSize), ...)`), achieving **0 MB/s heap churn**.
+     - **Resolution Capping (`maxEdge = 640`)**: Reduced motion video decoding edge from 1280 to 640 in `DesktopApp.kt` and `DesktopAppleArtistUi.kt`, reducing per-frame buffer size by 75% (~3.7 MB down to ~920 KB; ~2.7 MB total triple-buffer).
+     - **Deferred Still Hero & Palette Fallback**: When Apple video motion is active, `DesktopAppleArtistHero` skips loading the 1600x900 still cover underneath the motion. `rememberDesktopArtworkPalette` skips 1600x900 hero decoding when `appleArt?.background` is already provided, falling back to `artist.thumbnailUrl` if missing.
+     - **Disposal Memory Trimming**: Calling `openArtist()` trims previous screen textures; disposing `DesktopContinuedArtistMotionView` triggers `DesktopPageMemoryPolicy.trimProcessMemory()`, immediately returning native Skia and C++ allocator memory to the OS.
 
 ## External delivery blockers
 

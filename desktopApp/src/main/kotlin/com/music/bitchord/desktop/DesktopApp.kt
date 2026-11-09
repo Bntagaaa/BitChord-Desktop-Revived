@@ -2148,6 +2148,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         openedArtist = target
         artistState = UiState.Loading
         artistReloads++
+        DesktopImageLoader.trimMemory()
     }
 
     /**
@@ -6708,7 +6709,7 @@ private fun DesktopArtistPage(
                 val artist = state.data
                 val name = artistName
 
-                val palette = rememberDesktopArtworkPalette(appleArt?.heroUrl ?: artist.thumbnailUrl)
+                val palette = rememberDesktopArtworkPalette(if (appleArt?.background != null) null else artist.thumbnailUrl)
                 val artistBackground = appleArt?.background?.let { Color(it) } ?: Color(
                     palette.primary.red * 0.42f,
                     palette.primary.green * 0.42f,
@@ -6882,22 +6883,22 @@ private fun DesktopArtistBanner(
     subscribed: Boolean,
 ) {
     Box(Modifier.fillMaxWidth().height(heroHeight).background(background)) {
+        val motionUrl = appleArt?.wideVideoUrl ?: appleArt?.squareVideoUrl
         DesktopAppleArtistHero(
             fallbackUrl = fallbackUrl,
-            appleUrl = appleArt?.heroUrl,
+            appleUrl = if (motionUrl != null) null else appleArt?.heroUrl,
             fallbackPx = HEADER_ART_PX,
             modifier = Modifier.matchParentSize(),
         )
 
         // Wide banner for every artist, even with no motion or only portrait artwork.
         // Continued supplies wide/square HLS, Apple still art, then the YouTube Music fallback.
-        val motionUrl = appleArt?.wideVideoUrl ?: appleArt?.squareVideoUrl
         motionUrl?.let { url ->
             DesktopContinuedArtistMotionView(
                 url = url,
                 modifier = Modifier.matchParentSize(),
                 fallbackUrl = appleArt?.squareVideoUrl?.takeIf { it != url },
-                maxEdge = 1280,
+                maxEdge = 640,
                 contentScale = ContentScale.Crop,
                 publishBackdrop = false,
             )

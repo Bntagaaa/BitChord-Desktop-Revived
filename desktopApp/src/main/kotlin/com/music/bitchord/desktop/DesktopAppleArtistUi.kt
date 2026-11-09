@@ -139,7 +139,7 @@ internal fun DesktopAppleArtistHeader(
                         url = video,
                         modifier = Modifier.matchParentSize(),
                         fallbackUrl = art?.squareVideoUrl?.takeIf { it != video },
-                        maxEdge = 1280,
+                        maxEdge = 640,
                         publishBackdrop = false,
                     )
                 }
