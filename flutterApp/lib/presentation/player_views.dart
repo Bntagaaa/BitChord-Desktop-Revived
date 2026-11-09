@@ -40,6 +40,9 @@ class PlayerDock extends StatelessWidget {
         child: GlassSurface(
           blur: !app.setting('reduce_dynamic_blur', false),
           radius: 16,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xB324242A)
+              : const Color(0xE8E7EBF1),
           child: SizedBox(
             height: 58,
             child: LayoutBuilder(
@@ -58,6 +61,7 @@ class PlayerDock extends StatelessWidget {
                           if (medium)
                             ToolButton(
                               icon: Icons.shuffle,
+              asset: 'assets/icons/player_transport_shuffle.svg',
                               label: 'Shuffle',
                               size: 30,
                               selected: player.shuffle,
@@ -101,6 +105,9 @@ class PlayerDock extends StatelessWidget {
                               icon: player.repeat == PlaybackRepeat.one
                                   ? Icons.repeat_one
                                   : Icons.repeat,
+                              asset: player.repeat == PlaybackRepeat.one
+                                  ? 'assets/icons/player_transport_repeat_one.svg'
+                                  : 'assets/icons/player_transport_repeat.svg',
                               label: 'Repeat: ${player.repeat.name}',
                               size: 30,
                               selected: player.repeat != PlaybackRepeat.off,
@@ -162,6 +169,7 @@ class PlayerDock extends StatelessWidget {
                           const SizedBox(width: 5),
                           ToolButton(
                             icon: Icons.lyrics_outlined,
+              asset: 'assets/icons/player_transport_lyrics.svg',
                             label: 'Lyrics',
                             size: 30,
                             selected: panel == PlayerPanel.lyrics,
@@ -176,6 +184,7 @@ class PlayerDock extends StatelessWidget {
                             ),
                           ToolButton(
                             icon: Icons.queue_music,
+              asset: 'assets/icons/player_transport_up_next.svg',
                             label: 'Queue',
                             size: 30,
                             selected: panel == PlayerPanel.queue,
@@ -271,7 +280,7 @@ class TransportButton extends StatelessWidget {
       onPressed: action,
       padding: EdgeInsets.zero,
       icon: SvgPicture.asset(
-        'assets/icons/ic_player_$name.svg',
+        'assets/icons/player_transport_$name.svg',
         width: iconSize,
         height: iconSize,
         colorFilter: ColorFilter.mode(
@@ -428,6 +437,7 @@ class QueueView extends StatelessWidget {
           title: 'Your queue is empty',
           message: 'Play a song or add music from a song menu.',
           icon: Icons.queue_music,
+              asset: 'assets/icons/player_transport_up_next.svg',
         );
       }
       return Column(
@@ -1094,6 +1104,7 @@ class NowPlayingViewState extends State<NowPlayingView> {
                           children: [
                             ToolButton(
                               icon: Icons.lyrics_outlined,
+              asset: 'assets/icons/player_transport_lyrics.svg',
                               label: 'Lyrics',
                               selected: lyrics,
                               onPressed: () => setState(() => lyrics = !lyrics),
@@ -1132,6 +1143,7 @@ class NowPlayingViewState extends State<NowPlayingView> {
                             const SizedBox(width: 20),
                             ToolButton(
                               icon: Icons.queue_music,
+              asset: 'assets/icons/player_transport_up_next.svg',
                               label: 'Queue',
                               selected: queue,
                               onPressed: () => setState(() => queue = !queue),
@@ -1232,6 +1244,9 @@ class NowPlayingViewState extends State<NowPlayingView> {
               icon: app.isLiked(song)
                   ? Icons.star_rounded
                   : Icons.star_outline_rounded,
+              asset: app.isLiked(song)
+                  ? 'assets/icons/bit-star-filled.svg'
+                  : 'assets/icons/bit-star.svg',
               label: 'Like',
               onPressed: () => app.toggleLike(song),
               selected: app.isLiked(song),
@@ -1316,6 +1331,7 @@ class NowPlayingViewState extends State<NowPlayingView> {
           children: [
             ToolButton(
               icon: Icons.shuffle,
+              asset: 'assets/icons/player_transport_shuffle.svg',
               label: 'Shuffle',
               selected: player.shuffle,
               onPressed: () => player.setShuffle(!player.shuffle),
@@ -1361,6 +1377,9 @@ class NowPlayingViewState extends State<NowPlayingView> {
               icon: player.repeat == PlaybackRepeat.one
                   ? Icons.repeat_one
                   : Icons.repeat,
+              asset: player.repeat == PlaybackRepeat.one
+                  ? 'assets/icons/player_transport_repeat_one.svg'
+                  : 'assets/icons/player_transport_repeat.svg',
               label: 'Repeat: ${player.repeat.name}',
               selected: player.repeat != PlaybackRepeat.off,
               onPressed: () => player.setRepeat(

@@ -401,7 +401,7 @@ class _Sidebar extends StatelessWidget {
                               tooltip: 'Expand sidebar',
                               onPressed: onToggle,
                               icon: SvgPicture.asset(
-                                'assets/icons/ic_logo.svg',
+                                'assets/icons/bitchord_logo_original.svg',
                                 width: 28,
                                 height: 22,
                                 colorFilter: ColorFilter.mode(
@@ -415,7 +415,7 @@ class _Sidebar extends StatelessWidget {
                             children: [
                               const SizedBox(width: 8),
                               SvgPicture.asset(
-                                'assets/icons/ic_logo.svg',
+                                'assets/icons/bitchord_logo_original.svg',
                                 width: 28,
                                 height: 18,
                                 colorFilter: ColorFilter.mode(
@@ -483,24 +483,28 @@ class _Sidebar extends StatelessWidget {
                     'History',
                     Icons.history_rounded,
                     AppRoute.history,
+                    svg: 'bit-clock',
                   ),
                   item(
                     context,
                     'Downloads',
                     Icons.download_outlined,
                     AppRoute.downloads,
+                    svg: 'bit-download',
                   ),
                   item(
                     context,
                     'Local Music',
                     Icons.library_music_outlined,
                     AppRoute.localMusic,
+                    svg: 'bit-library',
                   ),
                   item(
                     context,
                     'Spotify',
                     Icons.album_outlined,
                     AppRoute.spotify,
+                    spotify: true,
                   ),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 10),
@@ -619,7 +623,7 @@ class _Sidebar extends StatelessWidget {
                   item(
                     context,
                     'Settings',
-                    Icons.settings_outlined,
+                    Icons.settings_rounded,
                     AppRoute.settings,
                   ),
                 ],
@@ -637,10 +641,12 @@ class _Sidebar extends StatelessWidget {
     IconData icon,
     AppRoute route, {
     String? svg,
+    bool spotify = false,
   }) => _NavItem(
     label: label,
     icon: icon,
     svg: svg,
+    spotify: spotify,
     collapsed: collapsed,
     selected: app.route == route,
     onTap: () => onNavigate(route),
@@ -655,17 +661,27 @@ class _NavItem extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.svg,
+    this.spotify = false,
   });
   final String label;
   final IconData icon;
   final String? svg;
+  final bool spotify;
   final bool collapsed, selected;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
     final p = DesktopPalette.of(context);
     final color = selected ? p.navAccent : p.secondary;
-    final glyph = svg == null
+    final glyph = spotify
+        ? Image.asset(
+            'assets/branding/spotify_logo.webp',
+            width: collapsed ? 20 : 18,
+            height: collapsed ? 20 : 18,
+            color: color,
+            colorBlendMode: BlendMode.srcIn,
+          )
+        : svg == null
         ? Icon(icon, size: collapsed ? 20 : 18, color: color)
         : SvgPicture.asset(
             'assets/icons/$svg.svg',

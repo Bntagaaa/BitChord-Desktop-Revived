@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../domain/models.dart';
 import 'desktop_theme.dart';
@@ -177,6 +178,7 @@ class ToolButton extends StatelessWidget {
     this.size = 34,
     this.iconSize = 19,
     this.color,
+    this.asset,
   });
   final IconData icon;
   final String label;
@@ -184,9 +186,13 @@ class ToolButton extends StatelessWidget {
   final bool selected;
   final double size, iconSize;
   final Color? color;
+  final String? asset;
   @override
   Widget build(BuildContext context) {
     final p = DesktopPalette.of(context);
+    final tint = onPressed == null
+        ? p.secondary.withAlpha(90)
+        : color ?? (selected ? p.foreground : p.secondary);
     return SizedBox(
       width: size,
       height: size,
@@ -196,15 +202,18 @@ class ToolButton extends StatelessWidget {
         padding: EdgeInsets.zero,
         style: IconButton.styleFrom(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          backgroundColor: selected ? p.foreground.withAlpha(22) : null,
+          backgroundColor: selected && asset == null
+              ? p.foreground.withAlpha(22)
+              : null,
         ),
-        icon: Icon(
-          icon,
-          size: iconSize,
-          color: onPressed == null
-              ? p.secondary.withAlpha(90)
-              : color ?? (selected ? p.foreground : p.secondary),
-        ),
+        icon: asset == null
+            ? Icon(icon, size: iconSize, color: tint)
+            : SvgPicture.asset(
+                asset!,
+                width: iconSize,
+                height: iconSize,
+                colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
+              ),
       ),
     );
   }
