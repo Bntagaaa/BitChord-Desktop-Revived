@@ -121,6 +121,11 @@
       "source": "desktopApp/src/main/composeResources/drawable/player_transport_up_next.svg",
       "target": "flutterApp/assets/icons/player_transport_up_next.svg",
       "sha256": "6972559ebbd7d51f66456ddca94db7d8c351549069942b9ac20b844e6ecb1626"
+    },
+    {
+      "source": "desktopApp/packaging/icons/AppIcon.ico",
+      "target": "flutterApp/windows/runner/resources/app_icon.ico",
+      "sha256": "8e9cea81b74172c46300d9ed176eb498d7eb1974cfcd01474c0099e79d80c4bf"
     }
   ],
   "kotlin_inventory": [

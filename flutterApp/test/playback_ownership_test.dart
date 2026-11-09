@@ -31,17 +31,27 @@ class _Audio implements AudioOutput {
     durations.add(Duration(seconds: opened.length == 1 ? 100 : 200));
     states.add(true);
   }
+
   @override
   Future<void> playPause() async {}
   @override
-  Future<void> seek(Duration value) async { positions.add(value); }
+  Future<void> seek(Duration value) async {
+    positions.add(value);
+  }
+
   @override
   Future<void> setVolume(double value) async {}
   @override
   Future<void> setRate(double value) async {}
   @override
   Future<void> close() async {
-    await Future.wait([positions.close(), durations.close(), states.close(), ends.close(), failures.close()]);
+    await Future.wait([
+      positions.close(),
+      durations.close(),
+      states.close(),
+      ends.close(),
+      failures.close(),
+    ]);
   }
 }
 
@@ -55,29 +65,53 @@ class _Lyrics extends LyricsRepository {
 }
 
 void main() {
-  test('old native events during a track handover cannot advance the new queue or its lyrics', () async {
-    final audio = _Audio(), lyrics = _Lyrics();
-    final app = MusicApplication(settings: Settings.memory(), api: InnerTube(), audio: audio, lyrics: lyrics);
-    final first = Song(id: 'local:first', title: 'First', artist: '', localUri: Uri.file('/first.flac'));
-    final second = Song(id: 'local:second', title: 'Second', artist: '', localUri: Uri.file('/second.flac'));
-    await app.play(first);
-    expect(lyrics.requests.single, ('local:first', const Duration(seconds: 100)));
-    audio.positions.add(const Duration(seconds: 90));
-    expect(app.position.value.inSeconds, 90);
-    final handover = app.play(second);
-    // These readings belong to the old native stream while the next URI is
-    // being resolved. They must not become metadata/completion for the new song.
-    audio.positions.add(const Duration(seconds: 99));
-    audio.durations.add(const Duration(seconds: 100));
-    audio.ends.add(true);
-    audio.failures.add('Previous stream failed');
-    expect(app.position.value, Duration.zero);
-    expect(app.duration.value, Duration.zero);
-    expect(app.error, isNull);
-    await handover;
-    expect(audio.opened.length, 2);
-    expect(app.song?.id, 'local:second');
-    expect(lyrics.requests.last, ('local:second', const Duration(seconds: 200)));
-    await app.close();
-  });
+  test(
+    'old native events during a track handover cannot advance the new queue or its lyrics',
+    () async {
+      final audio = _Audio(), lyrics = _Lyrics();
+      final app = MusicApplication(
+        settings: Settings.memory(),
+        api: InnerTube(),
+        audio: audio,
+        lyrics: lyrics,
+      );
+      final first = Song(
+        id: 'local:first',
+        title: 'First',
+        artist: '',
+        localUri: Uri.file('/first.flac'),
+      );
+      final second = Song(
+        id: 'local:second',
+        title: 'Second',
+        artist: '',
+        localUri: Uri.file('/second.flac'),
+      );
+      await app.play(first);
+      expect(lyrics.requests.single, (
+        'local:first',
+        const Duration(seconds: 100),
+      ));
+      audio.positions.add(const Duration(seconds: 90));
+      expect(app.position.value.inSeconds, 90);
+      final handover = app.play(second);
+      // These readings belong to the old native stream while the next URI is
+      // being resolved. They must not become metadata/completion for the new song.
+      audio.positions.add(const Duration(seconds: 99));
+      audio.durations.add(const Duration(seconds: 100));
+      audio.ends.add(true);
+      audio.failures.add('Previous stream failed');
+      expect(app.position.value, Duration.zero);
+      expect(app.duration.value, Duration.zero);
+      expect(app.error, isNull);
+      await handover;
+      expect(audio.opened.length, 2);
+      expect(app.song?.id, 'local:second');
+      expect(lyrics.requests.last, (
+        'local:second',
+        const Duration(seconds: 200),
+      ));
+      await app.close();
+    },
+  );
 }
