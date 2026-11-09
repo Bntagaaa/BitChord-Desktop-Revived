@@ -190,7 +190,6 @@ class _SmoothLyricsPanelState extends State<SmoothLyricsPanel>
     if (renderBox == null || !renderBox.hasSize) return;
 
     final viewport = RenderAbstractViewport.of(renderBox);
-    if (viewport == null) return;
     final revealed = viewport.getOffsetToReveal(
       renderBox,
       widget.centerFocus ? 0.38 : 0.25,
