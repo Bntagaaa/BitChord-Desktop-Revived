@@ -18,17 +18,19 @@ jobs:
         with:
           channel: stable
           flutter-version: 3.47.9
-      - name: Format using locked dependencies
+      - name: Format playback and range transport using locked dependencies
         run: |
           cd flutterApp
           flutter pub get --enforce-lockfile
-          dart format lib/playback/playback_controller.dart test/playback/playback_controller_test.dart
+          dart format lib test
           git diff --check
-      - name: Commit if formatter changed files
+      - name: Commit formatted code safely
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add flutterApp/lib/playback/playback_controller.dart flutterApp/test/playback/playback_controller_test.dart
+          git add flutterApp/lib flutterApp/test
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Format playback EOF protection and regression tests"
+          git commit -m "Format premature EOF and range transport regression"
+          git fetch origin 1.9.2-Rewrite
+          git rebase origin/1.9.2-Rewrite
           git push origin HEAD:1.9.2-Rewrite
