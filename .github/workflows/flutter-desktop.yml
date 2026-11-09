@@ -125,7 +125,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
       - run: flutter pub get --enforce-lockfile
-      - run: flutter build windows --release --no-pub
+      - run: flutter build windows --release --no-pub -v
       - name: Archive executable with all native libraries and assets
         shell: pwsh
         run: |
