@@ -4,6 +4,9 @@ import '../data/settings.dart';
 class AppColors {
   const AppColors(this.values);
   final Map<String, Color> values;
+  Color get foreground => values['foreground']!;
+  Color get accent => values['accent']!;
+  Color get onAccent => values['onAccent']!;
   Color get background => values['background']!;
   Color get surface => values['surface']!;
   Color get surfaceRaised => values['surfaceRaised']!;
@@ -31,6 +34,9 @@ class AppColors {
   Color get lyricsSurface => values['lyricsSurface']!;
   Color get replaySurface => values['replaySurface']!;
   static const dark = AppColors({
+    'foreground': Colors.white,
+    'accent': Colors.white,
+    'onAccent': Colors.black,
     'background': Color(0xFF202020),
     'surface': Color(0xFF0D0D0F),
     'surfaceRaised': Color(0xFF1C1C1E),
@@ -59,6 +65,7 @@ class AppColors {
     'replaySurface': Color(0xFF202020),
   });
   static const light = AppColors({
+    'onAccent': Colors.white,
     'background': Color(0xFFF7F8FB),
     'surface': Color(0xFFFFFFFF),
     'surfaceRaised': Color(0xFFEDEFF4),
@@ -102,9 +109,14 @@ ThemeData appTheme(Settings settings, Brightness platform) {
   final family = legacy ? 'SFProLegacy' : 'SFProDefault';
   final base = ThemeData(brightness: dark ? Brightness.dark : Brightness.light,
     useMaterial3: true, fontFamily: family, scaffoldBackgroundColor: colors.background,
-    colorScheme: ColorScheme.fromSeed(seedColor: colors.navAccent,
-      brightness: dark ? Brightness.dark : Brightness.light,
-      surface: colors.surface, onSurface: colors.foreground, primary: colors.navAccent));
+    colorScheme: (dark ? const ColorScheme.dark() : const ColorScheme.light()).copyWith(
+      primary: colors.accent, onPrimary: colors.onAccent,
+      primaryContainer: colors.accent.withValues(alpha: .16),
+      onPrimaryContainer: colors.foreground,
+      surface: colors.surface, onSurface: colors.foreground,
+      surfaceContainerHighest: colors.surfaceRaised,
+      onSurfaceVariant: colors.secondary, outline: colors.divider,
+      outlineVariant: colors.divider, surfaceTint: colors.accent));
   TextStyle style(double size, FontWeight weight, double modern, [double? original]) => TextStyle(
     fontFamily: family, fontSize: size, fontWeight: weight, color: colors.foreground,
     letterSpacing: legacy ? original : modern);

@@ -46,12 +46,31 @@ jobs:
           encoded = base64.b64encode(zlib.compress(patch)).decode()
           def publish(kind, encoded):
               chunks = [encoded[i:i+2800] for i in range(0,len(encoded),2800)]
-              for index, chunk in enumerate(chunks):
+              for index, chunk in list(enumerate(chunks))[:8]:
                   print('::notice title=Dart source fixes::'+kind+'|'+str(index)+'|'+str(len(chunks))+'|'+chunk)
           publish('PATCH',encoded)
+      - name: Save remaining Dart formatting evidence
+        if: always()
+        shell: python
+        run: |
+          import base64, pathlib, zlib
+          encoded=base64.b64encode(zlib.compress(pathlib.Path('format.patch').read_bytes())).decode()
+          chunks=[encoded[i:i+2800] for i in range(0,len(encoded),2800)]
+          if len(chunks)>16:
+              raise SystemExit('Formatting patch exceeds the evidence chunk limit')
+          for index,chunk in list(enumerate(chunks))[8:]:
+              print('::notice title=Dart source fixes::PATCH|'+str(index)+'|'+str(len(chunks))+'|'+chunk)
+      - name: Save resolved package lock evidence
+        if: always()
+        shell: python
+        run: |
+          import base64, pathlib, zlib
           lock = pathlib.Path('pubspec.lock')
           if lock.exists():
-              publish('LOCK',base64.b64encode(zlib.compress(lock.read_bytes())).decode())
+              encoded=base64.b64encode(zlib.compress(lock.read_bytes())).decode()
+              chunks=[encoded[i:i+2800] for i in range(0,len(encoded),2800)]
+              for index,chunk in enumerate(chunks):
+                  print('::notice title=Dart package lock::LOCK|'+str(index)+'|'+str(len(chunks))+'|'+chunk)
       - name: Analyze with zero warnings or infos
         run: flutter analyze --no-pub --fatal-infos --fatal-warnings > analyze.log 2>&1
       - name: Publish analyzer diagnostics

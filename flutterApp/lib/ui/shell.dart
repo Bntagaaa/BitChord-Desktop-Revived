@@ -16,7 +16,7 @@ class BitChordApplication extends StatelessWidget {
     listenable: application.settings,
     builder: (context, _) => MaterialApp(
       title: 'BitChord', debugShowCheckedModeBanner: false,
-      theme: appTheme(application.settings, MediaQuery.platformBrightnessOf(context)),
+      theme: appTheme(application.settings, WidgetsBinding.instance.platformDispatcher.platformBrightness),
       home: MusicShell(application: application)));
 }
 
