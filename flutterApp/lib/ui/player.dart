@@ -591,16 +591,15 @@ class _SweptLyricText extends StatelessWidget {
     if (line.isGap) {
       final nextMs = line.endMs;
       final span = math.max(1, nextMs - line.timeMs);
-      final through =
-          ((position.inMilliseconds - line.timeMs) / span).clamp(0.0, 1.0);
+      final through = ((position.inMilliseconds - line.timeMs) / span).clamp(
+        0.0,
+        1.0,
+      );
       return SizedBox(
         height: 38,
         child: CustomPaint(
           size: const Size(double.infinity, 38),
-          painter: _GapDotsPainter(
-            progress: through,
-            color: Colors.white,
-          ),
+          painter: _GapDotsPainter(progress: through, color: Colors.white),
         ),
       );
     }
@@ -624,9 +623,7 @@ class _SweptLyricText extends StatelessWidget {
         children: [
           Text(
             line.text,
-            style: style.copyWith(
-              color: Colors.white.withValues(alpha: 0.4),
-            ),
+            style: style.copyWith(color: Colors.white.withValues(alpha: 0.4)),
           ),
           if (isGlow)
             ImageFiltered(
@@ -659,10 +656,7 @@ class _SweptLyricText extends StatelessWidget {
                 [0.0, start, end, 1.0],
               );
             },
-            child: Text(
-              line.text,
-              style: style,
-            ),
+            child: Text(line.text, style: style),
           ),
         ],
       );
@@ -670,9 +664,7 @@ class _SweptLyricText extends StatelessWidget {
       final alpha = isActive ? 1.0 : (isPast ? 0.75 : 0.4);
       mainText = Text(
         line.text,
-        style: style.copyWith(
-          color: Colors.white.withValues(alpha: alpha),
-        ),
+        style: style.copyWith(color: Colors.white.withValues(alpha: alpha)),
       );
     }
 

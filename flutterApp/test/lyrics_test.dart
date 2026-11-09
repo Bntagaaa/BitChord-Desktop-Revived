@@ -278,21 +278,24 @@ void main() {
     expect(topStop(0), 0.0);
   });
 
-  test('LrcRed and TTML parsing yields word-synced lyrics with revealedChars', () {
-    const rawTtml = '''
+  test(
+    'LrcRed and TTML parsing yields word-synced lyrics with revealedChars',
+    () {
+      const rawTtml = '''
 <tt xmlns="http://www.w3.org/ns/ttml" xmlns:lrc="http://lrc.red/lyric-ttml-internal" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" lrc:timing="Word" xml:lang="en">
 <head><metadata><ttm:agent type="person" xml:id="v1"/></metadata></head>
 <body><div begin="10.0" end="20.0"><p begin="10.0" end="15.0" ttm:agent="v1"><span begin="10.0" end="12.0">Hello</span> <span begin="12.0" end="15.0">World</span></p></div></body>
 </tt>''';
-    final lines = parseTtml(rawTtml);
-    expect(lines.length, 1);
-    expect(lines.first.text, 'Hello World');
-    expect(lines.first.words.length, 2);
-    expect(lines.first.words.first.text, 'Hello');
-    expect(lines.first.words.first.startMs, 10000);
-    expect(lines.first.words.first.endMs, 12000);
-    expect(lines.first.isWordSynced, isTrue);
-    expect(lines.first.revealedChars(11000), 2.5);
-    expect(lines.first.revealedChars(13500), 8.5);
-  });
+      final lines = parseTtml(rawTtml);
+      expect(lines.length, 1);
+      expect(lines.first.text, 'Hello World');
+      expect(lines.first.words.length, 2);
+      expect(lines.first.words.first.text, 'Hello');
+      expect(lines.first.words.first.startMs, 10000);
+      expect(lines.first.words.first.endMs, 12000);
+      expect(lines.first.isWordSynced, isTrue);
+      expect(lines.first.revealedChars(11000), 2.5);
+      expect(lines.first.revealedChars(13500), 8.5);
+    },
+  );
 }
