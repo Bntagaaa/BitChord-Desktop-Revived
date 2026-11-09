@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../domain/song.dart';
 import 'desktop_mini_player.dart';
 import 'desktop_new_page.dart';
+import 'desktop_player_sheet.dart';
 import 'desktop_sidebar.dart';
 import 'desktop_theme.dart';
 import 'desktop_typography.dart';
@@ -36,6 +37,7 @@ class _DesktopShellState extends State<DesktopShell> {
   DesktopRepeatMode _repeatMode = DesktopRepeatMode.off;
   bool _lyricsOpen = false;
   bool _queueOpen = false;
+  bool _playerSheetOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +113,7 @@ class _DesktopShellState extends State<DesktopShell> {
                       queueOpen: _queueOpen,
                       palette: palette,
                       onExpand: () {
-                        // Open immersive player sheet
+                        setState(() => _playerSheetOpen = true);
                       },
                       onPlayPause: () {
                         setState(() => _isPlaying = !_isPlaying);
@@ -124,6 +126,25 @@ class _DesktopShellState extends State<DesktopShell> {
                       onOpenLyrics: () => setState(() => _lyricsOpen = !_lyricsOpen),
                       onOpenQueue: () => setState(() => _queueOpen = !_queueOpen),
                     ),
+                  ),
+
+                  // Fullscreen Immersive Player Sheet
+                  DesktopPlayerSheet(
+                    visible: _playerSheetOpen,
+                    song: _currentSong,
+                    isPlaying: _isPlaying,
+                    isLoading: _isLoading,
+                    progress: _progress,
+                    volume: _volume,
+                    shuffle: _shuffle,
+                    palette: palette,
+                    onDismiss: () => setState(() => _playerSheetOpen = false),
+                    onPlayPause: () => setState(() => _isPlaying = !_isPlaying),
+                    onPrevious: () {},
+                    onNext: () {},
+                    onSeek: (p) => setState(() => _progress = p),
+                    onVolumeChange: (v) => setState(() => _volume = v),
+                    onToggleShuffle: () => setState(() => _shuffle = !_shuffle),
                   ),
                 ],
               ),
