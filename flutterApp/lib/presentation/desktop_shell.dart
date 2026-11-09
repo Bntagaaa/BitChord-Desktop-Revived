@@ -23,11 +23,51 @@ class DesktopShell extends StatefulWidget {
   State<DesktopShell> createState() => _DesktopShellState();
 }
 
-class _DesktopShellState extends State<DesktopShell> {
+class _DesktopShellState extends State<DesktopShell>
+    with SingleTickerProviderStateMixin {
   PlayerPanel? panel;
   final nowPlayingKey = GlobalKey<NowPlayingViewState>();
   bool nowPlaying = false, drawer = false;
+  bool sheetMounted = false;
+  late final AnimationController sheetMotion = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 360),
+    reverseDuration: const Duration(milliseconds: 280),
+  );
   AppController get app => widget.controller;
+
+  void openNowPlaying() {
+    setState(() {
+      sheetMounted = true;
+      nowPlaying = true;
+    });
+    if (app.setting('reduce_animation', false)) {
+      sheetMotion.value = 1;
+    } else {
+      sheetMotion.forward();
+    }
+  }
+
+  void closeNowPlaying() {
+    if (!nowPlaying) return;
+    setState(() => nowPlaying = false);
+    if (app.setting('reduce_animation', false)) {
+      sheetMotion.value = 0;
+      setState(() => sheetMounted = false);
+    } else {
+      sheetMotion.reverse().then((_) {
+        if (mounted && !nowPlaying) {
+          setState(() => sheetMounted = false);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    sheetMotion.dispose();
+    super.dispose();
+  }
 
   void navigate(AppRoute route) {
     setState(() => drawer = false);
@@ -83,10 +123,10 @@ class _DesktopShellState extends State<DesktopShell> {
                 PlaybackRepeat.values.length],
           );
         case DesktopShortcutAction.home:
-          setState(() => nowPlaying = false);
+          closeNowPlaying();
           navigate(AppRoute.home);
         case DesktopShortcutAction.search:
-          setState(() => nowPlaying = false);
+          closeNowPlaying();
           navigate(AppRoute.search);
         case DesktopShortcutAction.lyrics:
           if (nowPlaying) {
@@ -99,8 +139,8 @@ class _DesktopShellState extends State<DesktopShell> {
     }
     if (event.logicalKey == LogicalKeyboardKey.escape &&
         (nowPlaying || panel != null || drawer)) {
+      if (nowPlaying) closeNowPlaying();
       setState(() {
-        nowPlaying = false;
         panel = null;
         drawer = false;
       });
@@ -123,7 +163,7 @@ class _DesktopShellState extends State<DesktopShell> {
     if ((HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed) &&
         event.logicalKey == LogicalKeyboardKey.keyF) {
-      setState(() => nowPlaying = false);
+      closeNowPlaying();
       navigate(AppRoute.search);
       return KeyEventResult.handled;
     }
@@ -166,7 +206,7 @@ class _DesktopShellState extends State<DesktopShell> {
                   app: app,
                   panel: panel,
                   onPanel: togglePanel,
-                  onExpand: () => setState(() => nowPlaying = true),
+                  onExpand: openNowPlaying,
                 );
                 return Stack(
                   children: [
@@ -347,12 +387,25 @@ class _DesktopShellState extends State<DesktopShell> {
                         ),
                       ),
                     ],
-                    if (nowPlaying)
+                    if (sheetMounted)
                       Positioned.fill(
-                        child: NowPlayingView(
-                          key: nowPlayingKey,
-                          app: app,
-                          onClose: () => setState(() => nowPlaying = false),
+                        child: AnimatedBuilder(
+                          animation: sheetMotion,
+                          builder: (context, child) => Transform.translate(
+                            offset: Offset(
+                              0,
+                              constraints.maxHeight * (1 - sheetMotion.value),
+                            ),
+                            child: IgnorePointer(
+                              ignoring: !nowPlaying,
+                              child: child,
+                            ),
+                          ),
+                          child: NowPlayingView(
+                            key: nowPlayingKey,
+                            app: app,
+                            onClose: closeNowPlaying,
+                          ),
                         ),
                       ),
                   ],

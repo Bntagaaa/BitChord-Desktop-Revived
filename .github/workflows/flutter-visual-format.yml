@@ -1,0 +1,34 @@
+name: Format Flutter visual parity
+on:
+  push:
+    branches: ["1.9.2-Rewrite"]
+    paths:
+      - ".github/workflows/flutter-visual-format.yml"
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 1.9.2-Rewrite
+          persist-credentials: true
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+      - name: Format affected Dart files
+        run: |
+          cd flutterApp
+          dart format lib/presentation/widgets.dart lib/presentation/desktop_shell.dart lib/presentation/player_views.dart test/presentation/desktop_layout_test.dart
+          git diff --check
+      - name: Commit formatting
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flutterApp/lib/presentation/widgets.dart flutterApp/lib/presentation/desktop_shell.dart flutterApp/lib/presentation/player_views.dart flutterApp/test/presentation/desktop_layout_test.dart
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Format fullscreen sheet motion and regression tests"
+          git push origin HEAD:1.9.2-Rewrite
