@@ -529,11 +529,7 @@ class PlaybackController extends ChangeNotifier {
           // Resolve a new signed media URL and continue this track at its
           // last known good position, rather than jumping to the next song.
           unawaited(
-            _loadCurrent(
-              start: _furthestPosition,
-              play: true,
-              refresh: true,
-            ),
+            _loadCurrent(start: _furthestPosition, play: true, refresh: true),
           );
         } else {
           _intendedPlaying = false;
@@ -562,9 +558,10 @@ class PlaybackController extends ChangeNotifier {
     if (expected < const Duration(seconds: 20)) return false;
     // Allow normal stream/container duration differences and coarse position
     // ticks, without treating a 3-second decoder EOF as a finished song.
-    final toleranceMs = (expected.inMilliseconds * .06)
-        .round()
-        .clamp(4000, 12000);
+    final toleranceMs = (expected.inMilliseconds * .06).round().clamp(
+      4000,
+      12000,
+    );
     return _furthestPosition.inMilliseconds + toleranceMs <
         expected.inMilliseconds;
   }
