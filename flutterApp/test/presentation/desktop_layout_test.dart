@@ -19,8 +19,7 @@ import 'package:bitchord_desktop/presentation/widgets.dart';
 
 const _song = Song(
   videoId: 'fixture',
-  title:
-      'A long song title that should wrap gracefully across a narrow desktop window',
+  title: 'A long song title that should wrap gracefully across a narrow desktop window',
   artist: 'A long artist name',
   durationText: '3:45',
   albumName: 'Album',
@@ -207,9 +206,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1280, 720);
     playback.activeSong = _song;
-    await tester.pumpWidget(
-      host(NowPlayingView(app: app, onClose: () {})),
-    );
+    await tester.pumpWidget(host(NowPlayingView(app: app, onClose: () {})));
     await tester.pumpAndSettle();
     expect(find.byType(Artwork), findsWidgets);
     expect(find.byTooltip('Open lyrics'), findsOneWidget);
