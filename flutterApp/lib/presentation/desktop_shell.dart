@@ -194,10 +194,10 @@ class _DesktopShellState extends State<DesktopShell>
                     narrow || app.setting('sidebar_collapsed', false);
                 final sideWidth = collapsed ? 72.0 : 220.0;
                 final panelWidth = math.min(
-                  340.0,
-                  constraints.maxWidth - sideWidth - 380,
+                  360.0,
+                  constraints.maxWidth - sideWidth - 360,
                 );
-                final overlayPanel = panelWidth < 260;
+                final overlayPanel = panelWidth < 280;
                 final topPlayer = app.setting(
                   'enable_old_top_music_player_style',
                   false,
@@ -352,7 +352,7 @@ class _DesktopShellState extends State<DesktopShell>
                         right: 0,
                         top: 0,
                         bottom: 0,
-                        width: math.min(340, constraints.maxWidth - sideWidth),
+                        width: math.min(360, constraints.maxWidth - sideWidth),
                         child: PlayerSidePanel(
                           app: app,
                           panel: panel!,

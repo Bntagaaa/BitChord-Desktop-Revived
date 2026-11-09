@@ -12,6 +12,7 @@ import '../playback/playback_controller.dart';
 import 'desktop_theme.dart';
 import 'menus.dart';
 import 'settings_page.dart';
+import 'smooth_lyrics.dart';
 import 'widgets.dart';
 
 enum PlayerPanel { lyrics, queue, details }
@@ -312,9 +313,11 @@ class PlayerSidePanel extends StatelessWidget {
       PlayerPanel.queue => 'Queue',
       PlayerPanel.details => 'Now Playing',
     };
+    final p = DesktopPalette.of(context);
     return GlassSurface(
       radius: 0,
       blur: !app.setting('reduce_dynamic_blur', false),
+      color: p.lyricsSurface.withAlpha(225),
       child: Column(
         children: [
           Padding(
@@ -324,7 +327,11 @@ class PlayerSidePanel extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: p.foreground,
+                    ),
                   ),
                 ),
                 ToolButton(
@@ -547,371 +554,19 @@ class QueueView extends StatelessWidget {
   );
 }
 
-class LyricsView extends StatefulWidget {
+class LyricsView extends StatelessWidget {
   const LyricsView({super.key, required this.app, this.immersive = false});
   final AppController app;
   final bool immersive;
-  @override
-  State<LyricsView> createState() => _LyricsViewState();
-}
-
-class _LyricsViewState extends State<LyricsView> with WidgetsBindingObserver {
-  final scroll = ScrollController();
-  List<GlobalKey> keys = [];
-  LyricsDocument? document;
-  int active = -1;
-  DateTime manualUntil = DateTime.fromMillisecondsSinceEpoch(0);
-  bool focused = true;
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    widget.app.playback.addListener(_positionChanged);
-    _syncDocument();
-  }
-
-  @override
-  void didUpdateWidget(covariant LyricsView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.app.playback != widget.app.playback) {
-      oldWidget.app.playback.removeListener(_positionChanged);
-      widget.app.playback.addListener(_positionChanged);
-    }
-    _syncDocument();
-  }
-
-  void _syncDocument() {
-    if (identical(document, widget.app.lyrics)) return;
-    document = widget.app.lyrics;
-    keys = List.generate(document?.lines.length ?? 0, (_) => GlobalKey());
-    active = _activeIndex();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scrollToCurrent(jump: true),
-    );
-  }
-
-  int _activeIndex() =>
-      document?.activeIndex(
-        widget.app.playback.position +
-            Duration(
-              milliseconds: widget.app
-                  .setting<num>('lyrics_offset_ms', 0)
-                  .round(),
-            ),
-      ) ??
-      -1;
-  void _positionChanged() {
-    if (!mounted) return;
-    final next = _activeIndex();
-    if (next == active) return;
-    setState(() => active = next);
-    if (focused ||
-        widget.app.setting('animate_lyrics_while_unfocused', false)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
-    }
-  }
-
-  void _scrollToCurrent({bool jump = false}) {
-    if (!mounted ||
-        active < 0 ||
-        active >= keys.length ||
-        DateTime.now().isBefore(manualUntil)) {
-      return;
-    }
-    final target = keys[active].currentContext;
-    if (target == null) return;
-    Scrollable.ensureVisible(
-      target,
-      alignment: .36,
-      duration: jump || widget.app.setting('reduce_animation', false)
-          ? Duration.zero
-          : const Duration(milliseconds: 420),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    focused = state == AppLifecycleState.resumed;
-    if (focused) _scrollToCurrent(jump: true);
-  }
-
-  @override
-  void dispose() {
-    widget.app.playback.removeListener(_positionChanged);
-    WidgetsBinding.instance.removeObserver(this);
-    scroll.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
-    _syncDocument();
-    final p = DesktopPalette.of(context);
-    if (!widget.app.setting('synced_lyrics', true)) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Synced lyrics are off',
-              style: TextStyle(
-                color: widget.immersive ? Colors.white70 : p.secondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => widget.app.setSetting('synced_lyrics', true),
-              child: const Text('Enable lyrics'),
-            ),
-          ],
-        ),
-      );
-    }
-    if (widget.app.lyricsLoading) {
-      return Center(
-        child: Text(
-          'Lyrics are coming together',
-          style: TextStyle(
-            color: widget.immersive ? Colors.white54 : p.secondary,
-            fontSize: 12,
-          ),
-        ),
-      );
-    }
-    if (document?.isInstrumental == true) {
-      return Center(
-        child: Text(
-          'Instrumental',
-          style: TextStyle(
-            color: widget.immersive ? Colors.white : p.foreground,
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
-    }
-    if (document == null || document!.lines.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            widget.app.lyricsError ?? 'No lyrics available for this song.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: widget.immersive ? Colors.white54 : p.secondary,
-            ),
-          ),
-        ),
-      );
-    }
-    final size =
-        widget.app.setting<num>('lyrics_text_size', 28).toDouble() +
-        (widget.immersive ? 4 : 0);
-    return LayoutBuilder(
-      builder: (context, constraints) =>
-          NotificationListener<ScrollNotification>(
-            onNotification: (notice) {
-              if (notice is ScrollStartNotification &&
-                  notice.dragDetails != null) {
-                manualUntil = DateTime.now().add(const Duration(seconds: 5));
-              }
-              if (notice is UserScrollNotification &&
-                  notice.direction != ScrollDirection.idle) {
-                manualUntil = DateTime.now().add(const Duration(seconds: 5));
-              }
-              return false;
-            },
-            child: Scrollbar(
-              controller: scroll,
-              child: SingleChildScrollView(
-                controller: scroll,
-                padding: EdgeInsets.fromLTRB(
-                  widget.immersive ? 10 : 22,
-                  constraints.maxHeight * .3,
-                  widget.immersive ? 10 : 22,
-                  constraints.maxHeight * .55,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var i = 0; i < document!.lines.length; i++)
-                      Builder(
-                        builder: (context) {
-                          final line = document!.lines[i];
-                          final synced = document!.isSynced;
-                          final distance = (i - active).abs();
-                          final alpha = !synced || i == active
-                              ? 255
-                              : distance == 1
-                              ? 130
-                              : distance == 2
-                              ? 85
-                              : 50;
-                          final foreground = widget.immersive
-                              ? Colors.white
-                              : p.foreground;
-                          return Padding(
-                            key: keys[i],
-                            padding: const EdgeInsets.symmetric(vertical: 9),
-                            child: GestureDetector(
-                              onTap: synced
-                                  ? () {
-                                      manualUntil =
-                                          DateTime.fromMillisecondsSinceEpoch(
-                                            0,
-                                          );
-                                      widget.app.playback.seek(
-                                        line.start -
-                                            document!.offset -
-                                            Duration(
-                                              milliseconds: widget.app
-                                                  .setting<num>(
-                                                    'lyrics_offset_ms',
-                                                    0,
-                                                  )
-                                                  .round(),
-                                            ),
-                                      );
-                                    }
-                                  : null,
-                              child: Column(
-                                crossAxisAlignment:
-                                    line.alignment == LyricAlignment.end
-                                    ? CrossAxisAlignment.end
-                                    : CrossAxisAlignment.start,
-                                children: [
-                                  if (i == active && line.isWordSynced)
-                                    _TimedLyricLine(
-                                      app: widget.app,
-                                      line: line,
-                                      offset: document!.offset,
-                                      fontSize: size,
-                                      foreground: foreground,
-                                    )
-                                  else
-                                    Text(
-                                      line.text.isEmpty ? '♪' : line.text,
-                                      textAlign:
-                                          line.alignment == LyricAlignment.end
-                                          ? TextAlign.end
-                                          : TextAlign.start,
-                                      style: TextStyle(
-                                        fontSize: size,
-                                        fontWeight: FontWeight.w700,
-                                        color: foreground.withAlpha(alpha),
-                                        height: 1.12,
-                                      ),
-                                    ),
-                                  if (line.translation != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 7),
-                                      child: Text(
-                                        line.translation!,
-                                        style: TextStyle(
-                                          fontSize: size * .56,
-                                          color: foreground.withAlpha(alpha),
-                                        ),
-                                      ),
-                                    ),
-                                  if (line.romanization != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        line.romanization!,
-                                        style: TextStyle(
-                                          fontSize: size * .5,
-                                          color: foreground.withAlpha(alpha),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    const SizedBox(height: 22),
-                    Text(
-                      document!.source,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: widget.immersive ? Colors.white38 : p.secondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+    return SmoothLyricsPanel(
+      app: app,
+      immersive: immersive,
+      centerFocus: true,
     );
   }
-}
-
-/// Only the active timed line listens to sub-line position ticks.
-/// Other lyrics and the surrounding catalogue rebuild on line/track changes.
-class _TimedLyricLine extends StatelessWidget {
-  const _TimedLyricLine({
-    required this.app,
-    required this.line,
-    required this.offset,
-    required this.fontSize,
-    required this.foreground,
-  });
-  final AppController app;
-  final LyricLine line;
-  final Duration offset;
-  final double fontSize;
-  final Color foreground;
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: app.playback,
-    builder: (context, _) {
-      final position =
-          app.playback.position +
-          offset +
-          Duration(
-            milliseconds: app.setting<num>('lyrics_offset_ms', 0).round(),
-          );
-      final style = TextStyle(
-        fontSize: fontSize,
-        fontWeight: FontWeight.w700,
-        height: 1.12,
-        color: foreground,
-      );
-      return Text.rich(
-        TextSpan(
-          children: [
-            for (final word in line.words)
-              WidgetSpan(
-                alignment: PlaceholderAlignment.baseline,
-                baseline: TextBaseline.alphabetic,
-                child: ShaderMask(
-                  blendMode: BlendMode.srcIn,
-                  shaderCallback: (bounds) {
-                    final length = (word.end - word.start).inMilliseconds;
-                    final progress = length <= 0
-                        ? (position >= word.start ? 1.0 : 0.0)
-                        : ((position - word.start).inMilliseconds / length)
-                              .clamp(0.0, 1.0);
-                    return LinearGradient(
-                      colors: [foreground, foreground.withAlpha(105)],
-                      stops: [progress, progress],
-                    ).createShader(bounds);
-                  },
-                  child: Text(word.text, style: style),
-                ),
-              ),
-          ],
-        ),
-        style: style,
-        textAlign: line.alignment == LyricAlignment.end
-            ? TextAlign.end
-            : TextAlign.start,
-      );
-    },
-  );
 }
 
 class NowPlayingView extends StatefulWidget {
