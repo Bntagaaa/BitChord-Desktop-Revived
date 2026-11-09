@@ -21,14 +21,14 @@ jobs:
       - name: Format affected Dart files
         run: |
           cd flutterApp
-          dart format lib/presentation/widgets.dart lib/presentation/desktop_shell.dart lib/presentation/player_views.dart test/presentation/desktop_layout_test.dart
+          dart format lib/presentation/widgets.dart lib/presentation/desktop_shell.dart lib/presentation/player_views.dart lib/presentation/menus.dart test/presentation/desktop_layout_test.dart
           git diff --check
       - name: Commit formatting
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add flutterApp/lib/presentation/widgets.dart flutterApp/lib/presentation/desktop_shell.dart flutterApp/lib/presentation/player_views.dart flutterApp/test/presentation/desktop_layout_test.dart
+          git add flutterApp/lib/presentation/widgets.dart flutterApp/lib/presentation/desktop_shell.dart flutterApp/lib/presentation/player_views.dart flutterApp/lib/presentation/menus.dart flutterApp/test/presentation/desktop_layout_test.dart
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Format fullscreen sheet motion and regression tests"
           git push origin HEAD:1.9.2-Rewrite

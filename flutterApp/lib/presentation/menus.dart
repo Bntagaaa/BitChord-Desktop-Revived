@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 
 import '../application/app_controller.dart';
@@ -8,6 +9,44 @@ import '../application/download_service.dart';
 import '../domain/models.dart';
 import 'desktop_theme.dart';
 import 'widgets.dart';
+
+/// Use the desktop-native path drawings from DesktopPhoneMenuIcons.kt.
+String? _originalMenuAsset(DesktopMenuAction action) {
+  final label = action.label.toLowerCase();
+  if (label == 'like') {
+    return action.selected ? 'bit-star-filled' : 'bit-star';
+  }
+  if (label == 'dislike') {
+    return action.selected ? 'menu-broken-heart-filled' : 'menu-broken-heart';
+  }
+  if (label == 'add to playlist') return 'menu-add-to-playlist';
+  if (label == 'start radio' || label == 'start mix') return 'menu-radio';
+  if (label == 'play next') return 'menu-play-next';
+  if (label == 'add to queue') return 'menu-add-to-queue';
+  if (label == 'download' || label == 'download all') return 'menu-download';
+  if (label == 'open album') return 'menu-album';
+  if (label == 'open artist') return 'menu-artist';
+  if (label == 'sleep timer') return 'menu-sleep-timer';
+  if (label == 'share') return 'menu-share';
+  if (label == 'song info') return 'menu-info';
+  if (label == 'shuffle') return 'bit-shuffle';
+  return null;
+}
+
+Widget _menuIcon(
+  DesktopMenuAction action, {
+  required double size,
+  Color? color,
+}) {
+  final asset = _originalMenuAsset(action);
+  if (asset == null) return Icon(action.icon, size: size, color: color);
+  return SvgPicture.asset(
+    'assets/icons/$asset.svg',
+    width: size,
+    height: size,
+    colorFilter: ColorFilter.mode(color ?? Colors.white, BlendMode.srcIn),
+  );
+}
 
 class MenuPointer {
   static Offset? position;
@@ -107,14 +146,16 @@ Future<void> showGlassMenu(
                                           ),
                                           child: Column(
                                             children: [
-                                              Icon(
-                                                action.icon,
+                                              _menuIcon(
+                                                action,
                                                 size: 22,
                                                 color: action.selected
                                                     ? DesktopPalette.of(
                                                         context,
                                                       ).navAccent
-                                                    : null,
+                                                    : DesktopPalette.of(
+                                                        context,
+                                                      ).foreground,
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
@@ -154,14 +195,16 @@ Future<void> showGlassMenu(
                                   ),
                                   child: Row(
                                     children: [
-                                      Icon(
-                                        action.icon,
+                                      _menuIcon(
+                                        action,
                                         size: 18,
                                         color: action.destructive
                                             ? Theme.of(
                                                 context,
                                               ).colorScheme.error
-                                            : null,
+                                            : DesktopPalette.of(
+                                                context,
+                                              ).foreground,
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
