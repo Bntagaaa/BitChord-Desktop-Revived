@@ -1,0 +1,114 @@
+name: Flutter reworked port
+on:
+  push:
+    branches: [1.9.2-flutter-reworked]
+    paths: ['flutterApp/**', '.github/workflows/flutter-reworked.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: flutter-reworked-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: flutterApp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Format and apply supported Dart fixes
+        run: |
+          dart format lib test
+          dart fix --apply
+          dart format lib test
+      - name: Save reviewable formatting patch
+        if: always()
+        shell: python
+        run: |
+          import base64, pathlib, subprocess, zlib
+          patch = subprocess.check_output(['git', 'diff', '--', 'lib', 'test'])
+          pathlib.Path('format.patch').write_bytes(patch)
+          encoded = base64.b64encode(zlib.compress(patch)).decode()
+          for index in range(0, len(encoded), 16000):
+              print('::notice title=Dart source fixes ' + str(index) + '::' + encoded[index:index+16000])
+          lock = pathlib.Path('pubspec.lock')
+          if lock.exists():
+              print('::notice title=Dart package lock::' + base64.b64encode(zlib.compress(lock.read_bytes())).decode())
+      - name: Analyze with zero warnings or infos
+        run: flutter analyze --no-pub --fatal-infos --fatal-warnings > analyze.log 2>&1
+      - name: Publish analyzer diagnostics
+        if: always()
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          for line in Path('analyze.log').read_text(errors='replace').splitlines() if Path('analyze.log').exists() else []:
+              if re.search(r'^\s*(error|warning|info)\s+•', line) or 'Could not find an option' in line:
+                  print('::error::' + line)
+      - name: Unit and widget tests
+        run: flutter test --reporter expanded > tests.log 2>&1
+      - name: Publish test failures
+        if: failure()
+        shell: python
+        run: |
+          from pathlib import Path
+          if Path('tests.log').exists():
+              text=Path('tests.log').read_text(errors='replace')[-8000:]
+              print('::error::'+text.replace('%','%25').replace('\n','%0A'))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flutter-reworked-checks
+          path: |
+            flutterApp/analyze.log
+            flutterApp/tests.log
+            flutterApp/format.patch
+            flutterApp/pubspec.lock
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: flutterApp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          channel: stable
+          cache: true
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libasound2-dev libmpv-dev
+      - name: Generate standard native Flutter runners
+        run: flutter create --platforms=linux,windows --org=com.music --project-name=bitchord --no-pub .
+      - name: Use the original Windows application icon
+        if: runner.os == 'Windows'
+        run: Copy-Item ../desktopApp/packaging/icons/AppIcon.ico windows/runner/resources/app_icon.ico -Force
+      - run: flutter pub get
+      - name: Build Linux
+        if: runner.os == 'Linux'
+        run: flutter build linux --release
+      - name: Build Windows
+        if: runner.os == 'Windows'
+        run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-Flutter-${{ runner.os }}-${{ github.sha }}
+          path: |
+            flutterApp/build/linux/x64/release/bundle/
+            flutterApp/build/windows/x64/runner/Release/
+          if-no-files-found: error

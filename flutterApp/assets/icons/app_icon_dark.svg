@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="filter-1" filterUnits="userSpaceOnUse" x="-52" y="-52" width="1128" height="1128" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="14"/><feOffset dx="0" dy="8" result="shadow"/><feFlood flood-color="#000000" flood-opacity="0"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="linear-gradient-1" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#242424"/>
+      <stop offset="0.5" stop-color="#1c1c1c"/>
+      <stop offset="1" stop-color="#151515"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="512" cy="153.6" r="819.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="2.56" y1="2.56" x2="2.56" y2="1021.44" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="0.25" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="0.7" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+  <title>favicon.svg</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <g>
+      <g filter="url(#filter-1)">
+        <path d="M281.6 0 L742.4 0 C897.923 0 1024 126.077 1024 281.6 L1024 742.4 C1024 897.923 897.923 1024 742.4 1024 L281.6 1024 C126.077 1024 0 897.923 0 742.4 L0 281.6 C0 126.077 126.077 0 281.6 0 Z" fill="url(#linear-gradient-1)"/>
+      </g>
+      <path d="M281.6 0 L742.4 0 C897.923 0 1024 126.077 1024 281.6 L1024 742.4 C1024 897.923 897.923 1024 742.4 1024 L281.6 1024 C126.077 1024 0 897.923 0 742.4 L0 281.6 C0 126.077 126.077 0 281.6 0 Z" fill="url(#radial-gradient-1)"/>
+      <path d="M281.6 2.56 L742.4 2.56 C896.51 2.56 1021.44 127.49 1021.44 281.6 L1021.44 742.4 C1021.44 896.51 896.51 1021.44 742.4 1021.44 L281.6 1021.44 C127.49 1021.44 2.56 896.51 2.56 742.4 L2.56 281.6 C2.56 127.49 127.49 2.56 281.6 2.56 Z" fill="none" stroke="url(#linear-gradient-2)" stroke-width="2"/>
+    </g>
+    <path d="M179.659 579.688 C191.732 559.262 218.183 552.529 238.543 564.657 L238.564 564.657 C386.679 652.631 631.051 660.72 772.465 617.8 C795.174 610.913 819.188 623.733 826.069 646.441 C832.951 669.16 820.142 693.159 797.418 700.063 C635.083 749.343 365.223 739.821 194.695 638.588 C174.226 626.466 167.531 600.086 179.659 579.688 Z M243.394 434.355 C253.766 417.48 275.826 412.157 292.674 422.529 C416.204 498.474 604.506 520.463 750.619 476.111 C769.567 470.388 789.581 481.067 795.333 499.984 C801.039 518.932 790.355 538.909 771.439 544.671 C604.539 595.312 397.052 570.781 255.192 483.608 C238.345 473.236 233.023 451.181 243.394 434.355 Z M299.644 309.207 C307.875 295.707 325.546 291.426 339.046 299.712 C446.947 365.62 582.779 380.548 742.748 343.998 C758.164 340.487 773.53 350.144 777.041 365.565 C780.57 380.986 770.95 396.351 755.497 399.864 C580.436 439.875 430.274 422.639 309.137 348.608 C295.638 340.322 291.358 322.706 299.644 309.207 Z" fill="#ffffff" stroke="#ffffff" stroke-width="14" stroke-miterlimit="10"/>
+  </g>
+</svg>

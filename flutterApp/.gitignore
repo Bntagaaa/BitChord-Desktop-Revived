@@ -1,0 +1,6 @@
+.dart_tool/
+.flutter-plugins*
+build/
+coverage/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/

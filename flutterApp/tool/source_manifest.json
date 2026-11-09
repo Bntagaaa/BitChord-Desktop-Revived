@@ -1,0 +1,2228 @@
+{
+  "source_branch": "1.9.2",
+  "source_commit": "348b613a0c3db1a54de56483ea6f8748d6465211",
+  "assets": [
+    {
+      "source": "desktopApp/src/main/composeResources/font/bintang_music_black_about.ttf",
+      "target": "flutterApp/assets/fonts/bintang_music_black_about.ttf",
+      "sha256": "dbc7b5014205d52e6f66b321b2334d12f0a191a9399f2a1e5a07a281022f7a21"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/font/sf_pro_display_bold.otf",
+      "target": "flutterApp/assets/fonts/sf_pro_display_bold.otf",
+      "sha256": "9661ed5e91885b6a80cd458d5ef068db320574c2cb7c1ed2d77864fb91cb8adc"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/font/sf_pro_display_heavy.otf",
+      "target": "flutterApp/assets/fonts/sf_pro_display_heavy.otf",
+      "sha256": "68020e8fbddc00c16ae939f337d65459632a1359f7b51656e14bf0d7140629d7"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/font/sf_pro_display_medium.otf",
+      "target": "flutterApp/assets/fonts/sf_pro_display_medium.otf",
+      "sha256": "05865eda9d9a6880538034210becfcf21622fc1a0b30723acdb670009ddbf51c"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/font/sf_pro_display_regular.otf",
+      "target": "flutterApp/assets/fonts/sf_pro_display_regular.otf",
+      "sha256": "7dc04ac11000f759c973a45c6109e2c164372db0db23dd4796c887df73048cd0"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/font/sf_pro_display_semibold.otf",
+      "target": "flutterApp/assets/fonts/sf_pro_display_semibold.otf",
+      "sha256": "6c4fa1be203ec1b7a5135cf636d87e1e23a91a9aabd556309664251745fd8249"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/app_icon.png",
+      "target": "flutterApp/assets/icons/app_icon.png",
+      "sha256": "3057d3d2bc3e084f38e36904471319199df9f72b64bd9a279398cb1c284a3e00"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/app_icon_dark.svg",
+      "target": "flutterApp/assets/icons/app_icon_dark.svg",
+      "sha256": "48f61ab8dd1da957f1bec28698b3e09c6ded68770fbfa320fddb6f0c602710ab"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/app_icon_light.png",
+      "target": "flutterApp/assets/icons/app_icon_light.png",
+      "sha256": "846ea2f84fc45fd4f78806f5395f881e1c47677754a4d856599e696c0bec4395"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/app_icon_light_source.svg",
+      "target": "flutterApp/assets/icons/app_icon_light_source.svg",
+      "sha256": "4af5ded5369cc299cce2507dfcf714a71f01b9fcbf510426a7446c16a36ef7c4"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/bitchord_logo_original.svg",
+      "target": "flutterApp/assets/icons/bitchord_logo_original.svg",
+      "sha256": "3c7c14ae5903eb9eeebb5ef54ccd3fd853fa512ac20f62a957c0b818d1e80102"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/bitchord_no_music.svg",
+      "target": "flutterApp/assets/icons/bitchord_no_music.svg",
+      "sha256": "86996d56e8f656d31c9ebf4117d0b62d0817099d4f14c19a7c84134964d9ad09"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/bitchord_wordmark.svg",
+      "target": "flutterApp/assets/icons/bitchord_wordmark.svg",
+      "sha256": "c5bdee5d2b1dd7ed9a03c93183568ac06849779ddc959ad4fde119d842a1876a"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/logo.svg",
+      "target": "flutterApp/assets/icons/logo.svg",
+      "sha256": "818977d31d7442f2e3feac3f0aad82f057c61adb5cd7766ac05e53fe89114ea5"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/logo_mark.svg",
+      "target": "flutterApp/assets/icons/logo_mark.svg",
+      "sha256": "b4f604535aeb8ad8a87a70eee74037e1a5b9db428c292ec5dc0703842e547642"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/player_transport_lyrics.svg",
+      "target": "flutterApp/assets/icons/player_transport_lyrics.svg",
+      "sha256": "d38da6c927d130dadee90d19e54fed343939ac01c3256b872677d0b8a8c49003"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/player_transport_next.svg",
+      "target": "flutterApp/assets/icons/player_transport_next.svg",
+      "sha256": "6633d2551a9ff62f772f7c149f5a00f3e93e3755f8251f1f544871e2ba3173c0"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/player_transport_pause.svg",
+      "target": "flutterApp/assets/icons/player_transport_pause.svg",
+      "sha256": "bce242f9e30fd678e093c8a982950127d697fdd0ccc1153dfbe3a29b38d680bd"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/player_transport_play.svg",
+      "target": "flutterApp/assets/icons/player_transport_play.svg",
+      "sha256": "c4d22be6c63eafa932e17b095e6dd56181a512b63f99af810428926a81328e94"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/player_transport_previous.svg",
+      "target": "flutterApp/assets/icons/player_transport_previous.svg",
+      "sha256": "d5934e8492b3fd499b182391e0c52b749278a62ab648447cc5655f3bccacb049"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/player_transport_repeat.svg",
+      "target": "flutterApp/assets/icons/player_transport_repeat.svg",
+      "sha256": "d4244b58be59c9f85a1ca1175c2c36566125c5151c34a518117464f538b381c8"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/player_transport_repeat_one.svg",
+      "target": "flutterApp/assets/icons/player_transport_repeat_one.svg",
+      "sha256": "18af9d9d1ae2687406044f9fddc1d1459157911e46e9fe7fa35cfac42c272bdc"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/player_transport_shuffle.svg",
+      "target": "flutterApp/assets/icons/player_transport_shuffle.svg",
+      "sha256": "5df5237121422113554c7ac03efb37a2d756afc16a9bcfd98f31a02635378ab6"
+    },
+    {
+      "source": "desktopApp/src/main/composeResources/drawable/player_transport_up_next.svg",
+      "target": "flutterApp/assets/icons/player_transport_up_next.svg",
+      "sha256": "6972559ebbd7d51f66456ddca94db7d8c351549069942b9ac20b844e6ecb1626"
+    }
+  ],
+  "kotlin_inventory": [
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAboutVersionTitle.kt",
+      "sha256": "f2968c244210841866816bd2481363978204133ea251cb8ddb2656f4d2566af1",
+      "lines": 35
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAccountUi.kt",
+      "sha256": "a0300c30dcaf0a4ec9c6ad17b032c8c9003fcb329af5321ce9abee4803eac98d",
+      "lines": 550
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAccounts.kt",
+      "sha256": "a54b713157d8bb3ed64a44f73c643aa1b36e464d76ab3373fbf916674be028c3",
+      "lines": 392
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAddon.kt",
+      "sha256": "829d4a5b0cfd520cbd027ad7fd93803b2a7b72307237918d362f98f21e99ce9a",
+      "lines": 893
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAnalysisRuntime.kt",
+      "sha256": "9d1a417c5bba6bc738ebb714ba9b59930559f91de253f10ece10db50b4c464a4",
+      "lines": 102
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopApp.kt",
+      "sha256": "ca0c4125bfc91dad0161ade6a5f2db5d8b74abba2ada26ece8a93eba37d96e8b",
+      "lines": 9972
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAppIcon.kt",
+      "sha256": "b38a77957163e359c03a52f329ee738638da94b717e3e881280cc10e4d6056d7",
+      "lines": 35
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAppIconPicker.kt",
+      "sha256": "ceccecc870639f033bc0e16a2cf989d276f1acf12d95074198d264ad5f77d9bd",
+      "lines": 62
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAppearanceSettings.kt",
+      "sha256": "9770e3585dd2b27fde8e7924604a0e34e5c02e1913d87e390eee112d0e668fe1",
+      "lines": 190
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAppleArtistArt.kt",
+      "sha256": "8e2394314ac8ec675cb8c764e2721d111fbdb0d4154f3a54ddb2bfb391ce8bcd",
+      "lines": 201
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAppleArtistUi.kt",
+      "sha256": "25aea4e5a81e520db642152ee0cffa82347ee48ce3dd6a75b7fae795ace031eb",
+      "lines": 561
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopArtistBannerArtwork.kt",
+      "sha256": "00753361c5795a121a0f956d210e7fde7d507414091e8b53d43864f709369b51",
+      "lines": 66
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopArtistSignatures.kt",
+      "sha256": "1879f84ba664dfd700efda22de4a9bbe4f784ae3de8c33ce3644abd6bf2621d2",
+      "lines": 239
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopArtwork.kt",
+      "sha256": "e9f99ad1b74ee1970e889f3b0484fb7e9db5041d96b48a7501bbcdacbdc42176",
+      "lines": 114
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopArtworkMesh.kt",
+      "sha256": "9c2d92c2f884df61859fae9c958f390734e2606c2928a9fbfa1bcc6e21baaefd",
+      "lines": 191
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopArtworkPalette.kt",
+      "sha256": "afcf988b5e5202ec573c2618df596d30f5b0c3d901cca8dd605b6c16df02e289",
+      "lines": 64
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioCache.kt",
+      "sha256": "1badcae15d28f37bb190e568cf9d1d40852e8080d52866dde6558f80940919eb",
+      "lines": 97
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioDecoder.kt",
+      "sha256": "4a6a1c85a83fe5345e5d2134c18726b28c1957740fa40dece824d6cb0765cffa",
+      "lines": 560
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioDevices.kt",
+      "sha256": "bed8bb857c307ac2035e8ae20bc7042f311a7e64dd1bbdcba7aa4c50202cf75e",
+      "lines": 121
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioEngine.kt",
+      "sha256": "6b0848e7e7fe909c0a56d2197ad813a96a4b8eb3958d603c60f4f54efbfee7a9",
+      "lines": 2687
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioOutputUi.kt",
+      "sha256": "6c4a457d39786d65d559e55b49168a6bf33c218d5a0181c6f729d1a624a43de0",
+      "lines": 116
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioPipeline.kt",
+      "sha256": "2eec20c26040089625e73a703727ccca110630e58cd32fe6c3b062d9e56c9c68",
+      "lines": 32
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioPipelineUi.kt",
+      "sha256": "0d46a23704c5915128d8eed6e751bbfa9fd4332ef4e206ee040255a8fd9f7253",
+      "lines": 157
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioProcessors.kt",
+      "sha256": "c6c6dd62664f1a9c7ba3d7834595fdd1f9f01ff1057b114ac66ab4ca7b742a57",
+      "lines": 204
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioSink.kt",
+      "sha256": "417f69ebd2de7b43f161098d1ddb968275f84fa1e6b3fc72ef71eb916637a73d",
+      "lines": 300
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAudioSpeed.kt",
+      "sha256": "06cb4d3255b6d3598b9f761593f8c48d94a3cf6ed2ec11d5334edd662b9bf31c",
+      "lines": 195
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAutomixDuration.kt",
+      "sha256": "8a76af5a02c544c465d3ff38817ee28f548f47c394437f38fb0719a56c933017",
+      "lines": 30
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAutomixWorkQueue.kt",
+      "sha256": "e961e6b5c0190c0407d098f0e1570183bad1980fd569cbb245046a528cdb0090",
+      "lines": 41
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAutoplay.kt",
+      "sha256": "c923be35997552ca97e908caaf06689272e36d068f342f212c36db12e3077c41",
+      "lines": 77
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopAwtTray.kt",
+      "sha256": "888a60f26b57fd61515795cd663bddea7c54416eeb50d01c4fee2c8eae88d008",
+      "lines": 86
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopBlurCustomization.kt",
+      "sha256": "81e616a2ac7089c190fe6b1a4ce93f764f44b7c9a167de841a80675f45477d98",
+      "lines": 71
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopBrowserCookies.kt",
+      "sha256": "e22a069d188620669b819579bb325dc35a6555753ec48828a19b97857d403926",
+      "lines": 373
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopBrowserSignIn.kt",
+      "sha256": "92ef1d258560f9c92bddac1bc1a40d519b214bceef56c146771017e28a2b2baf",
+      "lines": 238
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopByteBudgetLru.kt",
+      "sha256": "bb208203384a2e04a17620c561b739a342fcffbd7821e45bc21001f1816cd026",
+      "lines": 51
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopCanvas.kt",
+      "sha256": "55103a861e9b83d10d039fd585e5b1adf52557fc8b8f725f959f23bd4a697882",
+      "lines": 380
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopCanvasBackdrop.kt",
+      "sha256": "0ed74d497f15ec1902faa7f4828e6d4981155b24263c261e899ae817ee83f03e",
+      "lines": 35
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopCanvasDecoder.kt",
+      "sha256": "f41a2835767ddd682cc648129f65c403f261a9617d9cfdba1173772db9ec9a7c",
+      "lines": 240
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopCanvasSources.kt",
+      "sha256": "b04b649511578233b200351f5d9fbdf40d13ab9f542f1108b030163137e01988",
+      "lines": 571
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopCanvasVideo.kt",
+      "sha256": "f7a19720179e782f9e7ca7dce51d1ac7dcbea7184d30e6635dd5b260039c232f",
+      "lines": 200
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopCodecs.kt",
+      "sha256": "9f6c6bfdc62b12f313f17b0923f668b0cf476a53714b3745ee6029d3247ec77d",
+      "lines": 38
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopContentPreferences.kt",
+      "sha256": "abbec9a19f429bec74372dda949c9812748a07a78cc8395b24327727d18997ca",
+      "lines": 124
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopContinuedArtistDecoder.kt",
+      "sha256": "7bcd05695b3b362f602b57b4b37930342a646d8fdaad6f0f6785939c9b1d1e8e",
+      "lines": 258
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopContinuedArtistMotion.kt",
+      "sha256": "8655354c1168cb0bac18d8a7f86490ecbe5bd8117a0542bc1cbdd8cdb421a565",
+      "lines": 112
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopDecodeAhead.kt",
+      "sha256": "b9a356347b580c62e097fc3d8ed70191419e6c0a68acdafd2ea34c1251101def",
+      "lines": 264
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopDirectSource.kt",
+      "sha256": "e4f6d1bd7db48d435a12dd6a03814d6fc1a10d97a576fbea650367ea871497dc",
+      "lines": 15
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopDiscordIpc.kt",
+      "sha256": "2719c847fe2ea1f217cc7682caff95990b0c5b9d851ab977a43430d65aa4c36e",
+      "lines": 157
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopDiscordRpc.kt",
+      "sha256": "3e9ad54673e97a3140163f4785bb5f696edc1b1d66cbf7cd94e0977add5fa200",
+      "lines": 300
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopDiscordSettings.kt",
+      "sha256": "8f96e2e5f74cabfc96441a7c80fe01771fbbf4bc6947cabd7b50a6056c0a6ec6",
+      "lines": 104
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopDownloadManager.kt",
+      "sha256": "07cb8aee44289905c011a5e09e5e2a6c67ca48cfca7aca3ef62650680c14734e",
+      "lines": 184
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopDownloadManagerUi.kt",
+      "sha256": "eb9177c49824618ffe8b2616892a7ddf740fa99554929da558ea378f34039d13",
+      "lines": 188
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopDownloadQueue.kt",
+      "sha256": "05d998bd1bbed4aec4328111185298edcd13fafa0864d1f2fe037ee9485b996a",
+      "lines": 252
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopEmbeddedLyrics.kt",
+      "sha256": "6629d58fa7a6b32fdbcaff24f1fa30795bbecb5a49d024f576c1c14feaf930db",
+      "lines": 279
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopEqualizer.kt",
+      "sha256": "6309195c6b3460bd4fb8cc44996904a6b9573db085cfff42984184cc16564abe",
+      "lines": 308
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopEqualizerSettings.kt",
+      "sha256": "8a677c3f59192ff8b859373d63da7913f392d5db545de57c2f5018bcd24dadf7",
+      "lines": 132
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopEqualizerUi.kt",
+      "sha256": "3a01c6cf77e1d8d3a182ede1fa10b350d7737a211b3a40ed982218760bff51e1",
+      "lines": 706
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopExternalLinks.kt",
+      "sha256": "6c617d5946fd9ecd59aae8d334fd89dcc218d8b02d2bf8a4b3d970d30280f4ef",
+      "lines": 17
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopFlyoutHost.kt",
+      "sha256": "48261fda1aecff1d4329c494d7099ad7494a2056874592f587201064437b3239",
+      "lines": 103
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopFlyoutState.kt",
+      "sha256": "0311676c5503652102611b39038e6589f6703a71e05a5c1e0ae3974fd28e8563",
+      "lines": 94
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopFontMetadata.kt",
+      "sha256": "51d979855a44f036bb5b366e32b806442fdd5a30d6ecd6d89b410441df63775a",
+      "lines": 53
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopFontSettings.kt",
+      "sha256": "752e1b8c7853ad983b8ba9c54d105ae55df1177b9cfac67b121259f63213cedc",
+      "lines": 42
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopHorizontalScroll.kt",
+      "sha256": "497451f2082f4fbf4de0be5d97691b8922217d770fc2b36eb9a5bf3b4f2e6413",
+      "lines": 39
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopHover.kt",
+      "sha256": "dc3480277c85ce9c24dc34627c266207557f6640429cff11695d8a80d4234857",
+      "lines": 186
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopInnerTubeXStore.kt",
+      "sha256": "0f268230da24b4d183f6af0e890380a0d1d1b9ffd5ed30480117f8786991db00",
+      "lines": 18
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopIntegrationsDialog.kt",
+      "sha256": "8945022b6b7146e404509d95365f30878ccdc5a9c00d01595bfc8f8a915a3751",
+      "lines": 729
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopIntegrationsUi.kt",
+      "sha256": "f89590b8921f87867e8a88add958e261cd065042d95b1a157398201d01ea033f",
+      "lines": 449
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopJioSaavn.kt",
+      "sha256": "1e1a1ac7378f6035d48c88e5861575ae86169e9e71b0af95eedd05a16262c629",
+      "lines": 232
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopKeyboardShortcutsModal.kt",
+      "sha256": "44cc3046d394486da6985cd000e5fa2189bac9d67aba1312efda53de2cc36e9a",
+      "lines": 126
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLibraryLoadPolicy.kt",
+      "sha256": "62efd3b9fcc15ee196f97e42028e5be4a03ca806525346ffbbf1fbcdaaac9887",
+      "lines": 14
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLicenses.kt",
+      "sha256": "9c00a8334cc8ae18abdc13136cbb4154f25a62c5efddbc160aa39dd28ce8c148",
+      "lines": 105
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLinuxAudioWatcher.kt",
+      "sha256": "6a9f50a360162de3ce4d68df44fbac4faa594a8bcf832a27e1fd9697b2630421",
+      "lines": 70
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLinuxPulseAudio.kt",
+      "sha256": "2f106ef2a9b7d51ba6ba87f8b90834fa78cf430eab6d784844428e685dc72dc4",
+      "lines": 66
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopListenTogether.kt",
+      "sha256": "b469ac288cbce10fc8e7dec5dfa2071dcaa496cbae01f442f780e218214bd3ae",
+      "lines": 873
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopListenTogetherUi.kt",
+      "sha256": "267ddd795258b3989a38ce90c5e89d147c8fb556b37680bb33e7551227060f4b",
+      "lines": 638
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopListeningStats.kt",
+      "sha256": "6b0f6495ea8041fad7c8048f6c21689722dd03ac10926f4d27aba2c6bd03b7c9",
+      "lines": 374
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLocalArtwork.kt",
+      "sha256": "3c470b1838722e9d1a037458dba6750df734d860665782cbd60dc6d9ad247f0b",
+      "lines": 468
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLocalMusic.kt",
+      "sha256": "ec51fef33a57a5c089d715ece8e1195009dd34b8e57fe79b985078272137986d",
+      "lines": 214
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLocalMusicWatcher.kt",
+      "sha256": "a9c93de5a81fdb1a2d30e9f65da061d298d254c2d25f8a4de39f9759795827e6",
+      "lines": 134
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLoopRegion.kt",
+      "sha256": "4d9726e811e99df8da8fc68118dfd62c7a2f7bd217c1ca47f4fc13b1e8544d25",
+      "lines": 42
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLoopView.kt",
+      "sha256": "ed7d0995ac8dbc37bf15a94544b53030d3e9b87a52cbd6f358133a40028de8d8",
+      "lines": 65
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLyricsClient.kt",
+      "sha256": "cdfecd4e3316f8e66b0c32c42538d986f8fd2dd83e8491c307e40858c115ef21",
+      "lines": 115
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLyricsSession.kt",
+      "sha256": "684d9156ba9b20703833b4c7657bd4088da145bb97b79dce0ce147692ed53477",
+      "lines": 80
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopLyricsSourcesUi.kt",
+      "sha256": "c87062c1095676496d683c84916b021c768cd938a7dffd66ac66cd79340a3ab2",
+      "lines": 316
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopManifestDownload.kt",
+      "sha256": "6906781b01bb039cb4b6a4ac507847687be2174c477024c5d6a770652644da7c",
+      "lines": 430
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopMediaCache.kt",
+      "sha256": "99b6f66d2f18f6f31a7257c3c782b94c8b5ed7538f99be84b5503ecfcd5d6909",
+      "lines": 113
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopMemoryOptimizer.kt",
+      "sha256": "6f3ed092e3d13d935e92506df1f0d19e6e8999d922dc84b7b3fbd78da051dd11",
+      "lines": 15
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopMenuPortal.kt",
+      "sha256": "cec29c1b252d0b09fc329ec3ca5e1a12c65cf5dbe6bdeb2a8eb5528ba1fed007",
+      "lines": 147
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopMixWaveform.kt",
+      "sha256": "0ea0964f04b591e239a0aa0df2ee3a11f43be4c52f6d4cca6421e20a4b014485",
+      "lines": 43
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopModules.kt",
+      "sha256": "2fe6089e7c1154bef5977a6a37e01e19cb9250917326f38c0ddefe87ebdccd50",
+      "lines": 667
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopMpris.kt",
+      "sha256": "19c5473ab06a60bff30bc9a8d5084a57a7094bc5200270a6b672a454e23e9e4d",
+      "lines": 329
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopMusicVideo.kt",
+      "sha256": "53ea8e676670768fca3a8ea3ad9f73143ea303e5ee9f51d5d6fe86cecf400149",
+      "lines": 202
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopNewPage.kt",
+      "sha256": "7a8eb0b126ae5e795d1f687a7bd36e1fb4be15eb4b994655c683d13c8c290ab2",
+      "lines": 411
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopNowPlayingDetails.kt",
+      "sha256": "af1cd4f817387eafc6f404137cb544f5ae12b0bd97499f8db9383375ecfd18f9",
+      "lines": 583
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopOriginalVersion.kt",
+      "sha256": "f1c6f708c6038b62fbd837d84352686423b982ed556f9e1ef7ae7230276223a4",
+      "lines": 38
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopOverlays.kt",
+      "sha256": "aeed124abb346118070aff1c8fb9d9d839eea265ef117e05ef511ed06d6e2f1b",
+      "lines": 74
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPageMemoryPolicy.kt",
+      "sha256": "8777995da8430b8054e936cfd6b0dc533266ebe528b0ad0e8938bc318fe05fbf",
+      "lines": 72
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPageWithSidePanel.kt",
+      "sha256": "9884012f35c33b6622f131ca744923093eb02909ae7cb2c403d0a3bb37664276",
+      "lines": 45
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPartySync.kt",
+      "sha256": "ecd9cd28a2255f3c5ec6b2da20c299b89f771ab7092451e9635fdf94e9f0dfed",
+      "lines": 515
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPcmWrite.kt",
+      "sha256": "ccc92e0c0e50ddd033cd80a9bf41cd1075fd1c6ab02bd65dc8bf43b737f1a04a",
+      "lines": 28
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPersistence.kt",
+      "sha256": "aec6bcb7b0b2e8a0bea453001687dc03b17d8e1d29e42b7a20c58eba6f2c005a",
+      "lines": 374
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPhoneMenuIcons.kt",
+      "sha256": "fd545368dd14cfeb0f2ce66cbe45298a50a2bf7c01729bf5c86994f346bc838d",
+      "lines": 216
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipController.kt",
+      "sha256": "b1ecab493b8b44b1eb3026b369d8ef60b7268b7c6cbfb61f225f05516a4b0067",
+      "lines": 55
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipGeometry.kt",
+      "sha256": "a47a9a6632aa91747b23686f1020b9ce914a4739ac93c9edbd4416478079bd1b",
+      "lines": 38
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipHost.kt",
+      "sha256": "4abf3f4d31e33fd8a3ee3270fb52317ff9a85b4b17d80d9330596dd08e73d1e5",
+      "lines": 30
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipSettings.kt",
+      "sha256": "c27101f6ea23a7b479ed808ed2f0a21864feeea3432d47717f42595d70b9359c",
+      "lines": 55
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipState.kt",
+      "sha256": "0ac5072905acacba737c53e3b2922285d51155b9f076de4e2ad6df13780db669",
+      "lines": 52
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipUi.kt",
+      "sha256": "349830b66098035466bf964a1e9476e9d20ea45c5e605a0e960ef8c967bd1cc4",
+      "lines": 293
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPipWindow.kt",
+      "sha256": "0daf96088d29f6c3eed81dd9eb97e244c5658190497bc07fd70c6b0e208ffcec",
+      "lines": 141
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlatform.kt",
+      "sha256": "0d2a9d0f081b5e1457266bcfad2969d5c5b20e0ef0d451d8b2b1ff08ae8fe26f",
+      "lines": 9
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlayback.kt",
+      "sha256": "67c0d6322c029e92852a908f9885eb9e545a19c3635c4ea9c04a241b0d56b516",
+      "lines": 215
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlaybackDiagnostics.kt",
+      "sha256": "04a118775510fdaf0785271e2f227d8973df883198bee122481c90294ba879e4",
+      "lines": 47
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlaybackTracker.kt",
+      "sha256": "fa3f1be0515c7b19a4f7c2b792e95085d8770947441ad71830dacbbd326897ce",
+      "lines": 217
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlaybackWrites.kt",
+      "sha256": "892d0088f4069f978b69db265ec5ffe15f718f17faed29b49aad030654f5c00a",
+      "lines": 44
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlayerHost.kt",
+      "sha256": "35b76a39129566e49ab08196b73e0c61292aec496720540f0b3dafc2fae1fd2a",
+      "lines": 293
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlayerSheet.kt",
+      "sha256": "a1dde4274fc2995cafdb3d806c5cff31597513a79daf0643873aeadb7c7131f3",
+      "lines": 142
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlayerThemeSettings.kt",
+      "sha256": "4d5eae1bc2acdfa1cf22b23f9c05373d4637da21f75d5a36ebbe1118dbaf7302",
+      "lines": 30
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlayhead.kt",
+      "sha256": "6ad79918328b0a9cb66835444d24b1b7c388eabc1814f50cc7a0382c5729aabb",
+      "lines": 60
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPlaylistUi.kt",
+      "sha256": "9dc3f2268c437020adf885c9291093cc081f801d7643b4a1d14fb876fafb429a",
+      "lines": 505
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPoTokenWebView.kt",
+      "sha256": "e74c5c3b45a38ba8c27a4740be38a82bca02b366efec9a1336fc469198c6ad4a",
+      "lines": 423
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPreferenceChunks.kt",
+      "sha256": "c5783d8f237aa9eca35350b47d78444f8ebdc837193614087384147f660a95da",
+      "lines": 63
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPresence.kt",
+      "sha256": "d67832fc61791dc3bcc89e75ff6b003a700dcd1385ae3f5af5d7147e4f4508ac",
+      "lines": 38
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopPrimaryNavigationIcons.kt",
+      "sha256": "a3d3753360303407e47c18ce68ac6b980dd9c22914424b708ca76840e3abcba8",
+      "lines": 18
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopQrCode.kt",
+      "sha256": "9719a7a88caa456fa2d41cc3328defa82cb36444c2d46d53039f4cbd12c46f97",
+      "lines": 87
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopQueue.kt",
+      "sha256": "a59d77875cbc92a8ad74a425478d66f8d479fddeea41fc2a047772121c795eba",
+      "lines": 315
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopQuickSearch.kt",
+      "sha256": "138101267890b04a555528e10928a31988bb644f29512485da205f220c7ebf6e",
+      "lines": 300
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopQuickSearchState.kt",
+      "sha256": "1fccdc18176de2af0f2007d68f5e9f084e925796d231f3978fe9183ff7fb4343",
+      "lines": 177
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopRangeStream.kt",
+      "sha256": "348a1855c841c71746653de0d165fdd0adddf77c368b574e26294b15c3e673fc",
+      "lines": 131
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopRateConverter.kt",
+      "sha256": "b76e31046a7e1a3f0e8964a9388ac5c1d906774197171245cbfdfbc15ba07601",
+      "lines": 114
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopReleaseNotesMarkdown.kt",
+      "sha256": "c77ca4f1d38456c68e28adae1641a89c51e1ae09247e58f0bdbded91c0a062fa",
+      "lines": 383
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopReplayUi.kt",
+      "sha256": "231be268e5792f623bc8365c7516edd51dfbcca3117053da64ed75753f11861f",
+      "lines": 568
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopScrobbleSettings.kt",
+      "sha256": "65f4b29720539f31117ac980459040eb55ad23f5ef3e77e8d3667b031478d307",
+      "lines": 133
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopScrobbling.kt",
+      "sha256": "4106afb53132671be4c65bb1cf0bee45ac0dcadde2c6edba16c394d19af93bce",
+      "lines": 312
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSearchClient.kt",
+      "sha256": "156b2be9da9e2843a7ccb6e02c564d1b85a5528b874698e65b641ed112d01e5f",
+      "lines": 189
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSearchSession.kt",
+      "sha256": "b725507c8e6894e273589b9e867957feaa4b45698149f7f6306a1737aea062d4",
+      "lines": 75
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSecretStore.kt",
+      "sha256": "18404821f68eff6df36f8b4abc6f5d7b30625895d238a374c7b8de9f695a8ed0",
+      "lines": 89
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSharedCalls.kt",
+      "sha256": "b2138ca865e3c910e05c0c5b2a010da01fabc5f3f85ae120546f46d4a2ac0380",
+      "lines": 88
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSharedPages.kt",
+      "sha256": "2b054b37ab02443044bb706ca8db92527acbce279772ec2ce96c821429486624",
+      "lines": 305
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopShelfBrowsePage.kt",
+      "sha256": "e4370b839bbc00993bb0f9a34372a5ecc5ba271a33c4e135fa8731df7736d6dc",
+      "lines": 184
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopShelfMedia.kt",
+      "sha256": "dc9d5f675ef0192499dd739a51cb1be6e859839ba2e3df3de7dbe55741c0ea13",
+      "lines": 27
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopShortcuts.kt",
+      "sha256": "d17ee2c6f62fb99ff3b758a0310ccf654f04e0fbfabdfa981bedb3187465e6c1",
+      "lines": 98
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSidePanel.kt",
+      "sha256": "5e446d881b87d3c2e27dba5c53c012bfd11a28350eda47a5c001c012e195569b",
+      "lines": 179
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSidebarMica.kt",
+      "sha256": "49f2d17e605d35c40cd278d8f05f573fbd7636be0a345c9641797f168723f0ee",
+      "lines": 171
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSidebarWidthPolicy.kt",
+      "sha256": "b8596d6727949fcb72adf0b84791bffd5721415d7864cfc1a18f6a5afdd3be6f",
+      "lines": 21
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSleepTimer.kt",
+      "sha256": "701e8dc6d8685bdf3a65b3890b1baf106ba9cb006b24a4d95e0c7df8b245549f",
+      "lines": 40
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSongMenuUi.kt",
+      "sha256": "8d69dd5ec4574a02b0947516d52bbf61ff2b781e9cd3318f50c1e7105e74caca",
+      "lines": 732
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSourceConfig.kt",
+      "sha256": "e9877fe8d35f37b0faaf694125abad82517e0f3b362717bb8a5c3e9912e2d398",
+      "lines": 171
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSourceRegistry.kt",
+      "sha256": "4ca9534b201f19dba58a52c04bf3945617b891acad6ea667ac10248310d14042",
+      "lines": 575
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSpotifyCanvas.kt",
+      "sha256": "79c13ab10ad7d65c4bd2f60919446b7ec341a62c9d49c98ec134135e9dd99963",
+      "lines": 410
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSpotifyChromiumToken.kt",
+      "sha256": "8fb58c3aa0d2256af020e5f97361e1d8fbfa8e35da49cd717774ace1f5623923",
+      "lines": 292
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSpotifyLibrary.kt",
+      "sha256": "4463b9b4ba7767d985fbc7a876513dd4c3524f7abb5d369160270012f9716250",
+      "lines": 344
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSpotifyLibraryAuth.kt",
+      "sha256": "fb38cece99a2c98960f47526cf5409da425206292393a59e36de526b3a6f7fa7",
+      "lines": 473
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopStartupDiagnostics.kt",
+      "sha256": "8f863a899d4aa0b9a0454dcd01f192ca36b9aa641dc70332270f62af0184e593",
+      "lines": 63
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopStatusNotifier.kt",
+      "sha256": "1772ac637b904ed259781a6207c7772a9f55881fb77c6f3d3a73a3003cf90b16",
+      "lines": 329
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopStrings.kt",
+      "sha256": "01d580def87f7411c30a5d60ee1ec783cc0c25276216fc999078791158c94126",
+      "lines": 131
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSurfaces.kt",
+      "sha256": "8b5c962a2abffc90290e18af82e5e644f191a5af16c15d78b63fbe0c877a9ed4",
+      "lines": 311
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopSystemTheme.kt",
+      "sha256": "41a40fd8dbb1aac31a1124ab6672f0a50424a49064e5b2df6192186f930079d2",
+      "lines": 41
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTempoBuffer.kt",
+      "sha256": "65a4021d70d0d86890ae97abacf27bbb799a076181793ed5c99ee2da3fbb2384",
+      "lines": 68
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTheme.kt",
+      "sha256": "d5036bd035adc0b643315e90b452bbac194c44581c0a23bf0399ce05728f2e54",
+      "lines": 188
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopThinSlider.kt",
+      "sha256": "c179fd664591f9a289bb55047b311ee76fb41a3bdbaa0d90d83e31304473a53c",
+      "lines": 182
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTopBarWidthPolicy.kt",
+      "sha256": "324e094229a743d8cb7312f04739e7cb764c9b60cb57e2aa4c5697bde4584d2c",
+      "lines": 20
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTrackAnalyzer.kt",
+      "sha256": "308dcd5db8d30a5dee3c1e3e8dd211df752563043362eac01db8462b913d60e2",
+      "lines": 580
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTrackLog.kt",
+      "sha256": "e6d03f64933a229a7696e71bb5c3f5a5a6a704f048cc65d03ed29bad74b6e2db",
+      "lines": 38
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTrackMatcher.kt",
+      "sha256": "68ab3da8755f42d163de09c90a4922af0c5351ac8e5ed18ba5be1b3a90c2140b",
+      "lines": 214
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTransitionEcho.kt",
+      "sha256": "9449dbd7632cac06096f8a43dbab7016f1fff8e49647afe2c2ab0a3dba30e152",
+      "lines": 32
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTransitionRide.kt",
+      "sha256": "91f26a1b60143ea915435ccf742a12dc0a76b9e00e97c28d5baf5b2bbb75ac41",
+      "lines": 363
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTranslationLanguageUi.kt",
+      "sha256": "47776e997c4eda47cd632d471302aea8940facbde2d1cc9f4c5f19504412305d",
+      "lines": 154
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTranslationSetting.kt",
+      "sha256": "62280be885be87af35f70cc2d9ec1c8d74b8b1e27cd7dd8e43280395fb5218f7",
+      "lines": 45
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTrayMenu.kt",
+      "sha256": "8939683e8566edd4bcf62b1bd91d743c1f64e4a069f4631aa1d230d0e0eab113",
+      "lines": 235
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopTypography.kt",
+      "sha256": "08e0e8d30df371ccc108302c030fb6548bb70e02bcd030262ca9e758ffed74b4",
+      "lines": 65
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUiScaleSettings.kt",
+      "sha256": "9976eca32d5eaf7a511c1124c69af7c4285af3a1326eaea3fb37ede264aa3b4a",
+      "lines": 34
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateChecker.kt",
+      "sha256": "f5477ad66db3d0a2e1d744209fb1b7bd7f5299250c04ff91c4e92359bf1f42b7",
+      "lines": 104
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateDiagnostics.kt",
+      "sha256": "0a9691cb58c97fa37ce3d3df62ff1c332ef3a5a9f0983cb07a125403ce0c226a",
+      "lines": 151
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateDialog.kt",
+      "sha256": "9fd1995bd550a1575a9c2627b5f786f44d2087217222143be6e09aff7b5344e9",
+      "lines": 194
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateDiskSpace.kt",
+      "sha256": "0a10618a2d26cd18c9c622510cc9849ac94c441df393b0d26cfc69611552d4c4",
+      "lines": 65
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateDownloader.kt",
+      "sha256": "599b384c640786cfe14b5f98670a982159191c36c772c3ab3a772ac72d81f815",
+      "lines": 114
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateInstallation.kt",
+      "sha256": "2c0ce7e85f55de20af327ee376298d4fb6a0c4ace3c1a8cb76296a992ba49686",
+      "lines": 74
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateInstaller.kt",
+      "sha256": "2bac85463b99614da5253870638d9e239d78e2e37fd7a376c817de101a3db010",
+      "lines": 139
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateManager.kt",
+      "sha256": "bbe03ce93dd942fff9dcb1bb5312010e250f3fe8a276520f190175ef2653ef99",
+      "lines": 207
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateReadiness.kt",
+      "sha256": "81152afa2325e597cacdb221ae59723ec376c3e2a5b1184bbc6e9b7cf9603ea5",
+      "lines": 70
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateShutdown.kt",
+      "sha256": "a3d86191aaa29f43140bd8eed06443e5331ca2352ee213eb9ecbc546a869019b",
+      "lines": 27
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopUpdateVersion.kt",
+      "sha256": "1a89005f64e552d6f117a6642594ca17639cdb6703ed04696271bcb81e20241a",
+      "lines": 33
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopVideoBeta.kt",
+      "sha256": "eadcfc4460ddd4fba157313bd4e07e17487d41f8408f44207d6434f42ef7ca60",
+      "lines": 14
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWebSignIn.kt",
+      "sha256": "47fb78c1db55f9d41331e025f7ca5ceda0169a9da6e2fbe4bc2db6cbbb18c01d",
+      "lines": 225
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWelcomeOnboarding.kt",
+      "sha256": "32986bf943cb2b5e923f7c31eae203b3bbb6e1d83110eef43c374da5e68bcc18",
+      "lines": 106
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWelcomeScreen.kt",
+      "sha256": "9e4fc364630a48e93fd08e3db9148b46d76a27a9f933ded1e45096723061ba76",
+      "lines": 242
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowBackdrop.kt",
+      "sha256": "bf75dc04cd82918a0914390bf52d6cfde7dffbd3470349f44c2027c76c6c6d7a",
+      "lines": 42
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowMode.kt",
+      "sha256": "864ffb9a0f3a87aa955d599207c6a917c3bb66ff46bccfb782c1afe86bbb8fea",
+      "lines": 150
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowVisibility.kt",
+      "sha256": "eb1c2b23159e5053eaa114147200d8ad381ddcedfdd51b1a822e17596ff001c2",
+      "lines": 79
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowsAudio.kt",
+      "sha256": "df1cc682cf4f7fc6bf286674d13040ffaaf323eac30e1b6a4cd263a9604dc227",
+      "lines": 96
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowsCaptionAppearance.kt",
+      "sha256": "74fe0b3e0be5a96bea110e986faf4ba5049a243cf4acd8cda05462a1f538db02",
+      "lines": 69
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowsCrypto.kt",
+      "sha256": "72c9a5a035a55255bdf9e1f2ad4ab42aaa40d9945c4f487cc8653ae97594e6a5",
+      "lines": 16
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowsFullscreen.kt",
+      "sha256": "a4e2819820c8826618a11cbe7359583c957ffae40e4c15aa86b0b9c87d74ab7a",
+      "lines": 63
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowsMedia.kt",
+      "sha256": "ea1189fe6889395c93c28e2cad35ef0df71ab3079989097cdbc97a066ef6e247",
+      "lines": 116
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopWindowsUpdate.kt",
+      "sha256": "0aaa9656dab914420dde78440f04e0e91dcc64ff851af57217077deaaddfec3b",
+      "lines": 98
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopYouTubeAuth.kt",
+      "sha256": "e249f00146f9103552927c8ca1302d1eccd93d9638f2a92a6299ec7e12290084",
+      "lines": 103
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/DesktopYouTubeSession.kt",
+      "sha256": "6ef790b8fb5b9e36401ecd2f811935aa8ef06933cf6eb641866036ae5b157d20",
+      "lines": 114
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/desktop/Main.kt",
+      "sha256": "5a8d313611e922c2d35deb50182ebcba97151254afd7b6378f3262b85bbaf7c7",
+      "lines": 341
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/playback/loopmix/LoopMixRenderer.kt",
+      "sha256": "34bc96861cb33ba98ebd6b3e26b5674eb020550113885bdb9c9c4fad5b8fa212",
+      "lines": 100
+    },
+    {
+      "source": "desktopApp/src/main/kotlin/com/music/bitchord/playback/loopmix/LoopMixSession.kt",
+      "sha256": "79cb059bc2d3cf72e7e82e599287e841e872b79947d71fb2b3b802173c4ab2a9",
+      "lines": 164
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/listentogether/JamInvite.kt",
+      "sha256": "fb7a620ac4e70a408c78505ab08ad248196dda6b5b4796983bcf3cc8367fb5a9",
+      "lines": 28
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/listentogether/PartyModels.kt",
+      "sha256": "818ef35a4ad4fdde01e629a433a09eac1fc9c3846349c21d7660444ceccdd929",
+      "lines": 188
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/listentogether/PartyQueueReading.kt",
+      "sha256": "2e185b8d6d9ac1f231e36c33bbf221acd506410b9d91dbbf7930c0338a168738",
+      "lines": 35
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/listentogether/ServerClock.kt",
+      "sha256": "b859def34f2da82be4a575a03c12b07472998f5d6515f8c636dd20d7b3696f77",
+      "lines": 95
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/model/Models.kt",
+      "sha256": "e506df900a719bba071e5e93c67567031389eb1ec39d89c356dbd863abbfe880",
+      "lines": 661
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/model/PlaylistOrder.kt",
+      "sha256": "09a162092929d91ffb04336b4dc4f05637f99566668b4460e9a204069f5123fd",
+      "lines": 69
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/model/SpotifyMatch.kt",
+      "sha256": "42869500c299c9927f8a0c6914bfa967130b3f9f8ab0c6c1ac189dee961d0375",
+      "lines": 18
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/model/TopPicks.kt",
+      "sha256": "893efc8aaee9a53f60d112157136f04e11525bffc8cf9b24736c0cbe1dfcb745",
+      "lines": 155
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/settings/AutomixPerformanceMode.kt",
+      "sha256": "da041c3548bb9322769cf19856150eaec6bc157f983a42401a3e69dca809b1a7",
+      "lines": 12
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/data/settings/TrackAnalysisState.kt",
+      "sha256": "49d587e46e5fe65e82a8201fdc09bba54cdc6931249c39623fd40c3f66303ad2",
+      "lines": 116
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/playback/EqualizerCurve.kt",
+      "sha256": "d446357392bb8c05cdcb848ab284753f9efd4063924509dfc0ac88675fb74ce5",
+      "lines": 215
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/playback/EqualizerPreset.kt",
+      "sha256": "05239c9152db5c010497b9abcd74d29ae596ec4cb7828c81978c431d732a4122",
+      "lines": 51
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/AnalysisLog.kt",
+      "sha256": "cb74dd804280aae65f8efcce196d4200b783572c6b880514eec87243e12f2268",
+      "lines": 15
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/AutomixAnalysisSource.kt",
+      "sha256": "7db01a3d27c3fed5f30066751c1872535027ea31e50da59ba871cb2f94d09c9b",
+      "lines": 29
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/BeatAwareTransition.kt",
+      "sha256": "142a15b4ca43a01e13c24b855d2b5d5f61cb61983d074e12fbfb5f0b87db0abc",
+      "lines": 45
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/LoopMix.kt",
+      "sha256": "639415c950b1f1ca3a8b64e9c31b69adb838eabd7a814c7e058762bacd0755c8",
+      "lines": 560
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/TrackAnalysis.kt",
+      "sha256": "b4b61d8975904a5ff65ef96abd179ca260d1c108800ca088972c4a3630351ed8",
+      "lines": 223
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/TransitionPlanner.kt",
+      "sha256": "26b6316901f950001578a49ff7771dd6285f5b2dd310eee1c2d9db05abfc9e99",
+      "lines": 1868
+    },
+    {
+      "source": "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/TransitionPolicy.kt",
+      "sha256": "5369860876566d7ccc92f041a299dd47a5437dc5c80b53a2a7420b6b841cd089",
+      "lines": 514
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/data/listentogether/JamInviteTest.kt",
+      "sha256": "40422c8c80de92ccf1a6d6ceffb30407893fe6b206b42a1862327d5892752bbe",
+      "lines": 56
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/data/listentogether/PartyQueueReadingTest.kt",
+      "sha256": "d23dcc4c578c0b1f4e3fcd0fc382e0361703b49ff4c85d116be824c9bad30fe5",
+      "lines": 51
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/data/listentogether/ServerClockTest.kt",
+      "sha256": "2dd4223b0a5ee3d2bed5759cd76756c0f79a396835f4f0bc00c7dd8d7c9f13e5",
+      "lines": 76
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/data/model/ModelsTest.kt",
+      "sha256": "a75afa17ef55737b169fb7eea9758d90ea154205074077ccc3390966bb3f169e",
+      "lines": 43
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/data/model/PlaylistOrderTest.kt",
+      "sha256": "ac891684860a7ac8c04e4b69db0bd72bb4c7bc4a0ea53ac2edd90af86ca5c508",
+      "lines": 66
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/playback/smart/AdvancedAutomixPlannerTest.kt",
+      "sha256": "b057f0bcd24ae09fbbf59a69e1d0c65273e41eea5614d129e420479819be388c",
+      "lines": 211
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/playback/smart/BeatAwareTransitionTest.kt",
+      "sha256": "a192f9240150197321fb7a195b9f3a88900abab517682ac699e1dde862348618",
+      "lines": 49
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/playback/smart/LoopMixTest.kt",
+      "sha256": "b1c4f839c88c307eacb4d6afab979b8064ac46d6c23b9e25ea098970dfc54801",
+      "lines": 311
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/playback/smart/PhraseBarAutomixTest.kt",
+      "sha256": "685d0d99c5dd6706334d60d3faebeb49c379de08a028db1cb8883e6cc554e273",
+      "lines": 121
+    },
+    {
+      "source": "shared/src/commonTest/kotlin/com/music/bitchord/playback/smart/SpokenOrLiveTest.kt",
+      "sha256": "560cd64aa1ccdd65d4670d92202e5ebbef5b3d0cce3d22a38ccde4aa79d49183",
+      "lines": 35
+    },
+    {
+      "source": "shared/src/jvmMain/kotlin/com/music/bitchord/data/spotify/SpotifyImporter.kt",
+      "sha256": "32b5c5ac66e550f3a0bfdb3f989eae0b8a6eb3f30b0de849318d564bd12be41d",
+      "lines": 312
+    },
+    {
+      "source": "shared/src/jvmMain/kotlin/com/music/bitchord/data/spotify/SpotifyLibrary.kt",
+      "sha256": "f43141ab9eae36bb108adb2cbc9a8832ced016c91bcc286d6995d5f1e9688584",
+      "lines": 325
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/auth/DataSyncId.kt",
+      "sha256": "f254c4f9ec003a84164603344aa1457c30b6b42c4b1cb0c9762a11e40f2ca600",
+      "lines": 13
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/AppleArtistPhotos.kt",
+      "sha256": "72b7302d31058cb4af109b8f603a9d92d7935987efec77566423244bc125419a",
+      "lines": 169
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/AppleCatalogue.kt",
+      "sha256": "a442b2c91fc109ada983dc4c4153b68c2f109c1680c55c7f1dbb088f86f4b512",
+      "lines": 83
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/DebugLog.kt",
+      "sha256": "cc4777bad0416a833d50e7f0a8e47b57d5ab357ab114f1bbc1073b232033152a",
+      "lines": 28
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/Http.kt",
+      "sha256": "d6d0b70452cbf67e6e69ad44f1004a7d2a39b0037be9c9d1fb3de5410357cd76",
+      "lines": 142
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/LikeState.kt",
+      "sha256": "417766bfa3df2e362d6a530c02ee8a53557ebca675868760b31640b782c400e9",
+      "lines": 47
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/LocaleTags.kt",
+      "sha256": "2292e3c39b2737b7d5383ff531fa69b782d7350ab8d3bd3c4444ac858dbda36d",
+      "lines": 115
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/MonotonicClock.kt",
+      "sha256": "6abe41e2f8fefb58d9ec2c3bb1ad6a6d6191e85c064b6fb5f9dba5ee5acfc018",
+      "lines": 13
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/NerdStats.kt",
+      "sha256": "b3bd8dcc7b41874699e62c91ee0166b210555d9796d74c198f89142c88b645c6",
+      "lines": 383
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/TopPicks.kt",
+      "sha256": "7315a7f6b0d67402a4fd2680903af3691ca2cad288a37fe1c2524f4a00163016",
+      "lines": 532
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/TrackLog.kt",
+      "sha256": "547bafee3e56482682fc436534bad9ce52261e38f4a004265dfe365cdf0726fd",
+      "lines": 284
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/YtMusicRepository.kt",
+      "sha256": "493549fa493f66458f96b766262f94c502c4fc48d9a391640c5e1f9a73a6434d",
+      "lines": 1146
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/canvas/CanvasArtwork.kt",
+      "sha256": "3f402efe10c7f026764e9ecb6b2783fa7821b084e322def9684bf74d5ff2f843",
+      "lines": 94
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/canvas/SpotifyCanvasQuery.kt",
+      "sha256": "9fe776bc406901651d94c44a2cd0fbe58199b8a03a52360b87af5e0a309b6d26",
+      "lines": 155
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/InnerTubeXResolver.kt",
+      "sha256": "b3ff38aed1e49347047dcf3916c28b0fb4cbc7cfd071e31998c42f4ebb66d29f",
+      "lines": 357
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/Innertube.kt",
+      "sha256": "ef8339616d45915ed2594659e5d771205a7d79416c1ed8359c2bd048d02ad955",
+      "lines": 1277
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/InnertubeParser.kt",
+      "sha256": "846d3818e233bce07799197880629f5ffc60d4f9658bd23ae31fdf48849325ae",
+      "lines": 1687
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/PlayerClient.kt",
+      "sha256": "b42afb45ff61c2e3c203b721b9bf09f4cf658865b417ce68e7970c96d481dc1b",
+      "lines": 161
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/StreamResolver.kt",
+      "sha256": "0b9d0f35a2619aff002b3855028bfc632077e572e5874119942cd10c2f4a9436",
+      "lines": 1146
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/potoken/JavaScriptUtil.kt",
+      "sha256": "ee337d403a18b73be2345376ea9a677cfb35477fb2405665f17528c25def54fe",
+      "lines": 129
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/potoken/PoTokenException.kt",
+      "sha256": "e2f1085b5a5ee6fea44a64a61fbb91a51ff8e7e734490c6609d25260e4e6bc91",
+      "lines": 13
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/potoken/PoTokenGenerator.kt",
+      "sha256": "98ffdd4439f6e457633161d8a3e54ace21afc38242fd63a1b7bfacf61d42fbe5",
+      "lines": 174
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/potoken/PoTokenPage.kt",
+      "sha256": "34a257ca000e04869388cda4c237bc2386515c78e95dafd5b8f5c63b52af180f",
+      "lines": 222
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/innertube/potoken/PoTokenResult.kt",
+      "sha256": "c914f4ccf05dfb12d9c247d1a7a567a69ac0d8699ba5dd732d9f480699af2c76",
+      "lines": 6
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/BackgroundVocals.kt",
+      "sha256": "11c19485335a0d665ec6e08fd6d806d49ec4771b57f3f044eef73b8fd83254f3",
+      "lines": 105
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/BetterLyrics.kt",
+      "sha256": "b2a69dcc5d49f0a27a4f391ff4a6f2aa2f8f7b5db121da2ffc382225a2f7f2a8",
+      "lines": 59
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/BiniLyrics.kt",
+      "sha256": "071f2dbaf55b75c5124dcb4a23ac3219d27083d1fd96346979cb4fdf68a1a137",
+      "lines": 125
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/EnhancedLrc.kt",
+      "sha256": "4576fd002f1de7c3e3b2a37741a990d454b5087d973512626ab7f20a17c050ef",
+      "lines": 95
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/Genius.kt",
+      "sha256": "8ad8b28f27c94982a6fc7bde9e591ce1ed122b673259d4885dda5082a8347e2c",
+      "lines": 357
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/KuGou.kt",
+      "sha256": "130c49927172995b9187139747a2f5be2dca1b9a4b2d1a5d665b378bbb76f6d6",
+      "lines": 158
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LrcLib.kt",
+      "sha256": "e8ed3e98e9b3b42448ff69830e8f06c677d98ac956e91a631954a5dff0bfdba9",
+      "lines": 209
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LrcRed.kt",
+      "sha256": "29d2de643c588d42b4950589924db8b744cb78bd245f9707791c4cf070f67ffc",
+      "lines": 178
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LrcWriter.kt",
+      "sha256": "a1acf30509b091348533da7f3a3a0e50b73840b511ee381da183ff2c57fb292f",
+      "lines": 177
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricAlignments.kt",
+      "sha256": "b988417827d8b79ce497a3a749b002e7128de40075db7aab293c61d4550f7f2d",
+      "lines": 73
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricGaps.kt",
+      "sha256": "1d05a764c8681193552888947223ac9addade01299d00d3c457fb116732024fc",
+      "lines": 34
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricLine.kt",
+      "sha256": "9c5627b46c71914f0562336190cc33d515411f2b3da3eb55d4397f9c61c4e22e",
+      "lines": 653
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricSections.kt",
+      "sha256": "ff4c363e10619d9d087c2443d15d86564b8343406b6401d24b187d840f808f5e",
+      "lines": 10
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricsHttp.kt",
+      "sha256": "8fdc7f17c53cbfd41a3de695baeaee21e0d484271cc0e2630e22969388b3e51f",
+      "lines": 83
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricsPlus.kt",
+      "sha256": "e6e4f82dafe01fca62d25bcb0c450ecf16e944dec0f9c9235c6fc9c17e1ea569",
+      "lines": 228
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricsQuery.kt",
+      "sha256": "f44fa1af872df1de7e1e97bd420ff44793aa5e344e423a547f8ef329d22ec7ef",
+      "lines": 59
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricsRepository.kt",
+      "sha256": "644a00624a63cc1bd846931f5aff8a4dbe5696c32537dc66875b762750152de3",
+      "lines": 305
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricsSource.kt",
+      "sha256": "5e7b41a75d55b27e11ac24b7f76bbc5b171378fb7ff61a9387aa6c98634fa383",
+      "lines": 154
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/LyricsTranslation.kt",
+      "sha256": "a90a3fb999fd26061f8c2fe60fbf0a0f7b5c04d78f8b1d9cdaa136741e89fac9",
+      "lines": 618
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/Megalobiz.kt",
+      "sha256": "2077036b94e36479147f24348091396aca7cae8a879b81f9881a6891e02be6cd",
+      "lines": 29
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/Musixmatch.kt",
+      "sha256": "49729ff9152879f378ab6e53ee1e8908c537328386a70965cf49d097e85f1162",
+      "lines": 362
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/PaxSenix.kt",
+      "sha256": "356b47ee1025173e2b35fd997d8537a7f866eb766248afbfb8711f2c8d15feaf",
+      "lines": 360
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/ProviderLyrics.kt",
+      "sha256": "68f451c193bd307dc8cb6d26cf8330f2ed755d71aae4d792457dc8a836804931",
+      "lines": 127
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/SimpMusicLyrics.kt",
+      "sha256": "86b1765c4d2d5c7dd24567b47b9830ae906a62b65bd87eb5126b94ec6f80a120",
+      "lines": 65
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/SyllableRuns.kt",
+      "sha256": "46e3ee2e1789085b87122044cf885265e1526ba7e3e8f40ab065b3c25c973390",
+      "lines": 79
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/TranslationLanguages.kt",
+      "sha256": "bf8a7ac39884008a75ce561e7bdc22acc7ef5c027c2adb2dc8dcddf615b4c159",
+      "lines": 189
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/TtmlLyrics.kt",
+      "sha256": "d6b665f991014801a5d7057080d1ebf9d3c7ef71661d726916a7a2f28e7fc148",
+      "lines": 308
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/Unison.kt",
+      "sha256": "983df086549c39c3303adbd05114b8d82170ca8dd595ee0a46e61b36a9bb1cde",
+      "lines": 103
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/lyrics/YouTubeLyrics.kt",
+      "sha256": "24720485febf4a5e3851a26836211e46f04d1e8d88c1360ecea77324ac3e86db",
+      "lines": 74
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/model/ArtistCredits.kt",
+      "sha256": "e5567ef1e0f60699b9ddf7e28e996fe36f99ef508b88bb50e440487e63bb1c89",
+      "lines": 373
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/model/SearchHistoryEntity.kt",
+      "sha256": "413a965abba0ffa653d473713ffe0a578ccc4ca7994ac230cff52f5ac7f334b7",
+      "lines": 34
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/presence/Presence.kt",
+      "sha256": "0fa49f9ba634f44c0b671e5f7cce09e4193cf230501eb727038610d3be2be0e2",
+      "lines": 126
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/settings/LibraryEnums.kt",
+      "sha256": "a87d1bc0299b8b669655a3bf11e77991c1d01c51b1454416ae4817f3c8fca623",
+      "lines": 19
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/settings/PlayerEnums.kt",
+      "sha256": "dea3c6c68ded7ed8a120a2f3657f4d9807d6b96675bc08d12f3c7108077d5821",
+      "lines": 45
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/sources/SourceTrackKeys.kt",
+      "sha256": "4aa34b9c937b0befb448d28507c2481bd1803acb4472736ee61da1f4ef9edeb6",
+      "lines": 20
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/sources/StreamFormat.kt",
+      "sha256": "7ccfa1bda735bbb5cc177d10f29a6612e362547e3f85927f168ce511fe187fd1",
+      "lines": 52
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/sources/TrackMatcher.kt",
+      "sha256": "2fa30f66eac634f462ec3b7a6bf23209a29eda44a6e8e0df4ea5448d89aeb50f",
+      "lines": 976
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/webdav/WebDavAuth.kt",
+      "sha256": "e578958689dba130e53016cccfed583a521b9474b965d1e1ded28be1afea2e5e",
+      "lines": 26
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/QueueBuilder.kt",
+      "sha256": "0259a48a1d21f46f6fef0ea939a872fe205d117a68883fce238316eb645ee96f",
+      "lines": 130
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/QueueSections.kt",
+      "sha256": "4d156555ee755cac0897c84d9f2f71dd32193d653b7f804c35ed3baaeba23110",
+      "lines": 22
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/QueueTimeline.kt",
+      "sha256": "d796020aee30c079abfbf745d2e77810b3579162fcaa4589f88b80759275c835",
+      "lines": 261
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/TransitionFilter.kt",
+      "sha256": "8ae4db7c945cc7cc86a0e5139c5e834c3ee8b9d97dc30e202828176ee794349a",
+      "lines": 193
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/AnalysisStore.kt",
+      "sha256": "3b4ade20175d9196203f24c30a0ca2951371660032884116cfa78a885317ed9f",
+      "lines": 343
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/BeatTracker.kt",
+      "sha256": "af07fc4fea10427d7319502ce0a78d348f3e437d175b569b599b8cc4c168bf8b",
+      "lines": 340
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/MelSpectrogram.kt",
+      "sha256": "bb930c4797433a5089ebe3ecb9cbc528ee8d9bf3f14c4759584bcb641f1889f0",
+      "lines": 108
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/NativeAnalysisLibrary.kt",
+      "sha256": "15e9eb16f43d5fa797c6eb67ad912c886f0bb3df976c6aa8fc7a7545d150e1fd",
+      "lines": 23
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/TrackFeatures.kt",
+      "sha256": "28a380a933d84fa5740362ee89bddc80d1f2a8c6ffc1a18ff808cb895f2728ee",
+      "lines": 188
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/VocalTracker.kt",
+      "sha256": "a9880bb69335d8d394f8da2aa94c6dd3138bb7b6f670a5b89cb266b8f3fbab6b",
+      "lines": 280
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/DiscordWebSocket.kt",
+      "sha256": "6acf262798ec934376150d45a7404ce37ee473b12e91caf0765565e855f7cb9e",
+      "lines": 608
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/HeartBeat.kt",
+      "sha256": "8001fad81da7b73e00057382cfe57a91edbbe013bcd2e9864309786fb0123dcd",
+      "lines": 22
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/Identify.kt",
+      "sha256": "a0d1ba43ecda59d15a21e5831b4f3ececc3c449d13a283076faca1be445b621a",
+      "lines": 77
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/Payload.kt",
+      "sha256": "b1f99a4bb97a96d847501e8867f4ce61c3fbd76ee647cbc63b0ac31bd6a365ca",
+      "lines": 18
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/Ready.kt",
+      "sha256": "4d4744f3dc437120d73cd42a5baa3f21038dfd43178c0d188427989cf4b7eee1",
+      "lines": 24
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/Resume.kt",
+      "sha256": "077d9f87d6a209294a85225ed18fa54b48bb8bf4891da075362064a6163c0686",
+      "lines": 14
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/op/OpCode.kt",
+      "sha256": "e4f6c43f29b3535eddf880eb1c391ac50e222cafbb4bc53ea901145e8ccda103",
+      "lines": 42
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/op/OpCodesSerializer.kt",
+      "sha256": "c5214f1387466b009b81c8b701ad772f80ff975291fd770e6f46bc1485bdefef",
+      "lines": 30
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/presence/Activity.kt",
+      "sha256": "10d65e32ac383ace1dddd18bff73c6a3ff2d215f9665a3914463e8ad93af4ec4",
+      "lines": 34
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/presence/Assets.kt",
+      "sha256": "9dafd92962604265e909aaccf0692dce9426f3149570891a8cb086c4cc460ac8",
+      "lines": 16
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/presence/Metadata.kt",
+      "sha256": "42ce93a87737716c98b1832de2a22222d54365016ab68f7b55d1458a9c830665",
+      "lines": 10
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/presence/Presence.kt",
+      "sha256": "a7057b491a901385e8bb0d5e09405d1168ed55424f51fc67618c8f7d6e292067",
+      "lines": 16
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/gateway/entities/presence/Timestamps.kt",
+      "sha256": "f2d3a536bbeeee3b0963062c542fa4bff018244dbee982f1a125923e42fcb65f",
+      "lines": 12
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/rpc/ArtworkCache.kt",
+      "sha256": "8278b0efa64abd803d646ef2721a7be99211c75b3f0cb0ce5724c14e69bd83c8",
+      "lines": 11
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/rpc/ExternalAssets.kt",
+      "sha256": "d717ef2da7c40462b786267ba7296d9e8facf9d1a69fb9a202424cef08451170",
+      "lines": 42
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/rpc/KizzyRPC.kt",
+      "sha256": "1b2bc246c68a537d12c8f1ebdb5616690ee4c020b05b67d8e48a8141b8eb64ec",
+      "lines": 196
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/rpc/RpcImage.kt",
+      "sha256": "337ca067029611831c1f6360442e04f04897994f9b7a15d8d27fca35147b6d25",
+      "lines": 40
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/rpc/UserInfo.kt",
+      "sha256": "f8b01998933f8e4b8a3f7608970c2b2ad377983ceed5ab42fbf4a899df08437e",
+      "lines": 11
+    },
+    {
+      "source": "shared/src/jvmSharedMain/kotlin/com/my/kizzy/utils/Ext.kt",
+      "sha256": "79ab8e6ade21096e244e624f162bb6311bbe65beb6f6b91c6a3fbd7828ba67e2",
+      "lines": 25
+    },
+    {
+      "source": "shared/src/jvmTest/kotlin/com/music/bitchord/data/presence/PresenceTest.kt",
+      "sha256": "dee3fda64b8671ee78dcefbb7cd057b5b961030771aab97adfda33a043cc2bd5",
+      "lines": 87
+    },
+    {
+      "source": "shared/src/jvmTest/kotlin/com/music/bitchord/data/spotify/SpotifyLibraryTest.kt",
+      "sha256": "07e30fb55d9d142cdd226fb0ccb91ae110fd2a0ac60cd6b69703140dbff5dc22",
+      "lines": 68
+    },
+    {
+      "source": "sharedUi/src/androidMain/kotlin/com/music/bitchord/ui/components/BlurredBackdrop.android.kt",
+      "sha256": "6b4b01b6a0e3c22b2d48764ff0182330ebda92bd89bd56d399c9b9aa15c42704",
+      "lines": 88
+    },
+    {
+      "source": "sharedUi/src/androidMain/kotlin/com/music/bitchord/ui/components/ContextClick.android.kt",
+      "sha256": "b64a519b3dab3e8ec7fb97f9a1c197b2090b7e0894ea28489eefe0d9ad9e9b95",
+      "lines": 5
+    },
+    {
+      "source": "sharedUi/src/androidMain/kotlin/com/music/bitchord/ui/graphics/ArtworkPixels.android.kt",
+      "sha256": "a8e4c8f3926438b69c4ae0e3c9fa4c4657b204d05b2f2dcfac597568781e6d56",
+      "lines": 24
+    },
+    {
+      "source": "sharedUi/src/androidMain/kotlin/com/music/bitchord/ui/haptics/Haptics.android.kt",
+      "sha256": "074cb0c645dac155555bbd57378b0ed027b8f025771d145daaa2999c2bc683ab",
+      "lines": 336
+    },
+    {
+      "source": "sharedUi/src/androidMain/kotlin/com/music/bitchord/ui/player/PlayerPlatformUi.android.kt",
+      "sha256": "986f2e05b1600a640d3d9ec5fa3fd14db439163910d1018717a6f773e21b2048",
+      "lines": 120
+    },
+    {
+      "source": "sharedUi/src/androidMain/kotlin/com/music/bitchord/ui/theme/ScreenOrientation.android.kt",
+      "sha256": "3bec19c41a6e5e1528b35ce8f58f7df509ac3005c35e4a803516a8ad4bd8c1ee",
+      "lines": 77
+    },
+    {
+      "source": "sharedUi/src/androidMain/kotlin/com/music/bitchord/ui/theme/StatusBarIcons.android.kt",
+      "sha256": "e5566a58b43104aeeb79aa6d3cdd753258db84b9907cab06d595fbd049cd7d12",
+      "lines": 116
+    },
+    {
+      "source": "sharedUi/src/jvmMain/kotlin/com/music/bitchord/ui/components/BlurredBackdrop.jvm.kt",
+      "sha256": "6917d2676de0062eb11cf9fd2ecc03bf52b5a5a6ac94602d44aec481fa7e2825",
+      "lines": 154
+    },
+    {
+      "source": "sharedUi/src/jvmMain/kotlin/com/music/bitchord/ui/components/ContextClick.jvm.kt",
+      "sha256": "83d5c23ab4804795d220458a62f2e663173e2381b2479e842adb57b3a1962198",
+      "lines": 22
+    },
+    {
+      "source": "sharedUi/src/jvmMain/kotlin/com/music/bitchord/ui/graphics/ArtworkPixels.jvm.kt",
+      "sha256": "a963d4be4afb811120567dea8489f43f58edebb53e8b573cbcdc377fafdd3e7c",
+      "lines": 32
+    },
+    {
+      "source": "sharedUi/src/jvmMain/kotlin/com/music/bitchord/ui/graphics/PaletteQuantizer.kt",
+      "sha256": "5b5682e0c2239e45bec083dfe2b0ac1aed4c7c1ae0c81e4734c7667406527995",
+      "lines": 266
+    },
+    {
+      "source": "sharedUi/src/jvmMain/kotlin/com/music/bitchord/ui/haptics/Haptics.jvm.kt",
+      "sha256": "9a8b4a3001fbce8db995371dc00a38bf3e341433c417bd328a884121e48410dc",
+      "lines": 13
+    },
+    {
+      "source": "sharedUi/src/jvmMain/kotlin/com/music/bitchord/ui/player/PlayerPlatformUi.jvm.kt",
+      "sha256": "f2ff0980b9ec431a495622f0af12b08010bc7ab8809a74fbd988a54151146eb3",
+      "lines": 139
+    },
+    {
+      "source": "sharedUi/src/jvmMain/kotlin/com/music/bitchord/ui/theme/ScreenOrientation.jvm.kt",
+      "sha256": "cf3d146369d8fc690b683e1a05b0455df03db49a79959ba2e0d1f89fdb3cbbb4",
+      "lines": 12
+    },
+    {
+      "source": "sharedUi/src/jvmMain/kotlin/com/music/bitchord/ui/theme/StatusBarIcons.jvm.kt",
+      "sha256": "4d1c6fb8a505c715cd1e735b4e2ae8af0ff4317e8fa41a3c90956080ccc0ec0d",
+      "lines": 20
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/playback/PlaybackPosition.kt",
+      "sha256": "d83eedca52d8d0dada1d1644adf87f6e4f868a0929d2932d61b78be3afc847a0",
+      "lines": 73
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/AppUi.kt",
+      "sha256": "60b73b0fc6224a7ffa1e66afa0fdb797802fda05c3fcf46c1d3ba6f349823bb9",
+      "lines": 66
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/ForegroundState.kt",
+      "sha256": "77900493d6d8db32214e826bfece08637901370f1cd29fc11ae6bf98b8681518",
+      "lines": 60
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/LyricsProviderState.kt",
+      "sha256": "db562f6681fcb80e8c2b18cb0e7230c3d9d788d4edee7d6eb667cf0baee68008",
+      "lines": 9
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/BlurredBackdrop.kt",
+      "sha256": "5d8de3e3592cf9342b79638f9212c20d2cf4305ec534f8849b35c14b0abc159b",
+      "lines": 16
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/Common.kt",
+      "sha256": "fcac54c8c0c723f5bc3e2e79d31d30349ad70287e8daa6ec9fe671f311292a75",
+      "lines": 1013
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/ContextClick.kt",
+      "sha256": "e483da91e0158e09ed26f582ecb28d2832047a7cf0e16f556d2bd2f8684fa0c1",
+      "lines": 12
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/LongPressOrigin.kt",
+      "sha256": "0b55cd635a62f0d49eb26b3f55c9aff82f38f061cea7c77973389b893d702aaa",
+      "lines": 166
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/OptimizedHaze.kt",
+      "sha256": "2ca1c680390d65e650060fcfd20600541fe63b3de189a6de182c3ceba082dee8",
+      "lines": 32
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/SearchField.kt",
+      "sha256": "23ceb4d3ef6a1ee5c7f0352552e3e10f2dafdb5d8ed23d3f278c01265c8afc25",
+      "lines": 160
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/ShelfRow.kt",
+      "sha256": "c48a2bc382e15bc3436253b96b7322493bccfec41d88dcfc09b713358a647064",
+      "lines": 50
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/Skeletons.kt",
+      "sha256": "870dbd2063564ce6a5e2bcc5b88b5c8f151add63af549aeec2693365243ad33f",
+      "lines": 371
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/SongText.kt",
+      "sha256": "506cd2275a4e02d2a641dfa04d02d1ce46326315ebf8a99dfb787aed541a171e",
+      "lines": 213
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/graphics/ArtworkPixels.kt",
+      "sha256": "cb2224aada68ca29800cfb4198d7df784eb8b23e9a0a36cd8476ab24efb65b05",
+      "lines": 35
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/graphics/ColorUtils.kt",
+      "sha256": "ab9d5bc6bf0b889e7593927d0f615e420e0a467b5cbe3d6f24fa8032c2255b03",
+      "lines": 121
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/graphics/FadeCurve.kt",
+      "sha256": "47ac727960534069785d7711aca61c1d5e6a176118fcdfbb350955a488b41ec5",
+      "lines": 21
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/graphics/FadingEdges.kt",
+      "sha256": "d327c1bafc726d65083be688c25f58de7a3e01f3ae6726879e3bb30d94ecc769",
+      "lines": 58
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/haptics/Haptics.kt",
+      "sha256": "029e2eb277ed54070a2a0741f17fb9de97f411e1d061a3280983fa49f5ade814",
+      "lines": 62
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/icons/BitChordIcons.kt",
+      "sha256": "f14f968be47a64732fc9466a93d20feb97877d49e31caca3ff6fd6e6886e88f6",
+      "lines": 790
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/ArtistCredits.kt",
+      "sha256": "d829c56145657132c1f44357edd57c03d5f6af5ef7aa6382d6dca219b31565f0",
+      "lines": 83
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/ArtworkMeshBackdrop.kt",
+      "sha256": "d062189b490654c978fc87de0a1d8469caf09c96d5dde45c099a3c5dff736e2a",
+      "lines": 852
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/AudioOutputLabels.kt",
+      "sha256": "efccd8d603b17e4aa43fb3895f49ff9f6de3fd98bfc48a14226be74900d68be8",
+      "lines": 48
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/AudioOutputSheet.kt",
+      "sha256": "1d12a7064a142e7fc73dd73aa7427bf92414ff5a2b209adc1c7252f4f7e2e873",
+      "lines": 417
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/DesktopMusicVideoLayout.kt",
+      "sha256": "a1e85b789998358b09820e2f8a683631d5c35b03c666d8fa62e23ee8bbbe2e51",
+      "lines": 96
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/FrameHeuristics.kt",
+      "sha256": "6ae274301120416dc70140cab20db5019e677c5ff9becfae4be1cb80fcf08f20",
+      "lines": 35
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LandscapeHeaderPolicy.kt",
+      "sha256": "e83c14404ae7573544b7c8bfd0938a6b9a64a671da2474d7cb5052e523bcb630",
+      "lines": 5
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LandscapeLyricEdges.kt",
+      "sha256": "830689361b320a2458ebcf6512254a15169d77cc5dd78a01770528d5c90fd0c0",
+      "lines": 49
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LandscapeLyricsFrame.kt",
+      "sha256": "e72c266bd9c852f51b63be5a37886ac3db9efd35df78570c768b5cc0654df182",
+      "lines": 112
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LandscapeMetadataMotion.kt",
+      "sha256": "c6ee6ebd096702361b8836eaf9e276ae5e57f5376251034822d3788f29a34475",
+      "lines": 139
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LandscapePlayer.kt",
+      "sha256": "29363ad9756d912c875a51f182c50a022d036bec399028bf62c2b7e16f9744e5",
+      "lines": 568
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LandscapePlayerColumns.kt",
+      "sha256": "f107989bdf281b9fe98889e2f38178cf3484e4d35ba7e22de760a4ca42c72e86",
+      "lines": 217
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/ListenTogetherMembersSheet.kt",
+      "sha256": "389015b74796320dbc8beb140f9d51002cd35270a1cbbf2532ed1feab7e75afe",
+      "lines": 206
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LyricClock.kt",
+      "sha256": "d8d3bae9f78af6b0cd9c50a5ee4bf7af0040a8fb2043ad285c7d3c9999456e66",
+      "lines": 379
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LyricFocus.kt",
+      "sha256": "6432eb97f9e9c0beac68939dfd823c4f2d049f5ca0f5bf17c967fee72fc43fa5",
+      "lines": 15
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LyricsControlsGesture.kt",
+      "sha256": "4ffcec2ceff3ca7eb16a65a29313aa7181100055c78ff2b40b9a2e1600d50710",
+      "lines": 136
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LyricsOffsetSheet.kt",
+      "sha256": "2025dcd8454c66e3ff57d547854b3abade44cccab9b8be02fa9ad4e1d9e382d8",
+      "lines": 282
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LyricsProviderSheet.kt",
+      "sha256": "7315b38db30038ed0df9aec2ec76d788e60793681483f8d96caa9d562ba3980f",
+      "lines": 250
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LyricsShare.kt",
+      "sha256": "36c1e6bb450600c61685f02de83bd68b8ca7101020bed1621b1a2b8feaa71572",
+      "lines": 398
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/LyricsSidePanelTheme.kt",
+      "sha256": "9c8be5e512e134dfea6b731f69be972c0e26503075a72e3595aa0f6bf518aa8c",
+      "lines": 38
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/MeshGradient.kt",
+      "sha256": "c88c84d9a9768e9086c7ea6ea6980c39ed18799727596f9322527f758f3ca0f3",
+      "lines": 416
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/MixViewPopup.kt",
+      "sha256": "d4af3815753067cbe15fd4aca75d05c525bdce60dd922faa8cf994f1b0432227",
+      "lines": 650
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/MusicVideoLayout.kt",
+      "sha256": "ee13b488722cb4e5960e8bc8702314ccb53313363daac7f80957884f39ae9af7",
+      "lines": 393
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/NowPlayingScreen.kt",
+      "sha256": "c55892a49e53824b9af48e240dee078c6328452e2751c2df18c884f80cb4c1f4",
+      "lines": 4074
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerChrome.kt",
+      "sha256": "0a192ec25863584b6832fdaa54ecb40b495c867760d23b50143170b47266f361",
+      "lines": 147
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerControls.kt",
+      "sha256": "c93afe8a4df9ba36b99ec1ef6382d150bcc7aca2d707d0e7c4be52254e9198f2",
+      "lines": 1936
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerDock.kt",
+      "sha256": "00b61a242a9447a66ffb45686dd4a146c6a22dd17cb61f54f2fc6a3ddb370b47",
+      "lines": 122
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerDrawer.kt",
+      "sha256": "cd8616e229074e935f896efa5e32e508b9245c2f055ffda32bb3973cf822a6ff",
+      "lines": 270
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerHost.kt",
+      "sha256": "0807d920c1bcbde813ed649233413327efdc39706760a58dc48fd61a3bb9de7f",
+      "lines": 460
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerLyrics.kt",
+      "sha256": "2772de30d318b881207105e267b1508deaa4b28f6dd8c7b701765010d08bc10d",
+      "lines": 3296
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerMarqueeMotion.kt",
+      "sha256": "307273e131c79a650b15867f7b7799a118e80146e85b99a8aa9fe20b8a4df5f1",
+      "lines": 35
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerPlatformUi.kt",
+      "sha256": "31608d209dadfc7295454071e98fb84dc1de020963fd6e213e2e157ebd15c06c",
+      "lines": 58
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerQueue.kt",
+      "sha256": "e55e2fbfb900e732a9e59c6017eb4c2934888c30d7d73b7b62e712af271896ec",
+      "lines": 857
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerSidePanels.kt",
+      "sha256": "5603af1521dc67c289e8427e5422e3c6eb85461ee4afb79ac363d316792ddd93",
+      "lines": 177
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/PlayerState.kt",
+      "sha256": "fe37cf10898ff0c559d746b361d59921fcb234d86d3d4e3e743b63ed0b3e0acd",
+      "lines": 316
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/player/ThinSlider.kt",
+      "sha256": "f71928542bb6e67dd0b531239fa5efc78b6ee14dbf62b2bbdd4832825570e89b",
+      "lines": 491
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/replay/ReplayCard.kt",
+      "sha256": "1b9bc73c95138872a90946183909c80d3660a9edb5aaebd4ac647bbe29472412",
+      "lines": 329
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/screens/ExploreScreen.kt",
+      "sha256": "4f92f42ea2992f8cb4fd73091d66f2a95df0eacad7b3be03aa0c3413556d0b5d",
+      "lines": 470
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/screens/HomeScreen.kt",
+      "sha256": "7d6ab8d5492d390c8c53f6224314c91081db8d8cfb8293af3e942cee93557846",
+      "lines": 1384
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/screens/LibraryScreen.kt",
+      "sha256": "ba2b9c857c11b567d84f45a0a6f90873461c0fee50f953117d719bc3352d2083",
+      "lines": 527
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/screens/SearchScreen.kt",
+      "sha256": "424559aa29116b7463257b4e66d9771cacf099998aa8fcbf2ea94fa6c7e15765",
+      "lines": 1106
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/screens/TopPicksShelf.kt",
+      "sha256": "574a351ed1676ca53f39c189b4b3ed7119f2645f27d374978db92226f118571b",
+      "lines": 1642
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/theme/ArtworkPalette.kt",
+      "sha256": "f155d52b9e419593193c05a26052697353ddcc3e5cefd2e32daf5515a2bed6dd",
+      "lines": 463
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/theme/BitChordTypography.kt",
+      "sha256": "a58a9d1ee3d0e67489c0a70adf565d78eda81bb5cddb8f9b64cd8408fc5abfb0",
+      "lines": 56
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/theme/ScreenOrientation.kt",
+      "sha256": "43d52b54b83757f3d74ade18df67bf71f91887d0e185888c5dd5740fe01fbd1e",
+      "lines": 18
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/theme/StatusBarIcons.kt",
+      "sha256": "514649a8e5281dafee8ee0cd4c5fc5ea689f1d36f0803a1b23e7d2928ef63aef",
+      "lines": 37
+    },
+    {
+      "source": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/utils/SheetGestureGuard.kt",
+      "sha256": "6ada19eb33cee39327e66434bf58175dc1b9988c776b313e7230d909bd832bb2",
+      "lines": 91
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/LandscapeHeaderBehaviorTest.kt",
+      "sha256": "c2e02ab4bb6082e50106ea3a7d5b6b86e294a97cd38e45ab0a04a118ce303e3a",
+      "lines": 44
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/LyricAnimationWindowTest.kt",
+      "sha256": "c9536727edfa7ba79058546ad7819171a17b868903e25116b52224bb95e151e2",
+      "lines": 83
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/LyricClockTest.kt",
+      "sha256": "a48c80bb61a1750b5d8b8cc5c6b2521c9d15c9d985e10e2eeabae8536e33b43c",
+      "lines": 248
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/LyricFocusTest.kt",
+      "sha256": "e1722d505ad93394acc077022a01ec543058a3226bf662809f623039f9d49e76",
+      "lines": 50
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/LyricsOffsetTest.kt",
+      "sha256": "c3358b50247a6ac8ccb242a8e70ccbc1ef31e9756714202db1b3fbede8684702",
+      "lines": 29
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/components/BlurredBackdropJvmTest.kt",
+      "sha256": "6581eef0c7cebc5b2c3572fe726a50a533726cb03dc6e1666f7eaa2ab02bb516",
+      "lines": 47
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/player/LandscapeArtistTextStyleTest.kt",
+      "sha256": "5581ebf8ba2fc3a90f8b1647b8f70358aaeb842d1fee981305a031319c4be759",
+      "lines": 40
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/player/LandscapeLyricsFrameTest.kt",
+      "sha256": "111c30b04264282ae0c406cab84272bbca417f2957c2bc88a36a7571787464b7",
+      "lines": 178
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/player/LandscapeMetadataStateTest.kt",
+      "sha256": "5304dbf934fc6cbbf37c9341e68b435b5a3b66f92640ce52081dbfdcbfff80a0",
+      "lines": 82
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/player/LandscapePlayerMotionTest.kt",
+      "sha256": "cb63b7e5b07405e908bf724e39c65851e5f87a083b92f65aa7d04fbeec0e68b1",
+      "lines": 407
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/player/LandscapeTrackHeaderTest.kt",
+      "sha256": "96c089215c7c17817fed4ef6a65e319545bd013f02070c9e05adba88ad04d54e",
+      "lines": 119
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/player/LyricsSidePanelThemeTest.kt",
+      "sha256": "c4484b985d7ef61f5fe994eb4d1e3d16f11fe96ff649c9c7b4e2320e2396104d",
+      "lines": 32
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/player/PlayerChromeTest.kt",
+      "sha256": "3299b7b5bc6bf46a58d00cb821b8c93b7b0081fc81f202a87a9747821298decf",
+      "lines": 74
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/screens/LibraryShelfCardWidthTest.kt",
+      "sha256": "3b6876bef868a1c906c9f0f3ba76e05fa0329ac788e6b61edc21a53a8056e139",
+      "lines": 23
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/theme/ArtworkPaletteTest.kt",
+      "sha256": "dbb4f6b1b184211c36a91d64222077fe90cbb3297971321fb99539f78afa4a9f",
+      "lines": 23
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/theme/BitChordTypographyTest.kt",
+      "sha256": "431804a9bc00b5ba8993bbe280e1f5920fed78b5706483a82656108f75586d68",
+      "lines": 74
+    },
+    {
+      "source": "sharedUi/src/jvmTest/kotlin/com/music/bitchord/ui/theme/StatusBarContrastTest.kt",
+      "sha256": "4ad26dbd64d1c6dbb75281df53cd3f7bc4d6f3bef7ea6a45cdfaa192ee4fd339",
+      "lines": 33
+    }
+  ]
+}
