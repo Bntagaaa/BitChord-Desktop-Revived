@@ -28,9 +28,8 @@ class InnerTube {
     _ => _language,
   };
   set language(String value) => _language = value;
-  String get _acceptLanguage => language == 'en'
-      ? 'en-US,en;q=0.9'
-      : '$language,en-US;q=0.8,en;q=0.7';
+  String get _acceptLanguage =>
+      language == 'en' ? 'en-US,en;q=0.9' : '$language,en-US;q=0.8,en;q=0.7';
   String region = 'US';
   String? _cookie;
   String? visitorData;
