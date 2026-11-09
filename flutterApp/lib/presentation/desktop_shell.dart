@@ -25,7 +25,7 @@ class _DesktopShellState extends State<DesktopShell> {
   bool _settingsOpen = false;
 
   // Mock player state for initial demonstration
-  final Song? _currentSong = const Song(
+  final Song _currentSong = const Song(
     videoId: 'sample',
     title: 'Welcome to BitChord',
     artist: 'Native Desktop Revived',
