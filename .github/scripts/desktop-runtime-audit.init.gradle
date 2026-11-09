@@ -6,6 +6,9 @@ gradle.projectsEvaluated {
     def desktop = gradle.rootProject.project(':desktopApp')
     desktop.tasks.register('writeDesktopRuntimeAudit') {
         group = 'verification'
+        // Packaging can consume classes directories instead of project jars.
+        // The artifact inventory must build its own project artifact inputs.
+        dependsOn(desktop.configurations.runtimeClasspath)
         doLast {
             def artifacts = desktop.configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts
             def records = artifacts.collect { artifact ->
@@ -28,6 +31,16 @@ gradle.projectsEvaluated {
                 androidArchives: androidArchives, artifacts: records,
             ])) + '\n'
             logger.lifecycle('Desktop runtime audit: ' + records.size() + ' artifacts, ' + androidArchives.size() + ' AARs')
+            def renderer = records.findAll {
+                it.component.startsWith('org.jetbrains.skiko:') ||
+                it.component.startsWith('org.jetbrains.compose.ui:ui-desktop:') ||
+                it.component.startsWith('dev.chrisbanes.haze:') ||
+                it.component.startsWith('io.coil-kt.coil3:')
+            }.collect { it.component }.unique()
+            logger.lifecycle('::notice title=Resolved desktop runtime::' + JsonOutput.toJson([
+                artifacts: records.size(), totalBytes: records.sum { it.bytes },
+                androidAars: androidArchives.size(), renderer: renderer,
+            ]))
             if (!androidArchives.empty) throw new GradleException('Android AAR found in desktop runtime; see desktop-runtime.json')
         }
     }
