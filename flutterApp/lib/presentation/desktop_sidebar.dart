@@ -330,7 +330,7 @@ class DesktopAccountButton extends StatelessWidget {
                 ? Image.network(
                     avatarUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(
+                    errorBuilder: (_, _, _) => Icon(
                       Icons.person_rounded,
                       size: 18.0,
                       color: palette.foreground.withValues(alpha: 0.85),
