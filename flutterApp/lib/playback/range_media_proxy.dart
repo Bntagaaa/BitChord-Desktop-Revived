@@ -156,6 +156,24 @@ class RangeMediaProxy {
   }
 
   Future<_RangeWindow> _read(int start, int end) async {
+    // Googlevideo occasionally terminates an individual range request. A
+    // bounded retry keeps a transient network EOF from reaching libmpv as if
+    // it were the end of the song; the same range is verified on each try.
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await _readOnce(start, end);
+      } on SocketException {
+        if (_closed || attempt >= 2) rethrow;
+      } on TimeoutException {
+        if (_closed || attempt >= 2) rethrow;
+      } on HttpException {
+        if (_closed || attempt >= 2) rethrow;
+      }
+      await Future<void>.delayed(Duration(milliseconds: 120 * (attempt + 1)));
+    }
+  }
+
+  Future<_RangeWindow> _readOnce(int start, int end) async {
     if (_closed) throw StateError('Closed range transport.');
     final request = await _client
         .getUrl(Uri.parse(source.uri))

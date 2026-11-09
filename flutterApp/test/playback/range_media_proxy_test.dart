@@ -64,6 +64,77 @@ void main() {
     },
   );
 
+  test('transient upstream range failure retries without truncating playback', () async {
+    var requests = 0;
+    final bytes = List.generate(8000, (i) => i % 251);
+    final upstream = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    upstream.listen((request) async {
+      requests++;
+      if (requests == 2) {
+        request.response.statusCode = HttpStatus.badGateway;
+        await request.response.close();
+        return;
+      }
+      final range = RegExp(r'^bytes=(\\d+)-(\\d+)
+    () async {
+      final upstream = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      upstream.listen((request) async {
+        request.response.contentLength = 200000;
+        try {
+          request.response.add(List.filled(200000, 1));
+          await request.response.close();
+        } on Object {
+          /* The range limiter cancels this intentionally. */
+        }
+      });
+      final proxy = RangeMediaProxy(
+        ResolvedStream(uri: 'http://127.0.0.1:${upstream.port}/audio'),
+        windowBytes: 32768,
+      );
+      try {
+        await expectLater(proxy.open(), throwsA(isA<HttpException>()));
+      } finally {
+        await proxy.close();
+        await upstream.close(force: true);
+      }
+    },
+  );
+}
+).firstMatch(
+        request.headers.value(HttpHeaders.rangeHeader)!,
+      )!;
+      final start = int.parse(range[1]!);
+      final end = min(bytes.length - 1, int.parse(range[2]!));
+      request.response.statusCode = HttpStatus.partialContent;
+      request.response.headers.set(
+        HttpHeaders.contentRangeHeader,
+        'bytes $start-$end/${bytes.length}',
+      );
+      request.response.contentLength = end - start + 1;
+      request.response.add(bytes.sublist(start, end + 1));
+      await request.response.close();
+    });
+    final proxy = RangeMediaProxy(
+      ResolvedStream(uri: 'http://127.0.0.1:${upstream.port}/audio'),
+      windowBytes: 4096,
+    );
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse(await proxy.open());
+      final response = await (await client.getUrl(uri)).close();
+      final actual = await response.fold<List<int>>(
+        [],
+        (output, chunk) => output..addAll(chunk),
+      );
+      expect(actual, bytes);
+      expect(requests, 3);
+    } finally {
+      client.close(force: true);
+      await proxy.close();
+      await upstream.close(force: true);
+    }
+  });
+
   test(
     'server that ignores range cannot allocate a whole media file',
     () async {
