@@ -2,5 +2,6 @@
 .flutter-plugins*
 build/
 coverage/
+__pycache__/
 linux/flutter/ephemeral/
 windows/flutter/ephemeral/

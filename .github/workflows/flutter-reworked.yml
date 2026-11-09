@@ -164,7 +164,15 @@ jobs:
           pulseaudio --check || pulseaudio --start --exit-idle-time=-1
           pactl load-module module-null-sink sink_name=bitchord_test
           pactl set-default-sink bitchord_test
-          xvfb-run -a flutter test integration_test/native_audio_test.dart -d linux --reporter expanded 2>&1 | tee native-audio.log
+          mkdir -p build/reports
+          parec --device=bitchord_test.monitor --format=s16le --rate=48000 --channels=2 --latency-msec=20 > build/native-output.pcm &
+          capture_pid=$!
+          trap 'kill "$capture_pid" 2>/dev/null || true; wait "$capture_pid" 2>/dev/null || true' EXIT
+          PULSE_SINK=bitchord_test xvfb-run -a flutter test integration_test/native_audio_test.dart -d linux --reporter expanded 2>&1 | tee native-audio.log
+          kill "$capture_pid"
+          wait "$capture_pid" || true
+          trap - EXIT
+          python3 tool/verify_audio_capture.py build/native-output.pcm build/reports/native-audio-output.json
       - name: Verify Windows native window
         if: runner.os == 'Windows'
         shell: pwsh
@@ -199,6 +207,7 @@ jobs:
             flutterApp/build-linux.log
             flutterApp/build-windows.log
             flutterApp/build/reports/native-window/
+            flutterApp/build/reports/native-audio-output.json
       - uses: actions/upload-artifact@v4
         with:
           name: BitChord-Flutter-${{ runner.os }}-${{ github.sha }}
