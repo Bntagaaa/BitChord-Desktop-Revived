@@ -150,12 +150,10 @@ Future<void> showGlassMenu(
                                                 action,
                                                 size: 22,
                                                 color: action.selected
-                                                    ? DesktopPalette.of(
-                                                        context,
-                                                      ).navAccent
-                                                    : DesktopPalette.of(
-                                                        context,
-                                                      ).foreground,
+                                                    ? DesktopPalette.of(context)
+                                                          .navAccent
+                                                    : DesktopPalette.of(context)
+                                                          .foreground,
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
@@ -199,12 +197,11 @@ Future<void> showGlassMenu(
                                         action,
                                         size: 18,
                                         color: action.destructive
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.error
-                                            : DesktopPalette.of(
-                                                context,
-                                              ).foreground,
+                                            ? Theme.of(context)
+                                                  .colorScheme
+                                                  .error
+                                            : DesktopPalette.of(context)
+                                                  .foreground,
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
@@ -218,9 +215,9 @@ Future<void> showGlassMenu(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w600,
                                                 color: action.destructive
-                                                    ? Theme.of(
-                                                        context,
-                                                      ).colorScheme.error
+                                                    ? Theme.of(context)
+                                                          .colorScheme
+                                                          .error
                                                     : null,
                                               ),
                                             ),
@@ -420,9 +417,8 @@ void copySongLink(BuildContext context, Song song) {
           'https://music.youtube.com/watch?v=${Uri.encodeComponent(song.videoId)}',
     ),
   );
-  ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(const SnackBar(content: Text('Song link copied')));
+  ScaffoldMessenger.of(context)
+      .showSnackBar(const SnackBar(content: Text('Song link copied')));
 }
 
 Future<void> choosePlaylist(
@@ -600,9 +596,8 @@ void showCollectionMenu(
                 'https://music.youtube.com/browse/${Uri.encodeComponent(browseId)}',
           ),
         );
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Link copied')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Link copied')));
       }),
     if (playlistId != null) ...[
       null,
