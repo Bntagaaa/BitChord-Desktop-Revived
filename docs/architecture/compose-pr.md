@@ -4,6 +4,8 @@ Application-owned artwork loads share one producer per URL, cap concurrent decod
 
 Addon Graal contexts also share one serialized owner per module key. Reload cannot leak a late context or close a native handle under its current call, and failed initialization disposes its context.
 
+Playback clock ticks no longer invalidate the whole desktop presentation. Playhead/video consumers keep the original clock samples, platform integrations read the engine snapshot, and transport/metadata changes remain observable. A Compose test checks scrubber updates independently of application recomposition.
+
 Validation so far: 15 runtime ownership/cancellation tests and two isolated presentation tests pass locally. At 8ae67aa6, Linux/Windows tests, native/render/packaged checks, distributables, Android, backend and AppImage packaging pass in CI run 42544620782. Later commits require their own CI verification. A pinned baseline/candidate packaged-process idle benchmark and runtime artifact inventory are included. Full playback/navigation/long-session measurements, broader domain/navigation extraction, remaining optional service/native audits and live integration/visual parity verification remain pending. No 30% memory reduction or complete re-architecture is claimed.
 
 Base: `348b613a0c3db1a54de56483ea6f8748d6465211` from `1.9.2`. This draft only changes `1.9.2-Compose-Dekstop`; it does not merge or modify the Flutter experiment, other branches, user data or dependency versions.

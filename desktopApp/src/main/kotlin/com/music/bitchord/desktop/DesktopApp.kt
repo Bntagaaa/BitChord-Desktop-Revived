@@ -1986,7 +1986,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
             }
         }
     }
-    val playback by playbackEngine.state.collectAsState()
+    val playbackPresentation = remember(playbackEngine) { playbackEngine.state.presentationStates() }
+    val playback by playbackPresentation.collectAsState(initial = DesktopPlaybackState())
 
     // The shared player reads the playhead off this one object, and only where it
     // draws it — see PlaybackPosition — so a tick never recomposes the player.
@@ -1998,6 +1999,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
             playerPosition.report(it.positionMs, it.positionSampledAtNanos)
             playerPosition.seeks = it.seeks
             playerPosition.advancing = !it.awaitingAudio
+            DesktopPlayerHost.videoClock.value = it
         }
     }
 
@@ -2052,7 +2054,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         playbackSpeed,
     ) {
         mprisController.update(
-            playback = playback,
+            playback = playbackEngine.state.value,
             shuffle = shuffle,
             loopStatus = when (repeatMode) {
                 DesktopRepeatMode.OFF -> "None"
@@ -2063,8 +2065,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         )
     }
     LaunchedEffect(playback.song?.videoId, playback.isPlaying, playback.durationMs) {
-        DesktopScrobbling.onPlaybackStateChanged(playback)
-        DesktopWindowsMedia.publish(playback)
+        val snapshot = playbackEngine.state.value
+        DesktopScrobbling.onPlaybackStateChanged(snapshot)
+        DesktopWindowsMedia.publish(snapshot)
     }
     // Refetched on opening the page rather than cached for the session: the
     // point of it is that something played elsewhere shows up here.
@@ -2084,7 +2087,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     // Keyed on the same things, plus the rate: Discord counts the bar down on
     // its own clock, so only a change to what it was told is worth another push.
     LaunchedEffect(playback.song?.videoId, playback.isPlaying, playback.durationMs, playbackSpeed) {
-        DesktopDiscordRpc.onPlaybackStateChanged(playback, playbackSpeed)
+        DesktopDiscordRpc.onPlaybackStateChanged(playbackEngine.state.value, playbackSpeed)
     }
     // The account's own history on YouTube Music, which is what the home feed is built out of.
     DisposableEffect(playback.song?.videoId) {
@@ -2106,7 +2109,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     LaunchedEffect(playback.song?.videoId, playback.isPlaying) {
         val songId = playback.song?.videoId ?: return@LaunchedEffect
         if (!playback.isPlaying) return@LaunchedEffect
-        var previousPosition = playback.positionMs
+        var previousPosition = playbackEngine.state.value.positionMs
         var countedAsPlay = songId in statsCountedSongs
         while (currentCoroutineContext().isActive) {
             delay(STATS_SAMPLE_MS)
@@ -3400,7 +3403,6 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
 
     // What the shared player reads as settings, kept in step with the window's own.
     SideEffect {
-        DesktopPlayerHost.videoClock.value = playback
         DesktopPlayerHost.videoSpeed = playbackSpeed
         DesktopPlayerSettings.animatedCanvas.value = animatedCanvas
         DesktopPlayerSettings.fullBleedArtwork.value = fullBleedArtwork
@@ -3933,9 +3935,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             DesktopShortcut.PREVIOUS -> playPrevious()
                             DesktopShortcut.NEXT -> playNext()
                             DesktopShortcut.SEEK_BACKWARD ->
-                                if (selectedSong != null) seekPlayer(playback.positionMs - 5_000L)
+                                if (selectedSong != null) seekPlayer(playbackEngine.state.value.positionMs - 5_000L)
                             DesktopShortcut.SEEK_FORWARD ->
-                                if (selectedSong != null) seekPlayer(playback.positionMs + 5_000L)
+                                if (selectedSong != null) seekPlayer(playbackEngine.state.value.positionMs + 5_000L)
                             DesktopShortcut.VOLUME_UP -> {
                                 volume = (volume + 0.05f).coerceIn(0f, 1f)
                                 persistence.saveString("volume", volume.toString())
@@ -3998,8 +4000,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             song = selectedSong,
                             isPlaying = playback.isPlaying,
                             isLoading = playback.isLoading,
-                            previousEnabled = liveQueue.hasPrevious || playback.positionMs > BACK_RESTARTS_AFTER_MS,
-                            progress = if (playback.durationMs > 0L) playback.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
+                            previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,
+                            progress = if (playback.durationMs > 0L) playerPosition.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
                             volume = playback.volume,
                             shuffle = shuffle,
                             repeatMode = repeatMode,
@@ -4046,8 +4048,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                         song = selectedSong,
                         isPlaying = playback.isPlaying,
                         isLoading = playback.isLoading,
-                        previousEnabled = liveQueue.hasPrevious || playback.positionMs > BACK_RESTARTS_AFTER_MS,
-                        progress = if (playback.durationMs > 0L) playback.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
+                        previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,
+                        progress = if (playback.durationMs > 0L) playerPosition.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
                         volume = playback.volume,
                         shuffle = shuffle,
                         repeatMode = repeatMode,
