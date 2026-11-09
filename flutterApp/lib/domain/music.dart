@@ -44,14 +44,22 @@ class Song {
     final parts = durationText?.split(':').map(int.tryParse).toList();
     if (parts == null || parts.any((part) => part == null)) return null;
     var seconds = 0;
-    for (final part in parts) { seconds = seconds * 60 + part!; }
+    for (final part in parts) {
+      seconds = seconds * 60 + part!;
+    }
     return Duration(seconds: seconds);
   }
 }
 
 class CatalogItem {
-  const CatalogItem({required this.title, this.subtitle = '', this.artwork,
-    this.browseId, this.params, this.song});
+  const CatalogItem({
+    required this.title,
+    this.subtitle = '',
+    this.artwork,
+    this.browseId,
+    this.params,
+    this.song,
+  });
   final String title;
   final String subtitle;
   final String? artwork;
@@ -67,8 +75,14 @@ class Shelf {
 }
 
 class CatalogPage {
-  const CatalogPage({this.title = '', this.subtitle = '', this.artwork,
-    this.shelves = const [], this.songs = const [], this.continuation});
+  const CatalogPage({
+    this.title = '',
+    this.subtitle = '',
+    this.artwork,
+    this.shelves = const [],
+    this.songs = const [],
+    this.continuation,
+  });
   final String title;
   final String subtitle;
   final String? artwork;

@@ -1,6 +1,7 @@
 // Port source: DesktopTheme.kt and BitChordTypography.kt @ 348b613a.
 import 'package:flutter/material.dart';
 import '../data/settings.dart';
+
 class AppColors {
   const AppColors(this.values);
   final Map<String, Color> values;
@@ -99,46 +100,87 @@ class AppColors {
 
 ThemeData appTheme(Settings settings, Brightness platform) {
   final mode = settings.get('desktop_theme_mode', 'SYSTEM');
-  final dark = mode == 'DARK' || (mode == 'SYSTEM' && platform == Brightness.dark);
+  final dark =
+      mode == 'DARK' || (mode == 'SYSTEM' && platform == Brightness.dark);
   final pitch = mode == 'DARK' && settings.get('desktop_pitch_black', false);
   final legacy = settings.get('app_font', 'DEFAULT') == 'LEGACY';
   final palette = dark ? AppColors.dark : AppColors.light;
-  final colors = AppColors({...palette.values, if (pitch) ...{
-    'background': Colors.black, 'surface': Colors.black, 'sidebarSurface': Colors.black, 'chromeSurface': Colors.black,
-  }});
+  final colors = AppColors({
+    ...palette.values,
+    if (pitch) ...{
+      'background': Colors.black,
+      'surface': Colors.black,
+      'sidebarSurface': Colors.black,
+      'chromeSurface': Colors.black,
+    },
+  });
   final family = legacy ? 'SFProLegacy' : 'SFProDefault';
-  final base = ThemeData(brightness: dark ? Brightness.dark : Brightness.light,
-    useMaterial3: true, fontFamily: family, scaffoldBackgroundColor: colors.background,
-    colorScheme: (dark ? const ColorScheme.dark() : const ColorScheme.light()).copyWith(
-      primary: colors.accent, onPrimary: colors.onAccent,
-      primaryContainer: colors.accent.withValues(alpha: .16),
-      onPrimaryContainer: colors.foreground,
-      surface: colors.surface, onSurface: colors.foreground,
-      surfaceContainerHighest: colors.surfaceRaised,
-      onSurfaceVariant: colors.secondary, outline: colors.divider,
-      outlineVariant: colors.divider, surfaceTint: colors.accent));
-  TextStyle style(double size, FontWeight weight, double modern, [double? original]) => TextStyle(
-    fontFamily: family, fontSize: size, fontWeight: weight, color: colors.foreground,
-    letterSpacing: legacy ? original : modern);
-  return base.copyWith(textTheme: base.textTheme.copyWith(
-    displayLarge: style(34, FontWeight.w800, -.5, -.8),
-    headlineLarge: style(30, FontWeight.w800, -.4, -.7),
-    headlineMedium: style(22, FontWeight.w700, -.25, -.4),
-    titleLarge: style(20, FontWeight.w700, -.2, -.3),
-    titleMedium: style(16, FontWeight.w600, .05, -.2),
-    bodyLarge: style(16, FontWeight.w400, .2),
-    bodyMedium: style(14, FontWeight.w400, .3),
-    labelMedium: style(12, FontWeight.w600, .25),
-    labelSmall: style(11, FontWeight.w600, .3),
-  ), extensions: [PaletteExtension(colors)]);
+  final base = ThemeData(
+    brightness: dark ? Brightness.dark : Brightness.light,
+    useMaterial3: true,
+    fontFamily: family,
+    scaffoldBackgroundColor: colors.background,
+    colorScheme: (dark ? const ColorScheme.dark() : const ColorScheme.light())
+        .copyWith(
+          primary: colors.accent,
+          onPrimary: colors.onAccent,
+          primaryContainer: colors.accent.withValues(alpha: .16),
+          onPrimaryContainer: colors.foreground,
+          surface: colors.surface,
+          onSurface: colors.foreground,
+          surfaceContainerHighest: colors.surfaceRaised,
+          onSurfaceVariant: colors.secondary,
+          outline: colors.divider,
+          outlineVariant: colors.divider,
+          surfaceTint: colors.accent,
+        ),
+  );
+  TextStyle style(
+    double size,
+    FontWeight weight,
+    double modern, [
+    double? original,
+  ]) => TextStyle(
+    fontFamily: family,
+    fontSize: size,
+    fontWeight: weight,
+    color: colors.foreground,
+    letterSpacing: legacy ? original : modern,
+  );
+  return base.copyWith(
+    textTheme: base.textTheme.copyWith(
+      displayLarge: style(34, FontWeight.w800, -.5, -.8),
+      headlineLarge: style(30, FontWeight.w800, -.4, -.7),
+      headlineMedium: style(22, FontWeight.w700, -.25, -.4),
+      titleLarge: style(20, FontWeight.w700, -.2, -.3),
+      titleMedium: style(16, FontWeight.w600, .05, -.2),
+      bodyLarge: style(16, FontWeight.w400, .2),
+      bodyMedium: style(14, FontWeight.w400, .3),
+      labelMedium: style(12, FontWeight.w600, .25),
+      labelSmall: style(11, FontWeight.w600, .3),
+    ),
+    extensions: [PaletteExtension(colors)],
+  );
 }
 
 @immutable
 class PaletteExtension extends ThemeExtension<PaletteExtension> {
   const PaletteExtension(this.colors);
   final AppColors colors;
-  @override PaletteExtension copyWith({AppColors? colors}) => PaletteExtension(colors ?? this.colors);
-  @override PaletteExtension lerp(covariant PaletteExtension? other, double t) => other == null ? this : PaletteExtension(
-    AppColors({for (final key in colors.values.keys) key: Color.lerp(colors.values[key], other.colors.values[key], t)!}));
+  @override
+  PaletteExtension copyWith({AppColors? colors}) =>
+      PaletteExtension(colors ?? this.colors);
+  @override
+  PaletteExtension lerp(covariant PaletteExtension? other, double t) =>
+      other == null
+      ? this
+      : PaletteExtension(
+          AppColors({
+            for (final key in colors.values.keys)
+              key: Color.lerp(colors.values[key], other.colors.values[key], t)!,
+          }),
+        );
 }
-AppColors paletteOf(BuildContext context) => Theme.of(context).extension<PaletteExtension>()!.colors;
+
+AppColors paletteOf(BuildContext context) =>
+    Theme.of(context).extension<PaletteExtension>()!.colors;

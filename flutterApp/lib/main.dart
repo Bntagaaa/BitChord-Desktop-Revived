@@ -14,11 +14,11 @@ Future<void> main() async {
   await windowManager.ensureInitialized();
   final application = MusicApplication(settings: await Settings.load(),
     api: InnerTube(), audio: NativeAudioOutput());
-  await windowManager.waitUntilReadyToShow(const WindowOptions(
+  unawaited(windowManager.waitUntilReadyToShow(const WindowOptions(
     title: 'BitChord', size: Size(1200, 800), minimumSize: Size(560, 360),
     titleBarStyle: TitleBarStyle.normal), () async {
       await windowManager.show(); await windowManager.focus();
-    });
+    }));
   await windowManager.setPreventClose(true);
   windowManager.addListener(_Exit(application));
   runApp(BitChordApplication(application: application));

@@ -11,9 +11,14 @@ String lyricsTitle(String title) {
     r'\s+(feat|ft|featuring)\.?\s+.*$',
     r'\s*[(\[]\s*(official\s*)?(music\s*)?(video|audio|visuali[sz]er|lyrics?\s*video|lyrics?|m/?v|hd|hq|4k|full\s*song)\s*[)\]]',
     r'\s*[(\[]\s*official\s*[)\]]',
-  ]) { value = value.replaceAll(RegExp(pattern, caseSensitive: false), ' '); }
-  value = value.replaceAll(RegExp(r'\s+'), ' ').trim()
-    .replaceAll(RegExp(r'[,\-–—]+\s*$'), '').trim();
+  ]) {
+    value = value.replaceAll(RegExp(pattern, caseSensitive: false), ' ');
+  }
+  value = value
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim()
+      .replaceAll(RegExp(r'[,\-–—]+\s*$'), '')
+      .trim();
   return value.isEmpty ? title.trim() : value;
 }
 
@@ -25,18 +30,31 @@ List<LyricLine> parseLrc(String source) {
     final match = stamp.firstMatch(row);
     if (match == null) continue;
     final fraction = int.parse(match[3]!) * (match[3]!.length == 2 ? 10 : 1);
-    final millis = int.parse(match[1]!) * 60000 + int.parse(match[2]!) * 1000 + fraction;
-    lines.add(LyricLine(Duration(milliseconds: millis),
-      row.substring(match.end).replaceAll(words, '').replaceFirst(RegExp(r'^<R>'), '').trim()));
+    final millis =
+        int.parse(match[1]!) * 60000 + int.parse(match[2]!) * 1000 + fraction;
+    lines.add(
+      LyricLine(
+        Duration(milliseconds: millis),
+        row
+            .substring(match.end)
+            .replaceAll(words, '')
+            .replaceFirst(RegExp(r'^<R>'), '')
+            .trim(),
+      ),
+    );
   }
   lines.sort((a, b) => a.time.compareTo(b.time));
   final kept = <LyricLine>[];
   for (var index = 0; index < lines.length; index++) {
     final line = lines[index];
-    if (line.text.isNotEmpty || index == lines.length - 1 ||
-        lines[index + 1].time - line.time >= const Duration(seconds: 4)) kept.add(line);
+    if (line.text.isNotEmpty ||
+        index == lines.length - 1 ||
+        lines[index + 1].time - line.time >= const Duration(seconds: 4)) {
+      kept.add(line);
+    }
   }
-  if (kept.isNotEmpty && kept.first.text.isNotEmpty &&
+  if (kept.isNotEmpty &&
+      kept.first.text.isNotEmpty &&
       kept.first.time >= const Duration(seconds: 4)) {
     kept.insert(0, const LyricLine(Duration.zero, ''));
   }
@@ -53,19 +71,36 @@ class LyricsRepository {
       'duration': duration.inSeconds.toString(),
     };
     Future<dynamic> get(String path, Map<String, String> parameters) async {
-      final response = await _client.get(Uri.https('lrclib.net', '/api/$path', parameters),
-        headers: {'User-Agent': 'BitChord (https://github.com/bitchord)'})
-        .timeout(const Duration(seconds: 15));
+      final response = await _client
+          .get(
+            Uri.https('lrclib.net', '/api/$path', parameters),
+            headers: {'User-Agent': 'BitChord (https://github.com/bitchord)'},
+          )
+          .timeout(const Duration(seconds: 15));
       return response.statusCode == 200 ? jsonDecode(response.body) : null;
     }
+
     final exact = object(await get('get', query))['syncedLyrics'] as String?;
     if (exact != null && exact.isNotEmpty) return parseLrc(exact);
     query.remove('duration');
-    final hits = array(await get('search', query)).map(object)
-      .where((hit) => (hit['syncedLyrics'] as String?)?.isNotEmpty ?? false).toList()
-      ..sort((a, b) => (((a['duration'] as num?) ?? 0) - duration.inSeconds).abs()
-        .compareTo((((b['duration'] as num?) ?? 0) - duration.inSeconds).abs()));
-    return hits.isEmpty ? const [] : parseLrc(hits.first['syncedLyrics'] as String);
+    final hits =
+        array(await get('search', query))
+            .map(object)
+            .where(
+              (hit) => (hit['syncedLyrics'] as String?)?.isNotEmpty ?? false,
+            )
+            .toList()
+          ..sort(
+            (a, b) => (((a['duration'] as num?) ?? 0) - duration.inSeconds)
+                .abs()
+                .compareTo(
+                  (((b['duration'] as num?) ?? 0) - duration.inSeconds).abs(),
+                ),
+          );
+    return hits.isEmpty
+        ? const []
+        : parseLrc(hits.first['syncedLyrics'] as String);
   }
+
   void close() => _client.close();
 }

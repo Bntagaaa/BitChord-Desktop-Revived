@@ -25,9 +25,9 @@ jobs:
       - run: flutter pub get
       - name: Format and apply supported Dart fixes
         run: |
-          dart format lib test > format.log 2>&1
+          dart format lib test integration_test > format.log 2>&1
           dart fix --apply >> format.log 2>&1
-          dart format lib test >> format.log 2>&1
+          dart format lib test integration_test >> format.log 2>&1
       - name: Publish formatter diagnostics
         if: failure()
         shell: python
@@ -41,7 +41,7 @@ jobs:
         shell: python
         run: |
           import base64, pathlib, subprocess, zlib
-          patch = subprocess.check_output(['git', 'diff', '--', 'lib', 'test'])
+          patch = subprocess.check_output(['git', 'diff', '--', 'lib', 'test', 'integration_test'])
           pathlib.Path('format.patch').write_bytes(patch)
           encoded = base64.b64encode(zlib.compress(patch)).decode()
           def publish(kind, encoded):
@@ -107,7 +107,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-latest]
+        os: [ubuntu-22.04, windows-2022]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -123,7 +123,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libasound2-dev libmpv-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libasound2-dev libmpv-dev xvfb xdotool imagemagick tesseract-ocr pulseaudio
       - name: Generate standard native Flutter runners
         run: flutter create --platforms=linux,windows --org=com.music --project-name=bitchord --no-pub .
       - name: Use the original Windows application icon
@@ -132,10 +132,62 @@ jobs:
       - run: flutter pub get
       - name: Build Linux
         if: runner.os == 'Linux'
-        run: flutter build linux --release
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build linux --release 2>&1 | tee build-linux.log
       - name: Build Windows
         if: runner.os == 'Windows'
-        run: flutter build windows --release
+        shell: pwsh
+        run: |
+          flutter build windows --release 2>&1 | Tee-Object -FilePath build-windows.log
+          exit $LASTEXITCODE
+      - name: Verify real Linux window and settings interaction
+        if: runner.os == 'Linux'
+        run: xvfb-run -a -s '-screen 0 1280x900x24' bash tool/smoke-linux.sh
+      - name: Verify native audio decode, playhead and seek
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pulseaudio --check || pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=bitchord_test
+          pactl set-default-sink bitchord_test
+          xvfb-run -a flutter test integration_test/native_audio_test.dart -d linux --reporter expanded 2>&1 | tee native-audio.log
+      - name: Verify Windows native window
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path build/windows/x64/runner/Release/bitchord.exe
+          $app = Start-Process $exe -PassThru
+          try {
+            for ($i=0; $i -lt 40; $i++) {
+              Start-Sleep -Seconds 1
+              $app.Refresh()
+              if ($app.HasExited) { throw 'Flutter app exited before native-window validation' }
+              if ($app.MainWindowHandle -ne 0) { break }
+            }
+            if ($app.MainWindowHandle -eq 0) { throw 'No Windows native window was shown' }
+            Write-Output '::notice::Flutter Windows native window was shown'
+          } finally { if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force } }
+      - name: Report native build or launch failure
+        if: failure()
+        shell: python
+        run: |
+          from pathlib import Path
+          for path in [Path('build-linux.log'),Path('build-windows.log'),Path('native-audio.log'),Path('build/reports/native-window/application.log')]:
+              if path.exists():
+                  text=path.read_text(errors='replace')[-3000:]
+                  print('::error::'+text.replace('%','%25').replace('\n','%0A'))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Flutter-native-evidence-${{ runner.os }}
+          path: |
+            flutterApp/native-audio.log
+            flutterApp/build-linux.log
+            flutterApp/build-windows.log
+            flutterApp/build/reports/native-window/
       - uses: actions/upload-artifact@v4
         with:
           name: BitChord-Flutter-${{ runner.os }}-${{ github.sha }}

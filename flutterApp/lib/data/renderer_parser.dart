@@ -9,19 +9,27 @@ String text(dynamic value) {
   if (map['simpleText'] is String) return map['simpleText'] as String;
   return array(map['runs']).map((run) => object(run)['text'] ?? '').join();
 }
+
 dynamic at(dynamic root, List<String> keys) {
   dynamic value = root;
-  for (final key in keys) { value = object(value)[key]; }
+  for (final key in keys) {
+    value = object(value)[key];
+  }
   return value;
 }
+
 Iterable<JsonMap> renderers(dynamic root, String name) sync* {
   if (root is Map) {
     for (final entry in root.entries) {
-      if (entry.key == name && entry.value is JsonMap) yield entry.value as JsonMap;
+      if (entry.key == name && entry.value is JsonMap) {
+        yield entry.value as JsonMap;
+      }
       yield* renderers(entry.value, name);
     }
   } else if (root is List) {
-    for (final child in root) { yield* renderers(child, name); }
+    for (final child in root) {
+      yield* renderers(child, name);
+    }
   }
 }
 
@@ -33,42 +41,101 @@ String? thumbnail(dynamic root) {
     if (value is Map) {
       final thumbs = value['thumbnails'];
       if (thumbs is List) urls.addAll(thumbs.map(object));
-      for (final child in value.values) { walk(child); }
+      for (final child in value.values) {
+        walk(child);
+      }
     } else if (value is List) {
-      for (final child in value) { walk(child); }
+      for (final child in value) {
+        walk(child);
+      }
     }
   }
+
   walk(root);
   if (urls.isEmpty && candidates.isEmpty) return null;
-  urls.sort((a, b) => ((a['width'] as num?) ?? 0).compareTo((b['width'] as num?) ?? 0));
+  urls.sort(
+    (a, b) => ((a['width'] as num?) ?? 0).compareTo((b['width'] as num?) ?? 0),
+  );
   return urls.isEmpty ? null : urls.last['url'] as String?;
 }
 
 class RendererParser {
   static final _duration = RegExp(r'^\d+(?::\d{2}){1,2}$');
-  static final _tally = RegExp(r'^[\d,.]+\s*[KMB]?\s*(plays?|views?|listeners?)$', caseSensitive: false);
-  static const _types = {'song', 'video', 'album', 'single', 'ep', 'artist', 'playlist'};
+  static final _tally = RegExp(
+    r'^[\d,.]+\s*[KMB]?\s*(plays?|views?|listeners?)$',
+    caseSensitive: false,
+  );
+  static const _types = {
+    'song',
+    'video',
+    'album',
+    'single',
+    'ep',
+    'artist',
+    'playlist',
+  };
 
-  Song? song(JsonMap row, {String? artistFallback, String? albumId, String? albumName}) {
-    final id = at(row, ['playlistItemData', 'videoId']) ??
-      at(row, ['overlay', 'musicItemThumbnailOverlayRenderer', 'content',
-        'musicPlayButtonRenderer', 'playNavigationEndpoint', 'watchEndpoint', 'videoId']);
+  Song? song(
+    JsonMap row, {
+    String? artistFallback,
+    String? albumId,
+    String? albumName,
+  }) {
+    final id =
+        at(row, ['playlistItemData', 'videoId']) ??
+        at(row, [
+          'overlay',
+          'musicItemThumbnailOverlayRenderer',
+          'content',
+          'musicPlayButtonRenderer',
+          'playNavigationEndpoint',
+          'watchEndpoint',
+          'videoId',
+        ]);
     final columns = array(row['flexColumns']);
     String column(int index) => index < columns.length
-      ? text(at(columns[index], ['musicResponsiveListItemFlexColumnRenderer', 'text'])) : '';
+        ? text(
+            at(columns[index], [
+              'musicResponsiveListItemFlexColumnRenderer',
+              'text',
+            ]),
+          )
+        : '';
     final title = column(0);
     if (id is! String || title.isEmpty) return null;
-    final parts = column(1).split(' • ').where((part) => part.trim().isNotEmpty).toList();
-    final fixed = array(row['fixedColumns']).map((value) =>
-      text(at(value, ['musicResponsiveListItemFixedColumnRenderer', 'text'])));
+    final parts = column(
+      1,
+    ).split(' • ').where((part) => part.trim().isNotEmpty).toList();
+    final fixed = array(row['fixedColumns']).map(
+      (value) => text(
+        at(value, ['musicResponsiveListItemFixedColumnRenderer', 'text']),
+      ),
+    );
     final duration = [...parts, ...fixed].where(_duration.hasMatch).firstOrNull;
-    final artist = parts.where((part) => !_duration.hasMatch(part) &&
-      !_types.contains(part.toLowerCase()) && !_tally.hasMatch(part)).firstOrNull;
-    final runs = columns.expand((column) => array(at(column,
-      ['musicResponsiveListItemFlexColumnRenderer', 'text', 'runs'])));
+    final artist = parts
+        .where(
+          (part) =>
+              !_duration.hasMatch(part) &&
+              !_types.contains(part.toLowerCase()) &&
+              !_tally.hasMatch(part),
+        )
+        .firstOrNull;
+    final runs = columns.expand(
+      (column) => array(
+        at(column, [
+          'musicResponsiveListItemFlexColumnRenderer',
+          'text',
+          'runs',
+        ]),
+      ),
+    );
     String? artistId;
     for (final run in runs) {
-      final browse = at(run, ['navigationEndpoint', 'browseEndpoint', 'browseId']);
+      final browse = at(run, [
+        'navigationEndpoint',
+        'browseEndpoint',
+        'browseId',
+      ]);
       if (browse is! String) continue;
       if (browse.startsWith('UC')) artistId ??= browse;
       if (browse.startsWith('MPRE')) {
@@ -76,13 +143,22 @@ class RendererParser {
         albumName ??= object(run)['text'] as String?;
       }
     }
-    return Song(id: id, title: title, artist: artist ?? artistFallback ?? 'Unknown artist',
-      artwork: thumbnail(row['thumbnail']), durationText: duration, artistId: artistId,
-      albumId: albumId, albumName: albumName,
-      playlistSetVideoId: at(row, ['playlistItemData', 'playlistSetVideoId']) as String?,
-      isExplicit: renderers(row, 'musicInlineBadgeRenderer').any((badge) =>
-        at(badge, ['icon', 'iconType']) == 'MUSIC_EXPLICIT_BADGE'),
-      isVideo: parts.any((part) => part.toLowerCase() == 'video'));
+    return Song(
+      id: id,
+      title: title,
+      artist: artist ?? artistFallback ?? 'Unknown artist',
+      artwork: thumbnail(row['thumbnail']),
+      durationText: duration,
+      artistId: artistId,
+      albumId: albumId,
+      albumName: albumName,
+      playlistSetVideoId:
+          at(row, ['playlistItemData', 'playlistSetVideoId']) as String?,
+      isExplicit: renderers(row, 'musicInlineBadgeRenderer').any(
+        (badge) => at(badge, ['icon', 'iconType']) == 'MUSIC_EXPLICIT_BADGE',
+      ),
+      isVideo: parts.any((part) => part.toLowerCase() == 'video'),
+    );
   }
 
   CatalogItem? card(JsonMap row) {
@@ -93,13 +169,21 @@ class RendererParser {
     String? browseId = browse['browseId'] as String?;
     var video = at(endpoint, ['watchEndpoint', 'videoId']) as String?;
     if (browseId?.startsWith('MPED') ?? false) {
-      video = browseId!.substring(4); browseId = null;
+      video = browseId!.substring(4);
+      browseId = null;
     }
     final art = thumbnail(row['thumbnailRenderer']);
     final subtitle = text(row['subtitle']);
-    return CatalogItem(title: title, subtitle: subtitle, artwork: art,
-      browseId: browseId, params: browse['params'] as String?,
-      song: video == null ? null : Song(id: video, title: title, artist: subtitle, artwork: art));
+    return CatalogItem(
+      title: title,
+      subtitle: subtitle,
+      artwork: art,
+      browseId: browseId,
+      params: browse['params'] as String?,
+      song: video == null
+          ? null
+          : Song(id: video, title: title, artist: subtitle, artwork: art),
+    );
   }
 
   CatalogPage page(JsonMap root) {
@@ -110,21 +194,36 @@ class RendererParser {
       if (value != null && seen.add(value.id)) songs.add(value);
     }
     final shelves = <Shelf>[];
-    for (final rendererName in ['musicCarouselShelfRenderer', 'musicShelfRenderer', 'gridRenderer']) {
+    for (final rendererName in [
+      'musicCarouselShelfRenderer',
+      'musicShelfRenderer',
+      'gridRenderer',
+    ]) {
       for (final shelf in renderers(root, rendererName)) {
         final header = object(shelf['header']);
-        final title = text(at(header, ['musicCarouselShelfBasicHeaderRenderer', 'title']));
+        final title = text(
+          at(header, ['musicCarouselShelfBasicHeaderRenderer', 'title']),
+        );
         final heading = title.isNotEmpty ? title : text(shelf['title']);
         final items = <CatalogItem>[];
         for (final row in array(shelf['contents'] ?? shelf['items'])) {
           final twoRow = object(row)['musicTwoRowItemRenderer'];
           final responsive = object(row)['musicResponsiveListItemRenderer'];
           if (twoRow != null) {
-            final value = card(object(twoRow)); if (value != null) items.add(value);
+            final value = card(object(twoRow));
+            if (value != null) items.add(value);
           } else if (responsive != null) {
             final value = song(object(responsive));
-            if (value != null) items.add(CatalogItem(title: value.title,
-              subtitle: value.artist, artwork: value.artwork, song: value));
+            if (value != null) {
+              items.add(
+                CatalogItem(
+                  title: value.title,
+                  subtitle: value.artist,
+                  artwork: value.artwork,
+                  song: value,
+                ),
+              );
+            }
           }
         }
         if (items.isNotEmpty) shelves.add(Shelf(heading, items));
@@ -135,11 +234,20 @@ class RendererParser {
       ...renderers(root['header'], 'musicResponsiveHeaderRenderer'),
       ...renderers(root['header'], 'musicImmersiveHeaderRenderer'),
     ].firstOrNull;
-    final continuation = renderers(root, 'nextContinuationData').firstOrNull?['continuation'] ??
-      at(renderers(root, 'continuationItemRenderer').firstOrNull,
-        ['continuationEndpoint', 'continuationCommand', 'token']);
-    return CatalogPage(title: text(header?['title']), subtitle: text(header?['subtitle']),
-      artwork: thumbnail(header), shelves: shelves, songs: songs,
-      continuation: continuation as String?);
+    final continuation =
+        renderers(root, 'nextContinuationData').firstOrNull?['continuation'] ??
+        at(renderers(root, 'continuationItemRenderer').firstOrNull, [
+          'continuationEndpoint',
+          'continuationCommand',
+          'token',
+        ]);
+    return CatalogPage(
+      title: text(header?['title']),
+      subtitle: text(header?['subtitle']),
+      artwork: thumbnail(header),
+      shelves: shelves,
+      songs: songs,
+      continuation: continuation as String?,
+    );
   }
 }
