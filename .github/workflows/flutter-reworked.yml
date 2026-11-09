@@ -17,6 +17,9 @@ jobs:
         working-directory: flutterApp
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+      - run: python3 tool/verify_source.py
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.7'

@@ -81,6 +81,7 @@ class CatalogPage {
     this.artwork,
     this.shelves = const [],
     this.songs = const [],
+    this.items = const [],
     this.continuation,
   });
   final String title;
@@ -88,6 +89,7 @@ class CatalogPage {
   final String? artwork;
   final List<Shelf> shelves;
   final List<Song> songs;
+  final List<CatalogItem> items;
   final String? continuation;
 }
 

@@ -34,7 +34,6 @@ Iterable<JsonMap> renderers(dynamic root, String name) sync* {
 }
 
 String? thumbnail(dynamic root) {
-  final candidates = renderers(root, 'thumbnails').toList();
   // thumbnails is an array rather than a renderer object.
   final urls = <JsonMap>[];
   void walk(dynamic value) {
@@ -52,7 +51,7 @@ String? thumbnail(dynamic root) {
   }
 
   walk(root);
-  if (urls.isEmpty && candidates.isEmpty) return null;
+  if (urls.isEmpty) return null;
   urls.sort(
     (a, b) => ((a['width'] as num?) ?? 0).compareTo((b['width'] as num?) ?? 0),
   );
@@ -186,17 +185,35 @@ class RendererParser {
     );
   }
 
-  CatalogPage page(JsonMap root) {
+  CatalogItem? browseRow(JsonMap row) {
+    final endpoint = object(at(row, ['navigationEndpoint', 'browseEndpoint']));
+    final id = endpoint['browseId'] as String?;
+    if (id == null) return null;
+    final columns = array(row['flexColumns']);
+    final title = text(at(columns.firstOrNull, ['musicResponsiveListItemFlexColumnRenderer', 'text']));
+    if (title.isEmpty) return null;
+    final subtitle = columns.length < 2 ? '' :
+      text(at(columns[1], ['musicResponsiveListItemFlexColumnRenderer', 'text']));
+    return CatalogItem(title: title, subtitle: subtitle, browseId: id,
+      params: endpoint['params'] as String?, artwork: thumbnail(row['thumbnail']));
+  }
+
+  CatalogPage page(JsonMap root, {bool plainShelves = false}) {
     final songs = <Song>[];
+    final results = <CatalogItem>[];
     final seen = <String>{};
     for (final row in renderers(root, 'musicResponsiveListItemRenderer')) {
       final value = song(row);
-      if (value != null && seen.add(value.id)) songs.add(value);
+      if (value != null && seen.add(value.playlistSetVideoId ?? value.id)) songs.add(value);
+      if (value == null) {
+        final item = browseRow(row);
+        if (item != null && seen.add('browse:${item.browseId}')) results.add(item);
+      }
     }
     final shelves = <Shelf>[];
     for (final rendererName in [
       'musicCarouselShelfRenderer',
-      'musicShelfRenderer',
+      if (plainShelves) 'musicShelfRenderer',
       'gridRenderer',
     ]) {
       for (final shelf in renderers(root, rendererName)) {
@@ -246,7 +263,8 @@ class RendererParser {
       subtitle: text(header?['subtitle']),
       artwork: thumbnail(header),
       shelves: shelves,
-      songs: songs,
+      songs: plainShelves ? const [] : songs,
+      items: results,
       continuation: continuation as String?,
     );
   }

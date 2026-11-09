@@ -43,7 +43,7 @@ class MusicApplication extends ChangeNotifier {
         notifyListeners();
       }),
       audio.completed.listen((value) {
-        if (value) unawaited(next());
+        if (value) unawaited(next(automatic: true));
       }),
       audio.errors.listen((value) {
         error = value;
@@ -86,13 +86,14 @@ class MusicApplication extends ChangeNotifier {
     query = '';
     error = null;
     _request++;
+    busy = false;
     page = const CatalogPage();
     notifyListeners();
     switch (target) {
       case Destination.home:
-        await _load(() => api.browse('FEmusic_home'));
+        await _load(() => api.browse('FEmusic_home'), plainShelves: true);
       case Destination.newMusic:
-        await _load(() => api.browse('FEmusic_new_releases'));
+        await _load(() => api.browse('FEmusic_new_releases'), plainShelves: true);
       case Destination.library:
         if (api.signedIn) {
           await _load(() => api.browse('FEmusic_liked_playlists'));
@@ -115,6 +116,7 @@ class MusicApplication extends ChangeNotifier {
     query = value;
     if (value.trim().isEmpty) {
       _request++;
+      busy = false;
       page = const CatalogPage();
       notifyListeners();
       return;
@@ -133,16 +135,19 @@ class MusicApplication extends ChangeNotifier {
     await _load(() => api.browse(id, params: item.params));
   }
 
-  Future<void> _load(Future<JsonMap> Function() fetch) async {
+  Future<bool> _load(Future<JsonMap> Function() fetch, {bool plainShelves = false}) async {
     final generation = ++_request;
     busy = true;
     error = null;
     notifyListeners();
     try {
       final response = await fetch();
-      if (generation == _request && !_closed) page = parser.page(response);
+      if (generation != _request || _closed) return false;
+      page = parser.page(response, plainShelves: plainShelves);
+      return true;
     } on Exception catch (failure) {
       if (generation == _request && !_closed) error = failure.toString();
+      return false;
     } finally {
       if (generation == _request && !_closed) {
         busy = false;
@@ -155,13 +160,14 @@ class MusicApplication extends ChangeNotifier {
     final token = page.continuation;
     if (token == null || busy) return;
     final previous = page;
-    await _load(() => api.continuation(token));
-    if (error == null) {
+    final loaded = await _load(() => api.continuation(token));
+    if (loaded) {
       page = CatalogPage(
         title: previous.title,
         artwork: previous.artwork,
         subtitle: previous.subtitle,
         songs: [...previous.songs, ...page.songs],
+        items: [...previous.items, ...page.items],
         shelves: [...previous.shelves, ...page.shelves],
         continuation: page.continuation,
       );
@@ -180,6 +186,7 @@ class MusicApplication extends ChangeNotifier {
     } else {
       queue.context(context, index, origin);
     }
+    if (shuffle) queue.shuffleStartingOrder();
     await _openCurrent();
   }
 
@@ -225,18 +232,18 @@ class MusicApplication extends ChangeNotifier {
     }
   }
 
-  Future<void> next() async {
+  Future<void> next({bool automatic = false}) async {
     if (queue.entries.isEmpty) return;
-    if (repeat != RepeatMode.one) {
+    if (!automatic || repeat != RepeatMode.one) {
       final target = queue.index + 1;
-      if (target >= queue.entries.length && repeat == RepeatMode.off) return;
+      if (target >= queue.entries.length && repeat != RepeatMode.all) return;
       queue.index = target % queue.entries.length;
     }
     await _openCurrent();
   }
 
   Future<void> previous() async {
-    if (position.value > const Duration(seconds: 3)) {
+    if (position.value > const Duration(seconds: 10)) {
       await audio.seek(Duration.zero);
       return;
     }
@@ -259,7 +266,7 @@ class MusicApplication extends ChangeNotifier {
 
   Future<void> jumpTo(int index) async {
     if (index < 0 || index >= queue.entries.length) return;
-    queue.index = index;
+    queue.jump(index);
     await _openCurrent();
   }
 

@@ -12,13 +12,25 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   await windowManager.ensureInitialized();
-  final application = MusicApplication(settings: await Settings.load(),
-    api: InnerTube(), audio: NativeAudioOutput());
-  unawaited(windowManager.waitUntilReadyToShow(const WindowOptions(
-    title: 'BitChord', size: Size(1200, 800), minimumSize: Size(560, 360),
-    titleBarStyle: TitleBarStyle.normal), () async {
-      await windowManager.show(); await windowManager.focus();
-    }));
+  final application = MusicApplication(
+    settings: await Settings.load(),
+    api: InnerTube(),
+    audio: NativeAudioOutput(),
+  );
+  unawaited(
+    windowManager.waitUntilReadyToShow(
+      const WindowOptions(
+        title: 'BitChord',
+        size: Size(1200, 800),
+        minimumSize: Size(560, 360),
+        titleBarStyle: TitleBarStyle.normal,
+      ),
+      () async {
+        await windowManager.show();
+        await windowManager.focus();
+      },
+    ),
+  );
   await windowManager.setPreventClose(true);
   windowManager.addListener(_Exit(application));
   runApp(BitChordApplication(application: application));
@@ -28,8 +40,10 @@ class _Exit extends WindowListener {
   _Exit(this.application);
   final MusicApplication application;
   bool _closing = false;
-  @override void onWindowClose() {
-    if (_closing) return; _closing = true;
+  @override
+  void onWindowClose() {
+    if (_closing) return;
+    _closing = true;
     unawaited(() async {
       await application.close();
       await windowManager.destroy();

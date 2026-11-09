@@ -67,13 +67,16 @@ class InnerTube {
 
   Future<void> initialize() => _shell ??= _readShell(_generation);
   Future<void> _readShell(int generation) async {
+    final session = _cookie;
+    final sid = session == null ? null : sapisid(session);
     final response = await _client
         .get(
           Uri.parse('$origin/'),
           headers: {
             'User-Agent': userAgent,
             'Accept-Language': language,
-            if (_cookie != null) 'Cookie': _cookie!,
+            if (session != null) 'Cookie': session,
+            if (sid != null) 'Authorization': authorization(sid, DateTime.now().millisecondsSinceEpoch ~/ 1000),
           },
         )
         .timeout(const Duration(seconds: 20));
@@ -111,6 +114,7 @@ class InnerTube {
       _shell = null;
     }
     final version = _version ?? fallbackVersion;
+    final generation = _generation;
     final session = _cookie;
     final sid = session == null ? null : sapisid(session);
     final response = await _client
@@ -169,6 +173,7 @@ class InnerTube {
             'YouTube Music rejected the request',
       );
     }
+    if (generation != _generation) throw const MusicApiException('The account changed. Retry the request.');
     visitorData ??= at(root, ['responseContext', 'visitorData']) as String?;
     return root;
   }

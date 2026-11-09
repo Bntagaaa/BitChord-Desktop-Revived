@@ -4,6 +4,7 @@ import 'package:bitchord/data/renderer_parser.dart';
 import 'package:bitchord/domain/music.dart';
 import 'package:bitchord/domain/queue.dart';
 import 'package:bitchord/ui/player.dart';
+import 'package:bitchord/ui/theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -94,4 +95,19 @@ void main() {
       expect(geometry.actionsTop, 587.5);
     },
   );
+  test('jumping past context preserves manual queue rows and their origin', () {
+    const first = Song(id: 'local:first', title: 'first', artist: '');
+    const second = Song(id: 'local:second', title: 'second', artist: '');
+    const manual = Song(id: 'local:manual', title: 'manual', artist: '');
+    final queue = QueueTimeline()..context([first, second], 0, 'Album');
+    queue.enqueue(manual);
+    final identity = queue.entries[1].id;
+    queue.jump(2);
+    expect(queue.current, second);
+    expect(queue.entries[1].id, identity);
+    expect(queue.source, 'Album');
+  });
+  test('both theme palettes retain all source color roles', () {
+    expect(AppColors.dark.values.keys.toSet(), AppColors.light.values.keys.toSet());
+  });
 }
