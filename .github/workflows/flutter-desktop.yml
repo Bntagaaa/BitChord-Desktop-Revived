@@ -57,7 +57,15 @@ jobs:
           dart format lib test
           git diff --check
       - name: Analyze
-        run: flutter analyze --no-pub
+        run: |
+          if ! flutter analyze --no-pub > analyze.log 2>&1; then
+            cat analyze.log
+            while IFS= read -r line; do
+              echo "::error::$line"
+            done < analyze.log
+            exit 1
+          fi
+          cat analyze.log
       - name: Run unit and widget regressions
         run: flutter test --no-pub --coverage
       - uses: actions/upload-artifact@v4
