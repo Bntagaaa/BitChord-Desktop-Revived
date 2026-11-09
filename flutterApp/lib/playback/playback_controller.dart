@@ -69,7 +69,10 @@ class PlaybackController extends ChangeNotifier {
   Duration _fadeDuration = Duration.zero;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  Duration _furthestPosition = Duration.zero;
   Duration _crossfade = Duration.zero;
+  String? _prematureEndEntryId;
+  int _prematureEndRetries = 0;
   double _volume = 70;
   double _rate = 1;
   double _fadeProgress = 0;
@@ -295,6 +298,7 @@ class PlaybackController extends ChangeNotifier {
     if (_closed || generation != _generation) return;
     _endHandled = false;
     _position = at;
+    _furthestPosition = at;
     _notify();
     if (_active != null) {
       await _command(() async {
@@ -312,6 +316,7 @@ class PlaybackController extends ChangeNotifier {
     _playing = false;
     _loading = false;
     _buffering = false;
+    _furthestPosition = Duration.zero;
     final subscription = _activeSubscription;
     _activeSubscription = null;
     final old = _active;
@@ -334,6 +339,8 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> retry() async {
     if (_closed || currentSong == null) return;
+    // An explicit Retry is a fresh attempt even after auto-recovery was used.
+    _prematureEndRetries = 0;
     await _loadCurrent(start: _position, play: true, refresh: true);
   }
 
@@ -345,8 +352,14 @@ class PlaybackController extends ChangeNotifier {
     var song = currentSong;
     if (_closed || song == null) return;
     final generation = ++_generation;
+    final entryId = song.queueEntryId ?? song.videoId;
+    if (_prematureEndEntryId != entryId) {
+      _prematureEndEntryId = entryId;
+      _prematureEndRetries = 0;
+    }
     _intendedPlaying = play;
     _position = start;
+    _furthestPosition = start;
     _duration = song.duration;
     _error = null;
     _videoError = null;
@@ -480,7 +493,19 @@ class PlaybackController extends ChangeNotifier {
       return;
     }
     _position = state.position;
-    if (state.duration > Duration.zero) _duration = state.duration;
+    if (state.position > _furthestPosition) {
+      _furthestPosition = state.position;
+    }
+    // A truncated segment can report its short decoder duration as though it
+    // were the whole track. Keep a known catalogue duration for both the UI
+    // and end-of-track/crossfade logic when the two are wildly different.
+    final expected = currentSong?.duration ?? Duration.zero;
+    if (state.duration > Duration.zero &&
+        (expected == Duration.zero ||
+            state.duration.inMilliseconds >= expected.inMilliseconds * .90 ||
+            state.duration + const Duration(seconds: 8) >= expected)) {
+      _duration = state.duration;
+    }
     _playing = state.playing && _intendedPlaying;
     _buffering = state.buffering;
     _audioDevices = state.audioDevices;
@@ -492,8 +517,36 @@ class PlaybackController extends ChangeNotifier {
       _lastCheckpoint = now;
       _schedulePersist();
     }
-    if (state.completed && !_endHandled && !_mixing && !_loading) {
+    if (state.completed &&
+        !_endHandled &&
+        !_mixing &&
+        !_loading &&
+        _intendedPlaying) {
       _endHandled = true;
+      if (_endedPrematurely(expected)) {
+        if (_prematureEndRetries == 0) {
+          _prematureEndRetries++;
+          // Resolve a new signed media URL and continue this track at its
+          // last known good position, rather than jumping to the next song.
+          unawaited(
+            _loadCurrent(
+              start: _furthestPosition,
+              play: true,
+              refresh: true,
+            ),
+          );
+        } else {
+          _intendedPlaying = false;
+          _playing = false;
+          _buffering = false;
+          _setError(
+            'Playback stream ended before the song finished. '
+            'The connection or media URL may have expired. Press Retry to resume.',
+          );
+          _schedulePersist();
+        }
+        return;
+      }
       unawaited(_advance(automatic: true));
       return;
     }
@@ -503,6 +556,17 @@ class PlaybackController extends ChangeNotifier {
         unawaited(_loadRadio());
       }
     }
+  }
+
+  bool _endedPrematurely(Duration expected) {
+    if (expected < const Duration(seconds: 20)) return false;
+    // Allow normal stream/container duration differences and coarse position
+    // ticks, without treating a 3-second decoder EOF as a finished song.
+    final toleranceMs = (expected.inMilliseconds * .06)
+        .round()
+        .clamp(4000, 12000);
+    return _furthestPosition.inMilliseconds + toleranceMs <
+        expected.inMilliseconds;
   }
 
   void _prefetch() {
@@ -725,6 +789,10 @@ class PlaybackController extends ChangeNotifier {
     final generation = ++_generation;
     _endHandled = false;
     _position = incoming.state.position;
+    _furthestPosition = incoming.state.position;
+    final newSong = currentSong!;
+    _prematureEndEntryId = newSong.queueEntryId ?? newSong.videoId;
+    _prematureEndRetries = 0;
     _duration = incoming.state.duration;
     _bind(incoming, generation);
     _onBackendState(incoming, incoming.state, generation);
@@ -752,8 +820,9 @@ class PlaybackController extends ChangeNotifier {
           !_endHandled &&
           !_loading &&
           _intendedPlaying) {
-        _endHandled = true;
-        unawaited(_advance(automatic: true));
+        // Completion during an aborted blend needs the same validation as
+        // an ordinary decoder EOF: never bypass premature-end protection.
+        _onBackendState(outgoing!, outgoing.state, generation);
       }
     }
   }
