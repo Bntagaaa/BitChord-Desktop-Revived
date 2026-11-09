@@ -49,7 +49,7 @@ jobs:
               cd "$tree"
               bash gradlew --no-daemon :desktopApp:createDistributable :desktopApp:writeDesktopRuntimeAudit \
                 -I "$GITHUB_WORKSPACE/candidate/.github/scripts/desktop-runtime-audit.init.gradle" \
-                -Pbitchord.version=1.9.2-compose-profile --console=plain 2>&1 | tee "$GITHUB_WORKSPACE/$tree-build.log"
+                -Pbitchord.version=1.9.2-compose-profile "-Pbitchord.audit.label=$tree" --console=plain 2>&1 | tee "$GITHUB_WORKSPACE/$tree-build.log"
             )
           done
       - name: Report build failure details

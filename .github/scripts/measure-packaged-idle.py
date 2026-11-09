@@ -231,11 +231,13 @@ def main():
         "pss_reduction_percent": report["pss_reduction_percent"],
         "runs": [{key: row[key] for key in ("label", "round", "native_window_ms", "summary",
                                           "heap_used_bytes", "jvm_nmt_committed_bytes",
-                                          "jcmd_exit_codes", "hot_surviving_threads",
-                                          "loaded_native_libraries", "jvm_nmt_categories")}
-                 for row in results],
+                                          "jcmd_exit_codes")} for row in results],
     }
     print("::notice title=Packaged idle comparison::" + json.dumps(public), flush=True)
+    for row in results:
+        attribution = {key: row[key] for key in (
+            "label", "round", "hot_surviving_threads", "loaded_native_libraries", "jvm_nmt_categories")}
+        print("::notice title=Packaged native attribution::" + json.dumps(attribution), flush=True)
 
 
 if __name__ == "__main__":

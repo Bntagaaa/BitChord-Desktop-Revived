@@ -1,0 +1,228 @@
+{
+  "scenario": "clean welcome idle only; no playback/navigation/long-session acceptance",
+  "pss_median_bytes": {
+    "baseline": 867232768.0,
+    "candidate": 851952640.0
+  },
+  "pss_reduction_percent": 1.7619408034176165,
+  "runs": [
+    {
+      "label": "baseline",
+      "round": 1,
+      "native_window_ms": 3606.922037000004,
+      "summary": {
+        "rss_bytes": {
+          "median": 896475136.0,
+          "max": 908500992
+        },
+        "pss_bytes": {
+          "median": 867232768.0,
+          "max": 879258624
+        },
+        "private_bytes": {
+          "median": 845545472.0,
+          "max": 857571328
+        },
+        "swap_pss_bytes": {
+          "median": 0.0,
+          "max": 0
+        },
+        "threads": {
+          "median": 87.0,
+          "max": 91
+        },
+        "cpu_percent_one_core": 104.22933900316633
+      },
+      "heap_used_bytes": 82075648,
+      "jvm_nmt_committed_bytes": 406240256,
+      "jcmd_exit_codes": {
+        "heap": 0,
+        "native_memory": 0,
+        "flags": 0
+      }
+    },
+    {
+      "label": "candidate",
+      "round": 1,
+      "native_window_ms": 3075.4847370000107,
+      "summary": {
+        "rss_bytes": {
+          "median": 891039744.0,
+          "max": 900677632
+        },
+        "pss_bytes": {
+          "median": 861724672.0,
+          "max": 871362560
+        },
+        "private_bytes": {
+          "median": 840003584.0,
+          "max": 849641472
+        },
+        "swap_pss_bytes": {
+          "median": 0.0,
+          "max": 0
+        },
+        "threads": {
+          "median": 87.0,
+          "max": 91
+        },
+        "cpu_percent_one_core": 104.29057243718722
+      },
+      "heap_used_bytes": 81564672,
+      "jvm_nmt_committed_bytes": 404998144,
+      "jcmd_exit_codes": {
+        "heap": 0,
+        "native_memory": 0,
+        "flags": 0
+      }
+    },
+    {
+      "label": "candidate",
+      "round": 2,
+      "native_window_ms": 3335.2985819999503,
+      "summary": {
+        "rss_bytes": {
+          "median": 865099776.0,
+          "max": 867037184
+        },
+        "pss_bytes": {
+          "median": 835831808.0,
+          "max": 837769216
+        },
+        "private_bytes": {
+          "median": 814116864.0,
+          "max": 816054272
+        },
+        "swap_pss_bytes": {
+          "median": 0.0,
+          "max": 0
+        },
+        "threads": {
+          "median": 91.0,
+          "max": 95
+        },
+        "cpu_percent_one_core": 104.60806697956117
+      },
+      "heap_used_bytes": 80919552,
+      "jvm_nmt_committed_bytes": 377317376,
+      "jcmd_exit_codes": {
+        "heap": 0,
+        "native_memory": 0,
+        "flags": 0
+      }
+    },
+    {
+      "label": "baseline",
+      "round": 2,
+      "native_window_ms": 3076.3945989999684,
+      "summary": {
+        "rss_bytes": {
+          "median": 909979648.0,
+          "max": 911736832
+        },
+        "pss_bytes": {
+          "median": 880715776.0,
+          "max": 882472960
+        },
+        "private_bytes": {
+          "median": 859025408.0,
+          "max": 860782592
+        },
+        "swap_pss_bytes": {
+          "median": 0.0,
+          "max": 0
+        },
+        "threads": {
+          "median": 86.0,
+          "max": 90
+        },
+        "cpu_percent_one_core": 104.53726679444185
+      },
+      "heap_used_bytes": 81475584,
+      "jvm_nmt_committed_bytes": 404777984,
+      "jcmd_exit_codes": {
+        "heap": 0,
+        "native_memory": 0,
+        "flags": 0
+      }
+    },
+    {
+      "label": "baseline",
+      "round": 3,
+      "native_window_ms": 3361.993986000016,
+      "summary": {
+        "rss_bytes": {
+          "median": 871483392.0,
+          "max": 873603072
+        },
+        "pss_bytes": {
+          "median": 842313728.0,
+          "max": 844433408
+        },
+        "private_bytes": {
+          "median": 820647936.0,
+          "max": 822767616
+        },
+        "swap_pss_bytes": {
+          "median": 0.0,
+          "max": 0
+        },
+        "threads": {
+          "median": 86.0,
+          "max": 91
+        },
+        "cpu_percent_one_core": 104.22704290782474
+      },
+      "heap_used_bytes": 83063808,
+      "jvm_nmt_committed_bytes": 406666240,
+      "jcmd_exit_codes": {
+        "heap": 0,
+        "native_memory": 0,
+        "flags": 0
+      }
+    },
+    {
+      "label": "candidate",
+      "round": 3,
+      "native_window_ms": 3074.278882000044,
+      "summary": {
+        "rss_bytes": {
+          "median": 881258496.0,
+          "max": 883916800
+        },
+        "pss_bytes": {
+          "median": 851952640.0,
+          "max": 854610944
+        },
+        "private_bytes": {
+          "median": 830222336.0,
+          "max": 832880640
+        },
+        "swap_pss_bytes": {
+          "median": 0.0,
+          "max": 0
+        },
+        "threads": {
+          "median": 83.0,
+          "max": 87
+        },
+        "cpu_percent_one_core": 104.43702718691397
+      },
+      "heap_used_bytes": 78743552,
+      "jvm_nmt_committed_bytes": 379364352,
+      "jcmd_exit_codes": {
+        "heap": 0,
+        "native_memory": 0,
+        "flags": 0
+      }
+    }
+  ],
+  "source": {
+    "workflow_run": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/42546036077",
+    "baseline_commit": "348b613a0c3db1a54de56483ea6f8748d6465211",
+    "candidate_commit": "1b17fa59",
+    "artifact": "compose-packaged-linux-idle",
+    "artifact_sha256": "e75f138980fd398b54bfd7d0ef42900be511940b37cfd99038c19edf22c91849",
+    "protocol": "3 rounds each; alternate order; 20s warmup; 60s sampling; 1280x900 Xvfb; clean forced welcome; same NMT summary instrumentation"
+  }
+}

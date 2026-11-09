@@ -74,7 +74,7 @@ Local evidence: 15 runtime ownership/race/cancellation tests and two isolated ac
 
 ## Performance acceptance still outstanding
 
-No before/after packaged-process PSS result or 30% reduction is claimed yet. Required measurements remain idle/playback/navigation/fullscreen/long-session RSS/PSS, heap, native allocations, CPU, startup/transition latency and frame timing. Compare equivalent packaged builds with identical settings and fixtures; never substitute Gradle daemon memory or a cache microbenchmark for application memory. JVM NMT does not account for all Skia/FFmpeg/driver allocations.
+The first packaged idle result is below. No 30% reduction is claimed. Required measurements still include playback/navigation/fullscreen/long-session RSS/PSS, heap, native allocations, CPU, startup/transition latency and frame timing. Compare equivalent packaged builds with identical settings and fixtures; never substitute Gradle daemon memory or a cache microbenchmark for application memory. JVM NMT does not account for all Skia/FFmpeg/driver allocations.
 
 Optional subsystem initialization, JavaFX/GraalVM/ONNX/native decoder lifetimes, navigation data retention and shared Coil/artwork budgets require further profiling. All remaining feature, visual and platform checks above must be completed before calling the experiment a complete re-architecture.
 
@@ -86,8 +86,25 @@ The two production builds receive the same diagnostic-only NativeMemoryTracking=
 
 Results are uploaded as compose-packaged-linux-idle when the workflow succeeds. An absent/failed measurement remains unverified; this document intentionally contains no invented before/after numbers.
 
+### First measured idle result
+
+Run 42546036077 compares source 348b613a with candidate 1b17fa59, before the later playback-clock projection. The recorded numerical evidence and artifact digest are in measurements/linux-idle-1b17fa59.json. Values below are medians across three runs; memory units are MiB.
+
+| Metric | Baseline | Candidate |
+| --- | ---: | ---: |
+| Process PSS | 827.06 | 812.49 |
+| Process RSS | 854.95 | 840.43 |
+| Heap used at final sample | 78.27 | 77.17 |
+| JVM NMT committed at final sample | 387.42 | 361.79 |
+| CPU, percent of one core | 104.23% | 104.44% |
+| Native window appearance | 3362 ms | 3075 ms |
+
+The observed PSS difference is 1.76%, with overlapping run ranges; this does not establish a substantial steady-state reduction. The aspirational 30% target is not met. CPU remains high in both builds under software-rendered Xvfb. Neither native window appearance nor a fixture recomposition count is a usable-first-frame/frame-time benchmark. The high process usage relative to heap merits further native/render attribution; NMT committed memory cannot be subtracted from PSS to infer exact third-party native allocations.
+
+Both inventories contain zero AAR artifacts and the same Linux Compose 1.12.0, Skiko 0.150.1, Haze 1.7.3 and Coil 3.0.4 renderer versions. Therefore, no Android-runtime removal or dependency-version upgrade is claimed as the cause of this measured difference.
+
 ## External delivery blockers
 
 GitHub rejected draft creation from Actions with: "GitHub Actions is not permitted to create or approve pull requests (createPullRequest)." Repository settings were not changed. The environment also currently denies api.github.com, preventing a direct authenticated CLI fallback. The prepared PR description is in compose-pr.md. The implementation branch is pushed normally; no automatic merge is attempted.
 
-The first packaged benchmark run stopped during its build, before measurements. Build failure diagnostics and log artifacts are included in subsequent runs so this must be resolved before publishing any memory result.
+Earlier benchmark attempts stopped in the artifact inventory because Gradle had packaged project classes without creating every project JAR. The audit now declares its artifact build dependencies; run 42546036077 completed both packaged builds and all six real process measurements.

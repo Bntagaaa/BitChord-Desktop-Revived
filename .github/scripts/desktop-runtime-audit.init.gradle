@@ -38,6 +38,7 @@ gradle.projectsEvaluated {
                 it.component.startsWith('io.coil-kt.coil3:')
             }.collect { it.component }.unique()
             logger.lifecycle('::notice title=Resolved desktop runtime::' + JsonOutput.toJson([
+                label: desktop.providers.gradleProperty('bitchord.audit.label').orNull,
                 artifacts: records.size(), totalBytes: records.sum { it.bytes },
                 androidAars: androidArchives.size(), renderer: renderer,
             ]))
