@@ -45,7 +45,7 @@ data class DesktopAppleArtistArt(
 internal object DesktopAppleArtistArtRepository {
 
     private const val CACHE_SIZE = 96
-    private const val HERO_WIDTH = 1600
+    private const val HERO_WIDTH = 1000
     private const val LOGO_WIDTH = 1000
 
     private class Entry(val art: DesktopAppleArtistArt?, val time: Long = System.currentTimeMillis()) {

@@ -2513,6 +2513,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
             }
             searchFocusRequested = true
         }
+        if (page != destination) {
+            DesktopImageLoader.trimMemory()
+        }
         destination = page
     }
 
@@ -2989,6 +2992,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                 else -> Unit
             }
             recentPageUsage.remove(evict)
+            withContext(Dispatchers.IO) {
+                DesktopPageMemoryPolicy.trimProcessMemory()
+            }
             DesktopTrackLog.log("memory: evicted inactive page ${evict.id} at ${rss / 1_048_576L} MiB RSS")
         }
     }

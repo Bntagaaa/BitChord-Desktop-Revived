@@ -33,3 +33,4 @@ jobs:
           git fetch origin 1.9.2-Rewrite
           git rebase origin/1.9.2-Rewrite
           git push origin HEAD:1.9.2-Rewrite
+# trigger format

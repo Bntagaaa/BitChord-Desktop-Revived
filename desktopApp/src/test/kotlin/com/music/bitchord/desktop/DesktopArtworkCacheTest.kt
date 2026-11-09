@@ -20,8 +20,8 @@ class DesktopArtworkCacheTest {
     @Test
     fun theBudgetIsAFractionOfTheHeapRatherThanEverything() {
         val budget = DesktopArtworkCache.budgetBytes
-        assertTrue(budget >= 32L * 1024 * 1024, "a small heap should still cache something: $budget")
-        assertTrue(budget <= 128L * 1024 * 1024, "the cache should not grow without reason: $budget")
+        assertTrue(budget >= 16L * 1024 * 1024, "a small heap should still cache something: $budget")
+        assertTrue(budget <= 32L * 1024 * 1024, "the cache should not grow without reason: $budget")
     }
 
     @Test

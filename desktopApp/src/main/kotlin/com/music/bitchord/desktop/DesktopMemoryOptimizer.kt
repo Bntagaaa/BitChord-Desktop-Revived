@@ -7,9 +7,8 @@ import kotlinx.coroutines.withContext
 object DesktopMemoryOptimizer {
 
     fun onWindowHidden() {
-        DesktopArtworkCache.clear()
+        DesktopPageMemoryPolicy.trimProcessMemory()
         runCatching { DesktopMediaCache.trim() }
-        System.gc()
-        DesktopTrackLog.log("memory: trimmed image cache and requested heap GC on window hide")
+        DesktopTrackLog.log("memory: trimmed image cache, coil cache, and requested heap GC on window hide")
     }
 }
