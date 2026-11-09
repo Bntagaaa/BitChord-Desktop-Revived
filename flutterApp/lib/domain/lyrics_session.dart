@@ -2,10 +2,10 @@
 // engine's duration; a zero-length database match must wait for real metadata.
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../data/lyrics.dart';
 import 'music.dart';
 
-typedef LyricsLookup = Future<List<LyricLine>> Function(Song song, Duration duration);
+typedef LyricsLookup =
+    Future<List<LyricLine>> Function(Song song, Duration duration);
 
 class LyricsSession extends ChangeNotifier {
   LyricsSession(this.lookup);
@@ -34,7 +34,9 @@ class LyricsSession extends ChangeNotifier {
 
   // The application supplies this only for the adopted audio generation.
   void reportDuration(Duration value) {
-    if (_closed || _nativeDuration > Duration.zero || value <= Duration.zero) return;
+    if (_closed || _nativeDuration > Duration.zero || value <= Duration.zero) {
+      return;
+    }
     _nativeDuration = value;
     _refresh();
   }
@@ -42,7 +44,9 @@ class LyricsSession extends ChangeNotifier {
   void _refresh() {
     final song = _song;
     if (_closed || song == null || !_enabled) return;
-    final duration = _nativeDuration > Duration.zero ? _nativeDuration : song.duration ?? Duration.zero;
+    final duration = _nativeDuration > Duration.zero
+        ? _nativeDuration
+        : song.duration ?? Duration.zero;
     if (duration <= Duration.zero || duration == _askedDuration) return;
     _askedDuration = duration;
     final request = ++_request;
@@ -51,16 +55,25 @@ class LyricsSession extends ChangeNotifier {
         final result = await lookup(song, duration);
         if (_closed || request != _request) return;
         lines = withBackgroundVocals(result);
-        error = lines.any((line) => line.text.trim().isNotEmpty) ? null : 'Lyrics unavailable';
+        error = lines.any((line) => line.text.trim().isNotEmpty)
+            ? null
+            : 'Lyrics unavailable';
       } on Exception {
         if (_closed || request != _request) return;
         error = 'Lyrics unavailable';
       } finally {
-        if (!_closed && request == _request) { loading = false; notifyListeners(); }
+        if (!_closed && request == _request) {
+          loading = false;
+          notifyListeners();
+        }
       }
     }());
   }
 
   @override
-  void dispose() { _closed = true; _request++; super.dispose(); }
+  void dispose() {
+    _closed = true;
+    _request++;
+    super.dispose();
+  }
 }

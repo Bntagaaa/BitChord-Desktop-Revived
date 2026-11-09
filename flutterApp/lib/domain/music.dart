@@ -1,5 +1,6 @@
 // Port source: shared/src/commonMain/.../data/model/Models.kt @ 348b613a.
 export 'lyrics.dart';
+
 enum SearchFilter {
   all('All', null),
   songs('Songs', 'EgWKAQIIAWoKEAkQChAFEAMQBA=='),
@@ -93,4 +94,3 @@ class CatalogPage {
   final List<CatalogItem> items;
   final String? continuation;
 }
-

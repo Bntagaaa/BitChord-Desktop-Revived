@@ -44,7 +44,11 @@ class LyricsRepository {
     }
 
     String? exact;
-    try { exact = object(await get('get', query))['syncedLyrics'] as String?; } on Exception { /* An exact miss still gets the source's fuzzy fallback. */ }
+    try {
+      exact = object(await get('get', query))['syncedLyrics'] as String?;
+    } on Exception {
+      /* An exact miss still gets the source's fuzzy fallback. */
+    }
     if (exact != null && exact.isNotEmpty) return parseLrc(exact);
     query.remove('duration');
     final hits =

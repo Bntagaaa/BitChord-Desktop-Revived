@@ -403,9 +403,11 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
     builder: (context, position, _) {
       final lines = app.lyrics;
       if (lines.isEmpty) {
-        return Center(child: app.lyricsSession.loading
-          ? const CircularProgressIndicator(strokeWidth: 2)
-          : Text(app.lyricsSession.error ?? 'No lyrics available'));
+        return Center(
+          child: app.lyricsSession.loading
+              ? const CircularProgressIndicator(strokeWidth: 2)
+              : Text(app.lyricsSession.error ?? 'No lyrics available'),
+        );
       }
       var active = -1;
       for (var index = 0; index < lines.length; index++) {

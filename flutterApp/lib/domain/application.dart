@@ -39,7 +39,8 @@ class MusicApplication extends ChangeNotifier {
     LyricsRepository? lyrics,
   }) : resolver = StreamResolver(api) {
     lyricsRepository = lyrics ?? LyricsRepository();
-    lyricsSession = LyricsSession(lyricsRepository.fetch)..addListener(_lyricsChanged);
+    lyricsSession = LyricsSession(lyricsRepository.fetch)
+      ..addListener(_lyricsChanged);
     localScanner = LocalMusicScanner(artworkCache: localArtwork);
     _subscriptions.addAll([
       audio.position.listen((value) => position.value = value),
@@ -79,7 +80,10 @@ class MusicApplication extends ChangeNotifier {
   final List<Song> localSongs = [];
   final List<Song> history = [];
   List<LyricLine> get lyrics => lyricsSession.lines;
-  void _lyricsChanged() { if (!_closed) notifyListeners(); }
+  void _lyricsChanged() {
+    if (!_closed) notifyListeners();
+  }
+
   bool busy = false;
   bool loadingTrack = false;
   bool playing = false;
@@ -222,15 +226,21 @@ class MusicApplication extends ChangeNotifier {
     _audioGeneration = null;
     duration.value = Duration.zero;
     position.value = Duration.zero;
-    lyricsSession.select(selected, enabled: settings.get('synced_lyrics', true));
+    lyricsSession.select(
+      selected,
+      enabled: settings.get('synced_lyrics', true),
+    );
     notifyListeners();
     try {
       final stream = await resolver.resolve(selected);
       if (generation != _playRequest || _closed) return;
       _audioGeneration = generation;
       _loadingAudio = true;
-      try { await audio.open(stream.uri, headers: stream.headers); }
-      finally { if (generation == _playRequest) _loadingAudio = false; }
+      try {
+        await audio.open(stream.uri, headers: stream.headers);
+      } finally {
+        if (generation == _playRequest) _loadingAudio = false;
+      }
       if (generation != _playRequest || _closed) return;
       lyricsSession.reportDuration(duration.value);
       history.removeWhere((track) => track.id == selected.id);

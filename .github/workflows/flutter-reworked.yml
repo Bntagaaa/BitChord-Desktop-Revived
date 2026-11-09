@@ -26,11 +26,12 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Format and apply supported Dart fixes
+      - name: Require formatted source with no unapplied Dart fixes
         run: |
           dart format lib test integration_test > format.log 2>&1
           dart fix --apply >> format.log 2>&1
           dart format lib test integration_test >> format.log 2>&1
+          git diff --exit-code -- lib test integration_test >> format.log 2>&1
       - name: Publish formatter diagnostics
         if: failure()
         shell: python
@@ -87,6 +88,17 @@ jobs:
                   print('::error::' + line)
       - name: Unit and widget tests
         run: flutter test --reporter expanded > tests.log 2>&1
+      - name: Publish validation summary
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          analysis = Path('analyze.log').read_text(errors='replace')
+          tests = Path('tests.log').read_text(errors='replace')
+          if 'No issues found!' not in analysis or 'All tests passed!' not in tests:
+              raise SystemExit('Expected completed analyzer and test evidence')
+          results = re.findall(r'\+(\d+).*All tests passed!', tests)
+          print('::notice::Dart analysis: zero errors/warnings/infos; unit/widget tests passed: ' + (results[-1] if results else 'see tests.log'))
       - name: Publish test failures
         if: failure()
         shell: python
