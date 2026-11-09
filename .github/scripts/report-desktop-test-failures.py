@@ -16,7 +16,7 @@ if log.exists():
     for error in errors[:30]:
         annotate("Desktop Gradle check", error)
 
-for module in ("sharedUi", "shared", "desktopApp"):
+for module in ("desktopRuntime", "desktopUi", "sharedUi", "shared", "desktopApp"):
     for report in Path(module, "build/test-results").glob("**/TEST-*.xml"):
         for case in ET.parse(report).getroot().iter("testcase"):
             for failure in (*case.findall("failure"), *case.findall("error")):

@@ -21,6 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import java.net.URI
+import com.music.bitchord.desktop.runtime.SharedLoadCache
+import kotlinx.coroutines.CancellationException
 
 /**
  * Decoded artwork, kept to a budget.
@@ -42,24 +44,34 @@ internal object DesktopArtworkCache {
         (Runtime.getRuntime().maxMemory() / 6).coerceIn(32L * 1024 * 1024, 128L * 1024 * 1024)
 
     /** Four bytes a pixel, which is what every format here decodes to. */
-    private val images = DesktopByteBudgetLru<ImageBitmap>(budgetBytes) {
-        it.width.toLong() * it.height.toLong() * 4L
+    private val images = lazy {
+        val owner = DesktopApplicationResources.owner
+        owner.own("artwork") {
+            SharedLoadCache<String, ImageBitmap>(owner.scope, budgetBytes,
+                sizeOf = { it.width.toLong() * it.height.toLong() * 4L },
+                maxConcurrentLoads = 4)
+        }
     }
 
-    val heldBytes: Long get() = images.heldBytes
+    val heldBytes: Long get() = if (images.isInitialized()) images.value.heldBytes else 0
 
     /** Everything held, dropped — what the Storage settings' "Clear image cache" does. */
-    fun clear() = images.clear()
+    fun clear() { if (images.isInitialized()) images.value.clear() }
 
     suspend fun load(url: String?): ImageBitmap? {
         if (url.isNullOrBlank()) return null
-        images.get(url)?.let { return it }
-        return runCatching {
-            URI(url).toURL().openConnection().apply {
-                connectTimeout = 10_000
-                readTimeout = 10_000
-            }.getInputStream().use { stream -> stream.readBytes().decodeToImageBitmap() }
-        }.getOrNull()?.also { images.put(url, it) }
+        return images.value.load(url) {
+            try {
+                URI(url).toURL().openConnection().apply {
+                    connectTimeout = 10_000
+                    readTimeout = 10_000
+                }.getInputStream().use { stream -> stream.readBytes().decodeToImageBitmap() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+        }
     }
 }
 

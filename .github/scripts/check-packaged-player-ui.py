@@ -4,7 +4,7 @@ import sys
 from zipfile import ZipFile
 
 root = Path(__file__).resolve().parents[2]
-classes = root / "sharedUi/build/classes/kotlin/jvm/main"
+classes = root / "desktopUi/build/classes/kotlin/jvm/main"
 app = Path(sys.argv[1])
 libraries = app / "lib/app" if (app / "lib/app").is_dir() else app / "app"
 families = ("LandscapePlayerColumnsKt", "LandscapeLyricsFrameKt", "LandscapeLyricEdgesKt", "LandscapePlayerKt", "NowPlayingScreenKt")

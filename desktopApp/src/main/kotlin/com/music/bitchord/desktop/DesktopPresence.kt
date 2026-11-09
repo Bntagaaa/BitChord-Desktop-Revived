@@ -2,8 +2,7 @@ package com.music.bitchord.desktop
 
 import com.music.bitchord.data.presence.Presence
 import com.music.bitchord.data.presence.PresencePlatform
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import com.music.bitchord.desktop.runtime.DesktopResourceOwner
 import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.prefs.Preferences
@@ -17,14 +16,17 @@ internal object DesktopPresence {
     private const val KEY_INSTALL_ID = "presence_install_id"
     private val preferences = Preferences.userRoot().node("com.music.bitchord.desktop")
 
-    fun install() {
-        val presence = Presence(PresencePlatform.Pc, installId())
-        CoroutineScope(Dispatchers.Default).launch {
-            DesktopWindowVisibility.visible.collect(presence::setOpen)
+    fun install(owner: DesktopResourceOwner) {
+        owner.own("presence") {
+            val presence = Presence(PresencePlatform.Pc, installId())
+            val subscription = owner.scope.launch {
+                DesktopWindowVisibility.visible.collect(presence::setOpen)
+            }
+            AutoCloseable {
+                subscription.cancel()
+                presence.closeBlocking()
+            }
         }
-        // Covers both the window's close and the tray's Quit (exitProcess), so the
-        // count drops now rather than when the server's window runs out.
-        Runtime.getRuntime().addShutdownHook(Thread(presence::closeBlocking, "bitchord-presence-close"))
     }
 
     /** Random and local to this install: not the machine, and not the account. */

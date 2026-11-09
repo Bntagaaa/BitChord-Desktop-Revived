@@ -269,7 +269,7 @@ jobs:
 
       - name: Run tests
         if: ${{ inputs.run_tests }}
-        run: xvfb-run -a ./gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=${{ steps.meta.outputs.version }}"
+        run: xvfb-run -a ./gradlew :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=${{ steps.meta.outputs.version }}"
 
       # Manual quick builds wrap jpackage once; the reusable audit also checks native packages.
       - name: Build portable Linux application

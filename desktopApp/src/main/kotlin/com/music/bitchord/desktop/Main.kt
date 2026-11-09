@@ -3,6 +3,7 @@ package com.music.bitchord.desktop
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import com.music.bitchord.ui.LocalLyricAnimationAllowed
+import com.music.bitchord.ui.ProvideDesktopPresentationLifecycle
 import com.music.bitchord.ui.player.PlayerPlatform
 import com.music.bitchord.data.DebugLog
 import com.music.bitchord.data.TrackLog
@@ -32,6 +33,7 @@ import kotlinx.coroutines.swing.Swing
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
+    DesktopApplicationResources.installShutdownHook()
     DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.PROCESS_ENTRY)
     // Read the per-install welcome marker before services initialize or write preferences.
     val welcomeLaunch = DesktopWelcomeOnboarding.inspectStartup()
@@ -67,11 +69,12 @@ fun main() {
         ).asTokenProvider(),
     )
     // The public "apps open right now" count; see Presence.
-    DesktopPresence.install()
-    desktopMain(welcomeLaunch)
+    DesktopPresence.install(DesktopApplicationResources.owner)
+    try { desktopMain(welcomeLaunch) } finally { DesktopApplicationResources.close() }
 }
 
 private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = application {
+    DisposableEffect(Unit) { onDispose { DesktopApplicationResources.close() } }
     // Closing puts the window away rather than ending the process, while there is a tray icon to
     // bring it back from — see [DesktopWindowVisibility].
     val visible by DesktopWindowVisibility.visible.collectAsState()
@@ -103,6 +106,8 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     LaunchedEffect(visible, state.isMinimized) {
         if (!visible || state.isMinimized) {
             DesktopMemoryOptimizer.onWindowHidden()
+        } else {
+            DesktopMemoryOptimizer.onWindowShown()
         }
     }
     // Keep the floating host outside the main Window's visibility-paused composition.
@@ -330,8 +335,10 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
             LocalDensity provides uiDensity,
             LocalLyricAnimationAllowed provides lyricsAnimationAllowed,
         ) {
-            DesktopFlyoutHost {
-                BitChordDesktopApp(welcomeLaunch, pipHost)
+            ProvideDesktopPresentationLifecycle(visible && !state.isMinimized) {
+                DesktopFlyoutHost {
+                    BitChordDesktopApp(welcomeLaunch, pipHost)
+                }
             }
         }
     }

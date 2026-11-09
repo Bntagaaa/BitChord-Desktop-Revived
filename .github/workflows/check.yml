@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 concurrency:
   group: check-${{ github.workflow }}-${{ github.ref }}
@@ -47,7 +48,7 @@ jobs:
         env:
           BITCHORD_PIP_NATIVE_TEST: '1'
         shell: bash
-        run: xvfb-run -a ./gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | tee desktop-tests.log
+        run: xvfb-run -a ./gradlew :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | tee desktop-tests.log
 
       - name: Report test failures
         if: failure()
@@ -82,7 +83,7 @@ jobs:
         with:
           name: landscape-player-linux-render-evidence
           path: |
-            sharedUi/build/reports/landscape-player/
+            desktopUi/build/reports/landscape-player/
             desktopApp/build/reports/landscape-player/
           if-no-files-found: ignore
 
@@ -94,7 +95,7 @@ jobs:
           path: |
             desktopApp/build/reports/tests/
             shared/build/reports/tests/
-            sharedUi/build/reports/tests/
+            desktopUi/build/reports/tests/
 
   desktop-windows:
     name: Desktop · Windows
@@ -150,7 +151,7 @@ jobs:
       # Keep Windows' EXE/MSI metadata valid for the same descriptive build labels.
       - name: Tests
         run: |
-          .\gradlew.bat :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | Tee-Object -FilePath desktop-tests.log
+          .\gradlew.bat :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | Tee-Object -FilePath desktop-tests.log
           exit $LASTEXITCODE
 
       - name: Report test failures
@@ -190,7 +191,7 @@ jobs:
         with:
           name: landscape-player-windows-render-evidence
           path: |
-            sharedUi/build/reports/landscape-player/
+            desktopUi/build/reports/landscape-player/
             desktopApp/build/reports/landscape-player/
           if-no-files-found: ignore
 
@@ -202,7 +203,7 @@ jobs:
           path: |
             desktopApp/build/reports/tests/
             shared/build/reports/tests/
-            sharedUi/build/reports/tests/
+            desktopUi/build/reports/tests/
 
   android:
     name: Android

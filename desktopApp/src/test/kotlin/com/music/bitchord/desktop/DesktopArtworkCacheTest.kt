@@ -1,21 +1,16 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.runtime.ByteBudgetCache
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * The artwork cache's budget, driven through the policy rather than through decoded images — Skia
- * cannot load in a test JVM, and the thing worth pinning is the eviction, not the decoding.
- *
- * What matters is that there is a budget at all: unbounded, a session's browsing stayed decoded for
- * the life of the process, which is where the memory people reported was going.
- */
+/** Budget invariants without starting networking or native decoders. */
 class DesktopArtworkCacheTest {
 
     /** Sizes stand in for images: the value *is* its own byte count. */
-    private fun lru(budget: Long) = DesktopByteBudgetLru<Long>(budget) { it }
+    private fun lru(budget: Long) = ByteBudgetCache<String, Long>(budget) { it }
 
     @Test
     fun theBudgetIsAFractionOfTheHeapRatherThanEverything() {
@@ -56,10 +51,11 @@ class DesktopArtworkCacheTest {
     }
 
     @Test
-    fun oneEntryLargerThanTheBudgetIsStillHanded() {
+    fun anOversizedEntryDoesNotRemainRetained() {
         val cache = lru(10)
         cache.put("huge", 40L)
-        assertTrue(cache.contains("huge"), "the only entry was evicted, so nothing could be drawn")
+        assertFalse(cache.contains("huge"), "the caller owns its image; the cache must respect its budget")
+        assertEquals(0L, cache.heldBytes)
     }
 
     @Test

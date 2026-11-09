@@ -95,7 +95,7 @@ jobs:
         shell: pwsh
         env:
           BUILD_VERSION: ${{ steps.meta.outputs.version }}
-        run: .\gradlew.bat :shared:jvmTest :sharedUi:jvmTest :desktopApp:test "-Pbitchord.version=$env:BUILD_VERSION"
+        run: .\gradlew.bat :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=$env:BUILD_VERSION"
 
       - name: Build portable application only
         shell: pwsh
