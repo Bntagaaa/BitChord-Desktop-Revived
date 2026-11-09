@@ -202,9 +202,7 @@ class ToolButton extends StatelessWidget {
         padding: EdgeInsets.zero,
         style: IconButton.styleFrom(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          backgroundColor: selected && asset == null
-              ? p.foreground.withAlpha(22)
-              : null,
+          backgroundColor: selected ? p.foreground.withAlpha(22) : null,
         ),
         icon: asset == null
             ? Icon(icon, size: iconSize, color: tint)
