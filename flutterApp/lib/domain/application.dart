@@ -43,7 +43,9 @@ class MusicApplication extends ChangeNotifier {
       ..addListener(_lyricsChanged);
     localScanner = LocalMusicScanner(artworkCache: localArtwork);
     _subscriptions.addAll([
-      audio.position.listen((value) => position.value = value),
+      audio.position.listen((value) {
+        if (_audioGeneration == _playRequest) position.value = value;
+      }),
       audio.duration.listen((value) {
         if (_audioGeneration == _playRequest) {
           duration.value = value;
@@ -51,13 +53,17 @@ class MusicApplication extends ChangeNotifier {
         }
       }),
       audio.playing.listen((value) {
+        if (_audioGeneration != _playRequest) return;
         playing = value;
         notifyListeners();
       }),
       audio.completed.listen((value) {
-        if (value) unawaited(next(automatic: true));
+        if (value && _audioGeneration == _playRequest) {
+          unawaited(next(automatic: true));
+        }
       }),
       audio.errors.listen((value) {
+        if (_audioGeneration != _playRequest) return;
         error = value;
         notifyListeners();
       }),
@@ -128,10 +134,14 @@ class MusicApplication extends ChangeNotifier {
       case Destination.localMusic:
         await scanLocal(settings.get('local_music_folder', ''));
       case Destination.search:
-      case Destination.downloads:
-      case Destination.spotify:
       case Destination.settings:
         break;
+      case Destination.downloads:
+      case Destination.spotify:
+        // These services have not been ported. Do not present a fabricated
+        // empty library as if a real source had successfully returned it.
+        error = '${target.label} is not available in this build.';
+        notifyListeners();
     }
   }
 

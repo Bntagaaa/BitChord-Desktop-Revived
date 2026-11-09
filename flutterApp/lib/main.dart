@@ -51,8 +51,11 @@ class _Exit extends WindowListener {
     if (_closing) return;
     _closing = true;
     unawaited(() async {
-      await application.close();
-      await windowManager.destroy();
+      try {
+        await application.close();
+      } finally {
+        await windowManager.destroy();
+      }
     }());
   }
 }

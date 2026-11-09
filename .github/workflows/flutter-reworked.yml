@@ -27,6 +27,29 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Prepare missing standard desktop runners
+        shell: bash
+        run: |
+          if [ ! -f linux/CMakeLists.txt ] || [ ! -f windows/CMakeLists.txt ]; then
+            flutter create --platforms=linux,windows --org=com.music --project-name=bitchord --no-pub .
+          fi
+      - name: Save reviewable native runner source
+        shell: python
+        run: |
+          import base64, json, pathlib, zlib
+          sources = {}
+          for root in [pathlib.Path('linux'), pathlib.Path('windows')]:
+              for path in sorted(root.rglob('*')):
+                  if path.is_file() and not path.is_symlink() and 'ephemeral' not in path.parts and path.suffix != '.ico':
+                      sources[str(path)] = path.read_text()
+          if pathlib.Path('.metadata').exists():
+              sources['.metadata'] = pathlib.Path('.metadata').read_text()
+          encoded = base64.b64encode(zlib.compress(json.dumps(sources, sort_keys=True).encode())).decode()
+          chunks = [encoded[i:i+2800] for i in range(0,len(encoded),2800)]
+          if len(chunks) > 8:
+              raise SystemExit('Runner source exceeds reviewable evidence limit')
+          for index,chunk in enumerate(chunks):
+              print('::notice title=Native runner source::RUNNER|'+str(index)+'|'+str(len(chunks))+'|'+chunk)
       - name: Require formatted source with no unapplied Dart fixes
         run: |
           dart format lib test integration_test > format.log 2>&1
