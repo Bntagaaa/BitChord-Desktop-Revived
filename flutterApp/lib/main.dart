@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'presentation/desktop_shell.dart';
@@ -17,10 +18,10 @@ void main() async {
     title: 'BitChord',
   );
 
-  windowManager.waitUntilReadyToShow(windowOptions, () async {
+  unawaited(windowManager.waitUntilReadyToShow(windowOptions, () async {
     await windowManager.show();
     await windowManager.focus();
-  });
+  }));
 
   runApp(const BitChordApp());
 }

@@ -120,7 +120,7 @@ class DesktopMiniPlayer extends StatelessWidget {
                             iconSize: 20.0,
                             tint: previousEnabled
                                 ? palette.foreground
-                                : palette.secondary.withOpacity(0.4),
+                                : palette.secondary.withValues(alpha: 0.4),
                             onTap: previousEnabled ? onPrevious : null,
                           ),
                           const SizedBox(width: 4.0),
@@ -161,7 +161,7 @@ class DesktopMiniPlayer extends StatelessWidget {
                             iconSize: 20.0,
                             tint: song != null
                                 ? palette.foreground
-                                : palette.secondary.withOpacity(0.4),
+                                : palette.secondary.withValues(alpha: 0.4),
                             onTap: song != null ? onNext : null,
                           ),
                           const SizedBox(width: 4.0),
@@ -197,7 +197,7 @@ class DesktopMiniPlayer extends StatelessWidget {
                                       ? Image.network(
                                           song!.thumbnailUrl!,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => Icon(
+                                          errorBuilder: (_, _, _) => Icon(
                                             Icons.music_note_rounded,
                                             color: palette.secondary,
                                           ),
@@ -282,7 +282,7 @@ class DesktopMiniPlayer extends StatelessWidget {
                                 overlayShape: SliderComponentShape.noOverlay,
                                 activeTrackColor: palette.foreground,
                                 inactiveTrackColor:
-                                    palette.foreground.withOpacity(0.12),
+                                    palette.foreground.withValues(alpha: 0.12),
                                 thumbColor: palette.foreground,
                               ),
                               child: Slider(
@@ -303,7 +303,7 @@ class DesktopMiniPlayer extends StatelessWidget {
                           width: 48.0,
                           height: 48.0,
                           colorFilter: ColorFilter.mode(
-                            palette.secondary.withOpacity(0.4),
+                            palette.secondary.withValues(alpha: 0.4),
                             BlendMode.srcIn,
                           ),
                         ),
@@ -314,12 +314,12 @@ class DesktopMiniPlayer extends StatelessWidget {
                       alignment: Alignment.bottomLeft,
                       child: Container(
                         height: 2.0,
-                        color: palette.foreground.withOpacity(0.12),
+                        color: palette.foreground.withValues(alpha: 0.12),
                         child: FractionallySizedBox(
                           alignment: Alignment.centerLeft,
                           widthFactor: progress.clamp(0.0, 1.0),
                           child: Container(
-                            color: palette.accent.withOpacity(0.92),
+                            color: palette.accent.withValues(alpha: 0.92),
                           ),
                         ),
                       ),
@@ -374,7 +374,7 @@ class _ToolbarButtonState extends State<_ToolbarButton> {
           height: widget.size,
           decoration: BoxDecoration(
             color: _isHovered && widget.onTap != null
-                ? Colors.white.withOpacity(0.08)
+                ? Colors.white.withValues(alpha: 0.08)
                 : Colors.transparent,
             shape: BoxShape.circle,
           ),

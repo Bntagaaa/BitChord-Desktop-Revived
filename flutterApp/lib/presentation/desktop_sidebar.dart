@@ -259,8 +259,8 @@ class _DesktopSidebarItemState extends State<DesktopSidebarItem> {
     // Hover background colors:
     // alpha = if (selected) 0.035f else 0.075f
     final hoverColor = selected
-        ? Colors.white.withOpacity(0.035)
-        : Colors.white.withOpacity(0.075);
+        ? Colors.white.withValues(alpha: 0.035)
+        : Colors.white.withValues(alpha: 0.075);
 
     final backgroundColor = selected
         ? palette.navSelectedSurface

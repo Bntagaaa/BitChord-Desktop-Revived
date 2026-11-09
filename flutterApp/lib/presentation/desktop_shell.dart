@@ -25,7 +25,7 @@ class _DesktopShellState extends State<DesktopShell> {
   bool _settingsOpen = false;
 
   // Mock player state for initial demonstration
-  Song? _currentSong = const Song(
+  final Song? _currentSong = const Song(
     videoId: 'sample',
     title: 'Welcome to BitChord',
     artist: 'Native Desktop Revived',
@@ -33,8 +33,8 @@ class _DesktopShellState extends State<DesktopShell> {
     durationSeconds: 180,
   );
   bool _isPlaying = false;
-  bool _isLoading = false;
-  double _progress = 0.35;
+  final bool _isLoading = false;
+  final double _progress = 0.35;
   double _volume = 0.8;
   bool _shuffle = false;
   DesktopRepeatMode _repeatMode = DesktopRepeatMode.off;
@@ -204,7 +204,7 @@ class _DesktopShellState extends State<DesktopShell> {
           Icon(
             Icons.album_rounded,
             size: 64.0,
-            color: palette.secondary.withOpacity(0.4),
+            color: palette.secondary.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16.0),
           Text(

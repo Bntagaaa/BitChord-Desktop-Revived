@@ -11,9 +11,9 @@ double _contrastRatio(Color foreground, Color background) {
   }
 
   double luminance(Color color) {
-    return 0.2126 * linear(color.red / 255.0) +
-        0.7152 * linear(color.green / 255.0) +
-        0.0722 * linear(color.blue / 255.0);
+    return 0.2126 * linear(color.r) +
+        0.7152 * linear(color.g) +
+        0.0722 * linear(color.b);
   }
 
   final first = luminance(foreground);
