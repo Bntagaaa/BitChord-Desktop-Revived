@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../data/lyrics_client.dart';
 import '../domain/song.dart';
 import 'desktop_theme.dart';
 import 'desktop_thin_slider.dart';
@@ -59,22 +60,11 @@ class _DesktopPlayerSheetState extends State<DesktopPlayerSheet>
   late AnimationController _animController;
   late Animation<double> _slideAnimation;
   double _dragOffset = 0.0;
-  int _activeLyricIndex = 2;
+  int _activeLyricIndex = -1;
+  DesktopLyrics? _lyrics;
+  bool _isLoadingLyrics = false;
 
   final ScrollController _lyricsScrollController = ScrollController();
-
-  static const List<Map<String, dynamic>> _sampleLyrics = [
-    {'time': 0, 'text': 'Intro'},
-    {'time': 12, 'text': 'Di saat angin berhembus perlahan'},
-    {'time': 24, 'text': 'Kuteringat semua kenangan yang lalu'},
-    {'time': 38, 'text': 'Bayangmu hadir di setiap langkahku'},
-    {'time': 52, 'text': 'Menyapa rindu yang tak kunjung padam'},
-    {'time': 68, 'text': 'Biar waktu yang akan menjawab'},
-    {'time': 84, 'text': 'Semua tanya di dalam hatiku'},
-    {'time': 102, 'text': 'Kutahu kau masih di sana'},
-    {'time': 120, 'text': 'Menanti pagi kembali bersinar'},
-    {'time': 140, 'text': 'Outro'},
-  ];
 
   @override
   void initState() {
@@ -93,6 +83,8 @@ class _DesktopPlayerSheetState extends State<DesktopPlayerSheet>
     if (widget.visible) {
       _animController.value = 1.0;
     }
+
+    _loadLyrics(widget.song);
   }
 
   @override
@@ -104,6 +96,34 @@ class _DesktopPlayerSheetState extends State<DesktopPlayerSheet>
       } else {
         _animController.reverse();
       }
+    }
+
+    if (widget.song?.videoId != oldWidget.song?.videoId) {
+      _loadLyrics(widget.song);
+    }
+  }
+
+  Future<void> _loadLyrics(Song? song) async {
+    if (song == null) {
+      setState(() {
+        _lyrics = null;
+        _isLoadingLyrics = false;
+        _activeLyricIndex = -1;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingLyrics = true;
+      _activeLyricIndex = -1;
+    });
+
+    final res = await DesktopLyricsClient.lookup(song);
+    if (mounted && widget.song?.videoId == song.videoId) {
+      setState(() {
+        _lyrics = res;
+        _isLoadingLyrics = false;
+      });
     }
   }
 
@@ -254,7 +274,7 @@ class _DesktopPlayerSheetState extends State<DesktopPlayerSheet>
                           // Right Column: Apple Music Synchronized Lyrics
                           Expanded(
                             flex: 5,
-                            child: _buildLyricsColumn(),
+                            child: _buildLyricsColumn(totalSeconds),
                           ),
                         ],
                       );
@@ -288,7 +308,7 @@ class _DesktopPlayerSheetState extends State<DesktopPlayerSheet>
             child: AspectRatio(
               aspectRatio: 1.0,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: BorderRadius.circular(10.0),
                 child: Container(
                   color: widget.palette.surfaceRaised,
                   child: song?.thumbnailUrl != null
@@ -430,47 +450,141 @@ class _DesktopPlayerSheetState extends State<DesktopPlayerSheet>
     );
   }
 
-  Widget _buildLyricsColumn() {
+  Widget _buildLyricsColumn(int totalSeconds) {
+    if (_isLoadingLyrics) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: Text(
+              'Lyrics',
+              style: DesktopTypography.headlineLarge(Colors.white).copyWith(
+                fontSize: 26.0,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const Expanded(
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Colors.white70,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final lyrics = _lyrics;
+    if (lyrics == null || lyrics.lines.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: Text(
+              'Lyrics',
+              style: DesktopTypography.headlineLarge(Colors.white).copyWith(
+                fontSize: 26.0,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Text(
+                'Lyrics unavailable',
+                style: DesktopTypography.bodyLarge(
+                  Colors.white.withValues(alpha: 0.4),
+                ).copyWith(fontSize: 16.0),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final currentMs = (widget.progress * totalSeconds * 1000).round();
+    int newActive = -1;
+    for (int i = 0; i < lyrics.lines.length; i++) {
+      if (currentMs >= lyrics.lines[i].timeMs) {
+        newActive = i;
+      } else {
+        break;
+      }
+    }
+
+    if (newActive != _activeLyricIndex && newActive >= 0) {
+      _activeLyricIndex = newActive;
+      if (_lyricsScrollController.hasClients) {
+        final targetOffset = max(0.0, (newActive - 2) * 52.0);
+        _lyricsScrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 16.0),
-          child: Text(
-            'Lyrics',
-            style: DesktopTypography.headlineLarge(Colors.white).copyWith(
-              fontSize: 26.0,
-              fontWeight: FontWeight.w700,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Lyrics',
+                style: DesktopTypography.headlineLarge(Colors.white).copyWith(
+                  fontSize: 26.0,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                lyrics.source,
+                style: DesktopTypography.caption(
+                  Colors.white.withValues(alpha: 0.35),
+                ).copyWith(fontSize: 11.0),
+              ),
+            ],
           ),
         ),
         Expanded(
           child: ListView.builder(
             controller: _lyricsScrollController,
-            itemCount: _sampleLyrics.length,
+            itemCount: lyrics.lines.length,
             itemBuilder: (context, index) {
-              final lyric = _sampleLyrics[index];
+              final lyric = lyrics.lines[index];
+              if (lyric.isGap) return const SizedBox(height: 20.0);
               final isActive = index == _activeLyricIndex;
 
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12.0),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() => _activeLyricIndex = index);
-                  },
-                  child: AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 200),
-                    style: TextStyle(
-                      fontFamily: 'SFProDisplay',
-                      fontSize: isActive ? 26.0 : 22.0,
-                      fontWeight:
-                          isActive ? FontWeight.w700 : FontWeight.w500,
-                      color: isActive
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.38),
-                      height: 1.3,
+                padding: const EdgeInsets.symmetric(vertical: 10.0),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () {
+                      if (totalSeconds > 0) {
+                        widget.onSeek((lyric.timeMs / 1000) / totalSeconds);
+                      }
+                    },
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontFamily: 'SFProDisplay',
+                        fontSize: isActive ? 26.0 : 22.0,
+                        fontWeight:
+                            isActive ? FontWeight.w700 : FontWeight.w500,
+                        color: isActive
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.38),
+                        height: 1.3,
+                      ),
+                      child: Text(lyric.text),
                     ),
-                    child: Text(lyric['text'] as String),
                   ),
                 ),
               );

@@ -203,6 +203,7 @@ class _DesktopShellState extends State<DesktopShell> {
 
     switch (_destination) {
       case DesktopDestination.listenNow:
+      case DesktopDestination.newPage:
         return DesktopNewPage(
           palette: palette,
           onSongSelected: (song) {

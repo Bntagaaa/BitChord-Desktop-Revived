@@ -32,15 +32,15 @@ void main() {
     expect(find.text('New'), findsOneWidget);
     expect(find.text('New albums & singles'), findsOneWidget);
     expect(find.text('Trending'), findsOneWidget);
-    expect(find.text('Dicari Onty Onty'), findsOneWidget);
     expect(find.text('DIRANTAI DIGELANGI RINDU'), findsOneWidget);
 
     // Tap on album card
-    final albumFinder = find.text('Dicari Onty Onty');
+    final albumFinder = find.text('DIRANTAI DIGELANGI RINDU');
     await tester.tap(albumFinder);
     await tester.pumpAndSettle();
 
     expect(selected, isNotNull);
-    expect(selected!.title, 'Dicari Onty Onty');
+    expect(selected!.title, 'DIRANTAI DIGELANGI RINDU');
+    expect(selected!.videoId, 'AStEe82Se1Y');
   });
 }

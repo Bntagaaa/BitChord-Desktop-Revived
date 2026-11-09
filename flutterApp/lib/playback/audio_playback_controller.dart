@@ -2,14 +2,15 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_lib;
+import '../data/innertube_client.dart';
 import '../domain/song.dart';
 
 /// Central native audio playback controller.
 ///
 /// Features:
 /// - Uses [Player] from `media_kit` (libmpv native audio decoder).
-/// - Automatically resolves YouTube audio streams via [yt_lib.YoutubeExplode].
-/// - Fallback search when a synthetic / query title is provided.
+/// - Resolves YouTube audio streams via [yt_lib.YoutubeExplode] and [InnertubeClient].
+/// - Fallback search when a synthetic or album ID is provided.
 /// - Full lifecycle management: position, duration, buffering, play, pause, seek.
 class AudioPlaybackController extends ChangeNotifier {
   AudioPlaybackController() {
@@ -101,6 +102,8 @@ class AudioPlaybackController extends ChangeNotifier {
     _player.setVolume((_volume * 100.0).clamp(0.0, 100.0));
   }
 
+  static final RegExp _videoIdRegex = RegExp(r'^[A-Za-z0-9_-]{11}$');
+
   /// Plays a song by resolving its audio stream URL.
   Future<void> playSong(Song song) async {
     _currentSong = song;
@@ -112,21 +115,50 @@ class AudioPlaybackController extends ChangeNotifier {
     try {
       String? streamUrl;
       String targetId = song.videoId;
+      Song resolvedSong = song;
 
-      // If videoId is a placeholder or title query, find on YouTube
-      if (targetId.startsWith('track-') ||
-          targetId.startsWith('album-') ||
-          targetId == 'sample') {
-        final query = '${song.title} ${song.artist}';
+      // 1. If ID is an album browseId (MPREb... or VL...), resolve first track
+      if (targetId.startsWith('MPREb') || targetId.startsWith('VL')) {
+        final albumTracks = await InnertubeClient.instance.browseAlbumSongs(targetId);
+        if (albumTracks.isNotEmpty) {
+          final first = albumTracks.first;
+          targetId = first.videoId;
+          resolvedSong = Song(
+            videoId: first.videoId,
+            title: first.title,
+            artist: first.artist.isNotEmpty ? first.artist : song.artist,
+            thumbnailUrl: first.thumbnailUrl ?? song.thumbnailUrl,
+            durationSeconds: first.durationSeconds,
+          );
+          _currentSong = resolvedSong;
+          notifyListeners();
+        }
+      }
+
+      // 2. If targetId is still not a valid 11-char YouTube ID, search on YouTube
+      if (!_videoIdRegex.hasMatch(targetId)) {
+        final cleanArtist = ShelfItem.cleanArtist(song.artist);
+        final cleanTitle = song.title.split(' - ').first.trim();
+        final query = '$cleanTitle $cleanArtist'.trim();
+
         final searchResults = await _yt.search.search(query).timeout(
               const Duration(seconds: 8),
             );
         if (searchResults.isNotEmpty) {
           targetId = searchResults.first.id.value;
+          resolvedSong = Song(
+            videoId: targetId,
+            title: searchResults.first.title,
+            artist: searchResults.first.author,
+            thumbnailUrl: searchResults.first.thumbnails.highResUrl,
+            durationSeconds: searchResults.first.duration?.inSeconds ?? song.durationSeconds,
+          );
+          _currentSong = resolvedSong;
+          notifyListeners();
         }
       }
 
-      // Extract highest bitrate audio stream
+      // 3. Extract highest bitrate audio stream
       final manifest = await _yt.videos.streamsClient.getManifest(targetId).timeout(
             const Duration(seconds: 10),
           );
@@ -137,7 +169,7 @@ class AudioPlaybackController extends ChangeNotifier {
       }
 
       if (streamUrl == null) {
-        throw Exception('No playable audio stream available for "${song.title}"');
+        throw Exception('No playable audio stream available for "${resolvedSong.title}"');
       }
 
       await _player.open(Media(streamUrl), play: true);
@@ -146,7 +178,6 @@ class AudioPlaybackController extends ChangeNotifier {
     } catch (e) {
       _errorMessage = e.toString();
       _isLoading = false;
-      // Keep UI playing status for feedback if in an offline sandbox
       notifyListeners();
     }
   }
