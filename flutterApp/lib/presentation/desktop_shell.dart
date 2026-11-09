@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../domain/song.dart';
+import '../playback/audio_playback_controller.dart';
 import 'desktop_mini_player.dart';
 import 'desktop_new_page.dart';
 import 'desktop_player_sheet.dart';
@@ -22,27 +23,28 @@ class DesktopShell extends StatefulWidget {
 }
 
 class _DesktopShellState extends State<DesktopShell> {
+  final AudioPlaybackController _audio = AudioPlaybackController();
+
   bool _userSidebarCollapsed = false;
   bool _sidebarDrawerOpen = false;
   DesktopDestination _destination = DesktopDestination.listenNow;
   bool _settingsOpen = false;
 
-  // Initial player state (empty dock by default, matching DesktopApp.kt line 6294)
-  Song? _currentSong;
-  bool _isPlaying = false;
-  bool _isLoading = false;
-  double _progress = 0.0;
-  double _volume = 0.8;
-  bool _shuffle = false;
   DesktopRepeatMode _repeatMode = DesktopRepeatMode.off;
   bool _lyricsOpen = false;
   bool _queueOpen = false;
   bool _playerSheetOpen = false;
 
   @override
+  void dispose() {
+    _audio.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.themeController,
+      listenable: Listenable.merge([widget.themeController, _audio]),
       builder: (context, _) {
         final palette = widget.themeController.palette;
 
@@ -101,13 +103,13 @@ class _DesktopShellState extends State<DesktopShell> {
                     right: 0.0,
                     bottom: 24.0,
                     child: DesktopMiniPlayer(
-                      song: _currentSong,
-                      isPlaying: _isPlaying,
-                      isLoading: _isLoading,
+                      song: _audio.currentSong,
+                      isPlaying: _audio.isPlaying,
+                      isLoading: _audio.isLoading,
                       previousEnabled: true,
-                      progress: _progress,
-                      volume: _volume,
-                      shuffle: _shuffle,
+                      progress: _audio.progress,
+                      volume: _audio.volume,
+                      shuffle: _audio.shuffle,
                       repeatMode: _repeatMode,
                       lyricsOpen: _lyricsOpen,
                       queueOpen: _queueOpen,
@@ -115,14 +117,12 @@ class _DesktopShellState extends State<DesktopShell> {
                       onExpand: () {
                         setState(() => _playerSheetOpen = true);
                       },
-                      onPlayPause: () {
-                        setState(() => _isPlaying = !_isPlaying);
-                      },
+                      onPlayPause: () => _audio.togglePlayPause(),
                       onPrevious: () {},
                       onNext: () {},
-                      onShuffleChange: (s) => setState(() => _shuffle = s),
+                      onShuffleChange: (_) => _audio.toggleShuffle(),
                       onRepeatModeChange: (r) => setState(() => _repeatMode = r),
-                      onVolumeChange: (v) => setState(() => _volume = v),
+                      onVolumeChange: (v) => _audio.setVolume(v),
                       onOpenLyrics: () => setState(() => _lyricsOpen = !_lyricsOpen),
                       onOpenQueue: () => setState(() => _queueOpen = !_queueOpen),
                     ),
@@ -131,20 +131,20 @@ class _DesktopShellState extends State<DesktopShell> {
                   // Fullscreen Immersive Player Sheet
                   DesktopPlayerSheet(
                     visible: _playerSheetOpen,
-                    song: _currentSong,
-                    isPlaying: _isPlaying,
-                    isLoading: _isLoading,
-                    progress: _progress,
-                    volume: _volume,
-                    shuffle: _shuffle,
+                    song: _audio.currentSong,
+                    isPlaying: _audio.isPlaying,
+                    isLoading: _audio.isLoading,
+                    progress: _audio.progress,
+                    volume: _audio.volume,
+                    shuffle: _audio.shuffle,
                     palette: palette,
                     onDismiss: () => setState(() => _playerSheetOpen = false),
-                    onPlayPause: () => setState(() => _isPlaying = !_isPlaying),
+                    onPlayPause: () => _audio.togglePlayPause(),
                     onPrevious: () {},
                     onNext: () {},
-                    onSeek: (p) => setState(() => _progress = p),
-                    onVolumeChange: (v) => setState(() => _volume = v),
-                    onToggleShuffle: () => setState(() => _shuffle = !_shuffle),
+                    onSeek: (p) => _audio.seek(p),
+                    onVolumeChange: (v) => _audio.setVolume(v),
+                    onToggleShuffle: () => _audio.toggleShuffle(),
                   ),
                 ],
               ),
@@ -207,11 +207,7 @@ class _DesktopShellState extends State<DesktopShell> {
         return DesktopNewPage(
           palette: palette,
           onSongSelected: (song) {
-            setState(() {
-              _currentSong = song;
-              _isPlaying = true;
-              _progress = 0.05;
-            });
+            _audio.playSong(song);
           },
         );
       default:

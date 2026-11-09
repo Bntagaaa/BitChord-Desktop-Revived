@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 import 'presentation/desktop_shell.dart';
 import 'presentation/desktop_theme.dart';
@@ -7,6 +8,7 @@ import 'presentation/desktop_typography.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   await windowManager.ensureInitialized();
 
   const windowOptions = WindowOptions(

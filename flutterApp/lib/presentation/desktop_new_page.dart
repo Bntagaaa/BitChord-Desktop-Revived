@@ -115,7 +115,7 @@ class DesktopNewPage extends StatelessWidget {
                                 onClick: () {
                                   onSongSelected(
                                     Song(
-                                      videoId: track.videoId ?? 'track-$c',
+                                      videoId: track.videoId,
                                       title: track.title,
                                       artist: track.subtitle,
                                       thumbnailUrl: track.thumbnailUrl,
@@ -142,15 +142,14 @@ class DesktopNewPage extends StatelessWidget {
 class _ShelfItem {
   final String title;
   final String subtitle;
-  final String? thumbnailUrl;
-  final String? videoId;
 
   const _ShelfItem({
     required this.title,
     required this.subtitle,
-    this.thumbnailUrl,
-    this.videoId,
   });
+
+  String? get thumbnailUrl => null;
+  String get videoId => 'track-$title';
 }
 
 class _NewSectionHeader extends StatelessWidget {
