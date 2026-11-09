@@ -368,7 +368,7 @@ class _SmoothLyricRowState extends State<_SmoothLyricRow> {
 
     final textColor = widget.immersive
         ? Colors.white
-        : (widget.isLight ? const Color(0xFF1B2230) : p.foreground);
+        : (widget.isLight ? p.foreground : p.foreground);
 
     final isDuetEnd = widget.line.alignment == LyricAlignment.end;
 
