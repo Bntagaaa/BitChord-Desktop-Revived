@@ -1,0 +1,34 @@
+// Use exactly the same audit with both pinned baseline and candidate builds.
+import groovy.json.JsonOutput
+import java.security.MessageDigest
+
+gradle.projectsEvaluated {
+    def desktop = gradle.rootProject.project(':desktopApp')
+    desktop.tasks.register('writeDesktopRuntimeAudit') {
+        group = 'verification'
+        doLast {
+            def artifacts = desktop.configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts
+            def records = artifacts.collect { artifact ->
+                def digest = MessageDigest.getInstance('SHA-256')
+                artifact.file.withInputStream { stream ->
+                    byte[] buffer = new byte[65536]
+                    int count
+                    while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count)
+                }
+                [component: artifact.moduleVersion.id.toString(), file: artifact.file.name,
+                 type: artifact.type, bytes: artifact.file.length(),
+                 sha256: digest.digest().encodeHex().toString()]
+            }.sort { a, b -> a.component <=> b.component ?: a.file <=> b.file }
+            def androidArchives = records.findAll { it.type == 'aar' || it.file.endsWith('.aar') }
+            def report = desktop.layout.buildDirectory.file('reports/desktop-runtime.json').get().asFile
+            report.parentFile.mkdirs()
+            report.text = JsonOutput.prettyPrint(JsonOutput.toJson([
+                os: System.getProperty('os.name'), java: System.getProperty('java.version'),
+                artifactCount: records.size(), totalArtifactBytes: records.sum { it.bytes },
+                androidArchives: androidArchives, artifacts: records,
+            ])) + '\n'
+            logger.lifecycle('Desktop runtime audit: ' + records.size() + ' artifacts, ' + androidArchives.size() + ' AARs')
+            if (!androidArchives.empty) throw new GradleException('Android AAR found in desktop runtime; see desktop-runtime.json')
+        }
+    }
+}

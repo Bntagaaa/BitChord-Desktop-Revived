@@ -69,3 +69,11 @@ Local evidence: runtime ownership/race/cancellation tests and isolated actual de
 No before/after packaged-process PSS result or 30% reduction is claimed yet. Required measurements remain idle/playback/navigation/fullscreen/long-session RSS/PSS, heap, native allocations, CPU, startup/transition latency and frame timing. Compare equivalent packaged builds with identical settings and fixtures; never substitute Gradle daemon memory or a cache microbenchmark for application memory. JVM NMT does not account for all Skia/FFmpeg/driver allocations.
 
 Optional subsystem initialization, JavaFX/GraalVM/ONNX/native decoder lifetimes, navigation data retention and shared Coil/artwork budgets require further profiling. All remaining feature, visual and platform checks above must be completed before calling the experiment a complete re-architecture.
+
+### Reproducible packaged idle comparison
+
+The Compose packaged baseline workflow builds the immutable baseline above and the candidate on the same Linux runner, with the same release launcher version, dependency audit script and JVM options. It alternates three fresh-profile launches of each in an identical 1280×900 Xvfb display. Each run opens the real welcome screen, warms up for 20 seconds, then samples the actual launcher PID for 60 seconds. The sampler records RSS, PSS, private/swap bytes, threads and CPU time from /proc, a native-window appearance latency, screenshots and jcmd heap/NMT summaries.
+
+The two production builds receive the same diagnostic-only NativeMemoryTracking=summary option through their environment. Their shipped heap/GC configuration remains unchanged. This is a clean welcome idle measurement, not a playback, navigation, first-usable-frame, physical GPU or long-session benchmark. It must not be extrapolated into those claims. JVM NMT covers only the allocations it tracks; process PSS additionally includes third-party native allocations. The dependency inventory lists resolved artifact coordinates, sizes and SHA-256s for both builds and rejects packaged Android AARs without treating AndroidX JVM libraries as Android-only.
+
+Results are uploaded as compose-packaged-linux-idle when the workflow succeeds. An absent/failed measurement remains unverified; this document intentionally contains no invented before/after numbers.

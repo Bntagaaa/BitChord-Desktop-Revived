@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${INPUT_VERSION:-1.8.2-test}"
-          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_NAME" == "fix/1.9.2-landscape-lyrics-track-header" ]]; then
             version="1.9.2-landscape-${GITHUB_SHA:0:8}"
           fi
           if [[ ! "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then

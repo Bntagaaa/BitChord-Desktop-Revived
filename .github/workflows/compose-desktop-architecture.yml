@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: compose-architecture-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   verify:
@@ -37,12 +37,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          trap 'echo "::error::Draft PR automation failed; inspect the preceding GitHub CLI error. No branch was merged or reset."' ERR
+          run_gh() {
+            if gh "$@" 2>pr-error.log; then
+              return 0
+            else
+              code=$?
+              while IFS= read -r line; do echo "::error::$line" >&2; done < pr-error.log
+              return "$code"
+            fi
+          }
           test "$GITHUB_REPOSITORY" = "Bntagaaa/BitChord-Desktop-Revived"
           test "$GITHUB_REF_NAME" = "1.9.2-Compose-Dekstop"
-          number=$(gh pr list --state open --base 1.9.2 --head 1.9.2-Compose-Dekstop --json number --jq '.[0].number // empty')
+          number=$(run_gh pr list --state open --base 1.9.2 --head 1.9.2-Compose-Dekstop --json number --jq '.[0].number // empty')
           if [[ -n "$number" ]]; then
-            gh pr edit "$number" --title "Desktop Compose architecture and resource ownership" --body-file docs/architecture/compose-pr.md
+            run_gh pr edit "$number" --title "Desktop Compose architecture and resource ownership" --body-file docs/architecture/compose-pr.md
           else
-            gh pr create --draft --base 1.9.2 --head 1.9.2-Compose-Dekstop \
+            run_gh pr create --draft --base 1.9.2 --head 1.9.2-Compose-Dekstop \
               --title "Desktop Compose architecture and resource ownership" --body-file docs/architecture/compose-pr.md
           fi

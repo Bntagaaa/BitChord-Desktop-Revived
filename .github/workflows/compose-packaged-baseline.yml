@@ -1,0 +1,70 @@
+name: Compose packaged baseline
+
+on:
+  push:
+    branches: [1.9.2-Compose-Dekstop]
+    paths:
+      - .github/workflows/compose-packaged-baseline.yml
+      - .github/scripts/measure-packaged-idle.py
+      - .github/scripts/desktop-runtime-audit.init.gradle
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compose-packaged-baseline
+  cancel-in-progress: true
+
+jobs:
+  linux-idle:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: candidate
+          persist-credentials: false
+      - name: Check out the immutable source baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 348b613a0c3db1a54de56483ea6f8748d6465211
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up identical virtual displays
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xdotool imagemagick
+      - name: Build equivalent production launchers and audit actual runtime artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tree in baseline candidate; do
+            (
+              cd "$tree"
+              bash gradlew --no-daemon :desktopApp:createDistributable :desktopApp:writeDesktopRuntimeAudit \
+                -I "$GITHUB_WORKSPACE/candidate/.github/scripts/desktop-runtime-audit.init.gradle" \
+                -Pbitchord.version=1.9.2-compose-profile --console=plain
+            )
+          done
+      - name: Measure packaged process RSS, PSS, CPU, heap and JVM NMT
+        run: |
+          xvfb-run -a -s '-screen 0 1280x900x24' python3 candidate/.github/scripts/measure-packaged-idle.py \
+            --baseline baseline/desktopApp/build/compose/binaries/main/app/BitChord/bin/BitChord \
+            --candidate candidate/desktopApp/build/compose/binaries/main/app/BitChord/bin/BitChord \
+            --output results --seconds 60 --rounds 3
+      - name: Publish measurements and dependency inventories
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-packaged-linux-idle
+          path: |
+            results/
+            baseline/desktopApp/build/reports/desktop-runtime.json
+            candidate/desktopApp/build/reports/desktop-runtime.json
+          if-no-files-found: warn

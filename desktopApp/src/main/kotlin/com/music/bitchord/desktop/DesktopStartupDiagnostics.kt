@@ -47,17 +47,12 @@ object DesktopStartupDiagnostics {
 
     private fun readProcessRssMb(): Long? {
         return runCatching {
-            val statm = File("/proc/self/statm")
-            if (statm.exists()) {
-                val parts = statm.readText().trim().split("\\s+".toRegex())
-                if (parts.size >= 2) {
-                    val pages = parts[1].toLongOrNull()
-                    if (pages != null) {
-                        return (pages * 4096) / (1024 * 1024)
-                    }
-                }
+            // VmRSS already uses KiB; statm requires the host's actual page size.
+            File("/proc/self/status").useLines { lines ->
+                lines.firstOrNull { it.startsWith("VmRSS:") }
+                    ?.substringAfter(':')?.trim()?.substringBefore(' ')
+                    ?.toLongOrNull()?.div(1024)
             }
-            null
         }.getOrNull()
     }
 }
