@@ -92,8 +92,8 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
               imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
               child: Opacity(
                 opacity: .45,
-                child: Image.network(
-                  app.song!.artwork!,
+              child: Image(
+                image: artworkProvider(app.song!.artwork!),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => const SizedBox.shrink(),
                 ),

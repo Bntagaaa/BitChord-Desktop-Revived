@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../data/innertube.dart';
 import '../data/lyrics.dart';
+import '../data/local_music.dart';
+import '../data/local_artwork.dart';
 import '../data/renderer_parser.dart';
 import '../data/settings.dart';
 import '../data/stream_resolver.dart';
@@ -32,7 +34,9 @@ class MusicApplication extends ChangeNotifier {
     required this.settings,
     required this.api,
     required this.audio,
+    LocalArtworkCache? localArtwork,
   }) : resolver = StreamResolver(api) {
+    localScanner = LocalMusicScanner(artworkCache: localArtwork);
     _subscriptions.addAll([
       audio.position.listen((value) => position.value = value),
       audio.duration.listen((value) {
@@ -55,6 +59,7 @@ class MusicApplication extends ChangeNotifier {
   final InnerTube api;
   final AudioOutput audio;
   final StreamResolver resolver;
+  late final LocalMusicScanner localScanner;
   final LyricsRepository lyricsRepository = LyricsRepository();
   final RendererParser parser = RendererParser();
   final QueueTimeline queue = QueueTimeline();
@@ -102,9 +107,10 @@ class MusicApplication extends ChangeNotifier {
         if (api.signedIn) {
           await _load(() => api.browse('FEmusic_history'));
         }
+      case Destination.localMusic:
+        await scanLocal(settings.get('local_music_folder', ''));
       case Destination.search:
       case Destination.downloads:
-      case Destination.localMusic:
       case Destination.spotify:
       case Destination.settings:
         break;
@@ -272,44 +278,21 @@ class MusicApplication extends ChangeNotifier {
 
   Future<void> scanLocal(String path) async {
     final generation = ++_request;
-    busy = true;
-    error = null;
-    notifyListeners();
+    busy = true; error = null; notifyListeners();
     try {
-      final songs = <Song>[];
-      await for (final item in Directory(
-        path,
-      ).list(recursive: true, followLinks: false)) {
-        if (item is! File ||
-            !RegExp(
-              r'\.(mp3|flac|wav|m4a|ogg|opus|aac)$',
-              caseSensitive: false,
-            ).hasMatch(item.path)) {
-          continue;
-        }
-        final file = item.uri.pathSegments.last;
-        songs.add(
-          Song(
-            id: item.uri.toString(),
-            title: file.replaceFirst(RegExp(r'\.[^.]+$'), ''),
-            artist: 'Local Music',
-            localUri: item.uri,
-          ),
-        );
-      }
-      songs.sort((a, b) => a.title.compareTo(b.title));
-      if (generation == _request && !_closed) {
-        localSongs
-          ..clear()
-          ..addAll(songs);
-      }
+      if (path.isNotEmpty) await settings.set('local_music_folder', path);
+      final home = Platform.environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'];
+      final roots = path.isNotEmpty ? [path] : [
+        if (home != null) '$home/Music', if (home != null) '$home/Downloads',
+      ];
+      final songs = await localScanner.scan(roots,
+        filterNonMusic: settings.get('filter_non_music_audio', false),
+        cancelled: () => generation != _request || _closed);
+      if (generation == _request && !_closed) { localSongs..clear()..addAll(songs); }
     } on Exception catch (failure) {
-      error = failure.toString();
+      if (generation == _request && !_closed) error = failure.toString();
     } finally {
-      if (generation == _request && !_closed) {
-        busy = false;
-        notifyListeners();
-      }
+      if (generation == _request && !_closed) { busy = false; notifyListeners(); }
     }
   }
 

@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'theme.dart';
+
+ImageProvider<Object> artworkProvider(String url) {
+  final uri = Uri.tryParse(url);
+  return uri?.scheme == 'file' ? FileImage(File.fromUri(uri!)) : NetworkImage(url);
+}
 
 class SourceIcon extends StatelessWidget {
   const SourceIcon(this.name, {super.key, this.size = 22, this.color});
@@ -38,10 +44,9 @@ class Artwork extends StatelessWidget {
           color: paletteOf(context).surfaceRaised,
           child: url == null
               ? const Center(child: Icon(Icons.music_note_rounded, size: 28))
-              : Image.network(
-                  url!,
+                  : Image(
+                      image: ResizeImage.resizeIfNeeded(pixelSize, null, artworkProvider(url!)),
                   fit: BoxFit.cover,
-                  cacheWidth: pixelSize,
                   errorBuilder: (_, _, _) => const Center(
                     child: Icon(Icons.music_note_rounded, size: 28),
                   ),

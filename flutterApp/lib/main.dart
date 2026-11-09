@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:path_provider/path_provider.dart';
 import 'data/innertube.dart';
 import 'data/settings.dart';
+import 'data/local_artwork.dart';
 import 'domain/application.dart';
 import 'platform/audio.dart';
 import 'ui/shell.dart';
@@ -12,10 +14,12 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   await windowManager.ensureInitialized();
+  final cache = await getApplicationCacheDirectory();
   final application = MusicApplication(
     settings: await Settings.load(),
     api: InnerTube(),
     audio: NativeAudioOutput(),
+    localArtwork: LocalArtworkCache('${cache.path}/flutter-reworked/local-artwork'),
   );
   unawaited(
     windowManager.waitUntilReadyToShow(
