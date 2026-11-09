@@ -67,7 +67,15 @@ jobs:
           fi
           cat analyze.log
       - name: Run unit and widget regressions
-        run: flutter test --no-pub --coverage
+        run: |
+          if ! flutter test --no-pub --coverage > test.log 2>&1; then
+            cat test.log
+            while IFS= read -r line; do
+              echo "::error::$line"
+            done < test.log
+            exit 1
+          fi
+          cat test.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
