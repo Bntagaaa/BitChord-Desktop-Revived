@@ -75,32 +75,7 @@ void main() {
         await request.response.close();
         return;
       }
-      final range = RegExp(r'^bytes=(\\d+)-(\\d+)
-    () async {
-      final upstream = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      upstream.listen((request) async {
-        request.response.contentLength = 200000;
-        try {
-          request.response.add(List.filled(200000, 1));
-          await request.response.close();
-        } on Object {
-          /* The range limiter cancels this intentionally. */
-        }
-      });
-      final proxy = RangeMediaProxy(
-        ResolvedStream(uri: 'http://127.0.0.1:${upstream.port}/audio'),
-        windowBytes: 32768,
-      );
-      try {
-        await expectLater(proxy.open(), throwsA(isA<HttpException>()));
-      } finally {
-        await proxy.close();
-        await upstream.close(force: true);
-      }
-    },
-  );
-}
-).firstMatch(
+      final range = RegExp(r'^bytes=(\d+)-(\d+)$').firstMatch(
         request.headers.value(HttpHeaders.rangeHeader)!,
       )!;
       final start = int.parse(range[1]!);
