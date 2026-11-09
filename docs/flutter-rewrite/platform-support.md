@@ -25,7 +25,7 @@ Build on the target operating system:
 
 Release builds on macOS produce a universal binary with the pinned toolchain.
 The workflow builds it on **both** `macos-15` (Apple Silicon) and
-`macos-15-intel` and verifies both slices using `lipo -verify_arch arm64 x86_64`.
+`macos-15-intel` and verifies both slices using `lipo "$binary" -verify_arch arm64 x86_64`.
 These are distinct host builds of the same universal target, not single-slice
 packages mislabeled as universal. Linux ARM64 and Windows ARM64 are not claimed
 as validated release targets in this workflow.

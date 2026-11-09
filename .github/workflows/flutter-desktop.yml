@@ -163,7 +163,8 @@ jobs:
       - name: Verify universal slices and archive application
         run: |
           app='build/macos/Build/Products/Release/BitChord Desktop Revived.app'
-          lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/BitChord Desktop Revived"
+          lipo "$app/Contents/MacOS/BitChord Desktop Revived" -archs
+          lipo "$app/Contents/MacOS/BitChord Desktop Revived" -verify_arch arm64 x86_64
           cp ../LICENSE "$app/Contents/Resources/LICENSE"
           cp ../docs/flutter-rewrite/platform-support.md "$app/Contents/Resources/NATIVE-BUILD-NOTES.md"
           ditto -c -k --sequesterRsrc --keepParent "$app" 'BitChord-Flutter-macos-universal-${{ matrix.host }}.zip'
