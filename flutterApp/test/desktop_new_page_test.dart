@@ -35,13 +35,12 @@ void main() {
     expect(find.text('Dicari Onty Onty'), findsOneWidget);
     expect(find.text('DIRANTAI DIGELANGI RINDU'), findsOneWidget);
 
-    // Tap on a trending track row
-    final trackFinder = find.text('DIRANTAI DIGELANGI RINDU');
-    await tester.ensureVisible(trackFinder);
-    await tester.tap(trackFinder);
+    // Tap on album card
+    final albumFinder = find.text('Dicari Onty Onty');
+    await tester.tap(albumFinder);
     await tester.pumpAndSettle();
 
     expect(selected, isNotNull);
-    expect(selected!.title, 'DIRANTAI DIGELANGI RINDU');
+    expect(selected!.title, 'Dicari Onty Onty');
   });
 }
