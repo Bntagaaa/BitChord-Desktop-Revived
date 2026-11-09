@@ -19,8 +19,18 @@ class InnerTube {
   static const origin = 'https://music.youtube.com';
   static const fallbackVersion = '1.20250101.01.00';
   static const userAgent =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-  String language = 'en';
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
+  String _language = 'en';
+  String get language => switch (_language.toLowerCase()) {
+    'iw' => 'he',
+    'in' => 'id',
+    'ji' => 'yi',
+    _ => _language,
+  };
+  set language(String value) => _language = value;
+  String get _acceptLanguage => language == 'en'
+      ? 'en-US,en;q=0.9'
+      : '$language,en-US;q=0.8,en;q=0.7';
   String region = 'US';
   String? _cookie;
   String? visitorData;
@@ -74,7 +84,7 @@ class InnerTube {
           Uri.parse('$origin/'),
           headers: {
             'User-Agent': userAgent,
-            'Accept-Language': language,
+            'Accept-Language': _acceptLanguage,
             'Cookie': ?session,
             if (sid != null)
               'Authorization': authorization(
@@ -132,7 +142,7 @@ class InnerTube {
             'Origin': origin,
             'X-Origin': origin,
             'Referer': '$origin/',
-            'Accept-Language': language,
+            'Accept-Language': _acceptLanguage,
             'X-YouTube-Client-Name': '67',
             'X-YouTube-Client-Version': version,
             if (visitorData != null) 'X-Goog-Visitor-Id': visitorData!,
