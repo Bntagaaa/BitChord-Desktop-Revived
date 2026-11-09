@@ -532,7 +532,10 @@ class _SweptLyricText extends StatelessWidget {
             ShaderMask(
               blendMode: BlendMode.dstIn,
               shaderCallback: (bounds) {
-                final lineEnd = line.end ?? (line.words.isNotEmpty ? line.words.last.end : line.start + const Duration(seconds: 4));
+                final lineEnd = line.end ??
+                    (line.words.isNotEmpty
+                        ? line.words.last.end
+                        : line.start + const Duration(seconds: 4));
                 final totalSpan = (lineEnd - line.start).inMilliseconds;
                 final elapsed = (currentPos - line.start).inMilliseconds;
                 final progress = totalSpan <= 0
