@@ -16,9 +16,12 @@ class QueueEntry {
     final bytes = List.generate(16, (_) => _random.nextInt(256));
     bytes[6] = (bytes[6] & 15) | 64;
     bytes[8] = (bytes[8] & 63) | 128;
-    final hex = bytes.map((value) => value.toRadixString(16).padLeft(2, '0')).join();
-    return '${hex.substring(0,8)}-${hex.substring(8,12)}-${hex.substring(12,16)}-${hex.substring(16,20)}-${hex.substring(20)}';
+    final hex = bytes
+        .map((value) => value.toRadixString(16).padLeft(2, '0'))
+        .join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
+
   QueueEntry promoted() => QueueEntry._(song, QueueTier.context, id, source);
 }
 
@@ -26,7 +29,8 @@ class QueueTimeline {
   final List<QueueEntry> entries = [];
   List<String> _beforeShuffle = [];
   int index = -1;
-  String get source => index >= 0 && index < entries.length ? entries[index].source : '';
+  String get source =>
+      index >= 0 && index < entries.length ? entries[index].source : '';
   Song? get current =>
       index >= 0 && index < entries.length ? entries[index].song : null;
   List<QueueEntry> get _manual => entries
@@ -54,7 +58,10 @@ class QueueTimeline {
     final manual = _manual;
     entries
       ..clear()
-      ..addAll([QueueEntry(song, QueueTier.context, source: origin), ...manual]);
+      ..addAll([
+        QueueEntry(song, QueueTier.context, source: origin),
+        ...manual,
+      ]);
     index = 0;
   }
 
@@ -71,33 +78,60 @@ class QueueTimeline {
 
   void jump(int target) {
     if (target < 0 || target >= entries.length) return;
-    if (target <= index) { index = target; return; }
+    if (target <= index) {
+      index = target;
+      return;
+    }
     final selected = entries[target];
     final manual = _manual;
     final remaining = entries.skip(target + 1).toList();
     final future = entries.skip(index + 1).toList();
     final rebuilt = switch (selected.tier) {
-      QueueTier.autoplay => [selected.promoted(), ...manual,
-        ...remaining.where((entry) => entry.tier == QueueTier.autoplay)],
-      QueueTier.context => [selected, ...manual,
+      QueueTier.autoplay => [
+        selected.promoted(),
+        ...manual,
+        ...remaining.where((entry) => entry.tier == QueueTier.autoplay),
+      ],
+      QueueTier.context => [
+        selected,
+        ...manual,
         ...remaining.where((entry) => entry.tier == QueueTier.context),
-        ...remaining.where((entry) => entry.tier == QueueTier.autoplay)],
-      QueueTier.user => [selected,
+        ...remaining.where((entry) => entry.tier == QueueTier.autoplay),
+      ],
+      QueueTier.user => [
+        selected,
         ...remaining.where((entry) => entry.tier == QueueTier.user),
         ...future.where((entry) => entry.tier == QueueTier.context),
-        ...future.where((entry) => entry.tier == QueueTier.autoplay)],
+        ...future.where((entry) => entry.tier == QueueTier.autoplay),
+      ],
     };
-    entries..clear()..addAll(rebuilt); index = 0;
+    entries
+      ..clear()
+      ..addAll(rebuilt);
+    index = 0;
   }
 
   void shuffleStartingOrder() {
     if (current == null) return;
     final selected = entries[index];
-    final rest = [for (var i = 0; i < entries.length; i++) if (i != index) entries[i]];
-    final context = rest.where((entry) => entry.tier == QueueTier.context).toList()..shuffle();
-    final autoplay = rest.where((entry) => entry.tier == QueueTier.autoplay).toList()..shuffle();
-    entries..clear()..addAll([selected,
-      ...rest.where((entry) => entry.tier == QueueTier.user), ...context, ...autoplay]);
+    final rest = [
+      for (var i = 0; i < entries.length; i++)
+        if (i != index) entries[i],
+    ];
+    final context =
+        rest.where((entry) => entry.tier == QueueTier.context).toList()
+          ..shuffle();
+    final autoplay =
+        rest.where((entry) => entry.tier == QueueTier.autoplay).toList()
+          ..shuffle();
+    entries
+      ..clear()
+      ..addAll([
+        selected,
+        ...rest.where((entry) => entry.tier == QueueTier.user),
+        ...context,
+        ...autoplay,
+      ]);
     index = 0;
   }
 

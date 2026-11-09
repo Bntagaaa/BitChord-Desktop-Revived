@@ -108,6 +108,9 @@ void main() {
     expect(queue.source, 'Album');
   });
   test('both theme palettes retain all source color roles', () {
-    expect(AppColors.dark.values.keys.toSet(), AppColors.light.values.keys.toSet());
+    expect(
+      AppColors.dark.values.keys.toSet(),
+      AppColors.light.values.keys.toSet(),
+    );
   });
 }

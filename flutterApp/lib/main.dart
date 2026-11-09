@@ -19,7 +19,9 @@ Future<void> main() async {
     settings: await Settings.load(),
     api: InnerTube(),
     audio: NativeAudioOutput(),
-    localArtwork: LocalArtworkCache('${cache.path}/flutter-reworked/local-artwork'),
+    localArtwork: LocalArtworkCache(
+      '${cache.path}/flutter-reworked/local-artwork',
+    ),
   );
   unawaited(
     windowManager.waitUntilReadyToShow(

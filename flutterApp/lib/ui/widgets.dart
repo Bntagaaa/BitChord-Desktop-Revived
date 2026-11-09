@@ -5,7 +5,9 @@ import 'theme.dart';
 
 ImageProvider<Object> artworkProvider(String url) {
   final uri = Uri.tryParse(url);
-  return uri?.scheme == 'file' ? FileImage(File.fromUri(uri!)) : NetworkImage(url);
+  return uri?.scheme == 'file'
+      ? FileImage(File.fromUri(uri!))
+      : NetworkImage(url);
 }
 
 class SourceIcon extends StatelessWidget {
@@ -44,8 +46,12 @@ class Artwork extends StatelessWidget {
           color: paletteOf(context).surfaceRaised,
           child: url == null
               ? const Center(child: Icon(Icons.music_note_rounded, size: 28))
-                  : Image(
-                      image: ResizeImage.resizeIfNeeded(pixelSize, null, artworkProvider(url!)),
+              : Image(
+                  image: ResizeImage.resizeIfNeeded(
+                    pixelSize,
+                    null,
+                    artworkProvider(url!),
+                  ),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => const Center(
                     child: Icon(Icons.music_note_rounded, size: 28),

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../domain/music.dart';
 import 'renderer_parser.dart';
+import 'lyric_formats.dart';
+export 'lyric_formats.dart';
 
 String lyricsTitle(String title) {
   var value = title;
@@ -20,45 +22,6 @@ String lyricsTitle(String title) {
       .replaceAll(RegExp(r'[,\-–—]+\s*$'), '')
       .trim();
   return value.isEmpty ? title.trim() : value;
-}
-
-List<LyricLine> parseLrc(String source) {
-  final stamp = RegExp(r'\[(\d{1,2}):(\d{2})[.:](\d{2,3})\]');
-  final words = RegExp(r'<(\d{1,3}):(\d{2})[.:](\d{2,3})>');
-  final lines = <LyricLine>[];
-  for (final row in source.split('\n')) {
-    final match = stamp.firstMatch(row);
-    if (match == null) continue;
-    final fraction = int.parse(match[3]!) * (match[3]!.length == 2 ? 10 : 1);
-    final millis =
-        int.parse(match[1]!) * 60000 + int.parse(match[2]!) * 1000 + fraction;
-    lines.add(
-      LyricLine(
-        Duration(milliseconds: millis),
-        row
-            .substring(match.end)
-            .replaceAll(words, '')
-            .replaceFirst(RegExp(r'^<R>'), '')
-            .trim(),
-      ),
-    );
-  }
-  lines.sort((a, b) => a.time.compareTo(b.time));
-  final kept = <LyricLine>[];
-  for (var index = 0; index < lines.length; index++) {
-    final line = lines[index];
-    if (line.text.isNotEmpty ||
-        index == lines.length - 1 ||
-        lines[index + 1].time - line.time >= const Duration(seconds: 4)) {
-      kept.add(line);
-    }
-  }
-  if (kept.isNotEmpty &&
-      kept.first.text.isNotEmpty &&
-      kept.first.time >= const Duration(seconds: 4)) {
-    kept.insert(0, const LyricLine(Duration.zero, ''));
-  }
-  return kept;
 }
 
 class LyricsRepository {
@@ -80,7 +43,8 @@ class LyricsRepository {
       return response.statusCode == 200 ? jsonDecode(response.body) : null;
     }
 
-    final exact = object(await get('get', query))['syncedLyrics'] as String?;
+    String? exact;
+    try { exact = object(await get('get', query))['syncedLyrics'] as String?; } on Exception { /* An exact miss still gets the source's fuzzy fallback. */ }
     if (exact != null && exact.isNotEmpty) return parseLrc(exact);
     query.remove('duration');
     final hits =

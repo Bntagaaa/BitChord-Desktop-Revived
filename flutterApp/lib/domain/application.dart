@@ -11,6 +11,7 @@ import '../data/stream_resolver.dart';
 import '../platform/audio.dart';
 import 'music.dart';
 import 'queue.dart';
+import 'lyrics_session.dart';
 
 enum Destination {
   home('Home'),
@@ -35,12 +36,18 @@ class MusicApplication extends ChangeNotifier {
     required this.api,
     required this.audio,
     LocalArtworkCache? localArtwork,
+    LyricsRepository? lyrics,
   }) : resolver = StreamResolver(api) {
+    lyricsRepository = lyrics ?? LyricsRepository();
+    lyricsSession = LyricsSession(lyricsRepository.fetch)..addListener(_lyricsChanged);
     localScanner = LocalMusicScanner(artworkCache: localArtwork);
     _subscriptions.addAll([
       audio.position.listen((value) => position.value = value),
       audio.duration.listen((value) {
-        duration.value = value;
+        if (_audioGeneration == _playRequest) {
+          duration.value = value;
+          if (!_loadingAudio) lyricsSession.reportDuration(value);
+        }
       }),
       audio.playing.listen((value) {
         playing = value;
@@ -60,7 +67,8 @@ class MusicApplication extends ChangeNotifier {
   final AudioOutput audio;
   final StreamResolver resolver;
   late final LocalMusicScanner localScanner;
-  final LyricsRepository lyricsRepository = LyricsRepository();
+  late final LyricsRepository lyricsRepository;
+  late final LyricsSession lyricsSession;
   final RendererParser parser = RendererParser();
   final QueueTimeline queue = QueueTimeline();
   final position = ValueNotifier(Duration.zero);
@@ -70,7 +78,8 @@ class MusicApplication extends ChangeNotifier {
   CatalogPage page = const CatalogPage();
   final List<Song> localSongs = [];
   final List<Song> history = [];
-  List<LyricLine> lyrics = [];
+  List<LyricLine> get lyrics => lyricsSession.lines;
+  void _lyricsChanged() { if (!_closed) notifyListeners(); }
   bool busy = false;
   bool loadingTrack = false;
   bool playing = false;
@@ -81,6 +90,8 @@ class MusicApplication extends ChangeNotifier {
   SearchFilter filter = SearchFilter.songs;
   int _request = 0;
   int _playRequest = 0;
+  int? _audioGeneration;
+  bool _loadingAudio = false;
   bool _closed = false;
   String? browseId;
   Song? get song => queue.current;
@@ -98,7 +109,10 @@ class MusicApplication extends ChangeNotifier {
       case Destination.home:
         await _load(() => api.browse('FEmusic_home'), plainShelves: true);
       case Destination.newMusic:
-        await _load(() => api.browse('FEmusic_new_releases'), plainShelves: true);
+        await _load(
+          () => api.browse('FEmusic_new_releases'),
+          plainShelves: true,
+        );
       case Destination.library:
         if (api.signedIn) {
           await _load(() => api.browse('FEmusic_liked_playlists'));
@@ -141,7 +155,10 @@ class MusicApplication extends ChangeNotifier {
     await _load(() => api.browse(id, params: item.params));
   }
 
-  Future<bool> _load(Future<JsonMap> Function() fetch, {bool plainShelves = false}) async {
+  Future<bool> _load(
+    Future<JsonMap> Function() fetch, {
+    bool plainShelves = false,
+  }) async {
     final generation = ++_request;
     busy = true;
     error = null;
@@ -202,17 +219,23 @@ class MusicApplication extends ChangeNotifier {
     final generation = ++_playRequest;
     loadingTrack = true;
     error = null;
-    lyrics = [];
+    _audioGeneration = null;
+    duration.value = Duration.zero;
+    position.value = Duration.zero;
+    lyricsSession.select(selected, enabled: settings.get('synced_lyrics', true));
     notifyListeners();
     try {
       final stream = await resolver.resolve(selected);
       if (generation != _playRequest || _closed) return;
-      await audio.open(stream.uri, headers: stream.headers);
+      _audioGeneration = generation;
+      _loadingAudio = true;
+      try { await audio.open(stream.uri, headers: stream.headers); }
+      finally { if (generation == _playRequest) _loadingAudio = false; }
       if (generation != _playRequest || _closed) return;
+      lyricsSession.reportDuration(duration.value);
       history.removeWhere((track) => track.id == selected.id);
       history.insert(0, selected);
       if (history.length > 50) history.removeLast();
-      unawaited(_loadLyrics(selected, generation));
     } on Exception catch (failure) {
       if (generation == _playRequest && !_closed) error = failure.toString();
     } finally {
@@ -220,21 +243,6 @@ class MusicApplication extends ChangeNotifier {
         loadingTrack = false;
         notifyListeners();
       }
-    }
-  }
-
-  Future<void> _loadLyrics(Song selected, int generation) async {
-    try {
-      final found = await lyricsRepository.fetch(
-        selected,
-        selected.duration ?? duration.value,
-      );
-      if (generation == _playRequest && !_closed) {
-        lyrics = found;
-        notifyListeners();
-      }
-    } on Exception {
-      /* Absence of provider lyrics never invents text or stops playback. */
     }
   }
 
@@ -278,21 +286,36 @@ class MusicApplication extends ChangeNotifier {
 
   Future<void> scanLocal(String path) async {
     final generation = ++_request;
-    busy = true; error = null; notifyListeners();
+    busy = true;
+    error = null;
+    notifyListeners();
     try {
       if (path.isNotEmpty) await settings.set('local_music_folder', path);
-      final home = Platform.environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'];
-      final roots = path.isNotEmpty ? [path] : [
-        if (home != null) '$home/Music', if (home != null) '$home/Downloads',
-      ];
-      final songs = await localScanner.scan(roots,
+      final home =
+          Platform.environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'];
+      final roots = path.isNotEmpty
+          ? [path]
+          : [
+              if (home != null) '$home/Music',
+              if (home != null) '$home/Downloads',
+            ];
+      final songs = await localScanner.scan(
+        roots,
         filterNonMusic: settings.get('filter_non_music_audio', false),
-        cancelled: () => generation != _request || _closed);
-      if (generation == _request && !_closed) { localSongs..clear()..addAll(songs); }
+        cancelled: () => generation != _request || _closed,
+      );
+      if (generation == _request && !_closed) {
+        localSongs
+          ..clear()
+          ..addAll(songs);
+      }
     } on Exception catch (failure) {
       if (generation == _request && !_closed) error = failure.toString();
     } finally {
-      if (generation == _request && !_closed) { busy = false; notifyListeners(); }
+      if (generation == _request && !_closed) {
+        busy = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -306,6 +329,7 @@ class MusicApplication extends ChangeNotifier {
     resolver.close();
     api.close();
     lyricsRepository.close();
+    lyricsSession.dispose();
     await audio.close();
     position.dispose();
     duration.dispose();

@@ -75,8 +75,12 @@ class InnerTube {
           headers: {
             'User-Agent': userAgent,
             'Accept-Language': language,
-            if (session != null) 'Cookie': session,
-            if (sid != null) 'Authorization': authorization(sid, DateTime.now().millisecondsSinceEpoch ~/ 1000),
+            'Cookie': ?session,
+            if (sid != null)
+              'Authorization': authorization(
+                sid,
+                DateTime.now().millisecondsSinceEpoch ~/ 1000,
+              ),
           },
         )
         .timeout(const Duration(seconds: 20));
@@ -173,7 +177,9 @@ class InnerTube {
             'YouTube Music rejected the request',
       );
     }
-    if (generation != _generation) throw const MusicApiException('The account changed. Retry the request.');
+    if (generation != _generation) {
+      throw const MusicApiException('The account changed. Retry the request.');
+    }
     visitorData ??= at(root, ['responseContext', 'visitorData']) as String?;
     return root;
   }

@@ -421,14 +421,27 @@ class _MusicShellState extends State<MusicShell> {
               ),
             ),
           ),
-      for (final item in app.page.items) SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        sliver: SliverToBoxAdapter(child: ListTile(
-          leading: Artwork(item.artwork, size: 44, radius: 8),
-          title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text(item.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-          onTap: () => unawaited(app.browse(item))))),
-      SliverPadding(
+        for (final item in app.page.items)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            sliver: SliverToBoxAdapter(
+              child: ListTile(
+                leading: Artwork(item.artwork, size: 44, radius: 8),
+                title: Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  item.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => unawaited(app.browse(item)),
+              ),
+            ),
+          ),
+        SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           sliver: SliverList.builder(
             itemCount: songs.length,

@@ -92,8 +92,8 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
               imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
               child: Opacity(
                 opacity: .45,
-              child: Image(
-                image: artworkProvider(app.song!.artwork!),
+                child: Image(
+                  image: artworkProvider(app.song!.artwork!),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => const SizedBox.shrink(),
                 ),
@@ -403,7 +403,9 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
     builder: (context, position, _) {
       final lines = app.lyrics;
       if (lines.isEmpty) {
-        return const Center(child: Text('No lyrics available'));
+        return Center(child: app.lyricsSession.loading
+          ? const CircularProgressIndicator(strokeWidth: 2)
+          : Text(app.lyricsSession.error ?? 'No lyrics available'));
       }
       var active = -1;
       for (var index = 0; index < lines.length; index++) {
