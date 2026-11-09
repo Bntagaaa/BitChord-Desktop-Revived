@@ -17,4 +17,12 @@ class DesktopPageMemoryPolicyTest {
         assertEquals("Home", DesktopPageMemoryPolicy.oldestInactive(
             listOf("Library", "Home", "New"), "New", setOf("Home", "New")))
     }
+
+    @Test fun thresholdIsLoweredToPreventMemorySwelling() {
+        assertEquals(650L * 1024L * 1024L, DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES)
+    }
+
+    @Test fun trimProcessMemoryCompletesSafely() {
+        DesktopPageMemoryPolicy.trimProcessMemory()
+    }
 }

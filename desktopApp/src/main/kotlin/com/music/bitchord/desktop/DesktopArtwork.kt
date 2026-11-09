@@ -31,14 +31,14 @@ import kotlinx.coroutines.CancellationException
 internal object DesktopArtworkCache {
 
     /**
-     * A sixth of the heap, within reason.
+     * An eighth of the heap, within reason.
      *
      * Derived rather than fixed so the budget still makes sense against whatever `-Xmx` the
      * launcher was given, and clamped at both ends so a small heap still caches something and a
      * large one does not decide it may hold half a gigabyte of thumbnails.
      */
     internal val budgetBytes: Long =
-        (Runtime.getRuntime().maxMemory() / 6).coerceIn(32L * 1024 * 1024, 128L * 1024 * 1024)
+        (Runtime.getRuntime().maxMemory() / 8).coerceIn(16L * 1024 * 1024, 32L * 1024 * 1024)
 
     /** Four bytes a pixel, which is what every format here decodes to. */
     private val images = lazy {

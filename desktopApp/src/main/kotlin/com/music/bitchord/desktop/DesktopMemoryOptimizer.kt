@@ -13,13 +13,13 @@ object DesktopMemoryOptimizer {
         // Tray close and WindowState can report the same hidden episode. Never
         // run duplicate disk walks/forced collections from those two callbacks.
         if (!hidden.compareAndSet(false, true)) return
-        DesktopArtworkCache.clear()
+        DesktopPageMemoryPolicy.trimProcessMemory()
         DesktopApplicationResources.owner.scope.launch {
             runCatching { DesktopMediaCache.trim() }
             // Preserve the existing hidden-window GC policy, but don't request
             // it after the user has already restored the window.
             if (hidden.get()) System.gc()
-            DesktopTrackLog.log("memory: trimmed inactive artwork and media cache")
+            DesktopTrackLog.log("memory: trimmed inactive artwork, coil cache, and media cache")
         }
     }
 }

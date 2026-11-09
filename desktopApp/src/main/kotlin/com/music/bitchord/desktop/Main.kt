@@ -35,6 +35,7 @@ import org.jetbrains.compose.resources.painterResource
 fun main() {
     DesktopApplicationResources.installShutdownHook()
     DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.PROCESS_ENTRY)
+    DesktopImageLoader.install()
     // Read the per-install welcome marker before services initialize or write preferences.
     val welcomeLaunch = DesktopWelcomeOnboarding.inspectStartup()
     // Before any WebView exists, so sign-in and PoToken pages share the same cookie jar.

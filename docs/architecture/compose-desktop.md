@@ -146,6 +146,20 @@ Following thread CPU and native library attribution, three major root causes wer
    - Prevents the JVM from eagerly committing 256 MiB+ of heap on high-memory systems when only ~80 MiB is needed, actively uncommitting unused pages back to the OS every 10 seconds.
    - Applied symmetrically to `BitChord.bat` in the portable distribution.
 
+### Navigation & Active UI Memory Optimizations Applied
+
+Addressing runtime memory swelling during active UI browsing across screens (where RSS previously expanded from ~800 MiB to 1.5–2 GiB):
+1. **Dedicated Desktop Coil ImageLoader (`DesktopImageLoader`)**:
+   - Registered a global singleton `ImageLoader` on desktop with a strict `32 MiB` in-memory bitmap limit (`MAX_MEMORY_CACHE_BYTES`).
+   - Disabled weak references (`weakReferencesEnabled(false)`): on JVM/Desktop, Skia `Bitmap` wrapper objects are tiny (~24 bytes) on heap while pinning megabytes of off-heap C++ raster memory. Weak references prevented Skia textures from being freed without major heap GC. Disabling weak references releases native buffers immediately upon strong LRU eviction.
+   - Configured a persistent `100 MiB` local disk cache (`DesktopMediaCache.directory/coil_cache`), allowing evicted images to reload sub-millisecond from disk without network calls.
+2. **Proactive Navigation Trimming & Eviction**:
+   - `DesktopApp.kt` trims Coil memory cache on screen navigation transitions (`selectDestination`), freeing off-heap textures from departing views.
+   - Lowered `DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES` from 1024 MiB to 650 MiB.
+   - Enhanced eviction with `DesktopPageMemoryPolicy.trimProcessMemory()`: empties `DesktopArtworkCache`, clears Coil memory cache, triggers `System.gc()`, and on Linux invokes `malloc_trim(0)` via JNA to immediately release freed C++ allocator arenas back to the OS kernel.
+3. **Artwork Cache Clamping**:
+   - Clamped `DesktopArtworkCache.budgetBytes` to `[16 MiB, 32 MiB]` (down from `[32 MiB, 128 MiB]`), bounding in-memory custom artwork cache usage.
+
 ## External delivery blockers
 
 GitHub rejected draft creation from Actions with: "GitHub Actions is not permitted to create or approve pull requests (createPullRequest)." Repository settings were not changed. The environment also currently denies api.github.com, preventing a direct authenticated CLI fallback. The prepared PR description is in compose-pr.md. The implementation branch is pushed normally; no automatic merge is attempted.
