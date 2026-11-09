@@ -207,13 +207,12 @@ class PlayerDock extends StatelessWidget {
                               onPressed: () => showAudioOutputs(context, app),
                             ),
                           if (medium && !app.setting('hide_volume_bar', false))
-                            SizedBox(
+                            DesktopThinSlider(
+                              value: player.volume.clamp(0, 100) / 100.0,
                               width: wide ? 72 : 54,
-                              child: Slider(
-                                value: player.volume.clamp(0, 100),
-                                max: 100,
-                                onChanged: player.setVolume,
-                              ),
+                              idleHeight: 4,
+                              activeHeight: 7,
+                              onChanged: (v) => player.setVolume(v * 100),
                             ),
                         ],
                       ),
@@ -236,14 +235,16 @@ class PlayerDock extends StatelessWidget {
                       bottom: 0,
                       child: SizedBox(
                         height: 2,
-                        child: LinearProgressIndicator(
-                          value: player.duration.inMilliseconds <= 0
-                              ? 0
-                              : (player.position.inMilliseconds /
+                        child: CustomPaint(
+                          painter: _DockProgressPainter(
+                            progress: player.duration.inMilliseconds <= 0
+                                ? 0.0
+                                : (player.position.inMilliseconds /
                                         player.duration.inMilliseconds)
-                                    .clamp(0, 1),
-                          backgroundColor: p.foreground.withAlpha(30),
-                          color: p.foreground.withAlpha(235),
+                                    .clamp(0.0, 1.0),
+                            trackColor: p.foreground.withOpacity(0.12),
+                            fillColor: p.accent.withOpacity(0.92),
+                          ),
                         ),
                       ),
                     ),
@@ -256,6 +257,38 @@ class PlayerDock extends StatelessWidget {
       );
     },
   );
+}
+
+class _DockProgressPainter extends CustomPainter {
+  const _DockProgressPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.fillColor,
+  });
+
+  final double progress;
+  final Color trackColor;
+  final Color fillColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..color = trackColor,
+    );
+    if (progress > 0) {
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.width * progress, size.height),
+        Paint()..color = fillColor,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DockProgressPainter old) =>
+      old.progress != progress ||
+      old.trackColor != trackColor ||
+      old.fillColor != fillColor;
 }
 
 class TransportButton extends StatelessWidget {

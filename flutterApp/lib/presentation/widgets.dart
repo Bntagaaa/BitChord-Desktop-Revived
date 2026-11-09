@@ -476,3 +476,145 @@ Future<String?> askText(
   controller.dispose();
   return result;
 }
+
+/// Compact horizontal thin slider ported from DesktopThinSlider.kt in BitChord 1.9.2
+class DesktopThinSlider extends StatefulWidget {
+  const DesktopThinSlider({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.onChangeEnd,
+    this.idleHeight = 4.0,
+    this.activeHeight = 7.0,
+    this.width = 72.0,
+    this.activeColor,
+    this.inactiveColor,
+  });
+
+  final double value; // 0.0 .. 1.0
+  final ValueChanged<double> onChanged;
+  final VoidCallback? onChangeEnd;
+  final double idleHeight;
+  final double activeHeight;
+  final double width;
+  final Color? activeColor;
+  final Color? inactiveColor;
+
+  @override
+  State<DesktopThinSlider> createState() => _DesktopThinSliderState();
+}
+
+class _DesktopThinSliderState extends State<DesktopThinSlider> {
+  bool _hovered = false;
+  bool _dragging = false;
+
+  void _handleDrag(Offset localPos, double maxWidth) {
+    if (maxWidth <= 0) return;
+    final clampedX = localPos.dx.clamp(0.0, maxWidth);
+    final next = (clampedX / maxWidth).clamp(0.0, 1.0);
+    widget.onChanged(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = DesktopPalette.of(context);
+    final active = _hovered || _dragging;
+    final targetH = active ? widget.activeHeight : widget.idleHeight;
+    final activeCol = widget.activeColor ?? p.accent;
+    final inactiveCol = widget.inactiveColor ?? p.foreground.withOpacity(0.18);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragStart: (d) {
+          setState(() => _dragging = true);
+          _handleDrag(d.localPosition, widget.width);
+        },
+        onHorizontalDragUpdate: (d) {
+          _handleDrag(d.localPosition, widget.width);
+        },
+        onHorizontalDragEnd: (_) {
+          setState(() => _dragging = false);
+          widget.onChangeEnd?.call();
+        },
+        onHorizontalDragCancel: () {
+          setState(() => _dragging = false);
+          widget.onChangeEnd?.call();
+        },
+        onTapDown: (d) {
+          _handleDrag(d.localPosition, widget.width);
+        },
+        onTapUp: (_) => widget.onChangeEnd?.call(),
+        child: SizedBox(
+          width: widget.width,
+          height: widget.activeHeight + 22.0,
+          child: Center(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: targetH, end: targetH),
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOutCubic,
+              builder: (context, h, _) {
+                final radius = Radius.circular(h / 2);
+                final clampedVal = widget.value.clamp(0.0, 1.0);
+                return SizedBox(
+                  width: widget.width,
+                  height: h,
+                  child: CustomPaint(
+                    painter: _ThinSliderPainter(
+                      value: clampedVal,
+                      activeColor: activeCol,
+                      inactiveColor: inactiveCol,
+                      radius: radius,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThinSliderPainter extends CustomPainter {
+  const _ThinSliderPainter({
+    required this.value,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.radius,
+  });
+
+  final double value;
+  final Color activeColor;
+  final Color inactiveColor;
+  final Radius radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bgRRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      radius,
+    );
+    canvas.drawRRect(bgRRect, Paint()..color = inactiveColor);
+
+    if (value > 0.0) {
+      final fillWidth = size.width * value;
+      final fillRRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, fillWidth, size.height),
+        radius,
+      );
+      canvas.drawRRect(fillRRect, Paint()..color = activeColor);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ThinSliderPainter old) =>
+      old.value != value ||
+      old.activeColor != activeColor ||
+      old.inactiveColor != inactiveColor ||
+      old.radius != radius;
+}
