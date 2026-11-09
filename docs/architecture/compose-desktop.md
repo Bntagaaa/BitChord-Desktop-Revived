@@ -52,6 +52,12 @@ These implementations are retained; source presence does not mean every live int
 | Integrations | Google sign-in/PoToken, Discord, Last.fm, ListenBrainz, tray/notifications, MPRIS/Windows media, addons/modules, updater | Existing adapters/dependencies retained; authenticated and platform manual checks pending |
 | Data | Settings/theme/font preferences, library/playlists/download records, auth storage, cache locations | No schema/path migration or deletion introduced |
 
+The desktop navigation enum also includes Spotify and History. Settings sections retained from the source are Account, Listen Together, Sources, Audio Quality, Downloads, Output Precision, Audio Output, Playback, Content, Desktop Playback, Appearance, Lyrics, Local Music, Storage, Miscellaneous, Language, Advanced and App Updates. Retention of their source/callbacks does not substitute for authenticated/manual verification.
+
+### Visual evidence
+
+The Compose visual parity workflow renders the pinned baseline and candidate on both Windows and Linux using the existing real LandscapePlayerMotionTest and DesktopPipUiTest. It compares the eight saved player frames (including timed transitions and lyric hover states) and ten PiP renders at multiple sizes, including the existing reduced-blur case. Comparison requires identical dimensions, all RGBA pixels, and the same file set. Missing files fail the check. Differences are preserved as PNGs rather than automatically accepted. This verifies only those fixtures; the remaining screens, font/theme combinations and physical GPU behavior still require review.
+
 ## Build and verification
 
 Use JDK 21 and the existing native build prerequisites.
