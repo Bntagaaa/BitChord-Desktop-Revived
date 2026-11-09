@@ -82,3 +82,78 @@ TextTheme buildBitChordTypography({
     ),
   );
 }
+
+/// Static typography accessors matching BitChord design tokens.
+abstract class DesktopTypography {
+  static TextStyle displayLarge(Color color) => TextStyle(
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w800,
+        fontSize: 34,
+        letterSpacing: -0.5,
+        color: color,
+      );
+
+  static TextStyle headlineLarge(Color color) => TextStyle(
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w800,
+        fontSize: 30,
+        letterSpacing: -0.4,
+        color: color,
+      );
+
+  static TextStyle headlineMedium(Color color) => TextStyle(
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w700,
+        fontSize: 22,
+        letterSpacing: -0.25,
+        color: color,
+      );
+
+  static TextStyle titleLarge(Color color) => TextStyle(
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w700,
+        fontSize: 20,
+        letterSpacing: -0.2,
+        color: color,
+      );
+
+  static TextStyle titleMedium(Color color) => TextStyle(
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w600,
+        fontSize: 16,
+        letterSpacing: 0.05,
+        color: color,
+      );
+
+  static TextStyle bodyLarge(Color color) => TextStyle(
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w400,
+        fontSize: 16,
+        letterSpacing: 0.2,
+        color: color,
+      );
+
+  static TextStyle bodyMedium(Color color) => TextStyle(
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w400,
+        fontSize: 14,
+        letterSpacing: 0.3,
+        color: color,
+      );
+
+  static TextStyle bodySmall(Color color) => TextStyle(
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w400,
+        fontSize: 12,
+        letterSpacing: 0.25,
+        color: color,
+      );
+
+  static TextStyle caption(Color color) => TextStyle(
+        fontFamily: 'SFProDisplay',
+        fontWeight: FontWeight.w500,
+        fontSize: 11,
+        letterSpacing: 0.3,
+        color: color,
+      );
+}
