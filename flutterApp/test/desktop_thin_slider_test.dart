@@ -58,13 +58,29 @@ void main() {
     final sliderFinder = find.byType(DesktopThinSlider);
     final sliderTopLeft = tester.getTopLeft(sliderFinder);
 
-    // Tap beyond left edge
-    await tester.tapAt(sliderTopLeft + const Offset(-20.0, 14.0));
+    // Tap at left edge (0%)
+    await tester.tapAt(sliderTopLeft + const Offset(0.0, 14.0));
     await tester.pumpAndSettle();
     expect(currentValue, 0.0);
 
-    // Tap beyond right edge
-    await tester.tapAt(sliderTopLeft + const Offset(150.0, 14.0));
+    // Tap at right edge (100%)
+    await tester.tapAt(sliderTopLeft + const Offset(100.0, 14.0));
+    await tester.pumpAndSettle();
+    expect(currentValue, 1.0);
+
+    // Drag from center beyond left edge (clamps to 0.0)
+    final gesture =
+        await tester.startGesture(sliderTopLeft + const Offset(50.0, 14.0));
+    await gesture.moveBy(const Offset(-100.0, 0.0));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(currentValue, 0.0);
+
+    // Drag from center beyond right edge (clamps to 1.0)
+    final gesture2 =
+        await tester.startGesture(sliderTopLeft + const Offset(50.0, 14.0));
+    await gesture2.moveBy(const Offset(200.0, 0.0));
+    await gesture2.up();
     await tester.pumpAndSettle();
     expect(currentValue, 1.0);
   });
