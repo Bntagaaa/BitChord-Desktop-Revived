@@ -396,6 +396,7 @@ class DesktopPoTokenWebView private constructor(
 
         /** Starts the JavaFX toolkit without a window; it stays up for the process. */
         private fun startFx(): Boolean = runCatching {
+            TrackLog.i(TAG, "Initializing JavaFX platform on demand for BotGuard PoToken/WebView")
             val started = CountDownLatch(1)
             try {
                 Platform.startup { started.countDown() }
@@ -405,6 +406,7 @@ class DesktopPoTokenWebView private constructor(
             }
             Platform.setImplicitExit(false)
             started.await()
+            TrackLog.i(TAG, "JavaFX platform initialized successfully")
             true
         }.onFailure { TrackLog.w(TAG, "JavaFX unavailable, no PoTokens on this desktop: ${it.message}") }
             .getOrDefault(false)

@@ -131,6 +131,21 @@ The audit identified that both baseline and candidate load:
 
 Both inventories contain zero AAR artifacts and the same Linux Compose 1.12.0, Skiko 0.150.1, Haze 1.7.3 and Coil 3.0.4 renderer versions. Therefore, no Android-runtime removal or dependency-version upgrade is claimed as the cause of this measured difference.
 
+### Idle Memory and CPU Optimizations Applied
+
+Following thread CPU and native library attribution, three major root causes were resolved:
+1. **Lazy BotGuard PoToken Initialization**:
+   - `PoTokenGenerator.asTokenProvider()` and `getWebClientPoToken` now bypass JavaFX startup and WebEngine creation for blank `videoId` prewarm calls (`InnerTubeExtractor.prewarm()`).
+   - WebEngine and WebKit runtime (`libjfxwebkit.so`, `libglass.so`, `libprism_es2.so`) remain uninitialized until a real track playback with BotGuard requirements or an in-app web sign-in dialog is explicitly triggered.
+   - Saves ~150–250 MiB of native WebKit/JavaScriptCore heap allocation at startup and idle.
+2. **Modal Overlay Animation Suspension**:
+   - `HomeScreen` and `MoodGridPage` artwork motion is now disabled when the first-launch welcome modal, settings pages, or other modal overlays are obscuring the screen (`artworkMotion = !shortcutBlockedByModal && overlays.settingsPage == null && ...`).
+   - Prevents `TopPicksShelf` `loopPhase` from spinning `withFrameNanos` continuously on `AWT-EventQueue-0` under unaccelerated Xvfb Mesa software rasterization.
+3. **G1 Uncommit & Sized Initial Heap**:
+   - Configured jpackage JVM args `-Xms32m`, `-XX:MinHeapFreeRatio=20`, `-XX:MaxHeapFreeRatio=40`, `-XX:-ShrinkHeapInSteps`, `-XX:G1PeriodicGCInterval=10000`, and `-XX:G1PeriodicGCSystemLoadThreshold=0`.
+   - Prevents the JVM from eagerly committing 256 MiB+ of heap on high-memory systems when only ~80 MiB is needed, actively uncommitting unused pages back to the OS every 10 seconds.
+   - Applied symmetrically to `BitChord.bat` in the portable distribution.
+
 ## External delivery blockers
 
 GitHub rejected draft creation from Actions with: "GitHub Actions is not permitted to create or approve pull requests (createPullRequest)." Repository settings were not changed. The environment also currently denies api.github.com, preventing a direct authenticated CLI fallback. The prepared PR description is in compose-pr.md. The implementation branch is pushed normally; no automatic merge is attempted.

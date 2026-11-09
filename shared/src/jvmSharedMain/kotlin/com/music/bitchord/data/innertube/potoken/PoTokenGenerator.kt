@@ -56,6 +56,10 @@ class PoTokenGenerator(
     private var webPoTokenGenerator: PoTokenMinter? = null
 
     suspend fun getWebClientPoToken(videoId: String, sessionId: String): PoTokenResult? {
+        if (videoId.isBlank()) {
+            TrackLog.d(TAG, "Skipping PoToken generation for blank videoId")
+            return null
+        }
         val supported = available()
         TrackLog.d(TAG, "WebView state: supported=$supported, badImpl=$webViewBadImpl")
         if (!supported || webViewBadImpl) {
@@ -159,12 +163,16 @@ class PoTokenGenerator(
             visitorData: String,
             cookie: String?,
         ): com.metrolist.innertubex.extraction.PoTokenResult? =
-            getWebClientPoToken(videoId, visitorData)?.let { token ->
-                com.metrolist.innertubex.extraction.PoTokenResult(
-                    playerRequestToken = token.playerRequestPoToken,
-                    streamingDataToken = token.streamingDataPoToken,
-                    visitorData = visitorData,
-                )
+            if (videoId.isBlank()) {
+                null
+            } else {
+                getWebClientPoToken(videoId, visitorData)?.let { token ->
+                    com.metrolist.innertubex.extraction.PoTokenResult(
+                        playerRequestToken = token.playerRequestPoToken,
+                        streamingDataToken = token.streamingDataPoToken,
+                        visitorData = visitorData,
+                    )
+                }
             }
 
         override suspend fun close() {

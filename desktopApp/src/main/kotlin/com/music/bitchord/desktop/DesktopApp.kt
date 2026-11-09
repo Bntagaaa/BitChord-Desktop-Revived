@@ -5039,7 +5039,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                                 gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
                                 onClick = { mood, label -> openTopPick(TopPicks.moodStation(mood), label) },
                                 contentPadding = sharedPagePadding,
-                                artworkMotion = !overlays.nowPlaying && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
+                                artworkMotion = !shortcutBlockedByModal && overlays.settingsPage == null && !overlays.nowPlaying && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
                             )
                         }
                         destination == DesktopDestination.LISTEN_NOW -> HomeScreen(
@@ -5049,7 +5049,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             onTopPickClick = if (DesktopContentPreferences.hideTopPicks) null else ::openTopPick,
                             onMoodClick = if (DesktopContentPreferences.hideHomeMoods) null else { mood, label -> openTopPick(TopPicks.moodStation(mood), label) },
                             onMoodsShowAll = { showMoodGrid = true },
-                            artworkMotion = !overlays.nowPlaying && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
+                            artworkMotion = !shortcutBlockedByModal && overlays.settingsPage == null && !overlays.nowPlaying && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
                             state = (homeState as? UiState.Success<List<HomeShelf>>)?.let { loaded ->
                                 val prefs = DesktopContentPreferences
                                 val trimmed = loaded.data.mapNotNull { shelf ->
