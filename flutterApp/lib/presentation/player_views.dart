@@ -561,11 +561,7 @@ class LyricsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SmoothLyricsPanel(
-      app: app,
-      immersive: immersive,
-      centerFocus: true,
-    );
+    return SmoothLyricsPanel(app: app, immersive: immersive, centerFocus: true);
   }
 }
 

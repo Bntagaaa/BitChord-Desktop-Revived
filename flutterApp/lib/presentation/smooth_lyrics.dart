@@ -90,12 +90,15 @@ class _SmoothLyricsPanelState extends State<SmoothLyricsPanel>
     _doc = widget.app.lyrics;
     _lineKeys = List.generate(_doc?.lines.length ?? 0, (_) => GlobalKey());
     _activeLine = _resolveActiveLine();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive(jump: true));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollToActive(jump: true),
+    );
   }
 
   int _resolveActiveLine() {
     final offsetMs = widget.app.setting<num>('lyrics_offset_ms', 0).round();
-    final adjustedPos = widget.app.playback.position + Duration(milliseconds: offsetMs);
+    final adjustedPos =
+        widget.app.playback.position + Duration(milliseconds: offsetMs);
     return _doc?.activeIndex(adjustedPos) ?? -1;
   }
 
@@ -104,7 +107,8 @@ class _SmoothLyricsPanelState extends State<SmoothLyricsPanel>
     final next = _resolveActiveLine();
     if (next != _activeLine) {
       setState(() => _activeLine = next);
-      if (_isWindowFocused || widget.app.setting('animate_lyrics_while_unfocused', false)) {
+      if (_isWindowFocused ||
+          widget.app.setting('animate_lyrics_while_unfocused', false)) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive());
       }
     }
@@ -216,68 +220,80 @@ class _SmoothLyricsPanelState extends State<SmoothLyricsPanel>
       );
     }
 
-    final baseFontSize = widget.app.setting<num>('lyrics_text_size', 30).toDouble() +
+    final baseFontSize =
+        widget.app.setting<num>('lyrics_text_size', 30).toDouble() +
         (widget.immersive ? 4 : 0);
-    final reduceBlur = widget.app.setting('reduce_dynamic_blur', false) ||
+    final reduceBlur =
+        widget.app.setting('reduce_dynamic_blur', false) ||
         !widget.app.setting('lyrics_blur', true);
 
     return LayoutBuilder(
-      builder: (context, constraints) => NotificationListener<ScrollNotification>(
-        onNotification: (notice) {
-          if (notice is ScrollStartNotification && notice.dragDetails != null) {
-            _manualBrowsingUntil = DateTime.now().add(const Duration(seconds: 5));
-          }
-          if (notice is UserScrollNotification && notice.direction != ScrollDirection.idle) {
-            _manualBrowsingUntil = DateTime.now().add(const Duration(seconds: 5));
-          }
-          return false;
-        },
-        child: Scrollbar(
-          controller: _scroll,
-          child: SingleChildScrollView(
-            controller: _scroll,
-            padding: EdgeInsets.fromLTRB(
-              widget.immersive ? 20 : 28,
-              constraints.maxHeight * 0.32,
-              widget.immersive ? 20 : 28,
-              constraints.maxHeight * 0.52,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < _doc!.lines.length; i++)
-                  _SmoothLyricRow(
-                    key: _lineKeys[i],
-                    line: _doc!.lines[i],
-                    index: i,
-                    activeLine: _activeLine,
-                    isSynced: _doc!.isSynced,
-                    docOffset: _doc!.offset,
-                    fontSize: baseFontSize,
-                    app: widget.app,
-                    immersive: widget.immersive,
-                    isLight: isLight,
-                    reduceBlur: reduceBlur,
-                    onSeek: (target) {
-                      _manualBrowsingUntil = DateTime.fromMillisecondsSinceEpoch(0);
-                      widget.app.playback.seek(target);
-                    },
-                  ),
-                const SizedBox(height: 32),
-                Text(
-                  _doc!.source.isNotEmpty ? 'Lyrics by ${_doc!.source}' : '',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: widget.immersive ? Colors.white38 : p.secondary,
-                  ),
+      builder: (context, constraints) =>
+          NotificationListener<ScrollNotification>(
+            onNotification: (notice) {
+              if (notice is ScrollStartNotification &&
+                  notice.dragDetails != null) {
+                _manualBrowsingUntil = DateTime.now().add(
+                  const Duration(seconds: 5),
+                );
+              }
+              if (notice is UserScrollNotification &&
+                  notice.direction != ScrollDirection.idle) {
+                _manualBrowsingUntil = DateTime.now().add(
+                  const Duration(seconds: 5),
+                );
+              }
+              return false;
+            },
+            child: Scrollbar(
+              controller: _scroll,
+              child: SingleChildScrollView(
+                controller: _scroll,
+                padding: EdgeInsets.fromLTRB(
+                  widget.immersive ? 20 : 28,
+                  constraints.maxHeight * 0.32,
+                  widget.immersive ? 20 : 28,
+                  constraints.maxHeight * 0.52,
                 ),
-              ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < _doc!.lines.length; i++)
+                      _SmoothLyricRow(
+                        key: _lineKeys[i],
+                        line: _doc!.lines[i],
+                        index: i,
+                        activeLine: _activeLine,
+                        isSynced: _doc!.isSynced,
+                        docOffset: _doc!.offset,
+                        fontSize: baseFontSize,
+                        app: widget.app,
+                        immersive: widget.immersive,
+                        isLight: isLight,
+                        reduceBlur: reduceBlur,
+                        onSeek: (target) {
+                          _manualBrowsingUntil =
+                              DateTime.fromMillisecondsSinceEpoch(0);
+                          widget.app.playback.seek(target);
+                        },
+                      ),
+                    const SizedBox(height: 32),
+                    Text(
+                      _doc!.source.isNotEmpty
+                          ? 'Lyrics by ${_doc!.source}'
+                          : '',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: widget.immersive ? Colors.white38 : p.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 }
@@ -364,14 +380,21 @@ class _SmoothLyricRowState extends State<_SmoothLyricRow> {
         onTapUp: (_) => setState(() => _pressed = false),
         onTap: widget.isSynced
             ? () {
-                final offsetMs = widget.app.setting<num>('lyrics_offset_ms', 0).round();
-                final target = widget.line.start - widget.docOffset - Duration(milliseconds: offsetMs);
+                final offsetMs = widget.app
+                    .setting<num>('lyrics_offset_ms', 0)
+                    .round();
+                final target =
+                    widget.line.start -
+                    widget.docOffset -
+                    Duration(milliseconds: offsetMs);
                 widget.onSeek(target);
               }
             : null,
         child: TweenAnimationBuilder<double>(
           tween: Tween<double>(begin: targetScale, end: targetScale),
-          duration: _pressed ? const Duration(milliseconds: 120) : kLyricSettleDuration,
+          duration: _pressed
+              ? const Duration(milliseconds: 120)
+              : kLyricSettleDuration,
           curve: kLyricEasing,
           builder: (context, scale, child) => Transform.scale(
             scale: scale,
@@ -382,13 +405,14 @@ class _SmoothLyricRowState extends State<_SmoothLyricRow> {
             tween: Tween<double>(begin: targetAlpha, end: targetAlpha),
             duration: kLyricSettleDuration,
             curve: kLyricEasing,
-            builder: (context, alpha, child) => Opacity(
-              opacity: alpha.clamp(0.0, 1.0),
-              child: child,
-            ),
+            builder: (context, alpha, child) =>
+                Opacity(opacity: alpha.clamp(0.0, 1.0), child: child),
             child: blurRadius > 0.05
                 ? ImageFiltered(
-                    imageFilter: ui.ImageFilter.blur(sigmaX: blurRadius, sigmaY: blurRadius),
+                    imageFilter: ui.ImageFilter.blur(
+                      sigmaX: blurRadius,
+                      sigmaY: blurRadius,
+                    ),
                     child: _buildLineContent(textColor, isActive, isDuetEnd),
                   )
                 : _buildLineContent(textColor, isActive, isDuetEnd),
@@ -400,7 +424,9 @@ class _SmoothLyricRowState extends State<_SmoothLyricRow> {
 
   Widget _buildLineContent(Color color, bool isActive, bool isDuetEnd) {
     final textAlign = isDuetEnd ? TextAlign.end : TextAlign.start;
-    final crossAlign = isDuetEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final crossAlign = isDuetEnd
+        ? CrossAxisAlignment.end
+        : CrossAxisAlignment.start;
 
     final lineStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -428,7 +454,8 @@ class _SmoothLyricRowState extends State<_SmoothLyricRow> {
             textAlign: textAlign,
             style: lineStyle,
           ),
-        if (widget.line.translation != null && widget.line.translation!.isNotEmpty)
+        if (widget.line.translation != null &&
+            widget.line.translation!.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
@@ -442,7 +469,8 @@ class _SmoothLyricRowState extends State<_SmoothLyricRow> {
               ),
             ),
           ),
-        if (widget.line.romanization != null && widget.line.romanization!.isNotEmpty)
+        if (widget.line.romanization != null &&
+            widget.line.romanization!.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
@@ -485,14 +513,19 @@ class _SweptLyricText extends StatelessWidget {
       listenable: app.playback,
       builder: (context, _) {
         final offsetMs = app.setting<num>('lyrics_offset_ms', 0).round();
-        final currentPos = app.playback.position + docOffset + Duration(milliseconds: offsetMs);
+        final currentPos =
+            app.playback.position +
+            docOffset +
+            Duration(milliseconds: offsetMs);
 
         return Stack(
           children: [
             // 1. Unsung base text (rendered at kUnsungAlpha = 0.45)
             Text(
               line.text,
-              style: style.copyWith(color: color.withAlpha((255 * kUnsungAlpha).round())),
+              style: style.copyWith(
+                color: color.withAlpha((255 * kUnsungAlpha).round()),
+              ),
               textAlign: textAlign,
             ),
             // 2. Sung portion with smooth feathered leading edge
@@ -506,7 +539,9 @@ class _SweptLyricText extends StatelessWidget {
                     : (elapsed / totalSpan).clamp(0.0, 1.0);
 
                 // Feather wavefront runs ahead by kWipeFeather px to prevent abrupt syllable popping
-                final featherFraction = bounds.width > 0 ? (kWipeFeather / bounds.width).clamp(0.02, 0.25) : 0.08;
+                final featherFraction = bounds.width > 0
+                    ? (kWipeFeather / bounds.width).clamp(0.02, 0.25)
+                    : 0.08;
                 final lead = (progress + featherFraction).clamp(0.0, 1.0);
 
                 if (textAlign == TextAlign.end) {

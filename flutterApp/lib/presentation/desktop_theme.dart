@@ -223,8 +223,7 @@ class DesktopPalette extends ThemeExtension<DesktopPalette> {
     scrim: scrim ?? this.scrim,
     searchSurface: searchSurface ?? this.searchSurface,
     topPlayerSurface: topPlayerSurface ?? this.topPlayerSurface,
-    floatingPlayerSurface:
-        floatingPlayerSurface ?? this.floatingPlayerSurface,
+    floatingPlayerSurface: floatingPlayerSurface ?? this.floatingPlayerSurface,
     subtleFill: subtleFill ?? this.subtleFill,
     stripedRow: stripedRow ?? this.stripedRow,
     navAccent: navAccent ?? this.navAccent,
@@ -260,8 +259,10 @@ class DesktopPalette extends ThemeExtension<DesktopPalette> {
       scrim: c(scrim, other.scrim),
       searchSurface: c(searchSurface, other.searchSurface),
       topPlayerSurface: c(topPlayerSurface, other.topPlayerSurface),
-      floatingPlayerSurface:
-          c(floatingPlayerSurface, other.floatingPlayerSurface),
+      floatingPlayerSurface: c(
+        floatingPlayerSurface,
+        other.floatingPlayerSurface,
+      ),
       subtleFill: c(subtleFill, other.subtleFill),
       stripedRow: c(stripedRow, other.stripedRow),
       navAccent: c(navAccent, other.navAccent),
