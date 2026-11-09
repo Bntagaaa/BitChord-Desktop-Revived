@@ -1,0 +1,34 @@
+name: Format Flutter playback fix
+on:
+  push:
+    branches: ['1.9.2-Rewrite']
+    paths:
+      - '.github/workflows/flutter-playback-format.yml'
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 1.9.2-Rewrite
+          persist-credentials: true
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+      - name: Format using locked dependencies
+        run: |
+          cd flutterApp
+          flutter pub get --enforce-lockfile
+          dart format lib/playback/playback_controller.dart test/playback/playback_controller_test.dart
+          git diff --check
+      - name: Commit if formatter changed files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flutterApp/lib/playback/playback_controller.dart flutterApp/test/playback/playback_controller_test.dart
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Format playback EOF protection and regression tests"
+          git push origin HEAD:1.9.2-Rewrite
