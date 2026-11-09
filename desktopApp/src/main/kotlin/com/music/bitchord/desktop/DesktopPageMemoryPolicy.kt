@@ -11,7 +11,7 @@ import java.nio.file.Path
 
 /** Process resident memory, including native audio, images, and renderer allocations. */
 internal object DesktopPageMemoryPolicy {
-    const val TRIM_THRESHOLD_BYTES = 650L * 1_024L * 1_024L
+    const val TRIM_THRESHOLD_BYTES = 1_024L * 1_024L * 1_024L
 
     fun <T> oldestInactive(usageOldestFirst: List<T>, active: T, evictable: Set<T>): T? =
         usageOldestFirst.firstOrNull { it != active && it in evictable }
@@ -20,15 +20,6 @@ internal object DesktopPageMemoryPolicy {
         oldestInactive(usageOldestFirst, active,
             setOf(DesktopDestination.LISTEN_NOW, DesktopDestination.NEW,
                   DesktopDestination.SEARCH, DesktopDestination.EXPLORE))
-
-    fun trimProcessMemory() {
-        DesktopArtworkCache.clear()
-        DesktopImageLoader.trimMemory()
-        System.gc()
-        if (System.getProperty("os.name").contains("Linux", ignoreCase = true)) {
-            runCatching { LinuxLibC.instance?.malloc_trim(0L) }
-        }
-    }
 
     // Do not substitute JVM heap size for resident memory: native allocations are substantial.
     fun processResidentBytes(): Long? = runCatching {
@@ -75,15 +66,6 @@ internal object DesktopPageMemoryPolicy {
         companion object {
             val instance: WindowsProcessMemory by lazy {
                 Native.load("psapi", WindowsProcessMemory::class.java, W32APIOptions.DEFAULT_OPTIONS)
-            }
-        }
-    }
-
-    private interface LinuxLibC : com.sun.jna.Library {
-        fun malloc_trim(pad: Long): Int
-        companion object {
-            val instance: LinuxLibC? by lazy {
-                runCatching { Native.load("c", LinuxLibC::class.java) }.getOrNull()
             }
         }
     }
