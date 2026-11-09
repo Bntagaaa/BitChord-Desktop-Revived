@@ -15,6 +15,7 @@ import 'package:bitchord_desktop/presentation/desktop_shell.dart';
 import 'package:bitchord_desktop/presentation/desktop_theme.dart';
 import 'package:bitchord_desktop/presentation/menus.dart';
 import 'package:bitchord_desktop/presentation/player_views.dart';
+import 'package:bitchord_desktop/presentation/widgets.dart';
 
 const _song = Song(
   videoId: 'fixture',
@@ -197,6 +198,36 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('fullscreen landscape keeps artwork across pane changes', (
+    tester,
+  ) async {
+    addTearDown(() => tester.view.resetPhysicalSize());
+    addTearDown(() => tester.view.resetDevicePixelRatio());
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 720);
+    playback.activeSong = _song;
+    await tester.pumpWidget(
+      host(NowPlayingView(app: app, onClose: () {})),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Artwork), findsWidgets);
+    expect(find.byTooltip('Open lyrics'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byTooltip('Open lyrics'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LyricsView), findsOneWidget);
+    expect(find.byType(Artwork), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byTooltip('Up next'));
+    await tester.pumpAndSettle();
+    expect(find.byType(QueueView), findsOneWidget);
+    expect(find.byType(LyricsView), findsNothing);
+    expect(find.byType(Artwork), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Quick Search opens with keyboard focus', (tester) async {
     await tester.pumpWidget(host(DesktopShell(controller: app)));
