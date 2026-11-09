@@ -4,6 +4,11 @@ on:
   push:
     branches: [1.9.2-Compose-Dekstop]
   workflow_dispatch:
+    inputs:
+      try_create_pr:
+        description: 'Retry draft creation after repository Actions permissions allow it'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -25,6 +30,9 @@ jobs:
     secrets: inherit
 
   draft-pr:
+    # Repository policy currently rejects createPullRequest from Actions.
+    # Keep a deliberate retry available without turning every build red.
+    if: github.event_name == 'workflow_dispatch' && inputs.try_create_pr
     runs-on: ubuntu-latest
     permissions:
       contents: read

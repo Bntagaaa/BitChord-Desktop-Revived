@@ -78,3 +78,9 @@ The Compose packaged baseline workflow builds the immutable baseline above and t
 The two production builds receive the same diagnostic-only NativeMemoryTracking=summary option through their environment. Their shipped heap/GC configuration remains unchanged. This is a clean welcome idle measurement, not a playback, navigation, first-usable-frame, physical GPU or long-session benchmark. It must not be extrapolated into those claims. JVM NMT covers only the allocations it tracks; process PSS additionally includes third-party native allocations. The dependency inventory lists resolved artifact coordinates, sizes and SHA-256s for both builds and rejects packaged Android AARs without treating AndroidX JVM libraries as Android-only.
 
 Results are uploaded as compose-packaged-linux-idle when the workflow succeeds. An absent/failed measurement remains unverified; this document intentionally contains no invented before/after numbers.
+
+## External delivery blockers
+
+GitHub rejected draft creation from Actions with: "GitHub Actions is not permitted to create or approve pull requests (createPullRequest)." Repository settings were not changed. The environment also currently denies api.github.com, preventing a direct authenticated CLI fallback. The prepared PR description is in compose-pr.md. The implementation branch is pushed normally; no automatic merge is attempted.
+
+The first packaged benchmark run stopped during its build, before measurements. Build failure diagnostics and log artifacts are included in subsequent runs so this must be resolved before publishing any memory result.

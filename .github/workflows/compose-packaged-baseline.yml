@@ -49,9 +49,21 @@ jobs:
               cd "$tree"
               bash gradlew --no-daemon :desktopApp:createDistributable :desktopApp:writeDesktopRuntimeAudit \
                 -I "$GITHUB_WORKSPACE/candidate/.github/scripts/desktop-runtime-audit.init.gradle" \
-                -Pbitchord.version=1.9.2-compose-profile --console=plain
+                -Pbitchord.version=1.9.2-compose-profile --console=plain 2>&1 | tee "$GITHUB_WORKSPACE/$tree-build.log"
             )
           done
+      - name: Report build failure details
+        if: failure()
+        shell: python
+        run: |
+          from pathlib import Path
+          for path in Path(".").glob("*-build.log"):
+              text = path.read_text(errors="replace")
+              if "BUILD FAILED" in text or "FAILURE:" in text:
+                  start = text.rfind("FAILURE:")
+                  excerpt = text[start:] if start >= 0 else text[-6000:]
+                  excerpt = excerpt[:6000].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print("::error title=" + path.name + "::" + excerpt)
       - name: Measure packaged process RSS, PSS, CPU, heap and JVM NMT
         run: |
           xvfb-run -a -s '-screen 0 1280x900x24' python3 candidate/.github/scripts/measure-packaged-idle.py \
@@ -65,6 +77,7 @@ jobs:
           name: compose-packaged-linux-idle
           path: |
             results/
+            *-build.log
             baseline/desktopApp/build/reports/desktop-runtime.json
             candidate/desktopApp/build/reports/desktop-runtime.json
           if-no-files-found: warn
