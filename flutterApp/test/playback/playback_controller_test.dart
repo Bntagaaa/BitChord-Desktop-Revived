@@ -140,7 +140,11 @@ void main() {
       expect(rig.controller.queue[1].isVideoOrigin, isTrue);
       expect(normalized, isNot(contains('untouched')));
       rig.backends.last.emit(
-        rig.backends.last.state.copyWith(completed: true, playing: false),
+        rig.backends.last.state.copyWith(
+        completed: true,
+        playing: false,
+        position: const Duration(minutes: 2),
+      ),
       );
       await settle();
       expect(rig.controller.currentSong!.videoId, 'video-audio');
@@ -220,6 +224,69 @@ void main() {
       await rig.close();
     },
   );
+
+  test('early decoder EOF refreshes current song instead of skipping', () async {
+    final rig = _Rig();
+    await rig.controller.playSongs([song('one'), song('two')], source: 'Album');
+    rig.backends.last.emit(
+      rig.backends.last.state.copyWith(
+        position: const Duration(seconds: 7),
+        duration: const Duration(seconds: 7),
+        playing: false,
+        completed: true,
+      ),
+    );
+    await settle();
+    expect(rig.controller.currentSong!.videoId, 'one');
+    expect(rig.backends.length, 2);
+    expect(rig.backends.last.openedAt, const Duration(seconds: 7));
+    expect(rig.controller.duration, const Duration(minutes: 2));
+    expect(rig.controller.error, isNull);
+    expect(rig.controller.playing, isTrue);
+    await rig.close();
+  });
+
+  test('repeated early EOF stops with error instead of next-track loop', () async {
+    final rig = _Rig();
+    await rig.controller.playSongs([song('one'), song('two')]);
+    rig.backends.last.emit(
+      rig.backends.last.state.copyWith(
+        position: const Duration(seconds: 7),
+        playing: false,
+        completed: true,
+      ),
+    );
+    await settle();
+    expect(rig.backends.length, 2);
+    rig.backends.last.emit(
+      rig.backends.last.state.copyWith(
+        position: const Duration(seconds: 9),
+        playing: false,
+        completed: true,
+      ),
+    );
+    await settle();
+    expect(rig.backends.length, 2);
+    expect(rig.controller.currentSong!.videoId, 'one');
+    expect(rig.controller.playing, isFalse);
+    expect(rig.controller.error, contains('before the song finished'));
+    await rig.close();
+  });
+
+  test('real completion advances after catalogue end', () async {
+    final rig = _Rig();
+    await rig.controller.playSongs([song('one'), song('two')]);
+    rig.backends.last.emit(
+      rig.backends.last.state.copyWith(
+        position: const Duration(minutes: 2),
+        completed: true,
+        playing: false,
+      ),
+    );
+    await settle();
+    expect(rig.controller.currentSong!.videoId, 'two');
+    await rig.close();
+  });
 
   test('save writes are serialized and latest position is retained', () async {
     final writes = <PlaybackSnapshot>[];
