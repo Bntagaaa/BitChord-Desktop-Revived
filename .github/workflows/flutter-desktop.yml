@@ -1,0 +1,175 @@
+name: Flutter desktop rewrite
+
+on:
+  push:
+    branches: ['1.9.2-Rewrite']
+    paths:
+      - 'flutterApp/**'
+      - 'docs/flutter-rewrite/**'
+      - '.github/workflows/flutter-desktop.yml'
+  pull_request:
+    branches: ['1.9.2']
+    paths:
+      - 'flutterApp/**'
+      - 'docs/flutter-rewrite/**'
+      - '.github/workflows/flutter-desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-desktop-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.47.9'
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DASH__SUPPRESS_ANALYTICS: 'true'
+  CI: 'true'
+
+defaults:
+  run:
+    working-directory: flutterApp
+
+jobs:
+  validate:
+    name: Dart format, analyzer and Flutter tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Linux build and playback libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libnotify-dev libayatana-appindicator3-dev libmpv-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Analyze
+        run: flutter analyze --no-pub
+      - name: Run unit and widget regressions
+        run: flutter test --no-pub --coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flutter-test-coverage
+          path: flutterApp/coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 14
+
+  linux:
+    name: Linux x64 release bundle
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libnotify-dev libayatana-appindicator3-dev libmpv-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build linux --release --no-pub
+      - name: Check and archive the complete bundle
+        run: |
+          test -x build/linux/x64/release/bundle/bitchord_desktop
+          ldd build/linux/x64/release/bundle/bitchord_desktop
+          cp ../LICENSE build/linux/x64/release/bundle/LICENSE
+          cp ../docs/flutter-rewrite/platform-support.md build/linux/x64/release/bundle/NATIVE-BUILD-NOTES.md
+          tar -czf BitChord-Flutter-linux-x64.tar.gz -C build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-Flutter-linux-x64
+          path: flutterApp/BitChord-Flutter-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Windows x64 release bundle
+    needs: validate
+    runs-on: windows-2022
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build windows --release --no-pub
+      - name: Archive executable with all native libraries and assets
+        shell: pwsh
+        run: |
+          $bundle = 'build/windows/x64/runner/Release'
+          if (!(Test-Path "$bundle/bitchord_desktop.exe")) { throw 'Windows executable was not produced.' }
+          Copy-Item '../LICENSE' "$bundle/LICENSE"
+          Copy-Item '../docs/flutter-rewrite/platform-support.md' "$bundle/NATIVE-BUILD-NOTES.md"
+          Compress-Archive -Path "$bundle/*" -DestinationPath 'BitChord-Flutter-windows-x64.zip'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-Flutter-windows-x64
+          path: flutterApp/BitChord-Flutter-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    name: macOS universal release (${{ matrix.host }})
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            host: arm64
+            flutter-architecture: arm64
+          - runner: macos-15-intel
+            host: x64
+            flutter-architecture: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: ${{ matrix.flutter-architecture }}
+          cache: true
+      - name: Keep both supported macOS architectures
+        run: flutter config --no-enable-macos-arm64-only
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build macos --release --no-pub
+      - name: Verify universal slices and archive application
+        run: |
+          app='build/macos/Build/Products/Release/BitChord Desktop Revived.app'
+          lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/BitChord Desktop Revived"
+          cp ../LICENSE "$app/Contents/Resources/LICENSE"
+          cp ../docs/flutter-rewrite/platform-support.md "$app/Contents/Resources/NATIVE-BUILD-NOTES.md"
+          ditto -c -k --sequesterRsrc --keepParent "$app" 'BitChord-Flutter-macos-universal-${{ matrix.host }}.zip'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-Flutter-macos-universal-${{ matrix.host }}
+          path: flutterApp/BitChord-Flutter-macos-universal-${{ matrix.host }}.zip
+          if-no-files-found: error
+          retention-days: 14
