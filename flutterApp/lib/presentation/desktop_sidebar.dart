@@ -28,6 +28,10 @@ class DesktopSidebar extends StatelessWidget {
   final ValueChanged<DesktopDestination> onDestinationSelected;
   final VoidCallback onOpenSettings;
   final DesktopThemePalette palette;
+  final String? accountAvatarUrl;
+  final String? accountName;
+  final String? accountHandle;
+  final VoidCallback? onOpenAccount;
 
   const DesktopSidebar({
     super.key,
@@ -38,6 +42,10 @@ class DesktopSidebar extends StatelessWidget {
     required this.onDestinationSelected,
     required this.onOpenSettings,
     required this.palette,
+    this.accountAvatarUrl,
+    this.accountName,
+    this.accountHandle,
+    this.onOpenAccount,
   });
 
   @override
@@ -207,6 +215,67 @@ class DesktopSidebar extends StatelessWidget {
             Divider(color: palette.divider, height: 1.0),
             const SizedBox(height: 8.0),
 
+            // Profile Account Avatar Button (1:1 from DesktopApp.kt lines 5970-5995)
+            if (collapsed) ...[
+              SizedBox(
+                height: 44.0,
+                child: Center(
+                  child: DesktopAccountButton(
+                    avatarUrl: accountAvatarUrl,
+                    onClick: onOpenAccount ?? () {},
+                    palette: palette,
+                  ),
+                ),
+              ),
+            ] else ...[
+              InkWell(
+                onTap: onOpenAccount ?? () {},
+                borderRadius: BorderRadius.circular(8.0),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 5.0),
+                  child: Row(
+                    children: [
+                      DesktopAccountButton(
+                        avatarUrl: accountAvatarUrl,
+                        onClick: onOpenAccount ?? () {},
+                        palette: palette,
+                      ),
+                      const SizedBox(width: 8.0),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              accountName ?? 'BitChord User',
+                              style: TextStyle(
+                                color: palette.foreground,
+                                fontSize: 13.0,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (accountHandle != null && accountHandle!.isNotEmpty)
+                              Text(
+                                accountHandle!,
+                                style: TextStyle(
+                                  color: palette.secondary,
+                                  fontSize: 11.0,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 4.0),
+
             // Settings
             DesktopSidebarItem(
               icon: Icons.settings_rounded,
@@ -217,6 +286,62 @@ class DesktopSidebar extends StatelessWidget {
               onTap: onOpenSettings,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Translated 1:1 from DesktopAccountUi.kt lines 60-95 (DesktopAccountButton).
+class DesktopAccountButton extends StatelessWidget {
+  final String? avatarUrl;
+  final VoidCallback onClick;
+  final DesktopThemePalette palette;
+
+  const DesktopAccountButton({
+    super.key,
+    this.avatarUrl,
+    required this.onClick,
+    required this.palette,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onClick,
+      borderRadius: BorderRadius.circular(18.0),
+      child: Container(
+        width: 36.0,
+        height: 36.0,
+        alignment: Alignment.center,
+        child: Container(
+          width: 28.0,
+          height: 28.0,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: palette.foreground.withValues(alpha: 0.14),
+            border: Border.all(
+              color: palette.foreground.withValues(alpha: 0.18),
+              width: 1.0,
+            ),
+          ),
+          child: ClipOval(
+            child: avatarUrl != null
+                ? Image.network(
+                    avatarUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.person_rounded,
+                      size: 18.0,
+                      color: palette.foreground.withValues(alpha: 0.85),
+                    ),
+                  )
+                : Icon(
+                    Icons.person_rounded,
+                    size: 18.0,
+                    color: palette.foreground.withValues(alpha: 0.85),
+                  ),
+          ),
         ),
       ),
     );

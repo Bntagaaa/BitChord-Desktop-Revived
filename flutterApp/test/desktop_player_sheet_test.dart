@@ -7,6 +7,11 @@ import 'package:bitchord_desktop/presentation/desktop_theme.dart';
 void main() {
   testWidgets('DesktopPlayerSheet renders controls and lyrics when visible',
       (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     const testSong = Song(
       videoId: 'test-vid',
       title: 'Test Song Title',

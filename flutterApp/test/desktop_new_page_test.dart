@@ -7,6 +7,11 @@ import 'package:bitchord_desktop/presentation/desktop_theme.dart';
 void main() {
   testWidgets('DesktopNewPage renders header, albums carousel, and trending grid',
       (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     Song? selected;
 
     await tester.pumpWidget(
@@ -32,6 +37,7 @@ void main() {
 
     // Tap on a trending track row
     final trackFinder = find.text('DIRANTAI DIGELANGI RINDU');
+    await tester.ensureVisible(trackFinder);
     await tester.tap(trackFinder);
     await tester.pumpAndSettle();
 
