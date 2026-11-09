@@ -89,7 +89,7 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
                   if (_pane == PlayerPane.main) Positioned(top: 110, left: 0, right: 0, child: _transport()),
                 ]))),
             Positioned(left: 0, right: 0, top: geometry.actionsTop, child: _actions()),
-          ])))));
+          ]))));
       })),
       Align(alignment: Alignment.topCenter, child: Padding(padding: const EdgeInsets.only(top: 8),
         child: Container(width: 38, height: 5, decoration: BoxDecoration(
