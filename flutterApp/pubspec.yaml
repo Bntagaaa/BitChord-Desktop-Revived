@@ -1,0 +1,75 @@
+name: bitchord_desktop
+description: BitChord Desktop Revived, native Flutter desktop rewrite.
+publish_to: none
+version: 1.9.2+1
+
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.4.0
+  crypto: ^3.0.6
+  path: ^1.9.1
+  path_provider: ^2.1.5
+  xml: ^6.5.0
+  flutter_secure_storage: ^11.2.0
+  flutter_svg: ^2.2.0
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.7
+  youtube_explode_dart: ^3.1.0
+  window_manager: ^0.5.2
+  tray_manager: ^0.5.3
+  file_selector: ^1.0.3
+  url_launcher: ^6.3.2
+  audio_metadata_reader: ^1.8.1
+  dbus: ^0.7.11
+  audio_service: ^0.18.18
+  audio_service_win: ^0.0.3
+  desktop_multi_window: ^0.3.1
+  local_notifier: ^0.1.6
+  pointycastle: ^4.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/branding/
+    - assets/icons/
+  fonts:
+    - family: SFProDisplay
+      fonts:
+        - asset: assets/fonts/sf_pro_display_regular.otf
+          weight: 400
+        - asset: assets/fonts/sf_pro_display_regular.otf
+          weight: 500
+        - asset: assets/fonts/sf_pro_display_medium.otf
+          weight: 600
+        - asset: assets/fonts/sf_pro_display_semibold.otf
+          weight: 700
+        - asset: assets/fonts/sf_pro_display_bold.otf
+          weight: 800
+        - asset: assets/fonts/sf_pro_display_heavy.otf
+          weight: 900
+    - family: SFProDisplayLegacy
+      fonts:
+        - asset: assets/fonts/sf_pro_display_regular.otf
+          weight: 400
+        - asset: assets/fonts/sf_pro_display_medium.otf
+          weight: 500
+        - asset: assets/fonts/sf_pro_display_semibold.otf
+          weight: 600
+        - asset: assets/fonts/sf_pro_display_bold.otf
+          weight: 700
+        - asset: assets/fonts/sf_pro_display_heavy.otf
+          weight: 900
+    - family: BintangMusicBlack
+      fonts:
+        - asset: assets/fonts/bintang_music_black_about.ttf
+          weight: 900
