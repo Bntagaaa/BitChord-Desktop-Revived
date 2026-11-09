@@ -61,9 +61,9 @@ class AddonManifest {
   final bool allowDownloads;
   factory AddonManifest.fromJson(JsonMap raw) {
     final id = raw['id'] as String? ?? '';
-    final resources = InnertubeParser.array(raw['resources'])
-        .whereType<String>()
-        .toList();
+    final resources = InnertubeParser.array(
+      raw['resources'],
+    ).whereType<String>().toList();
     if (id.trim().isEmpty) {
       throw const ServiceException(
         'This server did not return an addon manifest.',
@@ -80,9 +80,9 @@ class AddonManifest {
       name: raw['name'] as String? ?? id,
       version: raw['version'] as String? ?? '',
       resources: resources,
-      settings: InnertubeParser.array(raw['settings'])
-          .map(InnertubeParser.object)
-          .toList(),
+      settings: InnertubeParser.array(
+        raw['settings'],
+      ).map(InnertubeParser.object).toList(),
       allowDownloads: flag(raw['allowDownloads']) ?? true,
     );
   }

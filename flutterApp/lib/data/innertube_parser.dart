@@ -30,9 +30,9 @@ class InnertubeParser {
     if (value is String) return value;
     final map = object(value);
     return string(map['simpleText']) ??
-        array(map['runs'])
-            .map((r) => object(r)['text'] as String? ?? '')
-            .join();
+        array(
+          map['runs'],
+        ).map((r) => object(r)['text'] as String? ?? '').join();
   }
 
   static Iterable<JsonMap> collect(
@@ -661,8 +661,9 @@ class InnertubeParser {
       final id = string(r['videoId']);
       final title = text(r['title']);
       if (id == null || title.isEmpty) continue;
-      final byline = text(r['longBylineText'])
-          .ifEmpty(text(r['shortBylineText']));
+      final byline = text(
+        r['longBylineText'],
+      ).ifEmpty(text(r['shortBylineText']));
       final credits = _artists(r['longBylineText']);
       final album = _album(r['longBylineText']);
       songs[id] = Song(

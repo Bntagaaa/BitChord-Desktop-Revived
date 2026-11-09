@@ -152,30 +152,33 @@ void main() {
     },
   );
 
-  test('parallel import preserves order and duplicates and reports unmatched tracks', () async {
-    final repo = SearchRepository();
-    final importer = SpotifyImporter(
-      repository: repo,
-      httpClient: MockClient(
-        (_) async => http.Response(
-          embed(['First', 'Second', 'First', 'Unavailable']),
-          200,
+  test(
+    'parallel import preserves order and duplicates and reports unmatched tracks',
+    () async {
+      final repo = SearchRepository();
+      final importer = SpotifyImporter(
+        repository: repo,
+        httpClient: MockClient(
+          (_) async => http.Response(
+            embed(['First', 'Second', 'First', 'Unavailable']),
+            200,
+          ),
         ),
-      ),
-    );
-    final progress = <int>[];
-    final result = await importer.importPlaylist(
-      playlistId,
-      onProgress: (completed, _) => progress.add(completed),
-    );
-    expect(result.songs.map((s) => s.title), ['First', 'Second', 'First']);
-    expect(result.unmatched.single.title, 'Unavailable');
-    expect(result.totalTracks, 4);
-    expect(progress.first, 0);
-    expect(progress.last, 4);
-    importer.close();
-    repo.close();
-  });
+      );
+      final progress = <int>[];
+      final result = await importer.importPlaylist(
+        playlistId,
+        onProgress: (completed, _) => progress.add(completed),
+      );
+      expect(result.songs.map((s) => s.title), ['First', 'Second', 'First']);
+      expect(result.unmatched.single.title, 'Unavailable');
+      expect(result.totalTracks, 4);
+      expect(progress.first, 0);
+      expect(progress.last, 4);
+      importer.close();
+      repo.close();
+    },
+  );
 
   test(
     'cancellation stops before any request when already requested',

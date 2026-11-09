@@ -116,36 +116,42 @@ void main() {
     },
   );
 
-  test('lazy audio normalization preserves entry metadata and reaches automatic next', () async {
-    final normalized = <String>[];
-    final rig = _Rig(
-      songNormalizer: (item) async {
-        normalized.add(item.videoId);
-        return item.isVideo ? song('${item.videoId}-audio') : item;
-      },
-    );
-    final video = song('video').copyWith(isVideo: true, isVideoOrigin: true);
-    await rig.controller.playSongs([
-      song('one'),
-      video,
-      song('untouched'),
-    ], source: 'Album');
-    final originalId = rig.controller.queue[1].queueEntryId;
-    await settle();
-    expect(rig.controller.queue[1].videoId, 'video-audio');
-    expect(rig.controller.queue[1].queueEntryId, originalId);
-    expect(rig.controller.queue[1].playbackSource, 'Album');
-    expect(rig.controller.queue[1].isVideoOrigin, isTrue);
-    expect(normalized, isNot(contains('untouched')));
-    rig.backends.last.emit(
-      rig.backends.last.state.copyWith(completed: true, playing: false),
-    );
-    await settle();
-    expect(rig.controller.currentSong!.videoId, 'video-audio');
-    expect(rig.controller.currentSong!.queueEntryId, originalId);
-    expect(rig.backends.last.stream!.uri, 'https://media.example/video-audio');
-    await rig.close();
-  });
+  test(
+    'lazy audio normalization preserves entry metadata and reaches automatic next',
+    () async {
+      final normalized = <String>[];
+      final rig = _Rig(
+        songNormalizer: (item) async {
+          normalized.add(item.videoId);
+          return item.isVideo ? song('${item.videoId}-audio') : item;
+        },
+      );
+      final video = song('video').copyWith(isVideo: true, isVideoOrigin: true);
+      await rig.controller.playSongs([
+        song('one'),
+        video,
+        song('untouched'),
+      ], source: 'Album');
+      final originalId = rig.controller.queue[1].queueEntryId;
+      await settle();
+      expect(rig.controller.queue[1].videoId, 'video-audio');
+      expect(rig.controller.queue[1].queueEntryId, originalId);
+      expect(rig.controller.queue[1].playbackSource, 'Album');
+      expect(rig.controller.queue[1].isVideoOrigin, isTrue);
+      expect(normalized, isNot(contains('untouched')));
+      rig.backends.last.emit(
+        rig.backends.last.state.copyWith(completed: true, playing: false),
+      );
+      await settle();
+      expect(rig.controller.currentSong!.videoId, 'video-audio');
+      expect(rig.controller.currentSong!.queueEntryId, originalId);
+      expect(
+        rig.backends.last.stream!.uri,
+        'https://media.example/video-audio',
+      );
+      await rig.close();
+    },
+  );
 
   test(
     'late audio version lookup cannot replace newer queue selection',

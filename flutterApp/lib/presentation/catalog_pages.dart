@@ -847,9 +847,9 @@ class _CatalogPagesState extends State<CatalogPages> {
                                 const SizedBox(height: 10),
                                 Text(
                                   name,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineLarge,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.headlineLarge,
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -1349,7 +1349,8 @@ Future<void> importSpotifyDialog(
     title: 'Import Spotify playlist',
     label: 'Spotify playlist URL',
     action: 'Import',
-    helper: 'Public playlist links are supported. Tracks are matched with YouTube Music.',
+    helper:
+        'Public playlist links are supported. Tracks are matched with YouTube Music.',
   );
   if (url != null) await app.importSpotify(url);
 }

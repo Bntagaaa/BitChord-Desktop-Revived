@@ -15,30 +15,36 @@ void main() {
     await root.delete(recursive: true);
   });
 
-  test('overlapping roots deduplicate files and tag failure uses filename fallback', () async {
-    final music = await Directory('${root.path}/music').create();
-    final sub = await Directory('${music.path}/album').create();
-    final audio = File('${sub.path}/Artist - Song.mp3');
-    await audio.writeAsBytes(List.filled(128, 0)); // Deliberately corrupt tags.
-    await File('${sub.path}/ignore.txt').writeAsString('Not music');
-    final songs = await service.scan([
-      music.path,
-      sub.path,
-      '${root.path}/missing',
-    ]);
-    expect(songs, hasLength(1));
-    expect(songs.single.title, 'Song');
-    expect(songs.single.artist, 'Artist');
-    expect(songs.single.localPath, audio.absolute.path);
-    expect(songs.single.localUri, audio.absolute.uri.toString());
-  });
+  test(
+    'overlapping roots deduplicate files and tag failure uses filename fallback',
+    () async {
+      final music = await Directory('${root.path}/music').create();
+      final sub = await Directory('${music.path}/album').create();
+      final audio = File('${sub.path}/Artist - Song.mp3');
+      await audio.writeAsBytes(
+        List.filled(128, 0),
+      ); // Deliberately corrupt tags.
+      await File('${sub.path}/ignore.txt').writeAsString('Not music');
+      final songs = await service.scan([
+        music.path,
+        sub.path,
+        '${root.path}/missing',
+      ]);
+      expect(songs, hasLength(1));
+      expect(songs.single.title, 'Song');
+      expect(songs.single.artist, 'Artist');
+      expect(songs.single.localPath, audio.absolute.path);
+      expect(songs.single.localUri, audio.absolute.uri.toString());
+    },
+  );
 
   test(
     'scanner observes source depth limit and does not traverse symlink loops',
     () async {
       final music = await Directory('${root.path}/music').create();
-      final within = await Directory('${music.path}/a/b/c')
-          .create(recursive: true);
+      final within = await Directory(
+        '${music.path}/a/b/c',
+      ).create(recursive: true);
       final beyond = await Directory('${within.path}/d').create();
       await File('${within.path}/Allowed.mp3').writeAsBytes([0]);
       await File('${beyond.path}/Too deep.mp3').writeAsBytes([0]);
@@ -57,8 +63,9 @@ void main() {
       final second = await Directory('${root.path}/second').create();
       final a = await File('${first.path}/One.mp3').writeAsBytes([0]);
       final b = await File('${second.path}/Two.mp3').writeAsBytes([0]);
-      final art = await File('${first.path}/cover.jpg')
-          .writeAsBytes([0xff, 0xd8]);
+      final art = await File(
+        '${first.path}/cover.jpg',
+      ).writeAsBytes([0xff, 0xd8]);
       final songs = await service.scan(
         [first.path, second.path],
         downloads: [
@@ -88,12 +95,15 @@ void main() {
     () async {
       final music = await Directory('${root.path}/music').create();
       await File('${music.path}/Small.mp3').writeAsBytes([0]);
-      await File('${music.path}/Song.flac')
-          .writeAsBytes(List.filled(250 * 1024, 0));
-      await File('${music.path}/Voice recording.mp3')
-          .writeAsBytes(List.filled(250 * 1024, 0));
-      await File('${music.path}/Alert.wav')
-          .writeAsBytes(List.filled(250 * 1024, 0));
+      await File(
+        '${music.path}/Song.flac',
+      ).writeAsBytes(List.filled(250 * 1024, 0));
+      await File(
+        '${music.path}/Voice recording.mp3',
+      ).writeAsBytes(List.filled(250 * 1024, 0));
+      await File(
+        '${music.path}/Alert.wav',
+      ).writeAsBytes(List.filled(250 * 1024, 0));
       final songs = await service.scan([music.path], filterNonMusic: true);
       expect(songs.map((s) => s.title), ['Song']);
     },

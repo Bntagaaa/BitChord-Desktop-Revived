@@ -101,53 +101,56 @@ void main() {
       repository.close();
     },
   );
-  test('cloud edits strip the browse prefix and preserve duplicate occurrence keys', () async {
-    final bodies = <Map<String, dynamic>>[];
-    final client = InnertubeClient(
-      httpClient: MockClient((request) async {
-        if (request.method == 'GET') return http.Response('{}', 200);
-        bodies.add(jsonDecode(request.body) as Map<String, dynamic>);
-        return http.Response('{"status":"STATUS_SUCCEEDED"}', 200);
-      }),
-    )..setCookie('SAPISID=test-session');
-    final repository = MusicRepository(client: client);
-    await repository.removeFromPlaylist('VLplaylist', [
-      const Song(
-        videoId: 'same-recording',
-        title: 'Song',
-        artist: 'Artist',
-        setVideoId: 'second-occurrence',
-      ),
-    ]);
-    expect(bodies.last['playlistId'], 'playlist');
-    expect(bodies.last['actions'], [
-      {
-        'action': 'ACTION_REMOVE_VIDEO',
-        'setVideoId': 'second-occurrence',
-        'removedVideoId': 'same-recording',
-      },
-    ]);
-    await repository.movePlaylistEntry(
-      'VLplaylist',
-      'second-occurrence',
-      beforeSetVideoId: 'first-occurrence',
-    );
-    expect(bodies.last['actions'], [
-      {
-        'action': 'ACTION_MOVE_VIDEO_BEFORE',
-        'setVideoId': 'second-occurrence',
-        'movedSetVideoIdSuccessor': 'first-occurrence',
-      },
-    ]);
-    await repository.movePlaylistEntry('VLplaylist', 'first-occurrence');
-    expect(
-      (bodies.last['actions'] as List).single.containsKey(
-        'movedSetVideoIdSuccessor',
-      ),
-      isFalse,
-    );
-    repository.close();
-  });
+  test(
+    'cloud edits strip the browse prefix and preserve duplicate occurrence keys',
+    () async {
+      final bodies = <Map<String, dynamic>>[];
+      final client = InnertubeClient(
+        httpClient: MockClient((request) async {
+          if (request.method == 'GET') return http.Response('{}', 200);
+          bodies.add(jsonDecode(request.body) as Map<String, dynamic>);
+          return http.Response('{"status":"STATUS_SUCCEEDED"}', 200);
+        }),
+      )..setCookie('SAPISID=test-session');
+      final repository = MusicRepository(client: client);
+      await repository.removeFromPlaylist('VLplaylist', [
+        const Song(
+          videoId: 'same-recording',
+          title: 'Song',
+          artist: 'Artist',
+          setVideoId: 'second-occurrence',
+        ),
+      ]);
+      expect(bodies.last['playlistId'], 'playlist');
+      expect(bodies.last['actions'], [
+        {
+          'action': 'ACTION_REMOVE_VIDEO',
+          'setVideoId': 'second-occurrence',
+          'removedVideoId': 'same-recording',
+        },
+      ]);
+      await repository.movePlaylistEntry(
+        'VLplaylist',
+        'second-occurrence',
+        beforeSetVideoId: 'first-occurrence',
+      );
+      expect(bodies.last['actions'], [
+        {
+          'action': 'ACTION_MOVE_VIDEO_BEFORE',
+          'setVideoId': 'second-occurrence',
+          'movedSetVideoIdSuccessor': 'first-occurrence',
+        },
+      ]);
+      await repository.movePlaylistEntry('VLplaylist', 'first-occurrence');
+      expect(
+        (bodies.last['actions'] as List).single.containsKey(
+          'movedSetVideoIdSuccessor',
+        ),
+        isFalse,
+      );
+      repository.close();
+    },
+  );
 
   test(
     'HTTP200 refused edit fails; unavailable occurrence ID never sends removal',
@@ -271,24 +274,27 @@ void main() {
     },
   );
 
-  test('an account change during preparation cannot send a mutation as another user', () async {
-    final shell = Completer<http.Response>();
-    var posted = false;
-    final client = InnertubeClient(
-      httpClient: MockClient((request) async {
-        if (request.method == 'GET') return shell.future;
-        posted = true;
-        return http.Response('{}', 200);
-      }),
-    )..setCookie('SAPISID=first');
-    final pending = expectLater(
-      client.post('playlist/delete', {'playlistId': 'one'}),
-      throwsA(isA<ServiceException>()),
-    );
-    client.setCookie('SAPISID=second');
-    shell.complete(http.Response('{}', 200));
-    await pending;
-    expect(posted, isFalse);
-    client.close();
-  });
+  test(
+    'an account change during preparation cannot send a mutation as another user',
+    () async {
+      final shell = Completer<http.Response>();
+      var posted = false;
+      final client = InnertubeClient(
+        httpClient: MockClient((request) async {
+          if (request.method == 'GET') return shell.future;
+          posted = true;
+          return http.Response('{}', 200);
+        }),
+      )..setCookie('SAPISID=first');
+      final pending = expectLater(
+        client.post('playlist/delete', {'playlistId': 'one'}),
+        throwsA(isA<ServiceException>()),
+      );
+      client.setCookie('SAPISID=second');
+      shell.complete(http.Response('{}', 200));
+      await pending;
+      expect(posted, isFalse);
+      client.close();
+    },
+  );
 }

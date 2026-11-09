@@ -157,7 +157,8 @@ class AppController extends ChangeNotifier {
     try {
       await addons.restore();
     } on Object {
-      notice = 'Saved music sources could not be restored from the system credential vault.';
+      notice =
+          'Saved music sources could not be restored from the system credential vault.';
     }
     try {
       if (intent != _authIntent) return;
@@ -170,7 +171,8 @@ class AppController extends ChangeNotifier {
       }
     } on Object {
       // A locked/unavailable credential vault must not block local playback.
-      notice = 'Your account could not be restored. Local music is available; connect your account again to sync.';
+      notice =
+          'Your account could not be restored. Local music is available; connect your account again to sync.';
     }
     _notify();
     await loadHome();
@@ -1026,7 +1028,8 @@ class AppController extends ChangeNotifier {
         results: songs.map((song) => SearchResult.track(song)).toList(),
       );
       if (addons.lastFailures.isNotEmpty) {
-        notice = 'Some sources could not be reached. Results from available sources are shown.';
+        notice =
+            'Some sources could not be reached. Results from available sources are shown.';
       }
     } on Object catch (failure) {
       if (generation == _searchGeneration) error = _message(failure);

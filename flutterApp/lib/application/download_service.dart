@@ -125,9 +125,9 @@ class DownloadService extends ChangeNotifier {
       if (offset > 0) {
         Map<String, dynamic>? resume;
         try {
-          resume = jsonDecode(
-            await resumeFile.readAsString(),
-          ) as Map<String, dynamic>;
+          resume =
+              jsonDecode(await resumeFile.readAsString())
+                  as Map<String, dynamic>;
         } on Object {
           /* A partial file without transport identity is restarted. */
         }
@@ -212,8 +212,9 @@ class DownloadService extends ChangeNotifier {
           }
           final append = response.statusCode == 206;
           if (append) {
-            final range = RegExp(r'^bytes (\d+)-(\d+)/(\d+|\*)$')
-                .firstMatch(response.headers['content-range'] ?? '');
+            final range = RegExp(
+              r'^bytes (\d+)-(\d+)/(\d+|\*)$',
+            ).firstMatch(response.headers['content-range'] ?? '');
             if (range == null || int.parse(range.group(1)!) != offset) {
               await response.stream.drain<void>();
               throw const ServiceException(

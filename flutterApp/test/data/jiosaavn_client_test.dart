@@ -12,22 +12,28 @@ const encoded =
 const decoded = 'https://aac.saavncdn.com/example/song_96.mp4';
 
 void main() {
-  test('legacy URL decoder matches the independent DES vector and validates padding', () {
-    expect(JioSaavnClient.decodeMediaUrl(encoded), decoded);
-    expect(JioSaavnClient.decodeMediaUrl('invalid'), isNull);
-    final corrupt = base64.decode(encoded)..[47] ^= 1;
-    expect(JioSaavnClient.decodeMediaUrl(base64.encode(corrupt)), isNull);
-  });
+  test(
+    'legacy URL decoder matches the independent DES vector and validates padding',
+    () {
+      expect(JioSaavnClient.decodeMediaUrl(encoded), decoded);
+      expect(JioSaavnClient.decodeMediaUrl('invalid'), isNull);
+      final corrupt = base64.decode(encoded)..[47] ^= 1;
+      expect(JioSaavnClient.decodeMediaUrl(base64.encode(corrupt)), isNull);
+    },
+  );
 
-  test('bitrate upgrade preserves signed query and only upgrades advertised tracks', () {
-    final best = JioSaavnClient.bestUrl('$decoded?token=private', true);
-    expect(
-      best.url,
-      'https://aac.saavncdn.com/example/song_320.mp4?token=private',
-    );
-    expect(best.kbps, 320);
-    expect(JioSaavnClient.bestUrl(decoded, false).kbps, 96);
-  });
+  test(
+    'bitrate upgrade preserves signed query and only upgrades advertised tracks',
+    () {
+      final best = JioSaavnClient.bestUrl('$decoded?token=private', true);
+      expect(
+        best.url,
+        'https://aac.saavncdn.com/example/song_320.mp4?token=private',
+      );
+      expect(best.kbps, 320);
+      expect(JioSaavnClient.bestUrl(decoded, false).kbps, 96);
+    },
+  );
 
   test(
     'catalogue and stream request follow source headers and metadata shape',

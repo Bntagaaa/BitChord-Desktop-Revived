@@ -223,8 +223,9 @@ class LocalStore {
     }
     final snapshot = LegacyProfile.parseXml(await source.readAsString());
     final before = jsonEncode(_data);
-    await File(p.join(directory.path, 'profile.before-migration.json'))
-        .writeAsString(before, flush: true);
+    await File(
+      p.join(directory.path, 'profile.before-migration.json'),
+    ).writeAsString(before, flush: true);
     final allSongs = <Song>[
       ...snapshot.history,
       ...snapshot.queue,

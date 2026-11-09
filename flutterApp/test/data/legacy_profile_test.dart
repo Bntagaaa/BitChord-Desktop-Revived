@@ -36,8 +36,9 @@ void main() {
 
   test('migration honors source four-rung audio-quality upgrade rules', () {
     expect(
-      LegacyProfile.parseXml(xml({'audio_quality': 'HIGH'}))
-          .settings['audio_quality'],
+      LegacyProfile.parseXml(
+        xml({'audio_quality': 'HIGH'}),
+      ).settings['audio_quality'],
       'LOSSLESS',
     );
     expect(
@@ -47,8 +48,9 @@ void main() {
       'HIGH',
     );
     expect(
-      LegacyProfile.parseXml(xml({'audio_quality': 'STANDARD'}))
-          .settings['audio_quality'],
+      LegacyProfile.parseXml(
+        xml({'audio_quality': 'STANDARD'}),
+      ).settings['audio_quality'],
       'MEDIUM',
     );
   });

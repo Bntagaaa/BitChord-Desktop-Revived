@@ -202,9 +202,11 @@ class SpotifyImporter {
                       ? Duration(
                           milliseconds:
                               (InnertubeParser.at(track, [
-                                'duration',
-                                'totalMilliseconds',
-                              ]) as num?)?.toInt() ??
+                                        'duration',
+                                        'totalMilliseconds',
+                                      ])
+                                      as num?)
+                                  ?.toInt() ??
                               0,
                         )
                       : null,
@@ -302,12 +304,14 @@ class SpotifyImporter {
             tracks.length,
         thumbnailUrl: InnertubeParser.findString(entity['coverArt'], 'url'),
       ),
-      token: InnertubeParser.at(props, [
-        'state',
-        'settings',
-        'session',
-        'accessToken',
-      ]) as String?,
+      token:
+          InnertubeParser.at(props, [
+                'state',
+                'settings',
+                'session',
+                'accessToken',
+              ])
+              as String?,
     );
   }
 

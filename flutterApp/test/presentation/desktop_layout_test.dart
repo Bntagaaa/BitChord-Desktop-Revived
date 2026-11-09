@@ -19,7 +19,8 @@ import 'package:bitchord_desktop/presentation/widgets.dart';
 
 const _song = Song(
   videoId: 'fixture',
-  title: 'A long song title that should wrap gracefully across a narrow desktop window',
+  title:
+      'A long song title that should wrap gracefully across a narrow desktop window',
   artist: 'A long artist name',
   durationText: '3:45',
   albumName: 'Album',

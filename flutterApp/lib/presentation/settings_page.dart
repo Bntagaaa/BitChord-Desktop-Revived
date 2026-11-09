@@ -614,91 +614,94 @@ class _HiddenSetting extends StatelessWidget {
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-Future<void> showAccounts(BuildContext context, AppController app) =>
-    showDialog<void>(
-      context: context,
-      builder: (context) => ListenableBuilder(
-        listenable: app,
-        builder: (context, _) => AlertDialog(
-          title: const Text('Account'),
-          content: SizedBox(
-            width: 440,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+Future<void> showAccounts(
+  BuildContext context,
+  AppController app,
+) => showDialog<void>(
+  context: context,
+  builder: (context) => ListenableBuilder(
+    listenable: app,
+    builder: (context, _) => AlertDialog(
+      title: const Text('Account'),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Artwork(app.account?.thumbnailUrl, size: 56, radius: 28),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            app.signedIn
-                                ? app.account?.name ?? 'YouTube Music'
-                                : 'YouTube Music',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text(
-                            app.account?.email ??
-                                (app.signedIn ? 'Connected' : 'Not connected'),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: DesktopPalette.of(context).secondary,
-                            ),
-                          ),
-                        ],
+                Artwork(app.account?.thumbnailUrl, size: 56, radius: 28),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        app.signedIn
+                            ? app.account?.name ?? 'YouTube Music'
+                            : 'YouTube Music',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                    ),
-                  ],
+                      Text(
+                        app.account?.email ??
+                            (app.signedIn ? 'Connected' : 'Not connected'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: DesktopPalette.of(context).secondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 20),
-                if (!app.signedIn)
-                  const Text(
-                    'Connect an existing YouTube Music browser session to access your personal recommendations and library.',
-                    style: TextStyle(height: 1.5),
-                  ),
-                if (!app.signedIn)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: FilledButton(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        final cookie = await askText(
-                          context,
-                          title: 'Connect YouTube Music',
-                          label: 'Cookie header',
-                          helper: 'Paste the Cookie header from your signed-in music.youtube.com browser session. This is a secret; do not share it.',
-                          action: 'Connect',
-                          obscure: true,
-                        );
-                        if (cookie != null) await app.signInWithCookie(cookie);
-                      },
-                      child: const Text('Import browser session'),
-                    ),
-                  ),
-                if (app.signedIn)
-                  TextButton(
-                    onPressed: () {
-                      app.signOut();
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Sign out'),
-                  ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Done'),
-            ),
+            const SizedBox(height: 20),
+            if (!app.signedIn)
+              const Text(
+                'Connect an existing YouTube Music browser session to access your personal recommendations and library.',
+                style: TextStyle(height: 1.5),
+              ),
+            if (!app.signedIn)
+              Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: FilledButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final cookie = await askText(
+                      context,
+                      title: 'Connect YouTube Music',
+                      label: 'Cookie header',
+                      helper:
+                          'Paste the Cookie header from your signed-in music.youtube.com browser session. This is a secret; do not share it.',
+                      action: 'Connect',
+                      obscure: true,
+                    );
+                    if (cookie != null) await app.signInWithCookie(cookie);
+                  },
+                  child: const Text('Import browser session'),
+                ),
+              ),
+            if (app.signedIn)
+              TextButton(
+                onPressed: () {
+                  app.signOut();
+                  Navigator.pop(context);
+                },
+                child: const Text('Sign out'),
+              ),
           ],
         ),
       ),
-    );
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Done'),
+        ),
+      ],
+    ),
+  ),
+);
 
 Future<void> showAudioOutputs(BuildContext context, AppController app) =>
     showDialog<void>(
@@ -1004,143 +1007,144 @@ void showBitChordAbout(BuildContext context, AppController app) =>
       ),
     );
 
-Future<void> showAddonSources(BuildContext context, AppController app) =>
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => ListenableBuilder(
-        listenable: app,
-        builder: (context, _) => AlertDialog(
-          title: const Text('Music sources'),
-          content: SizedBox(
-            width: 530,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 450),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Enabled sources are checked in order. YouTube Music remains available as the fallback.',
-                      style: TextStyle(
-                        color: DesktopPalette.of(context).secondary,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    for (final source in app.addonSources)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 5),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.extension_outlined, size: 22),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    source.label,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    source.baseUrl,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: DesktopPalette.of(context)
-                                          .secondary,
-                                    ),
-                                  ),
-                                ],
+Future<void> showAddonSources(
+  BuildContext context,
+  AppController app,
+) => showDialog<void>(
+  context: context,
+  builder: (dialogContext) => ListenableBuilder(
+    listenable: app,
+    builder: (context, _) => AlertDialog(
+      title: const Text('Music sources'),
+      content: SizedBox(
+        width: 530,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 450),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Enabled sources are checked in order. YouTube Music remains available as the fallback.',
+                  style: TextStyle(
+                    color: DesktopPalette.of(context).secondary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                for (final source in app.addonSources)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.extension_outlined, size: 22),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                source.label,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            Switch.adaptive(
-                              value: source.enabled,
-                              onChanged: (value) =>
-                                  app.toggleAddon(source.id, value),
-                            ),
-                            ToolButton(
-                              icon: Icons.arrow_upward,
-                              label: 'Move source earlier',
-                              size: 28,
-                              iconSize: 16,
-                              onPressed: app.addonSources.indexOf(source) == 0
-                                  ? null
-                                  : () => app.reorderAddons(
-                                      app.addonSources.indexOf(source),
-                                      app.addonSources.indexOf(source) - 1,
-                                    ),
-                            ),
-                            ToolButton(
-                              icon: Icons.arrow_downward,
-                              label: 'Move source later',
-                              size: 28,
-                              iconSize: 16,
-                              onPressed:
-                                  app.addonSources.indexOf(source) ==
-                                      app.addonSources.length - 1
-                                  ? null
-                                  : () => app.reorderAddons(
-                                      app.addonSources.indexOf(source),
-                                      app.addonSources.indexOf(source) + 1,
-                                    ),
-                            ),
-                            ToolButton(
-                              icon: Icons.delete_outline,
-                              label: 'Remove source',
-                              onPressed: () => app.removeAddon(source.id),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const Divider(),
-                    const ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.music_note_outlined),
-                      title: Text('YouTube Music'),
-                      subtitle: Text('Default catalogue and playback fallback'),
-                      trailing: Icon(Icons.check),
-                    ),
-                    if (app.error != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Text(
-                          app.error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontSize: 12,
+                              Text(
+                                source.baseUrl,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: DesktopPalette.of(context).secondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                  ],
+                        Switch.adaptive(
+                          value: source.enabled,
+                          onChanged: (value) =>
+                              app.toggleAddon(source.id, value),
+                        ),
+                        ToolButton(
+                          icon: Icons.arrow_upward,
+                          label: 'Move source earlier',
+                          size: 28,
+                          iconSize: 16,
+                          onPressed: app.addonSources.indexOf(source) == 0
+                              ? null
+                              : () => app.reorderAddons(
+                                  app.addonSources.indexOf(source),
+                                  app.addonSources.indexOf(source) - 1,
+                                ),
+                        ),
+                        ToolButton(
+                          icon: Icons.arrow_downward,
+                          label: 'Move source later',
+                          size: 28,
+                          iconSize: 16,
+                          onPressed:
+                              app.addonSources.indexOf(source) ==
+                                  app.addonSources.length - 1
+                              ? null
+                              : () => app.reorderAddons(
+                                  app.addonSources.indexOf(source),
+                                  app.addonSources.indexOf(source) + 1,
+                                ),
+                        ),
+                        ToolButton(
+                          icon: Icons.delete_outline,
+                          label: 'Remove source',
+                          onPressed: () => app.removeAddon(source.id),
+                        ),
+                      ],
+                    ),
+                  ),
+                const Divider(),
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.music_note_outlined),
+                  title: Text('YouTube Music'),
+                  subtitle: Text('Default catalogue and playback fallback'),
+                  trailing: Icon(Icons.check),
                 ),
-              ),
+                if (app.error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Text(
+                      app.error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-          actions: [
-            TextButton.icon(
-              onPressed: () async {
-                final value = await askText(
-                  context,
-                  title: 'Add music source',
-                  label: 'Manifest URL',
-                  helper: 'Paste the HTTPS URL to the add-on manifest.json.',
-                  action: 'Add source',
-                );
-                if (value != null) await app.addAddon(value);
-              },
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add source'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Done'),
-            ),
-          ],
         ),
       ),
-    );
+      actions: [
+        TextButton.icon(
+          onPressed: () async {
+            final value = await askText(
+              context,
+              title: 'Add music source',
+              label: 'Manifest URL',
+              helper: 'Paste the HTTPS URL to the add-on manifest.json.',
+              action: 'Add source',
+            );
+            if (value != null) await app.addAddon(value);
+          },
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Add source'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Done'),
+        ),
+      ],
+    ),
+  ),
+);
