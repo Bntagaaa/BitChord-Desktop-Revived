@@ -1,9 +1,11 @@
 // Port source: LandscapePlayer.kt, LandscapePlayerColumns.kt, LandscapeLyricsFrame.kt.
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../domain/application.dart';
+import '../domain/lyrics.dart';
 import 'theme.dart';
 import 'widgets.dart';
 import 'artwork_backdrop.dart';
@@ -481,15 +483,11 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
                                 horizontal: 14,
                                 vertical: 8,
                               ),
-                              child: Text(
-                                lines[index].text,
-                                style: TextStyle(
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white.withValues(
-                                    alpha: index == active ? 1 : .4,
-                                  ),
-                                ),
+                              child: _SweptLyricText(
+                                line: lines[index],
+                                position: position,
+                                isActive: index == active,
+                                isPast: active >= 0 && index < active,
                               ),
                             ),
                           ),
@@ -544,4 +542,161 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
       ),
     ],
   );
+}
+
+class _GapDotsPainter extends CustomPainter {
+  const _GapDotsPainter({required this.progress, required this.color});
+  final double progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const dots = 3;
+    const radius = 5.0;
+    const stride = 18.0;
+    final totalWidth = (dots - 1) * stride + radius * 2;
+    final startX = (size.width - totalWidth) / 2 + radius;
+    final cy = size.height / 2;
+
+    for (var i = 0; i < dots; i++) {
+      final lit = (progress * dots - i).clamp(0.0, 1.0);
+      final alpha = 0.25 + 0.75 * lit;
+      final paint = Paint()
+        ..color = color.withValues(alpha: alpha)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(startX + i * stride, cy), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GapDotsPainter old) =>
+      old.progress != progress || old.color != color;
+}
+
+class _SweptLyricText extends StatelessWidget {
+  const _SweptLyricText({
+    required this.line,
+    required this.position,
+    required this.isActive,
+    required this.isPast,
+  });
+
+  final LyricLine line;
+  final Duration position;
+  final bool isActive;
+  final bool isPast;
+
+  @override
+  Widget build(BuildContext context) {
+    if (line.isGap) {
+      final nextMs = line.endMs;
+      final span = math.max(1, nextMs - line.timeMs);
+      final through =
+          ((position.inMilliseconds - line.timeMs) / span).clamp(0.0, 1.0);
+      return SizedBox(
+        height: 38,
+        child: CustomPaint(
+          size: const Size(double.infinity, 38),
+          painter: _GapDotsPainter(
+            progress: through,
+            color: Colors.white,
+          ),
+        ),
+      );
+    }
+
+    const style = TextStyle(
+      fontSize: 34,
+      fontWeight: FontWeight.w700,
+      color: Colors.white,
+    );
+
+    Widget mainText;
+    if (isActive && line.isWordSynced) {
+      final posMs = position.inMilliseconds;
+      final revealed = line.revealedChars(posMs);
+      final isGlow = line.isGrowing(posMs);
+      final progress = line.text.isEmpty
+          ? 0.0
+          : (revealed / line.text.length).clamp(0.0, 1.0);
+
+      mainText = Stack(
+        children: [
+          Text(
+            line.text,
+            style: style.copyWith(
+              color: Colors.white.withValues(alpha: 0.4),
+            ),
+          ),
+          if (isGlow)
+            ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 6.0, sigmaY: 6.0),
+              child: Text(
+                line.text,
+                style: style.copyWith(
+                  color: Colors.white.withValues(alpha: 0.62),
+                ),
+              ),
+            ),
+          ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (bounds) {
+              const feather = 24.0;
+              final lead = bounds.width > 0
+                  ? (feather / bounds.width).clamp(0.01, 0.3)
+                  : 0.05;
+              final start = progress.clamp(0.0, 1.0);
+              final end = (start + lead).clamp(0.0, 1.0);
+              return ui.Gradient.linear(
+                Offset.zero,
+                Offset(bounds.width, 0),
+                const [
+                  Colors.white,
+                  Colors.white,
+                  Colors.transparent,
+                  Colors.transparent,
+                ],
+                [0.0, start, end, 1.0],
+              );
+            },
+            child: Text(
+              line.text,
+              style: style,
+            ),
+          ),
+        ],
+      );
+    } else {
+      final alpha = isActive ? 1.0 : (isPast ? 0.75 : 0.4);
+      mainText = Text(
+        line.text,
+        style: style.copyWith(
+          color: Colors.white.withValues(alpha: alpha),
+        ),
+      );
+    }
+
+    if (line.background != null && line.background!.text.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: line.alignment == LyricAlignment.end
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          mainText,
+          const SizedBox(height: 4),
+          Text(
+            line.background!.text,
+            style: TextStyle(
+              fontSize: 23,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.72),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return mainText;
+  }
 }
