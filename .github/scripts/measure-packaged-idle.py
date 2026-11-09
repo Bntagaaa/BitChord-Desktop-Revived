@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import statistics
 import subprocess
@@ -122,6 +123,14 @@ def measure(label, launcher, output, seconds, round_number):
                     "jcmd_exit_codes": {key: value["exit_code"] for key, value in diagnostics.items()},
                     "screenshot_exit_code": screenshot["exit_code"],
                 }
+                heap = re.search(r"heap\s+total\s+(\d+)([KM]),\s+used\s+(\d+)([KM])",
+                                 diagnostics.get("heap", {}).get("output", ""))
+                result["heap_used_bytes"] = (
+                    int(heap[3]) * (1024 if heap[4] == "K" else 1024**2) if heap else None
+                )
+                nmt = re.search(r"Total: reserved=(\d+)KB, committed=(\d+)KB",
+                                diagnostics.get("native_memory", {}).get("output", ""))
+                result["jvm_nmt_committed_bytes"] = int(nmt[2]) * 1024 if nmt else None
                 (run_dir / "metrics.json").write_text(json.dumps(result, indent=2) + "\n")
                 return result
             finally:
@@ -170,6 +179,16 @@ def main():
                        "track transition", "usable first frame", "frame times", "GPU activity"],
     }
     (args.output / "comparison.json").write_text(json.dumps(report, indent=2) + "\n")
+    # Public numerical evidence remains reviewable even without artifact-download access.
+    # No environment, credentials, user paths or application content are published here.
+    public = {
+        "scenario": report["scenario"], "pss_median_bytes": medians,
+        "pss_reduction_percent": report["pss_reduction_percent"],
+        "runs": [{key: row[key] for key in ("label", "round", "native_window_ms", "summary",
+                                          "heap_used_bytes", "jvm_nmt_committed_bytes",
+                                          "jcmd_exit_codes")} for row in results],
+    }
+    print("::notice title=Packaged idle comparison::" + json.dumps(public), flush=True)
 
 
 if __name__ == "__main__":

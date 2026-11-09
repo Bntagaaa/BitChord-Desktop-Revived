@@ -31,6 +31,7 @@ The large `DesktopApp.kt` still combines application state and callbacks. Its re
 - Oversized images are returned to readers without being retained above the byte budget. Eviction never closes an image another composable still owns.
 - Existing budget settings remain unchanged; no small heap limit or new GC flags are used to manufacture a memory improvement.
 - Presence subscription lifetime belongs to the application owner.
+- Addon Graal contexts have one serialized owner per module key. Concurrent searches cannot overwrite/leak a second context. Reload retires busy handles until their call finishes, closes idle contexts, and rejects stale creations; failed constructor initialization closes its context. The registry itself closes with the application. Arbitrary third-party JavaScript that never returns is not claimed to support immediate cooperative cancellation.
 - Native window visibility/focus controls presentation subscriptions. Hidden presentation is CREATED, visible/unfocused STARTED, focused RESUMED. Playback service scopes remain independent.
 - Duplicate window-hide callbacks coalesce. Disk trimming leaves the UI thread. The existing hidden-window GC request is retained but skipped if the window has already been restored.
 
@@ -62,7 +63,7 @@ Use JDK 21 and the existing native build prerequisites.
 
 Android SDK builds keep `:app` and `:sharedUi`; desktop-only settings do not configure the Android UI target. The shared data module still uses the existing Android/KMP build tooling.
 
-Local evidence: runtime ownership/race/cancellation tests and isolated actual desktop presentation-lifetime tests pass; desktop resource generation passes. Full local compilation is currently blocked by the environment's HTTP 403 denial for JitPack. Native Windows/Linux builds, Android regression compilation and packaged bytecode/native checks run in the dedicated branch CI. Claims must follow the actual CI results.
+Local evidence: 15 runtime ownership/race/cancellation tests and two isolated actual desktop presentation-lifetime tests pass; desktop resource generation passes. Full local compilation is currently blocked by the environment's HTTP 403 denial for JitPack. At commit 8ae67aa6, the dedicated branch CI run 42544620782 passed Linux/Windows tests, production distributables, packaged UI/native AutoMix checks, Android and backend checks, and AppImage packaging. Later changes require their own CI results. Draft PR automation failed separately; that failure does not establish a compiler/test failure.
 
 ## Performance acceptance still outstanding
 

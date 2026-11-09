@@ -25,11 +25,8 @@ import com.music.bitchord.desktop.runtime.SharedLoadCache
 import kotlinx.coroutines.CancellationException
 
 /**
- * Decoded artwork, kept to a budget.
- *
- * It used to be an unbounded map. Every distinct URL a session ever loaded stayed decoded for the
- * life of the process, so browsing Explore and Search for a while was hundreds of megabytes of
- * bitmaps nothing would ever ask for again — which is where the gigabyte people reported was going.
+ * Decoded artwork with a byte budget, shared producers and application ownership.
+ * Native bitmap retention and decode concurrency are separate from the JVM heap limit.
  */
 internal object DesktopArtworkCache {
 

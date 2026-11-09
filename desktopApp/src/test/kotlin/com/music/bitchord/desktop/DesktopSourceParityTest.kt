@@ -6,6 +6,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.net.URI
@@ -13,6 +16,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicInteger
 
 class DesktopSourceParityTest {
     @Test
@@ -63,6 +67,7 @@ class DesktopSourceParityTest {
         try {
             val port = server.address.port
             val streamUrl = "http://127.0.0.1:$port/audio.mp4"
+            val moduleDownloads = AtomicInteger()
             server.json("/index.json", """
                 {"category:music":[{"id":"fake","name":"Fake Module","download":"module.js"}]}
             """.trimIndent())
@@ -78,7 +83,7 @@ class DesktopSourceParityTest {
                     return {streamUrl: "http://127.0.0.1:$port/audio-" + quality + ".mp4", track: {mimeType: "audio/mp4", audioQuality: quality}};
                   }
                 };
-            """.trimIndent())
+            """.trimIndent(), onRequest = { moduleDownloads.incrementAndGet() })
             server.text("/audio.mp4", "not-a-real-audio-file")
 
             val config = DesktopSourceConfig(
@@ -87,9 +92,12 @@ class DesktopSourceParityTest {
                 label = "Test source",
                 baseUrl = "http://127.0.0.1:$port/index.json",
             )
-            val result = DesktopModuleSource.search(config, "demo", 5)
-                .getOrThrow()
-                .single() as SearchResult.Track
+            val searches = coroutineScope {
+                List(12) { async { DesktopModuleSource.search(config, "demo", 5).getOrThrow() } }.awaitAll()
+            }
+            assertEquals(1, moduleDownloads.get(), "parallel addon requests must share one Graal context")
+            val result = searches.first().single() as SearchResult.Track
+            searches.forEach { assertEquals(result, it.single()) }
             assertEquals("module:custom-test::fake::track", result.song.videoId)
 
             val stream = assertNotNull(DesktopModuleSource.stream(config, result.song, "HIGH").getOrThrow())
@@ -102,8 +110,9 @@ class DesktopSourceParityTest {
         }
     }
 
-    private fun HttpServer.text(path: String, body: String) {
+    private fun HttpServer.text(path: String, body: String, onRequest: () -> Unit = {}) {
         createContext(path) { exchange ->
+            onRequest()
             val bytes = body.toByteArray()
             exchange.sendResponseHeaders(200, bytes.size.toLong())
             exchange.responseBody.use { it.write(bytes) }

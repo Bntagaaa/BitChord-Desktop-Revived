@@ -3,8 +3,8 @@ package com.music.bitchord.desktop
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CancellationException
+import com.music.bitchord.desktop.runtime.KeyedResourceRegistry
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -28,7 +28,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
 
 @Serializable
 internal data class DesktopSpineModule(
@@ -155,58 +154,64 @@ private class DesktopModuleEngine(
         .build()
 
     init {
-        val bindings = context.getBindings("js")
-        bindings.putMember("__spine_fetch", ProxyExecutable { args ->
-            val url = args.getOrNull(0)?.asString() ?: error("fetch requires a URL")
-            val method = args.getOrNull(1)?.asString() ?: "GET"
-            val headers = args.getOrNull(2)?.asString()?.let(::parseHeaders).orEmpty()
-            val body = args.getOrNull(3)?.asString()
-            val response = DesktopModuleHttp.request(resolveUrl(url), method, headers, body)
-            buildJsonObject {
-                put("status", response.status)
-                put("ok", response.status in 200..299)
-                put("body", response.body)
-                put("headers", buildJsonObject {
-                    response.headers.forEach { (key, value) -> put(key, value) }
-                })
-            }.toString()
-        })
-        bindings.putMember("__spine_log", ProxyExecutable { args ->
-            // Module console output is intentionally ignored.
-            null
-        })
+        try {
+            val bindings = context.getBindings("js")
+            bindings.putMember("__spine_fetch", ProxyExecutable { args ->
+                val url = args.getOrNull(0)?.asString() ?: error("fetch requires a URL")
+                val method = args.getOrNull(1)?.asString() ?: "GET"
+                val headers = args.getOrNull(2)?.asString()?.let(::parseHeaders).orEmpty()
+                val body = args.getOrNull(3)?.asString()
+                val response = DesktopModuleHttp.request(resolveUrl(url), method, headers, body)
+                buildJsonObject {
+                    put("status", response.status)
+                    put("ok", response.status in 200..299)
+                    put("body", response.body)
+                    put("headers", buildJsonObject {
+                        response.headers.forEach { (key, value) -> put(key, value) }
+                    })
+                }.toString()
+            })
+            bindings.putMember("__spine_log", ProxyExecutable { args ->
+                // Module console output is intentionally ignored.
+                null
+            })
 
-        context.eval("js", POLYFILLS)
-        val cleanCode = preprocessModuleCode(jsCode)
-        context.eval(
-            "js",
-            """
-            var __spine_iife_error = null;
-            globalThis.__spine_mod = (function() {
-                try {
-                    var module = { exports: {} };
-                    var exports = module.exports;
-                    var self = {};
-                    $cleanCode
-                    if (module.exports && (module.exports.searchTracks || module.exports.getTrackStreamUrl)) {
-                        return module.exports;
+            context.eval("js", POLYFILLS)
+            val cleanCode = preprocessModuleCode(jsCode)
+            context.eval(
+                "js",
+                """
+                var __spine_iife_error = null;
+                globalThis.__spine_mod = (function() {
+                    try {
+                        var module = { exports: {} };
+                        var exports = module.exports;
+                        var self = {};
+                        $cleanCode
+                        if (module.exports && (module.exports.searchTracks || module.exports.getTrackStreamUrl)) {
+                            return module.exports;
+                        }
+                        var named = {};
+                        if (typeof searchTracks === 'function') named.searchTracks = searchTracks;
+                        if (typeof getTrackStreamUrl === 'function') named.getTrackStreamUrl = getTrackStreamUrl;
+                        return named;
+                    } catch (e) {
+                        __spine_iife_error = e && e.message ? e.message : String(e);
+                        return {};
                     }
-                    var named = {};
-                    if (typeof searchTracks === 'function') named.searchTracks = searchTracks;
-                    if (typeof getTrackStreamUrl === 'function') named.getTrackStreamUrl = getTrackStreamUrl;
-                    return named;
-                } catch (e) {
-                    __spine_iife_error = e && e.message ? e.message : String(e);
-                    return {};
-                }
-            })();
-            """.trimIndent(),
-        )
-        val error = context.eval("js", "String(__spine_iife_error || '')").asString()
-        check(error.isBlank()) { "Module init error: $error" }
-        val exports = context.eval("js", "Object.keys(__spine_mod).join(', ')").asString()
-        check("searchTracks" in exports || "getTrackStreamUrl" in exports) {
-            "Module has no supported exports"
+                })();
+                """.trimIndent(),
+            )
+            val error = context.eval("js", "String(__spine_iife_error || '')").asString()
+            check(error.isBlank()) { "Module init error: $error" }
+            val exports = context.eval("js", "Object.keys(__spine_mod).join(', ')").asString()
+            check("searchTracks" in exports || "getTrackStreamUrl" in exports) {
+                "Module has no supported exports"
+            }
+        } catch (failure: Throwable) {
+            // A constructor that fails never reaches the manager's ownership registry.
+            runCatching { context.close(true) }.exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
         }
     }
 
@@ -362,14 +367,15 @@ private class DesktopModuleEngine(
     }
 }
 
-private class DesktopModuleManager {
+private class DesktopModuleManager : AutoCloseable {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
         explicitNulls = false
     }
-    private val engines = ConcurrentHashMap<String, DesktopModuleEngine>()
-    private val locks = ConcurrentHashMap<String, Mutex>()
+    private val engines = KeyedResourceRegistry<String, DesktopModuleEngine>(
+        onCloseFailure = { DesktopTrackLog.log("module close: ${it.message}") },
+    )
     @Volatile private var cachedIndex: Pair<String, List<DesktopSpineModule>>? = null
 
     suspend fun modules(indexUrl: String): Result<List<DesktopSpineModule>> = withContext(Dispatchers.IO) {
@@ -397,38 +403,36 @@ private class DesktopModuleManager {
             .distinctBy(DesktopSpineModule::id)
     }
 
-    suspend fun load(module: DesktopSpineModule, indexUrl: String): Result<DesktopModuleEngine> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val key = moduleKey(indexUrl, module.id)
-                engines[key]?.let { return@runCatching it }
-                val downloadUrl = URI.create(indexUrl).resolve(module.download).toString()
-                val response = DesktopModuleHttp.get(downloadUrl)
-                check(response.status in 200..299) { "Module ${module.id} returned HTTP ${response.status}" }
-                val engine = DesktopModuleEngine(response.body, URI.create(downloadUrl).resolve(".").toString())
-                engines[key] = engine
-                locks.putIfAbsent(key, Mutex())
-                engine
-            }
-        }
-
     suspend fun call(
         module: DesktopSpineModule,
         indexUrl: String,
         functionName: String,
         args: List<Any?>,
-    ): Result<String> {
-        val engine = load(module, indexUrl).getOrElse { return Result.failure(it) }
-        val lock = locks.getOrPut(moduleKey(indexUrl, module.id)) { Mutex() }
-        return runCatching { lock.withLock { engine.call(functionName, args) } }
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            Result.success(engines.withResource(
+                moduleKey(indexUrl, module.id),
+                create = {
+                    val downloadUrl = URI.create(indexUrl).resolve(module.download).toString()
+                    val response = DesktopModuleHttp.get(downloadUrl)
+                    check(response.status in 200..299) { "Module ${module.id} returned HTTP ${response.status}" }
+                    DesktopModuleEngine(response.body, URI.create(downloadUrl).resolve(".").toString())
+                },
+                use = { it.call(functionName, args) },
+            ))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Result.failure(failure)
+        }
     }
 
-    fun close() {
-        engines.values.forEach { runCatching { it.close() } }
+    fun clear() {
         engines.clear()
-        locks.clear()
         cachedIndex = null
     }
+
+    override fun close() { engines.close(); cachedIndex = null }
 
     private companion object {
         val EXCLUDED_CATEGORIES = setOf("category:artworks", "category:testing")
@@ -445,7 +449,9 @@ internal object DesktopModuleSource {
     internal const val DOLBY = "DOLBY"
     private const val HIGH = "HIGH"
     private const val LOW = "LOW"
-    private val manager = DesktopModuleManager()
+    private val manager by lazy {
+        DesktopApplicationResources.owner.own("module-engines") { DesktopModuleManager() }
+    }
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
     internal data class ModuleTrackRef(
@@ -528,9 +534,9 @@ internal object DesktopModuleSource {
         }
     }
 
-    fun close() = manager.close()
+    fun close() = manager.clear()
 
-    fun reload() = manager.close()
+    fun reload() = manager.clear()
 
     /** Finds a strict same-recording module copy for a YouTube-origin row. */
     suspend fun match(config: DesktopSourceConfig, song: Song): Song? =
