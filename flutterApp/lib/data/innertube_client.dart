@@ -151,7 +151,7 @@ class InnertubeClient {
         if (canonical.contains('list=')) {
           final playlistId = canonical.split('list=').last.split('&').first;
           if (playlistId.isNotEmpty && !browseId.startsWith('VL$playlistId')) {
-            return browseAlbumSongs('VL$playlistId');
+            return await browseAlbumSongs('VL$playlistId');
           }
         }
 
@@ -211,7 +211,6 @@ class InnertubeClient {
     final itemsRaw = carousel['contents'] as List<dynamic>? ?? const [];
     final items = <ShelfItem>[];
 
-    final isTrending = title.toLowerCase().contains('trending');
     final isVideoShelf = title.toLowerCase().contains('video');
 
     for (final item in itemsRaw) {
