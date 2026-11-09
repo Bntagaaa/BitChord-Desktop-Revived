@@ -53,15 +53,26 @@ class LegacyProfile {
       throw const FormatException('No Java preferences found.');
     }
     String value(String key) {
-      if (!entries.containsKey('$key.0')) return entries[key] ?? '';
+      final suffixes = entries.keys
+          .where((k) => k.startsWith('$key.'))
+          .map((k) => int.tryParse(k.substring(key.length + 1)))
+          .whereType<int>()
+          .where((index) => index >= 0)
+          .toList();
+      if (!entries.containsKey('$key.0')) {
+        // Preserve genuine pre-chunking values, but never hide a damaged
+        // chunked value behind an old unchunked key or an empty collection.
+        if (suffixes.isNotEmpty) {
+          throw FormatException(
+            'Missing first legacy preference chunk for $key.',
+          );
+        }
+        return entries[key] ?? '';
+      }
       final chunks = <String>[];
       for (var i = 0; entries.containsKey('$key.$i'); i++) {
         chunks.add(entries['$key.$i']!);
       }
-      final suffixes = entries.keys
-          .where((k) => k.startsWith('$key.'))
-          .map((k) => int.tryParse(k.substring(key.length + 1)))
-          .whereType<int>();
       if (suffixes.any((i) => i >= chunks.length)) {
         throw FormatException('Missing legacy preference chunk for $key.');
       }

@@ -9,13 +9,13 @@ A green row in one category does not establish another category.
 | Dependency resolution with committed lock | Passed with Flutter 3.47.9 / Dart 3.13.7; offline enforced-lock resolution also passed |
 | Whole-project Dart analysis | **No issues found** |
 | Dart formatting | **65 files checked; 0 changes** |
-| Pure data/domain/migration/local-scan assertions | **53 passed, 0 failed** under Dart AOT |
+| Pure data/domain/migration/local-scan assertions | **54 passed, 0 failed** under Dart AOT, including rejection of a missing first legacy chunk |
 | Pure playback/transport/planner assertions | **44 passed, 0 failed** under Dart AOT |
 | Native runner callback API inspection | Matches installed plugin declarations on Linux, Windows and macOS |
 | Workflow YAML / macOS XML and entitlement parsing | Passed |
 | Normal local Flutter tests | **Blocked before tests executed** by `objective_c` native-asset hook: Dart JIT child exits 255 with no output |
 | Local native release build | Not established: managed Linux session lacks required native development packages; elevated installation was unavailable |
-| GitHub Actions full Flutter and platform matrix | Pending when this checkpoint was written; the PR description records actual run/job results and tested SHA |
+| GitHub Actions full Flutter and platform matrix | The [PR description](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/137) records actual run/job results and the exact tested SHA; results are not inferred for later untested commits |
 | Signed-in/live-stream/native playback smoke tests | Not established |
 | Source-versus-Flutter screenshot comparison | Not established |
 | Comparative performance measurements | Not established; see performance.md |
@@ -36,7 +36,7 @@ native/Flutter production services with stand-in implementations to manufacture
 a pass. The normal Flutter engine suite remains the authoritative integration
 check and runs unchanged in the workflow.
 
-The 97 passing pure tests cover queue identities/tiers/shuffle/restore, equalizer
+The 98 passing pure tests cover queue identities/tiers/shuffle/restore, equalizer
 curves/headroom, stream containers, source-ID guards, HTTP range validation,
 source AutoMix planning decisions, models/renderers, session-scoped requests,
 cloud playlist wire contracts, local scan/tag fallbacks, legacy chunk/Unicode/
@@ -48,9 +48,11 @@ Spotify matching/cancellation, addons and JioSaavn decoding/matching.
 The normal test tree additionally exercises native-boundary playback controller
 state, atomic profile persistence/recovery, download publication/resume/range/
 refresh-policy/cancel/shutdown behavior, auth-vault interleavings, application
-startup/session fences and widget layout/interaction fixtures. These tests are
-present and statically checked; their successful execution cannot be inferred
-from the 97 pure assertions.
+startup/session fences and widget layout/interaction fixtures. The normal engine
+suite passed all 141 tests at checkpoint `6907c4a`. The subsequent missing-first-
+chunk regression passed the pure harness; its normal-engine result belongs to
+the next commit's CI record on the PR. Pure assertions do not establish native
+playback, live service or OS credential-store acceptance.
 
 In particular, the integration review added regressions for a snapshot's volume
 winning over stale legacy preferences, preventing late initialization from

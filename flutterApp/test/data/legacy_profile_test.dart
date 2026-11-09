@@ -76,6 +76,31 @@ void main() {
   });
 
   test(
+    'missing first chunk fails without masking a genuine unchunked value',
+    () {
+      final encoded = legacySong();
+      expect(
+        () => LegacyProfile.parseXml(xml({'history.1': encoded})),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            contains('Missing first legacy preference chunk for history'),
+          ),
+        ),
+      );
+      expect(
+        () => LegacyProfile.parseXml(
+          xml({'history': encoded, 'history.1': encoded}),
+        ),
+        throwsFormatException,
+      );
+      final legacy = LegacyProfile.parseXml(xml({'history': encoded}));
+      expect(legacy.history.single.title, '日本語 • Déjà vu');
+    },
+  );
+
+  test(
     'chunked preferences reassemble and missing middle chunks fail safely',
     () {
       final encoded = legacySong();
