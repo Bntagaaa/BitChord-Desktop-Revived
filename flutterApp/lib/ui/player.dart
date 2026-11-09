@@ -1,11 +1,11 @@
 // Port source: LandscapePlayer.kt, LandscapePlayerColumns.kt, LandscapeLyricsFrame.kt.
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../domain/application.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import 'artwork_backdrop.dart';
 
 enum PlayerPane { main, lyrics, queue }
 
@@ -86,20 +86,7 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
     backgroundColor: paletteOf(context).lyricsSurface,
     body: Stack(
       children: [
-        if (app.song?.artwork != null)
-          Positioned.fill(
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-              child: Opacity(
-                opacity: .45,
-                child: Image(
-                  image: artworkProvider(app.song!.artwork!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                ),
-              ),
-            ),
-          ),
+        Positioned.fill(child: FullArtworkBackdrop(url: app.song?.artwork)),
         SafeArea(
           child: LayoutBuilder(
             builder: (context, bounds) {
