@@ -188,17 +188,17 @@ class _SmoothLyricsPanelState extends State<SmoothLyricsPanel>
     final renderBox = targetContext.findRenderObject() as RenderBox?;
     if (renderBox == null || !renderBox.hasSize) return;
 
-    final viewport = RenderAbstractViewport.of(renderBox);
-    if (viewport == null) return;
-    final offsetToCenter = viewport.getOffsetToReveal(
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final revealed = position.getOffsetToReveal(
       renderBox,
       widget.centerFocus ? 0.38 : 0.25,
     );
 
     final currentOffset = _scroll.offset;
-    final targetOffset = offsetToCenter.offset.clamp(
+    final targetOffset = revealed.offset.clamp(
       0.0,
-      _scroll.position.maxScrollExtent,
+      position.maxScrollExtent,
     );
     final delta = targetOffset - currentOffset;
 
@@ -877,7 +877,8 @@ class _SweptLyricText extends StatelessWidget {
       TextSelection(baseOffset: charIdx, extentOffset: math.min(text.length, charIdx + 1)),
     );
     if (boxes.isNotEmpty) {
-      return boxes.first.left + frac * boxes.first.width;
+      final b = boxes.first;
+      return b.left + frac * (b.right - b.left);
     }
     return maxWidth * (revealedChars / text.length).clamp(0.0, 1.0);
   }
