@@ -70,10 +70,20 @@ jobs:
             try {
               .\gradlew.bat ":${ui}:jvmTest" --tests '*.LandscapePlayerMotionTest' `
                 :desktopApp:test --tests '*.DesktopPipUiTest' `
-                -Pbitchord.version=test-visua --console=plain 2>&1 | Tee-Object -FilePath "$env:GITHUB_WORKSPACE/$tree-render.log"
+                "-Pbitchord.version=test-visua" --console=plain 2>&1 | Tee-Object -FilePath "$env:GITHUB_WORKSPACE/$tree-render.log"
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             } finally { Pop-Location }
           }
+      - name: Report render build or test errors
+        if: failure()
+        shell: python
+        run: |
+          from pathlib import Path
+          for path in Path(".").glob("*-render.log"):
+              text = path.read_text(errors="replace")
+              excerpt = text[text.rfind("FAILURE:"):] if "FAILURE:" in text else text[-5000:]
+              excerpt = excerpt[:5000].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::error title=" + path.name + "::" + excerpt)
       - name: Compare actual pixels, including alpha
         run: python candidate/.github/scripts/compare-desktop-renders.py --baseline baseline --candidate candidate --output results
       - name: Upload source, candidate and difference renders

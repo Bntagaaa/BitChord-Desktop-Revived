@@ -171,3 +171,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+
+      - name: Upload tested EXE and MSI
+        if: ${{ inputs.installers }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-Installers-${{ inputs.version }}
+          path: |
+            dist/*.msi
+            dist/*-setup.exe
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

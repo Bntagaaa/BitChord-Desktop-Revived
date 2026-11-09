@@ -29,6 +29,13 @@ jobs:
       run_tests: false
     secrets: inherit
 
+  windows-packages:
+    uses: ./.github/workflows/build-windows-portable.yml
+    with:
+      version: 1.9.2-compose-${{ github.sha }}
+      installers: true
+    secrets: inherit
+
   draft-pr:
     # Repository policy currently rejects createPullRequest from Actions.
     # Keep a deliberate retry available without turning every build red.
