@@ -19,6 +19,7 @@ This branch is **not a finished 1:1 port**. Do not label it production-ready or 
 | `lib/domain/lyric_clock.dart` | LyricClock.kt, LyricFocus.kt | Original dated-reading slew/glide/rate-learning arithmetic and overlapping-vocal focus; behavioral tests. Frame-clock integration in the Flutter panel remains required. |
 | `lib/data/stream_resolver.dart` | Original InnerTubeX v0.7.0 VISIONOS_0_1 profile and StreamResolver.kt | Direct anonymous audio formats, real audio-byte probe beyond 1 MiB; no invented URL or media IDs |
 | `lib/ui/theme.dart`, pubspec fonts | DesktopTheme.kt, BitChordTypography.kt, DesktopFontSettings.kt | Original color tokens, logical-to-physical font cuts, Default/Legacy and Pitch Black rules |
+| `tool/font_metadata.py`, derived Bold asset | DesktopFontMetadata.kt | Correct the bundled Bold cut's OS/2 classification from 600 to 700, preserve every outline/metric table and recompute SFNT checksums. Raw upstream assets remain unchanged. |
 | `lib/ui/shell.dart` | DesktopApp.kt frame/sidebar/dock | Initial Flutter presentation using the 72/220 dp rail, 980 dp breakpoint, 58 dp dock and original assets |
 | `lib/ui/player.dart` | LandscapePlayer.kt/Columns.kt/LyricsFrame.kt | Initial cover bounds, bounded queue, 2-second metadata reveal, original transition durations and lyric edge fades |
 
@@ -60,5 +61,7 @@ The current cloud executor has no Flutter SDK and explicitly denies its official
 CI run [42599145101](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/42599145101), commit fd9e21af: Dart analysis completed with zero errors/warnings/infos, seven unit/widget tests passed, both native release builds passed, Linux rendered Settings/Theme/Font were verified through a real X11 window, Windows showed a native window, and a native PCM integration test verified duration, advancing playhead and seek. Linux audio used a PulseAudio virtual sink; no physical-speaker audibility claim is made. The original WAV fixture is generated only in integration_test, never offered as application music.
 
 CI run [42601394399](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/42601394399), commit a64304e5, also passed after the local scanner/artwork port: analysis, unit/widget tests, both native builds and the native smoke/integration jobs. Later lyrics changes require their own results.
+
+CI run [42603648049](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/42603648049), commit 40cb2a9b, passed after the timing model, TTML/A2/QRC/YRC parsers and track-scoped lyric lookup were added. This includes the race/duration/parser behavioral tests, both native builds, window checks and native PCM playback test. The independent font checksum/outline validator passes locally. The later clock and strict committed-source checks require their own CI result.
 
 The source manifest validator confirms original Kotlin/assets remain unchanged, and the formatter/package-lock output from the real CI Dart SDK has been applied to this branch. The local cloud SDK and live network tests remain blocked until the environment network draft is applied.

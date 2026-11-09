@@ -37,7 +37,7 @@ flutter:
           weight: 600
         - asset: assets/fonts/sf_pro_display_semibold.otf
           weight: 700
-        - asset: assets/fonts/sf_pro_display_bold.otf
+        - asset: assets/fonts/sf_pro_display_bold_corrected.otf
           weight: 800
     - family: SFProLegacy
       fonts:
@@ -47,7 +47,7 @@ flutter:
           weight: 500
         - asset: assets/fonts/sf_pro_display_semibold.otf
           weight: 600
-        - asset: assets/fonts/sf_pro_display_bold.otf
+        - asset: assets/fonts/sf_pro_display_bold_corrected.otf
           weight: 700
         - asset: assets/fonts/sf_pro_display_heavy.otf
           weight: 800
