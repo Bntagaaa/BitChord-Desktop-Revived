@@ -177,17 +177,26 @@ class _DesktopShellState extends State<DesktopShell> {
                               ? Duration.zero
                               : const Duration(milliseconds: 180),
                           width: sideWidth,
-                          child: _Sidebar(
-                            app: app,
-                            collapsed: collapsed,
-                            onNavigate: navigate,
-                            onToggle: () {
-                              if (narrow) {
-                                setState(() => drawer = true);
-                              } else {
-                                app.setSetting('sidebar_collapsed', !collapsed);
-                              }
-                            },
+                          child: LayoutBuilder(
+                            builder: (context, sidebarConstraints) => _Sidebar(
+                              app: app,
+                              // Expanded rows need the expanded width, including
+                              // while the container is animating out of its rail.
+                              collapsed:
+                                  collapsed ||
+                                  sidebarConstraints.maxWidth < sideWidth,
+                              onNavigate: navigate,
+                              onToggle: () {
+                                if (narrow) {
+                                  setState(() => drawer = true);
+                                } else {
+                                  app.setSetting(
+                                    'sidebar_collapsed',
+                                    !collapsed,
+                                  );
+                                }
+                              },
+                            ),
                           ),
                         ),
                         Expanded(

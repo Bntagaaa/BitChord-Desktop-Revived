@@ -95,7 +95,11 @@ void main() {
       addTearDown(() => tester.view.resetPhysicalSize());
       addTearDown(() => tester.view.resetDevicePixelRatio());
       tester.view.devicePixelRatio = 1;
-      for (final size in const [Size(800, 600), Size(1280, 720)]) {
+      for (final size in const [
+        Size(800, 600),
+        Size(1280, 720),
+        Size(800, 600),
+      ]) {
         tester.view.physicalSize = size;
         for (final route in [
           AppRoute.home,
@@ -107,6 +111,12 @@ void main() {
         ]) {
           app.route = route;
           await tester.pumpWidget(host(DesktopShell(controller: app)));
+          await tester.pump(const Duration(milliseconds: 90));
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: '$route during the sidebar transition at $size',
+          );
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull, reason: '$route at $size');
         }
@@ -153,8 +163,10 @@ void main() {
     expect(find.text('Play next'), findsOneWidget);
     expect(find.text('Dislike'), findsOneWidget);
     final barriers = tester.widgetList<ModalBarrier>(find.byType(ModalBarrier));
+    expect(barriers, isNotEmpty);
     expect(
-      barriers.any((barrier) => barrier.color == Colors.transparent),
+      // Flutter represents a zero-alpha modal barrier with a null color.
+      barriers.every((barrier) => (barrier.color?.a ?? 0) == 0),
       isTrue,
     );
     await tester.ensureVisible(find.text('Sleep timer'));
@@ -163,6 +175,7 @@ void main() {
     await tester.tap(find.text('End of this track'));
     await tester.pumpAndSettle();
     expect(playback.sleepAfterTrack, isTrue);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
