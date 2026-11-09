@@ -70,7 +70,7 @@ Use JDK 21 and the existing native build prerequisites.
 
 Android SDK builds keep `:app` and `:sharedUi`; desktop-only settings do not configure the Android UI target. The shared data module still uses the existing Android/KMP build tooling.
 
-Local evidence: 15 runtime ownership/race/cancellation tests and two isolated actual desktop presentation-lifetime tests pass; desktop resource generation passes. Full local compilation is currently blocked by the environment's HTTP 403 denial for JitPack. At commit 8ae67aa6, the dedicated branch CI run 42544620782 passed Linux/Windows tests, production distributables, packaged UI/native AutoMix checks, Android and backend checks, and AppImage packaging. Later changes require their own CI results. Draft PR automation failed separately; that failure does not establish a compiler/test failure.
+Local evidence: 15 runtime ownership/race/cancellation tests in `:desktopRuntime:test`, all 19 presentation-lifetime and regression tests in `:desktopUi:jvmTest`, and playback clock projection tests in `:desktopApp:test` pass with JDK 21. At commit 64d7e70a, branch CI run 42547639362 passed Linux and Windows desktop tests, Android and backend checks, AppImage packaging, and generated complete Windows ZIP, EXE, and MSI installers. In addition, Compose visual parity run 42547190826 passed on both Windows and Linux with 100% pixel-by-pixel equality across all 18 fixtures. Draft PR automation in Actions remains restricted by repository permissions; that refusal does not affect compiler or test verification.
 
 ## Performance acceptance still outstanding
 
@@ -100,6 +100,34 @@ Run 42546036077 compares source 348b613a with candidate 1b17fa59, before the lat
 | Native window appearance | 3362 ms | 3075 ms |
 
 The observed PSS difference is 1.76%, with overlapping run ranges; this does not establish a substantial steady-state reduction. The aspirational 30% target is not met. CPU remains high in both builds under software-rendered Xvfb. Neither native window appearance nor a fixture recomposition count is a usable-first-frame/frame-time benchmark. The high process usage relative to heap merits further native/render attribution; NMT committed memory cannot be subtracted from PSS to infer exact third-party native allocations.
+
+### Second measured idle result with thread and native attribution
+
+Run 42547573281 compares source 348b613a with candidate 8162b6b3 (incorporating playback clock projection decoupling and per-thread attribution). Medians across three rounds:
+
+| Metric | Baseline | Candidate | Difference |
+| --- | ---: | ---: | ---: |
+| Process PSS | 878.42 | 866.15 | -1.40% |
+| Process RSS | 908.63 | 896.38 | -1.35% |
+| Heap used at final sample | 82.78 | 83.91 | +1.37% |
+| JVM NMT committed at final sample | 421.13 | 420.93 | -0.05% |
+| CPU, percent of one core | 104.70% | 105.09% | +0.39% |
+| Native window appearance | 2833.55 ms | 2571.76 ms | -9.24% |
+
+#### Thread CPU attribution
+Sampling of surviving process threads attributes the ~105% CPU consumption to:
+- `AWT-EventQueue-0`: 99.36% - 99.39% of one core (the AWT / Skiko event dispatch and Compose render loop running under unaccelerated Xvfb software Mesa `swrast`).
+- `C2 CompilerThread`: 2.09% - 2.35% of one core (JIT compilation passes).
+- `kotlinx.coroutines`: ~0.90% of one core (background dispatcher maintenance).
+- `JavaFX Application Thread`: 0.53% - 0.56% of one core.
+- `skiko-dispatcher`: 0.48% - 0.49% of one core.
+
+#### Loaded native libraries
+The audit identified that both baseline and candidate load:
+- JavaFX WebKit and graphics stack: `libjfxwebkit.so`, `libglass.so`, `libglassgtk3.so`, `libprism_es2.so`, `libprism_sw.so`
+- Skiko renderer: `libskiko-linux-x64.so`
+- Mesa software OpenGL / X11 rasterization: `swrast_dri.so`, `libGL.so`, `libGLX_mesa.so`, `libLLVM-15.so`, `libX11.so`, `libXext.so`, etc.
+- JVM core native runtime: `libjvm.so`, `libawt.so`, `libawt_xawt.so`, `libfontmanager.so`, `libfreetype.so`, `libnet.so`, `libnio.so`
 
 Both inventories contain zero AAR artifacts and the same Linux Compose 1.12.0, Skiko 0.150.1, Haze 1.7.3 and Coil 3.0.4 renderer versions. Therefore, no Android-runtime removal or dependency-version upgrade is claimed as the cause of this measured difference.
 
