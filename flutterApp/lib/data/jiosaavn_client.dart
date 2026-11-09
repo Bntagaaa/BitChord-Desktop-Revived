@@ -33,9 +33,11 @@ class JioSaavnClient {
       'p': '1',
       'n': '${limit.clamp(1, 50)}',
     });
-    final songs = InnertubeParser.array(
-      raw['results'],
-    ).map(InnertubeParser.object).map(parseSong).whereType<Song>().toList();
+    final songs = InnertubeParser.array(raw['results'])
+        .map(InnertubeParser.object)
+        .map(parseSong)
+        .whereType<Song>()
+        .toList();
     // Source1.9.2 prefers an explicit release when duplicate clean cuts exist.
     final explicit = songs.where((s) => s.isExplicit == true);
     final other = songs.where((s) => s.isExplicit != true);
@@ -166,9 +168,8 @@ class JioSaavnClient {
 
   static ({String url, int? kbps}) bestUrl(String url, bool supports320) {
     final uri = Uri.parse(url);
-    final suffix = RegExp(
-      r'_(48|96|160|320)\.(mp4|aac|mp3)$',
-    ).firstMatch(uri.path);
+    final suffix = RegExp(r'_(48|96|160|320)\.(mp4|aac|mp3)$')
+        .firstMatch(uri.path);
     if (suffix == null) return (url: url, kbps: supports320 ? 320 : null);
     if (!supports320) return (url: url, kbps: int.parse(suffix[1]!));
     return (

@@ -356,9 +356,9 @@ double incomingCuePoint(
   TrackAnalysis analysis, {
   double latest = double.infinity,
 }) {
-  final ranked = rankMixInCandidates(
-    analysis,
-  ).where((c) => c.time <= latest).firstOrNull;
+  final ranked = rankMixInCandidates(analysis)
+      .where((c) => c.time <= latest)
+      .firstOrNull;
   if (ranked != null) return ranked.time;
   final interval = orZero(analysis.beatInterval) > 0
       ? analysis.beatInterval
@@ -678,9 +678,9 @@ double? incomingMixInPoint(
       : orZero(analysis.bpm) > 0
       ? 60 / analysis.bpm
       : 0.0;
-  final best = rankMixInCandidates(
-    analysis,
-  ).where((c) => c.time <= latest).firstOrNull;
+  final best = rankMixInCandidates(analysis)
+      .where((c) => c.time <= latest)
+      .firstOrNull;
   final target = [best?.time, analysis.mixInTime]
       .whereType<double>()
       .where((v) => v.isFinite && v > 0 && v <= latest)

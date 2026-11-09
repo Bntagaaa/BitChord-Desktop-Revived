@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bitchord_desktop/domain/models.dart';
 import 'package:bitchord_desktop/data/local_store.dart';
+
 import 'legacy_fixture.dart';
 
 void main() {
@@ -45,9 +46,8 @@ void main() {
       expect(store.getSetting<double>('volume', 100), 50.0);
       expect(store.settings.containsKey('youtube_cookie'), isFalse);
       expect(
-        await File(
-          '${store.directory.path}/profile.before-migration.json',
-        ).exists(),
+        await File('${store.directory.path}/profile.before-migration.json')
+            .exists(),
         isTrue,
       );
       final reopened = await LocalStore.open(directory: store.directory);

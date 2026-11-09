@@ -150,9 +150,8 @@ class LyricsService {
                   (seconds <= 0 ||
                       duration == null ||
                       (duration - seconds).abs() <= 3) &&
-                  RegExp(
-                    r'^[A-Z]{2}[A-Z0-9]{3}\d{7}$',
-                  ).hasMatch(h['isrc'] as String? ?? '');
+                  RegExp(r'^[A-Z]{2}[A-Z0-9]{3}\d{7}$')
+                      .hasMatch(h['isrc'] as String? ?? '');
             })
             .toList();
         if (hits.isEmpty) return null;

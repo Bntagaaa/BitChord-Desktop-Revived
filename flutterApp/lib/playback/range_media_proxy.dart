@@ -73,9 +73,8 @@ class RangeMediaProxy {
       var end = total - 1;
       final rangeHeader = request.headers.value(HttpHeaders.rangeHeader);
       if (rangeHeader != null) {
-        final match = RegExp(
-          r'^bytes=(\d*)-(\d*)$',
-        ).firstMatch(rangeHeader.trim());
+        final match = RegExp(r'^bytes=(\d*)-(\d*)$')
+            .firstMatch(rangeHeader.trim());
         if (match == null || (match[1]!.isEmpty && match[2]!.isEmpty)) {
           response.statusCode = HttpStatus.requestedRangeNotSatisfiable;
           response.headers.set(

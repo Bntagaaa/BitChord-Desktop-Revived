@@ -29,17 +29,13 @@ void main() {
     'manifest downloads policy accepts the existing numeric/string encodings',
     () {
       expect(
-        AddonManifest.fromJson({
-          'id': 'one',
-          'allowDownloads': 0,
-        }).allowDownloads,
+        AddonManifest.fromJson({'id': 'one', 'allowDownloads': 0})
+            .allowDownloads,
         isFalse,
       );
       expect(
-        AddonManifest.fromJson({
-          'id': 'one',
-          'allowDownloads': 'false',
-        }).allowDownloads,
+        AddonManifest.fromJson({'id': 'one', 'allowDownloads': 'false'})
+            .allowDownloads,
         isFalse,
       );
       expect(
@@ -87,81 +83,78 @@ void main() {
     },
   );
 
-  test(
-    'addon requests map quality options, forward defaults and enforce playback-only',
-    () async {
-      final requests = <http.Request>[];
-      final client = AddonClient(
-        'https://example.invalid/addon',
-        httpClient: MockClient((request) async {
-          requests.add(request);
-          if (request.url.path.endsWith('/manifest.json')) {
-            return http.Response(
-              jsonEncode({
-                'id': 'test',
-                'name': 'Test',
-                'allowDownloads': false,
-                'settings': [
-                  {
-                    'key': 'quality',
-                    'default': 'MP3',
-                    'options': [
-                      {'value': 'MP3'},
-                      {'value': 'FLAC'},
-                    ],
-                  },
-                  {'key': 'mode', 'default': 'stereo'},
-                ],
-              }),
-              200,
-            );
-          }
-          if (request.url.path.endsWith('/search')) {
-            return http.Response(
-              jsonEncode({
-                'tracks': [
-                  {
-                    'id': 'track',
-                    'title': 'Song',
-                    'artist': 'Artist',
-                    'duration': 222,
-                    'format': 'flac',
-                  },
-                ],
-              }),
-              200,
-            );
-          }
+  test('addon requests map quality options, forward defaults and enforce playback-only', () async {
+    final requests = <http.Request>[];
+    final client = AddonClient(
+      'https://example.invalid/addon',
+      httpClient: MockClient((request) async {
+        requests.add(request);
+        if (request.url.path.endsWith('/manifest.json')) {
           return http.Response(
-            '{"url":"https://example.invalid/audio.flac","format":"flac"}',
+            jsonEncode({
+              'id': 'test',
+              'name': 'Test',
+              'allowDownloads': false,
+              'settings': [
+                {
+                  'key': 'quality',
+                  'default': 'MP3',
+                  'options': [
+                    {'value': 'MP3'},
+                    {'value': 'FLAC'},
+                  ],
+                },
+                {'key': 'mode', 'default': 'stereo'},
+              ],
+            }),
             200,
           );
-        }),
-      );
-      final tracks = await client.search('Song Artist');
-      expect(
-        tracks.single.asSong('source').duration,
-        const Duration(seconds: 222),
-      );
-      expect(requests.last.url.queryParameters, {
-        'quality': 'FLAC',
-        'mode': 'stereo',
-        'q': 'Song Artist',
-      });
-      final stream = await client.stream('track', 'source');
-      expect(stream.allowDownloads, isFalse);
-      final count = requests.length;
-      await expectLater(
-        client.stream('track', 'source', forDownload: true),
-        throwsA(isA<ServiceException>()),
-      );
-      expect(
-        requests.length,
-        count,
-      ); // Policy rejected before another stream request.
-      client.close();
-    },
-  );
+        }
+        if (request.url.path.endsWith('/search')) {
+          return http.Response(
+            jsonEncode({
+              'tracks': [
+                {
+                  'id': 'track',
+                  'title': 'Song',
+                  'artist': 'Artist',
+                  'duration': 222,
+                  'format': 'flac',
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response(
+          '{"url":"https://example.invalid/audio.flac","format":"flac"}',
+          200,
+        );
+      }),
+    );
+    final tracks = await client.search('Song Artist');
+    expect(
+      tracks.single.asSong('source').duration,
+      const Duration(seconds: 222),
+    );
+    expect(requests.last.url.queryParameters, {
+      'quality': 'FLAC',
+      'mode': 'stereo',
+      'q': 'Song Artist',
+    });
+    final stream = await client.stream('track', 'source');
+    expect(stream.allowDownloads, isFalse);
+    final count = requests.length;
+    await expectLater(
+      client.stream('track', 'source', forDownload: true),
+      throwsA(isA<ServiceException>()),
+    );
+    expect(
+      requests.length,
+      count,
+    ); // Policy rejected before another stream request.
+    client.close();
+  });
 
   test(
     '429 creates a bounded quiet period instead of hammering the server',

@@ -158,8 +158,9 @@ abstract interface class StreamResolver {
   Future<void> close();
 }
 
-typedef AuthenticatedPlayerLoader =
-    Future<Map<String, dynamic>> Function(String videoId);
+typedef AuthenticatedPlayerLoader = Future<Map<String, dynamic>> Function(
+  String videoId,
+);
 typedef AlternateStreamLoader = Future<ResolvedStream?> Function(Song song);
 
 /// Bounded resolver cache: only eight manifests and eight URLs are retained.

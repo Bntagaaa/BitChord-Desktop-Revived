@@ -37,40 +37,37 @@ void main() {
     },
   );
 
-  test(
-    'live shell metadata authenticates requests while typeahead stays anonymous',
-    () async {
-      final requests = <http.Request>[];
-      final client = InnertubeClient(
-        httpClient: MockClient((request) async {
-          requests.add(request);
-          return http.Response(request.method == 'GET' ? shell : '{}', 200);
-        }),
-        clock: () => DateTime.fromMillisecondsSinceEpoch(1700000000000),
-      );
-      client.setCookie('__Secure-3PAPISID=session');
-      await client.browse('FEmusic_home');
-      final signed = requests.last;
-      final body = jsonDecode(signed.body) as Map<String, dynamic>;
-      expect(signed.headers['cookie'], '__Secure-3PAPISID=session');
-      expect(
-        signed.headers['authorization'],
-        startsWith('SAPISIDHASH 1700000000_'),
-      );
-      expect(signed.headers['x-goog-authuser'], '2');
-      expect(signed.headers['x-youtube-client-version'], '1.live.01');
-      expect(body['context']['user']['onBehalfOfUser'], 'brand');
-      await client.post('search', {'query': 'typing'}, authenticated: false);
-      expect(requests.last.headers['cookie'], isNull);
-      expect(requests.last.headers['authorization'], isNull);
-      expect(
-        jsonDecode(requests.last.body)['context']['user']['onBehalfOfUser'],
-        isNull,
-      );
-      expect(requests.where((r) => r.method == 'GET'), hasLength(1));
-      client.close();
-    },
-  );
+  test('live shell metadata authenticates requests while typeahead stays anonymous', () async {
+    final requests = <http.Request>[];
+    final client = InnertubeClient(
+      httpClient: MockClient((request) async {
+        requests.add(request);
+        return http.Response(request.method == 'GET' ? shell : '{}', 200);
+      }),
+      clock: () => DateTime.fromMillisecondsSinceEpoch(1700000000000),
+    );
+    client.setCookie('__Secure-3PAPISID=session');
+    await client.browse('FEmusic_home');
+    final signed = requests.last;
+    final body = jsonDecode(signed.body) as Map<String, dynamic>;
+    expect(signed.headers['cookie'], '__Secure-3PAPISID=session');
+    expect(
+      signed.headers['authorization'],
+      startsWith('SAPISIDHASH 1700000000_'),
+    );
+    expect(signed.headers['x-goog-authuser'], '2');
+    expect(signed.headers['x-youtube-client-version'], '1.live.01');
+    expect(body['context']['user']['onBehalfOfUser'], 'brand');
+    await client.post('search', {'query': 'typing'}, authenticated: false);
+    expect(requests.last.headers['cookie'], isNull);
+    expect(requests.last.headers['authorization'], isNull);
+    expect(
+      jsonDecode(requests.last.body)['context']['user']['onBehalfOfUser'],
+      isNull,
+    );
+    expect(requests.where((r) => r.method == 'GET'), hasLength(1));
+    client.close();
+  });
 
   test(
     'HTTP 200 service errors are rejected and mutations are never retried',

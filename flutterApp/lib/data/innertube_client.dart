@@ -91,9 +91,9 @@ class InnertubeClient {
         // DATASYNC_ID is account||delegated; the second half is active.
         _dataSyncId = _pageId ?? normalizeDataSyncId(raw);
         _authUser =
-            RegExp(
-              r'"SESSION_INDEX"\s*:\s*"?(\d+)',
-            ).firstMatch(html)?.group(1) ??
+            RegExp(r'"SESSION_INDEX"\s*:\s*"?(\d+)')
+                .firstMatch(html)
+                ?.group(1) ??
             '0';
       }
       _ready = true;
@@ -160,9 +160,8 @@ class InnertubeClient {
       },
       ...payload,
     });
-    final uri = Uri.parse(
-      '$musicOrigin/youtubei/v1/$endpoint',
-    ).replace(queryParameters: {'prettyPrint': 'false', 'hl': language});
+    final uri = Uri.parse('$musicOrigin/youtubei/v1/$endpoint')
+        .replace(queryParameters: {'prettyPrint': 'false', 'hl': language});
     const reads = {
       'browse',
       'next',

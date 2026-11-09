@@ -203,32 +203,29 @@ void main() {
     },
   );
 
-  test(
-    'current failed sign-in restores the committed account, not an unverified attempt',
-    () async {
-      final oldValidation = Completer<Map<String, dynamic>>();
-      final vault = FakeVault()..cookie = 'SAPISID=committed';
-      final auth = AuthStore(storage: vault);
-      final client = AccountClient(
-        (cookie) => cookie == 'SAPISID=first'
-            ? oldValidation.future
-            : Future.error(const ServiceException('Second rejected')),
-      )..setCookie('SAPISID=committed');
-      final first = expectLater(
-        auth.signIn('SAPISID=first', client),
-        throwsA(isA<ServiceException>()),
-      );
-      await expectLater(
-        auth.signIn('SAPISID=second', client),
-        throwsA(isA<ServiceException>()),
-      );
-      oldValidation.complete(account('First'));
-      await first;
-      expect(client.cookie, 'SAPISID=committed');
-      expect(vault.cookie, 'SAPISID=committed');
-      client.close();
-    },
-  );
+  test('current failed sign-in restores the committed account, not an unverified attempt', () async {
+    final oldValidation = Completer<Map<String, dynamic>>();
+    final vault = FakeVault()..cookie = 'SAPISID=committed';
+    final auth = AuthStore(storage: vault);
+    final client = AccountClient(
+      (cookie) => cookie == 'SAPISID=first'
+          ? oldValidation.future
+          : Future.error(const ServiceException('Second rejected')),
+    )..setCookie('SAPISID=committed');
+    final first = expectLater(
+      auth.signIn('SAPISID=first', client),
+      throwsA(isA<ServiceException>()),
+    );
+    await expectLater(
+      auth.signIn('SAPISID=second', client),
+      throwsA(isA<ServiceException>()),
+    );
+    oldValidation.complete(account('First'));
+    await first;
+    expect(client.cookie, 'SAPISID=committed');
+    expect(vault.cookie, 'SAPISID=committed');
+    client.close();
+  });
 
   test('a failed vault write does not poison a subsequent logout', () async {
     final vault = FakeVault()

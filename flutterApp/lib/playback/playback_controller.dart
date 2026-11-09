@@ -1106,9 +1106,8 @@ class PlaybackController extends ChangeNotifier {
   void _trackChanged(Song song) {
     if (onTrackChanged != null) {
       unawaited(
-        Future<void>.sync(
-          () => onTrackChanged!(song),
-        ).catchError((Object _) {}),
+        Future<void>.sync(() => onTrackChanged!(song))
+            .catchError((Object _) {}),
       );
     }
   }
@@ -1147,8 +1146,7 @@ class PlaybackController extends ChangeNotifier {
     if (write == null) return Future.value();
     final saved = snapshot;
     _writeChain = _writeChain.then((_) => write(saved)).catchError((Object _) {
-      _persistenceError =
-          'Playback could not be saved. Check available storage and file permissions.';
+      _persistenceError = 'Playback could not be saved. Check available storage and file permissions.';
       _notify();
     });
     return _writeChain;
