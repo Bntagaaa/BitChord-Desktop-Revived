@@ -242,8 +242,8 @@ class PlayerDock extends StatelessWidget {
                                 : (player.position.inMilliseconds /
                                         player.duration.inMilliseconds)
                                     .clamp(0.0, 1.0),
-                            trackColor: p.foreground.withOpacity(0.12),
-                            fillColor: p.accent.withOpacity(0.92),
+                            trackColor: p.foreground.withValues(alpha: 0.12),
+                            fillColor: p.accent.withValues(alpha: 0.92),
                           ),
                         ),
                       ),

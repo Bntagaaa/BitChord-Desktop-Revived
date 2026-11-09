@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../application/app_controller.dart';
 import '../domain/models.dart';
@@ -188,9 +189,9 @@ class _SmoothLyricsPanelState extends State<SmoothLyricsPanel>
     final renderBox = targetContext.findRenderObject() as RenderBox?;
     if (renderBox == null || !renderBox.hasSize) return;
 
-    if (!_scroll.hasClients) return;
-    final position = _scroll.position;
-    final revealed = position.getOffsetToReveal(
+    final viewport = RenderAbstractViewport.of(renderBox);
+    if (viewport == null) return;
+    final revealed = viewport.getOffsetToReveal(
       renderBox,
       widget.centerFocus ? 0.38 : 0.25,
     );
@@ -198,7 +199,7 @@ class _SmoothLyricsPanelState extends State<SmoothLyricsPanel>
     final currentOffset = _scroll.offset;
     final targetOffset = revealed.offset.clamp(
       0.0,
-      position.maxScrollExtent,
+      _scroll.position.maxScrollExtent,
     );
     final delta = targetOffset - currentOffset;
 
@@ -773,7 +774,7 @@ class _GapDotsPainter extends CustomPainter {
       final lit = (through * kGapDots - i).clamp(0.0, 1.0);
       final dotAlpha = kGapDotRest + (1.0 - kGapDotRest) * lit;
       final paint = Paint()
-        ..color = color.withOpacity(dotAlpha.clamp(0.0, 1.0))
+        ..color = color.withValues(alpha: dotAlpha.clamp(0.0, 1.0))
         ..style = PaintingStyle.fill;
 
       final cx = radius + i * stride;
@@ -923,7 +924,7 @@ class _SweptLyricText extends StatelessWidget {
                 Text(
                   line.text.isEmpty ? '♪' : line.text,
                   style: style.copyWith(
-                    color: color.withOpacity(isPast ? 0.95 : kUnsungAlpha),
+                    color: color.withValues(alpha: isPast ? 0.95 : kUnsungAlpha),
                   ),
                   textAlign: textAlign,
                 ),
@@ -937,7 +938,7 @@ class _SweptLyricText extends StatelessWidget {
                     child: Text(
                       line.text,
                       style: style.copyWith(
-                        color: color.withOpacity(kGlowAlpha),
+                        color: color.withValues(alpha: kGlowAlpha),
                       ),
                       textAlign: textAlign,
                     ),

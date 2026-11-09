@@ -521,7 +521,8 @@ class _DesktopThinSliderState extends State<DesktopThinSlider> {
     final active = _hovered || _dragging;
     final targetH = active ? widget.activeHeight : widget.idleHeight;
     final activeCol = widget.activeColor ?? p.accent;
-    final inactiveCol = widget.inactiveColor ?? p.foreground.withOpacity(0.18);
+    final inactiveCol =
+        widget.inactiveColor ?? p.foreground.withValues(alpha: 0.18);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
