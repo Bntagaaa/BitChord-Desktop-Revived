@@ -3,6 +3,20 @@ name: Compose desktop architecture
 on:
   push:
     branches: [1.9.2-Compose-Dekstop]
+    paths:
+      - 'desktop*/**'
+      - 'shared*/**'
+      - 'app/**'
+      - 'native/**'
+      - '*.gradle.kts'
+      - gradle.properties
+      - 'gradle/**'
+      - .github/workflows/compose-desktop-architecture.yml
+      - .github/workflows/check.yml
+      - .github/workflows/build-test-appimage.yml
+      - .github/workflows/build-windows-portable.yml
+      - .github/scripts/check-packaged-player-ui.py
+      - .github/scripts/report-desktop-test-failures.py
   workflow_dispatch:
     inputs:
       try_create_pr:
