@@ -40,6 +40,32 @@ def sample(pid):
     }
 
 
+def thread_times(pid):
+    answer = {}
+    for task in (Path("/proc") / str(pid) / "task").iterdir():
+        try:
+            stat = (task / "stat").read_text().rsplit(")", 1)[1].split()
+            answer[int(task.name)] = {
+                "name": (task / "comm").read_text().strip(),
+                "cpu_s": (int(stat[11]) + int(stat[12])) / os.sysconf("SC_CLK_TCK"),
+            }
+        except (FileNotFoundError, ProcessLookupError):
+            pass  # A worker can exit during enumeration.
+    return answer
+
+
+def hot_threads(before, after, elapsed, dump):
+    rows = []
+    for tid in before.keys() & after.keys():
+        cpu = 100 * (after[tid]["cpu_s"] - before[tid]["cpu_s"]) / elapsed
+        marker = f"nid=0x{tid:x} "
+        block = next((part for part in dump.split("\n\n") if marker in part), "")
+        rows.append({"name": after[tid]["name"], "cpu_percent_one_core": cpu,
+                     "java_stack": [line.strip() for line in block.splitlines()
+                                    if line.lstrip().startswith("at ")][:20]})
+    return sorted(rows, key=lambda row: row["cpu_percent_one_core"], reverse=True)[:5]
+
+
 def command(args):
     result = subprocess.run(args, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=30)
@@ -96,12 +122,16 @@ def measure(label, launcher, output, seconds, round_number):
                 window_ms = (time.monotonic() - started) * 1000
                 # This is a native window latency, NOT an asserted usable-frame latency.
                 time.sleep(20)
+                threads_before = thread_times(process.pid)
+                sample_started = time.monotonic()
                 samples = []
                 for _ in range(seconds):
                     if process.poll() is not None:
                         raise RuntimeError(f"{label} exited during sampling: {process.returncode}")
                     samples.append(sample(process.pid))
                     time.sleep(1)
+                sample_elapsed = time.monotonic() - sample_started
+                threads_after = thread_times(process.pid)
                 # NMT tracks JVM allocations, not all third-party/driver native memory.
                 jcmd = shutil.which("jcmd")
                 diagnostics = {}
@@ -110,6 +140,7 @@ def measure(label, launcher, output, seconds, round_number):
                         ("heap", ["GC.heap_info"]),
                         ("native_memory", ["VM.native_memory", "summary", "scale=KB"]),
                         ("flags", ["VM.flags"]),
+                        ("threads", ["Thread.print"]),
                     ):
                         diagnostics[name] = command([jcmd, str(process.pid), *args])
                         (run_dir / f"{name}.txt").write_text(diagnostics[name]["output"])
@@ -122,6 +153,14 @@ def measure(label, launcher, output, seconds, round_number):
                     "summary": summarize(samples), "samples": samples,
                     "jcmd_exit_codes": {key: value["exit_code"] for key, value in diagnostics.items()},
                     "screenshot_exit_code": screenshot["exit_code"],
+                    "hot_surviving_threads": hot_threads(
+                        threads_before, threads_after, sample_elapsed,
+                        diagnostics.get("threads", {}).get("output", "")),
+                    "loaded_native_libraries": sorted({
+                        Path(line.split()[-1]).name
+                        for line in (Path("/proc") / str(process.pid) / "maps").read_text().splitlines()
+                        if len(line.split()) >= 6 and ".so" in line.split()[-1]
+                    }),
                 }
                 heap = re.search(r"heap\s+total\s+(\d+)([KM]),\s+used\s+(\d+)([KM])",
                                  diagnostics.get("heap", {}).get("output", ""))
@@ -131,6 +170,12 @@ def measure(label, launcher, output, seconds, round_number):
                 nmt = re.search(r"Total: reserved=(\d+)KB, committed=(\d+)KB",
                                 diagnostics.get("native_memory", {}).get("output", ""))
                 result["jvm_nmt_committed_bytes"] = int(nmt[2]) * 1024 if nmt else None
+                result["jvm_nmt_categories"] = {
+                    name.strip(): int(committed) * 1024
+                    for name, committed in re.findall(
+                        r"(?m)^-\s+(.+?)\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                        diagnostics.get("native_memory", {}).get("output", ""))
+                }
                 (run_dir / "metrics.json").write_text(json.dumps(result, indent=2) + "\n")
                 return result
             finally:
@@ -186,7 +231,9 @@ def main():
         "pss_reduction_percent": report["pss_reduction_percent"],
         "runs": [{key: row[key] for key in ("label", "round", "native_window_ms", "summary",
                                           "heap_used_bytes", "jvm_nmt_committed_bytes",
-                                          "jcmd_exit_codes")} for row in results],
+                                          "jcmd_exit_codes", "hot_surviving_threads",
+                                          "loaded_native_libraries", "jvm_nmt_categories")}
+                 for row in results],
     }
     print("::notice title=Packaged idle comparison::" + json.dumps(public), flush=True)
 
