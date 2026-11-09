@@ -438,7 +438,6 @@ class QueueView extends StatelessWidget {
           title: 'Your queue is empty',
           message: 'Play a song or add music from a song menu.',
           icon: Icons.queue_music,
-          asset: 'assets/icons/player_transport_up_next.svg',
         );
       }
       return Column(
@@ -1141,10 +1140,7 @@ class NowPlayingViewState extends State<NowPlayingView> {
                               switchOutCurve: Curves.easeInCubic,
                               layoutBuilder: (current, previous) => Stack(
                                 fit: StackFit.expand,
-                                children: [
-                                  ...previous,
-                                  if (current != null) current,
-                                ],
+                                children: [...previous, ?current],
                               ),
                               child: KeyedSubtree(
                                 key: ValueKey(pane),
