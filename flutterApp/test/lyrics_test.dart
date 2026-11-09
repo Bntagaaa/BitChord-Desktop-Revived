@@ -268,4 +268,13 @@ void main() {
       session.dispose();
     },
   );
+
+  test('lyric edge fade calculation follows the 28dp boundary', () {
+    const fadePixels = 28.0;
+    double topStop(double height) =>
+        height > 0 ? (fadePixels / height).clamp(0.0, 0.5) : 0.0;
+    expect(topStop(400), 28.0 / 400.0);
+    expect(topStop(50), 0.5);
+    expect(topStop(0), 0.0);
+  });
 }

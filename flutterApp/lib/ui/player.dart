@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../domain/application.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -71,6 +72,27 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
     _timer = Timer(const Duration(seconds: 2), () {
       if (mounted) setState(() => _intro = false);
     });
+  }
+
+  void _scrollToActive(int active) {
+    if (!_lyricsScroll.hasClients || active < 0) return;
+    final lineContext = _lyricsKeys[active]?.currentContext;
+    if (lineContext == null) return;
+    final box = lineContext.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final viewport = RenderAbstractViewport.of(box);
+    final reveal = viewport.getOffsetToReveal(box, 0.5);
+    final target = reveal.offset.clamp(
+      0.0,
+      _lyricsScroll.position.maxScrollExtent,
+    );
+    unawaited(
+      _lyricsScroll.animateTo(
+        target,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      ),
+    );
   }
 
   @override
@@ -408,55 +430,66 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
         _active = active;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          final lineContext = _lyricsKeys[active]?.currentContext;
-          if (lineContext != null) {
-            unawaited(
-              Scrollable.ensureVisible(
-                lineContext,
-                alignment: .5,
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.easeInOut,
-              ),
-            );
-          }
+          _scrollToActive(active);
         });
       }
       return Column(
         children: [
           Expanded(
             child: ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.white,
-                  Colors.white,
-                  Colors.transparent,
-                ],
-                stops: [0, .06, .92, 1],
-              ).createShader(bounds),
+              shaderCallback: (bounds) {
+                const fadePixels = 28.0;
+                final topFraction = bounds.height > 0
+                    ? (fadePixels / bounds.height).clamp(0.0, 0.5)
+                    : 0.0;
+                final bottomFraction = (1.0 - topFraction).clamp(0.5, 1.0);
+                return LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: const [
+                    Colors.transparent,
+                    Colors.white,
+                    Colors.white,
+                    Colors.transparent,
+                  ],
+                  stops: [0.0, topFraction, bottomFraction, 1.0],
+                ).createShader(bounds);
+              },
               blendMode: BlendMode.dstIn,
               child: SingleChildScrollView(
                 controller: _lyricsScroll,
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 140),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (var index = 0; index < lines.length; index++)
-                      InkWell(
+                      Padding(
                         key: _lyricsKeys.putIfAbsent(index, GlobalKey.new),
-                        borderRadius: BorderRadius.circular(10),
-                        onTap: () =>
-                            unawaited(app.audio.seek(lines[index].time)),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
-                            lines[index].text,
-                            style: TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white.withValues(
-                                alpha: index == active ? 1 : .4,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () =>
+                                unawaited(app.audio.seek(lines[index].time)),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              child: Text(
+                                lines[index].text,
+                                style: TextStyle(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white.withValues(
+                                    alpha: index == active ? 1 : .4,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
