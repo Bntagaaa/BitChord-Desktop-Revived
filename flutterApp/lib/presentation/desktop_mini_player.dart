@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../domain/song.dart';
 import 'desktop_theme.dart';
+import 'desktop_thin_slider.dart';
 
 enum DesktopRepeatMode {
   off('Off'),
@@ -269,27 +270,14 @@ class DesktopMiniPlayer extends StatelessWidget {
                           ),
                           const SizedBox(width: 6.0),
 
-                          // Volume slider (width 72.dp)
-                          SizedBox(
+                          // Volume slider: Apple Music scrubber (DesktopThinSlider.kt, width 72.dp)
+                          DesktopThinSlider(
+                            value: volume,
+                            onChanged: onVolumeChange,
                             width: 72.0,
-                            height: 20.0,
-                            child: SliderTheme(
-                              data: SliderThemeData(
-                                trackHeight: 4.0,
-                                thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 5.0,
-                                ),
-                                overlayShape: SliderComponentShape.noOverlay,
-                                activeTrackColor: palette.foreground,
-                                inactiveTrackColor:
-                                    palette.foreground.withValues(alpha: 0.12),
-                                thumbColor: palette.foreground,
-                              ),
-                              child: Slider(
-                                value: volume.clamp(0.0, 1.0),
-                                onChanged: onVolumeChange,
-                              ),
-                            ),
+                            idleHeight: 4.0,
+                            activeHeight: 7.0,
+                            palette: palette,
                           ),
                         ],
                       ),
@@ -310,20 +298,24 @@ class DesktopMiniPlayer extends StatelessWidget {
                       ),
 
                     // Bottom progress line: height 2dp (lines 6339-6350)
-                    Align(
-                      alignment: Alignment.bottomLeft,
-                      child: Container(
-                        height: 2.0,
-                        color: palette.foreground.withValues(alpha: 0.12),
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: progress.clamp(0.0, 1.0),
-                          child: Container(
-                            color: palette.accent.withValues(alpha: 0.92),
-                          ),
+                    if (song != null)
+                      Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Container(
+                          height: 2.0,
+                          color: palette.foreground.withValues(alpha: 0.12),
+                          child: progress > 0.0
+                              ? FractionallySizedBox(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: progress.clamp(0.0, 1.0),
+                                  child: Container(
+                                    color:
+                                        palette.accent.withValues(alpha: 0.92),
+                                  ),
+                                )
+                              : null,
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),

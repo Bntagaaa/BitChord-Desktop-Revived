@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../domain/song.dart';
 import 'desktop_mini_player.dart';
+import 'desktop_new_page.dart';
 import 'desktop_sidebar.dart';
 import 'desktop_theme.dart';
+import 'desktop_typography.dart';
 import 'sidebar_policy.dart';
-import '../domain/song.dart';
 
 /// Desktop application frame translated 1:1 from DesktopApp.kt lines 6470-6560.
 class DesktopShell extends StatefulWidget {
@@ -24,17 +26,11 @@ class _DesktopShellState extends State<DesktopShell> {
   DesktopDestination _destination = DesktopDestination.listenNow;
   bool _settingsOpen = false;
 
-  // Mock player state for initial demonstration
-  final Song _currentSong = const Song(
-    videoId: 'sample',
-    title: 'Welcome to BitChord',
-    artist: 'Native Desktop Revived',
-    thumbnailUrl: null,
-    durationSeconds: 180,
-  );
+  // Initial player state (empty dock by default, matching DesktopApp.kt line 6294)
+  Song? _currentSong;
   bool _isPlaying = false;
-  final bool _isLoading = false;
-  final double _progress = 0.35;
+  bool _isLoading = false;
+  double _progress = 0.0;
   double _volume = 0.8;
   bool _shuffle = false;
   DesktopRepeatMode _repeatMode = DesktopRepeatMode.off;
@@ -87,21 +83,11 @@ class _DesktopShellState extends State<DesktopShell> {
                         },
                       ),
 
-                      // Main Content column
+                      // Main Content area (starts immediately at top, matching DesktopApp.kt)
                       Expanded(
-                        child: Column(
-                          children: [
-                            // Top Navigation / Window Title bar
-                            _buildTopBar(palette),
-
-                            // Page Content with bottom padding of 132.dp for dock clearance
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 132.0),
-                                child: _buildPageContent(palette),
-                              ),
-                            ),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 132.0),
+                          child: _buildPageContent(palette),
                         ),
                       ),
                     ],
@@ -148,87 +134,100 @@ class _DesktopShellState extends State<DesktopShell> {
     );
   }
 
-  Widget _buildTopBar(DesktopThemePalette palette) {
-    return Container(
-      height: 48.0,
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      decoration: BoxDecoration(
-        color: palette.chromeSurface,
-        border: Border(
-          bottom: BorderSide(
-            color: palette.divider,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Text(
-            _settingsOpen ? 'Settings' : _destination.label,
-            style: TextStyle(
-              fontFamily: 'SFProDisplay',
-              fontSize: 16.0,
-              fontWeight: FontWeight.w600,
-              color: palette.foreground,
-            ),
-          ),
-          const Spacer(),
-          // Theme mode toggle icon
-          IconButton(
-            iconSize: 18.0,
-            tooltip: 'Toggle Dark / Light Mode',
-            icon: Icon(
-              widget.themeController.isDark
-                  ? Icons.light_mode_rounded
-                  : Icons.dark_mode_rounded,
-              color: palette.secondary,
-            ),
-            onPressed: () {
-              widget.themeController.setMode(
-                widget.themeController.isDark
-                    ? DesktopThemeMode.light
-                    : DesktopThemeMode.dark,
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPageContent(DesktopThemePalette palette) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.album_rounded,
-            size: 64.0,
-            color: palette.secondary.withValues(alpha: 0.4),
-          ),
-          const SizedBox(height: 16.0),
-          Text(
-            _settingsOpen ? 'Settings Page' : '${_destination.label} Feed',
-            style: TextStyle(
-              fontFamily: 'SFProDisplay',
-              fontSize: 22.0,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.25,
-              color: palette.foreground,
+    if (_settingsOpen) {
+      return Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Settings',
+              style: DesktopTypography.displayLarge(palette.foreground).copyWith(
+                fontSize: 34.0,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 8.0),
-          Text(
-            'Direct 1:1 Code Porting from BitChord Desktop 1.9.2',
-            style: TextStyle(
-              fontFamily: 'SFProDisplay',
-              fontSize: 14.0,
-              fontWeight: FontWeight.w400,
-              color: palette.secondary,
+            const SizedBox(height: 24.0),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'Theme Mode',
+                style: DesktopTypography.bodyLarge(palette.foreground),
+              ),
+              subtitle: Text(
+                widget.themeController.isDark ? 'Dark Mode' : 'Light Mode',
+                style: DesktopTypography.bodySmall(palette.secondary),
+              ),
+              trailing: IconButton(
+                icon: Icon(
+                  widget.themeController.isDark
+                      ? Icons.light_mode_rounded
+                      : Icons.dark_mode_rounded,
+                  color: palette.foreground,
+                ),
+                onPressed: () {
+                  widget.themeController.setMode(
+                    widget.themeController.isDark
+                        ? DesktopThemeMode.light
+                        : DesktopThemeMode.dark,
+                  );
+                },
+              ),
             ),
+          ],
+        ),
+      );
+    }
+
+    switch (_destination) {
+      case DesktopDestination.listenNow:
+        return DesktopNewPage(
+          palette: palette,
+          onSongSelected: (song) {
+            setState(() {
+              _currentSong = song;
+              _isPlaying = true;
+              _progress = 0.05;
+            });
+          },
+        );
+      default:
+        return Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _destination.label,
+                style: DesktopTypography.displayLarge(palette.foreground).copyWith(
+                  fontSize: 34.0,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 32.0),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.album_rounded,
+                      size: 64.0,
+                      color: palette.secondary.withValues(alpha: 0.4),
+                    ),
+                    const SizedBox(height: 16.0),
+                    Text(
+                      '${_destination.label} section',
+                      style: DesktopTypography.headlineMedium(palette.foreground),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
+    }
   }
 }
