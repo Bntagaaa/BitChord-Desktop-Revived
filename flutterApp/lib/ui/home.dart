@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../domain/application.dart';
-import '../domain/audio.dart';
 import '../domain/music.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -57,7 +56,7 @@ class _HomePageState extends State<HomePage> {
 
   bool _isItemPlaying(CatalogItem item) {
     final currentSong = widget.app.song;
-    final isPlaying = widget.app.status.value == PlayerStatus.playing;
+    final isPlaying = widget.app.playing;
     if (currentSong == null || !isPlaying) return false;
     if (item.song?.id == currentSong.id) return true;
     if (item.videoId != null && item.videoId == currentSong.id) return true;
@@ -108,7 +107,7 @@ class _HomePageState extends State<HomePage> {
     final colors = paletteOf(context);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([app, app.status]),
+      listenable: app,
       builder: (context, _) {
         final page = app.page;
         final shelves = page.shelves;
