@@ -642,6 +642,7 @@ class RecentSectionHeader extends StatelessWidget {
                   message: isGrid
                       ? 'Switch to list view'
                       : 'Switch to grid view',
+                  triggerMode: TooltipTriggerMode.longPress,
                   child: Icon(
                     isGrid ? Icons.view_list_rounded : Icons.grid_view_rounded,
                     size: 19,

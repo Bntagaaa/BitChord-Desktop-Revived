@@ -593,6 +593,7 @@ class _ShelfChevronButton extends StatelessWidget {
           height: 34,
           child: Tooltip(
             message: tooltip,
+            triggerMode: TooltipTriggerMode.longPress,
             child: Icon(icon, color: Colors.white, size: 22),
           ),
         ),
