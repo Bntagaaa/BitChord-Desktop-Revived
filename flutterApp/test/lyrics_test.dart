@@ -286,7 +286,6 @@ void main() {
         id: 'yt:catalog_track',
         title: 'Online Song',
         artist: 'Artist',
-
       );
       session.select(onlineTrack);
 
