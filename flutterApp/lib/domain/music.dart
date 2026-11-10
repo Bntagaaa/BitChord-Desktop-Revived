@@ -53,6 +53,13 @@ class Song {
   }
 }
 
+enum ShelfLayout {
+  cards,
+  list,
+  video,
+  hero,
+}
+
 class CatalogItem {
   const CatalogItem({
     required this.title,
@@ -61,6 +68,10 @@ class CatalogItem {
     this.browseId,
     this.params,
     this.song,
+    this.isVideo = false,
+    this.videoId,
+    this.durationText,
+    this.isExplicit = false,
   });
   final String title;
   final String subtitle;
@@ -68,12 +79,51 @@ class CatalogItem {
   final String? browseId;
   final String? params;
   final Song? song;
+  final bool isVideo;
+  final String? videoId;
+  final String? durationText;
+  final bool isExplicit;
 }
 
 class Shelf {
-  const Shelf(this.title, this.items);
+  const Shelf(
+    this.title,
+    this.items, {
+    this.subtitle,
+    this.moreBrowseId,
+    this.moreParams,
+    this.layout = ShelfLayout.cards,
+  });
   final String title;
   final List<CatalogItem> items;
+  final String? subtitle;
+  final String? moreBrowseId;
+  final String? moreParams;
+  final ShelfLayout layout;
+}
+
+ShelfLayout shelfLayoutFor({
+  required String title,
+  String? subtitle,
+  required List<CatalogItem> items,
+  bool fromList = false,
+}) {
+  if (items.isEmpty) return ShelfLayout.cards;
+  final first = items.first;
+  if (fromList && (first.videoId != null || first.song?.id != null)) {
+    return ShelfLayout.list;
+  }
+  final lowerTitle = title.trim().toLowerCase();
+  if (lowerTitle == 'listen again' ||
+      lowerTitle == 'quick picks' ||
+      lowerTitle == 'recents') {
+    return ShelfLayout.list;
+  }
+  final videoCount = items.where((it) => it.isVideo).length;
+  if (videoCount * 2 > items.length) {
+    return ShelfLayout.video;
+  }
+  return ShelfLayout.cards;
 }
 
 class CatalogPage {

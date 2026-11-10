@@ -173,6 +173,30 @@ class RendererParser {
     }
     final art = thumbnail(row['thumbnailRenderer']);
     final subtitle = text(row['subtitle']);
+
+    final timeStatus = at(row, [
+      'thumbnailOverlay',
+      'musicItemThumbnailOverlayRenderer',
+      'content',
+      'thumbnailOverlayTimeStatusRenderer',
+      'text',
+    ]);
+    final overlayDuration = text(timeStatus).trim();
+    final subParts = subtitle.split(' • ').map((s) => s.trim()).toList();
+    final durationFromSub = subParts.where(_duration.hasMatch).firstOrNull;
+    final finalDuration = overlayDuration.isNotEmpty ? overlayDuration : durationFromSub;
+
+    final isExplicit = renderers(row, 'musicInlineBadgeRenderer').any(
+      (badge) => at(badge, ['icon', 'iconType']) == 'MUSIC_EXPLICIT_BADGE',
+    ) || renderers(row, 'subtitleBadges').any(
+      (badge) => at(badge, ['icon', 'iconType']) == 'MUSIC_EXPLICIT_BADGE',
+    );
+
+    final isVideo = (video != null && browseId == null) &&
+        (at(row, ['aspectRatio'])?.toString().contains('16_9') == true ||
+            (finalDuration != null && browseId == null) ||
+            subtitle.toLowerCase().contains('video'));
+
     return CatalogItem(
       title: title,
       subtitle: subtitle,
@@ -181,7 +205,19 @@ class RendererParser {
       params: browse['params'] as String?,
       song: video == null
           ? null
-          : Song(id: video, title: title, artist: subtitle, artwork: art),
+          : Song(
+              id: video,
+              title: title,
+              artist: subtitle,
+              artwork: art,
+              durationText: finalDuration,
+              isVideo: isVideo,
+              isExplicit: isExplicit,
+            ),
+      isVideo: isVideo,
+      videoId: video,
+      durationText: finalDuration,
+      isExplicit: isExplicit,
     );
   }
 
@@ -238,12 +274,28 @@ class RendererParser {
     ]) {
       for (final shelf in renderers(root, rendererName)) {
         final header = object(shelf['header']);
-        final title = text(
-          at(header, ['musicCarouselShelfBasicHeaderRenderer', 'title']),
-        );
+        final basicHeader = object(header['musicCarouselShelfBasicHeaderRenderer']);
+        final title = text(basicHeader['title']);
         final heading = title.isNotEmpty ? title : text(shelf['title']);
+        final strapline = text(basicHeader['strapline']);
+
+        final moreEndpoint = object(
+          at(basicHeader, ['moreContentButton', 'buttonRenderer', 'navigationEndpoint', 'browseEndpoint']) ??
+          at(basicHeader, ['moreContentButton', 'musicMoreContentButtonRenderer', 'navigationEndpoint', 'browseEndpoint']) ??
+          at(shelf, ['bottomEndpoint', 'browseEndpoint']) ??
+          at(shelf, ['bottomButton', 'buttonRenderer', 'navigationEndpoint', 'browseEndpoint']),
+        );
+        final moreBrowseId = moreEndpoint['browseId'] as String?;
+        final moreParams = moreEndpoint['params'] as String?;
+
+        final contents = array(shelf['contents'] ?? shelf['items']);
+        var fromList = false;
+        if (contents.isNotEmpty && object(contents.first)['musicResponsiveListItemRenderer'] != null) {
+          fromList = true;
+        }
+
         final items = <CatalogItem>[];
-        for (final row in array(shelf['contents'] ?? shelf['items'])) {
+        for (final row in contents) {
           final twoRow = object(row)['musicTwoRowItemRenderer'];
           final responsive = object(row)['musicResponsiveListItemRenderer'];
           if (twoRow != null) {
@@ -258,12 +310,33 @@ class RendererParser {
                   subtitle: value.artist,
                   artwork: value.artwork,
                   song: value,
+                  videoId: value.id,
+                  isVideo: value.isVideo,
+                  durationText: value.durationText,
+                  isExplicit: value.isExplicit,
                 ),
               );
             }
           }
         }
-        if (items.isNotEmpty) shelves.add(Shelf(heading, items));
+        if (items.isNotEmpty) {
+          final layout = shelfLayoutFor(
+            title: heading,
+            subtitle: strapline.isNotEmpty ? strapline : null,
+            items: items,
+            fromList: fromList,
+          );
+          shelves.add(
+            Shelf(
+              heading,
+              items,
+              subtitle: strapline.isNotEmpty ? strapline : null,
+              moreBrowseId: moreBrowseId,
+              moreParams: moreParams,
+              layout: layout,
+            ),
+          );
+        }
       }
     }
     final header = [

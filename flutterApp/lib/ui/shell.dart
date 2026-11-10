@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../domain/application.dart';
 import '../domain/music.dart';
 import 'player.dart';
+import 'home.dart';
 import 'settings/settings_page.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -264,6 +265,7 @@ class _MusicShellState extends State<MusicShell> {
   Widget _page() {
     final colors = paletteOf(context);
     if (app.destination == Destination.settings) return SettingsPage(app: app);
+    if (app.destination == Destination.home) return HomePage(app: app);
     final songs = switch (app.destination) {
       Destination.localMusic => app.localSongs,
       Destination.history when !app.api.signedIn => app.history,
