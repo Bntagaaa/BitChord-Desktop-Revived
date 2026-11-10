@@ -53,12 +53,7 @@ class Song {
   }
 }
 
-enum ShelfLayout {
-  cards,
-  list,
-  video,
-  hero,
-}
+enum ShelfLayout { cards, list, video, hero }
 
 class CatalogItem {
   const CatalogItem({

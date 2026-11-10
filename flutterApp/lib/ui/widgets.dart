@@ -100,10 +100,7 @@ class TransportButton extends StatelessWidget {
   );
 }
 
-enum ArtworkHoverMode {
-  darkenOnly,
-  darkenAndPlay,
-}
+enum ArtworkHoverMode { darkenOnly, darkenAndPlay }
 
 class ArtworkHover extends StatefulWidget {
   const ArtworkHover({
@@ -163,11 +160,7 @@ class _ArtworkHoverState extends State<ArtworkHover> {
 }
 
 class ExplicitBadge extends StatelessWidget {
-  const ExplicitBadge({
-    super.key,
-    this.color,
-    this.size = 14.0,
-  });
+  const ExplicitBadge({super.key, this.color, this.size = 14.0});
 
   final Color? color;
   final double size;
@@ -202,10 +195,7 @@ class ExplicitBadge extends StatelessWidget {
 }
 
 class VideoDurationBadge extends StatelessWidget {
-  const VideoDurationBadge({
-    super.key,
-    required this.durationText,
-  });
+  const VideoDurationBadge({super.key, required this.durationText});
 
   final String durationText;
 
@@ -271,17 +261,19 @@ class _PlayingEqualizerBarsState extends State<PlayingEqualizerBars>
         animation: _anim,
         builder: (context, _) {
           final t = _anim.value;
-          final h1 = (0.38 +
-                  0.50 * (0.5 + 0.5 * sin(t * 2 * pi * (1300 / 520))))
-              .clamp(0.25, 1.0);
-          final h2 = (0.78 -
-                  0.45 *
-                      (0.5 + 0.5 * sin((t + 0.3) * 2 * pi * (1300 / 650))))
-              .clamp(0.25, 1.0);
-          final h3 = (0.52 +
-                  0.40 *
-                      (0.5 + 0.5 * sin((t + 0.6) * 2 * pi * (1300 / 780))))
-              .clamp(0.25, 1.0);
+          final h1 =
+              (0.38 + 0.50 * (0.5 + 0.5 * sin(t * 2 * pi * (1300 / 520))))
+                  .clamp(0.25, 1.0);
+          final h2 =
+              (0.78 -
+                      0.45 *
+                          (0.5 + 0.5 * sin((t + 0.3) * 2 * pi * (1300 / 650))))
+                  .clamp(0.25, 1.0);
+          final h3 =
+              (0.52 +
+                      0.40 *
+                          (0.5 + 0.5 * sin((t + 0.6) * 2 * pi * (1300 / 780))))
+                  .clamp(0.25, 1.0);
           return Row(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -299,13 +291,13 @@ class _PlayingEqualizerBarsState extends State<PlayingEqualizerBars>
   }
 
   Widget _bar(double height) => Container(
-        width: 3,
-        height: height,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
+    width: 3,
+    height: height,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(2),
+    ),
+  );
 }
 
 class DesktopScrollEdgeFade extends StatelessWidget {
@@ -329,7 +321,8 @@ class DesktopScrollEdgeFade extends StatelessWidget {
       builder: (context, _) {
         final hasClients = controller.hasClients;
         final canScrollBackward = hasClients && controller.offset > 0.0;
-        final canScrollForward = hasClients &&
+        final canScrollForward =
+            hasClients &&
             controller.position.maxScrollExtent > 0 &&
             controller.offset < controller.position.maxScrollExtent;
 
@@ -340,10 +333,14 @@ class DesktopScrollEdgeFade extends StatelessWidget {
         return ShaderMask(
           blendMode: BlendMode.dstIn,
           shaderCallback: (bounds) {
-            final topPx = (canScrollBackward ? topFade : 0.0)
-                .clamp(0.0, bounds.height / 3.0);
-            final bottomPx = (canScrollForward ? bottomFade : 0.0)
-                .clamp(0.0, bounds.height / 3.0);
+            final topPx = (canScrollBackward ? topFade : 0.0).clamp(
+              0.0,
+              bounds.height / 3.0,
+            );
+            final bottomPx = (canScrollForward ? bottomFade : 0.0).clamp(
+              0.0,
+              bounds.height / 3.0,
+            );
 
             final topFraction = bounds.height > 0
                 ? (topPx / bounds.height).clamp(0.0, 1.0)
@@ -398,7 +395,7 @@ class DesktopShelfRowChrome extends StatefulWidget {
 
   final Widget? child;
   final Widget Function(BuildContext context, ScrollController controller)?
-      builder;
+  builder;
   final ScrollController? controller;
   final double endInset;
 
@@ -431,8 +428,9 @@ class _DesktopShelfRowChromeState extends State<DesktopShelfRowChrome> {
     if (widget.controller != oldWidget.controller) {
       oldWidget.controller?.removeListener(_updateScrollMetrics);
       _effectiveController.addListener(_updateScrollMetrics);
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _updateScrollMetrics());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _updateScrollMetrics(),
+      );
     }
   }
 
@@ -461,10 +459,14 @@ class _DesktopShelfRowChromeState extends State<DesktopShelfRowChrome> {
     if (!_effectiveController.hasClients) return;
     final pos = _effectiveController.position;
     final viewport = pos.viewportDimension;
-    final distance =
-        (viewport - widget.endInset - _overlapPx).clamp(_overlapPx, viewport);
-    final target = (pos.pixels + (forward ? distance : -distance))
-        .clamp(0.0, pos.maxScrollExtent);
+    final distance = (viewport - widget.endInset - _overlapPx).clamp(
+      _overlapPx,
+      viewport,
+    );
+    final target = (pos.pixels + (forward ? distance : -distance)).clamp(
+      0.0,
+      pos.maxScrollExtent,
+    );
     _effectiveController.animateTo(
       target,
       duration: const Duration(milliseconds: 320),
@@ -474,12 +476,15 @@ class _DesktopShelfRowChromeState extends State<DesktopShelfRowChrome> {
 
   void _onPointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent && _effectiveController.hasClients) {
-      final delta =
-          event.scrollDelta.dy != 0 ? event.scrollDelta.dy : event.scrollDelta.dx;
+      final delta = event.scrollDelta.dy != 0
+          ? event.scrollDelta.dy
+          : event.scrollDelta.dx;
       if (delta != 0) {
         final pos = _effectiveController.position;
-        final target = (pos.pixels + (delta.sign * _wheelStep))
-            .clamp(0.0, pos.maxScrollExtent);
+        final target = (pos.pixels + (delta.sign * _wheelStep)).clamp(
+          0.0,
+          pos.maxScrollExtent,
+        );
         _effectiveController.jumpTo(target);
       }
     }
@@ -634,10 +639,9 @@ class _ShimmerBoxState extends State<ShimmerBox>
   @override
   Widget build(BuildContext context) {
     final baseColor = Theme.of(context).colorScheme.surfaceContainerHighest;
-    final highlightColor = Theme.of(context)
-        .colorScheme
-        .onSurfaceVariant
-        .withValues(alpha: 0.16);
+    final highlightColor = Theme.of(
+      context,
+    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.16);
 
     return AnimatedBuilder(
       animation: _controller,
@@ -696,4 +700,3 @@ class ShelfSkeleton extends StatelessWidget {
     );
   }
 }
-

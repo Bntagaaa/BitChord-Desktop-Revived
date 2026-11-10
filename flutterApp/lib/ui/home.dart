@@ -121,7 +121,12 @@ class _HomePageState extends State<HomePage> {
             controller: _scrollController,
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(pageGutter, 20, pageGutter, 8),
+                padding: const EdgeInsets.fromLTRB(
+                  pageGutter,
+                  20,
+                  pageGutter,
+                  8,
+                ),
                 sliver: SliverToBoxAdapter(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,10 +152,12 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               if (isBusy && shelves.isEmpty)
-                const SliverToBoxAdapter(
-                  child: ShelfSkeleton(),
-                ),
-              if (!isBusy && shelves.isEmpty && page.songs.isEmpty && page.items.isEmpty && error == null)
+                const SliverToBoxAdapter(child: ShelfSkeleton()),
+              if (!isBusy &&
+                  shelves.isEmpty &&
+                  page.songs.isEmpty &&
+                  page.items.isEmpty &&
+                  error == null)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(40),
@@ -163,77 +170,67 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               for (int i = 0; i < shelves.length; i++)
-                SliverToBoxAdapter(
-                  child: _buildShelf(shelves[i], i),
-                ),
+                SliverToBoxAdapter(child: _buildShelf(shelves[i], i)),
               if (page.items.isNotEmpty)
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: pageGutter),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = page.items[index];
-                        return ListTile(
-                          leading: Artwork(item.artwork, size: 44, radius: 8),
-                          title: Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            item.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: () => unawaited(app.browse(item)),
-                        );
-                      },
-                      childCount: page.items.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final item = page.items[index];
+                      return ListTile(
+                        leading: Artwork(item.artwork, size: 44, radius: 8),
+                        title: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          item.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => unawaited(app.browse(item)),
+                      );
+                    }, childCount: page.items.length),
                   ),
                 ),
               if (page.songs.isNotEmpty)
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: pageGutter),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final song = page.songs[index];
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                          leading: Artwork(song.artwork, size: 44, radius: 8),
-                          title: Text(
-                            song.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final song = page.songs[index];
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                        ),
+                        leading: Artwork(song.artwork, size: 44, radius: 8),
+                        title: Text(
+                          song.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          song.artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(song.durationText ?? ''),
+                        onTap: () => unawaited(
+                          app.play(
+                            song,
+                            context: page.songs,
+                            index: index,
+                            origin: page.title.isNotEmpty ? page.title : 'Home',
                           ),
-                          subtitle: Text(
-                            song.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: Text(song.durationText ?? ''),
-                          onTap: () => unawaited(
-                            app.play(
-                              song,
-                              context: page.songs,
-                              index: index,
-                              origin: page.title.isNotEmpty ? page.title : 'Home',
-                            ),
-                          ),
-                        );
-                      },
-                      childCount: page.songs.length,
-                    ),
+                        ),
+                      );
+                    }, childCount: page.songs.length),
                   ),
                 ),
               if (isBusy && shelves.isNotEmpty)
-                const SliverToBoxAdapter(
-                  child: ShelfSkeleton(),
-                ),
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 120),
-              ),
+                const SliverToBoxAdapter(child: ShelfSkeleton()),
+              const SliverToBoxAdapter(child: SizedBox(height: 120)),
             ],
           ),
         );
@@ -242,7 +239,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildShelf(Shelf shelf, int index) {
-    final isRecents = shelf.layout == ShelfLayout.list ||
+    final isRecents =
+        shelf.layout == ShelfLayout.list ||
         (index == 0 && shelf.title.trim().toLowerCase() == 'recents') ||
         shelf.title.trim().toLowerCase() == 'listen again';
 
@@ -282,9 +280,12 @@ class _HomePageState extends State<HomePage> {
                     builder: (context, controller) => ListView.separated(
                       controller: controller,
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: pageGutter),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: pageGutter,
+                      ),
                       itemCount: shelf.items.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: cardSpacing),
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(width: cardSpacing),
                       itemBuilder: (context, index) {
                         final item = shelf.items[index];
                         if (item.isVideo) {
@@ -316,7 +317,11 @@ class _HomePageState extends State<HomePage> {
               builder: (context, constraints) {
                 final columnWidth = min(constraints.maxWidth * 0.88, 400.0);
                 final columns = <List<CatalogItem>>[];
-                for (var i = 0; i < shelf.items.length; i += recentTracksPerColumn) {
+                for (
+                  var i = 0;
+                  i < shelf.items.length;
+                  i += recentTracksPerColumn
+                ) {
                   columns.add(
                     shelf.items.sublist(
                       i,
@@ -331,7 +336,9 @@ class _HomePageState extends State<HomePage> {
                     builder: (context, controller) => ListView.separated(
                       controller: controller,
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: pageGutter),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: pageGutter,
+                      ),
                       itemCount: columns.length,
                       separatorBuilder: (_, _) => const SizedBox(width: 12),
                       itemBuilder: (context, colIndex) {
@@ -372,14 +379,14 @@ class _HomePageState extends State<HomePage> {
             subtitle: shelf.subtitle ?? '',
             onOpen: shelf.moreBrowseId != null
                 ? () => unawaited(
-                      widget.app.browse(
-                        CatalogItem(
-                          title: shelf.title,
-                          browseId: shelf.moreBrowseId,
-                          params: shelf.moreParams,
-                        ),
+                    widget.app.browse(
+                      CatalogItem(
+                        title: shelf.title,
+                        browseId: shelf.moreBrowseId,
+                        params: shelf.moreParams,
                       ),
-                    )
+                    ),
+                  )
                 : null,
           ),
           SizedBox(
@@ -431,14 +438,14 @@ class _HomePageState extends State<HomePage> {
             subtitle: shelf.subtitle ?? '',
             onOpen: shelf.moreBrowseId != null
                 ? () => unawaited(
-                      widget.app.browse(
-                        CatalogItem(
-                          title: shelf.title,
-                          browseId: shelf.moreBrowseId,
-                          params: shelf.moreParams,
-                        ),
+                    widget.app.browse(
+                      CatalogItem(
+                        title: shelf.title,
+                        browseId: shelf.moreBrowseId,
+                        params: shelf.moreParams,
                       ),
-                    )
+                    ),
+                  )
                 : null,
           ),
           SizedBox(
@@ -480,14 +487,14 @@ class _HomePageState extends State<HomePage> {
             subtitle: shelf.subtitle ?? '',
             onOpen: shelf.moreBrowseId != null
                 ? () => unawaited(
-                      widget.app.browse(
-                        CatalogItem(
-                          title: shelf.title,
-                          browseId: shelf.moreBrowseId,
-                          params: shelf.moreParams,
-                        ),
+                    widget.app.browse(
+                      CatalogItem(
+                        title: shelf.title,
+                        browseId: shelf.moreBrowseId,
+                        params: shelf.moreParams,
                       ),
-                    )
+                    ),
+                  )
                 : null,
           ),
           LayoutBuilder(
@@ -501,7 +508,8 @@ class _HomePageState extends State<HomePage> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: pageGutter),
                     itemCount: shelf.items.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: cardSpacing),
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: cardSpacing),
                     itemBuilder: (context, index) {
                       final item = shelf.items[index];
                       return SizedBox(
@@ -546,9 +554,9 @@ class SectionHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -557,10 +565,7 @@ class SectionHeader extends StatelessWidget {
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 subtitle,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: colors.secondary,
-                ),
+                style: TextStyle(fontSize: 13, color: colors.secondary),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -570,10 +575,7 @@ class SectionHeader extends StatelessWidget {
     );
 
     if (onOpen != null) {
-      return InkWell(
-        onTap: onOpen,
-        child: header,
-      );
+      return InkWell(onTap: onOpen, child: header);
     }
     return header;
   }
@@ -607,9 +609,9 @@ class RecentSectionHeader extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -618,10 +620,7 @@ class RecentSectionHeader extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colors.secondary,
-                      ),
+                      style: TextStyle(fontSize: 13, color: colors.secondary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -641,7 +640,9 @@ class RecentSectionHeader extends StatelessWidget {
                 width: 32,
                 height: 32,
                 child: Tooltip(
-                  message: isGrid ? 'Switch to list view' : 'Switch to grid view',
+                  message: isGrid
+                      ? 'Switch to list view'
+                      : 'Switch to grid view',
                   child: Icon(
                     isGrid ? Icons.view_list_rounded : Icons.grid_view_rounded,
                     size: 19,
@@ -696,8 +697,7 @@ class CompactTrackRow extends StatelessWidget {
                   fit: StackFit.expand,
                   children: [
                     Artwork(item.artwork, size: 48, radius: 6),
-                    if (isPlaying)
-                      const Center(child: PlayingEqualizerBars()),
+                    if (isPlaying) const Center(child: PlayingEqualizerBars()),
                     Positioned.fill(
                       child: ArtworkHover(
                         mode: ArtworkHoverMode.darkenAndPlay,
@@ -722,7 +722,8 @@ class CompactTrackRow extends StatelessWidget {
                           item.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -739,10 +740,7 @@ class CompactTrackRow extends StatelessWidget {
                     item.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colors.secondary,
-                    ),
+                    style: TextStyle(fontSize: 12, color: colors.secondary),
                   ),
                 ],
               ),
@@ -752,10 +750,7 @@ class CompactTrackRow extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 8),
                 child: Text(
                   item.durationText!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colors.secondary,
-                  ),
+                  style: TextStyle(fontSize: 12, color: colors.secondary),
                 ),
               ),
           ],
@@ -803,8 +798,7 @@ class ShelfCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   Artwork(item.artwork, size: shelfCardWidth, radius: 11),
-                  if (isPlaying)
-                    const Center(child: PlayingEqualizerBars()),
+                  if (isPlaying) const Center(child: PlayingEqualizerBars()),
                   Positioned.fill(
                     child: ArtworkHover(
                       mode: ArtworkHoverMode.darkenAndPlay,
@@ -822,19 +816,16 @@ class ShelfCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+            ),
           ),
           if (item.subtitle.isNotEmpty)
             Text(
               item.subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: colors.secondary,
-              ),
+              style: TextStyle(fontSize: 12, color: colors.secondary),
             ),
         ],
       ),
@@ -880,8 +871,7 @@ class VideoShelfCard extends StatelessWidget {
                   fit: StackFit.expand,
                   children: [
                     Artwork(item.artwork, radius: 11),
-                    if (isPlaying)
-                      const Center(child: PlayingEqualizerBars()),
+                    if (isPlaying) const Center(child: PlayingEqualizerBars()),
                     Positioned.fill(
                       child: ArtworkHover(
                         mode: ArtworkHoverMode.darkenAndPlay,
@@ -889,7 +879,8 @@ class VideoShelfCard extends StatelessWidget {
                         child: const SizedBox.expand(),
                       ),
                     ),
-                    if (item.durationText != null && item.durationText!.isNotEmpty)
+                    if (item.durationText != null &&
+                        item.durationText!.isNotEmpty)
                       Positioned(
                         right: 6,
                         bottom: 6,
@@ -908,19 +899,16 @@ class VideoShelfCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+            ),
           ),
           if (item.subtitle.isNotEmpty)
             Text(
               item.subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: colors.secondary,
-              ),
+              style: TextStyle(fontSize: 12, color: colors.secondary),
             ),
         ],
       ),
@@ -962,8 +950,7 @@ class HeroCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 Artwork(item.artwork, radius: 17),
-                if (isPlaying)
-                  const Center(child: PlayingEqualizerBars()),
+                if (isPlaying) const Center(child: PlayingEqualizerBars()),
                 Positioned.fill(
                   child: ArtworkHover(
                     mode: ArtworkHoverMode.darkenOnly,
