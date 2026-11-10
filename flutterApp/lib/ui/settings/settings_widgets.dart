@@ -671,7 +671,7 @@ class AppIconPicker extends StatelessWidget {
               assetPath,
               width: 64.0,
               height: 64.0,
-              errorBuilder: (_, __, _) =>
+              errorBuilder: (_, _, _) =>
                   const Icon(Icons.music_note_rounded, size: 64.0),
             ),
             const SizedBox(height: 10.0),

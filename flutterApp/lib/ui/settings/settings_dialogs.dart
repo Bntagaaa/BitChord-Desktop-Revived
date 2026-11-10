@@ -1146,7 +1146,7 @@ class _DesktopAudioOutputDialogState extends State<DesktopAudioOutputDialog> {
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: visibleDevices.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     Divider(color: palette.divider, height: 1.0),
                 itemBuilder: (context, index) {
                   final dev = visibleDevices[index];
