@@ -36,11 +36,7 @@ class PlayerGeometry {
 }
 
 class ImmersivePlayer extends StatefulWidget {
-  const ImmersivePlayer({
-    super.key,
-    required this.app,
-    this.initialPane,
-  });
+  const ImmersivePlayer({super.key, required this.app, this.initialPane});
   final MusicApplication app;
   final PlayerPane? initialPane;
   @override
@@ -700,10 +696,7 @@ class _SweptLyricText extends StatelessWidget {
     if (line.isGap) {
       final nextMs = line.endMs;
       final span = math.max(1, nextMs - line.timeMs);
-      final through = ((positionMs - line.timeMs) / span).clamp(
-        0.0,
-        1.0,
-      );
+      final through = ((positionMs - line.timeMs) / span).clamp(0.0, 1.0);
       return AnimatedContainer(
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOutCubic,

@@ -37,6 +37,7 @@ class _Audio implements AudioOutput {
   Future<void> seek(Duration position) async {
     lastSeek = position;
   }
+
   @override
   Future<void> setVolume(double value) async {}
   @override

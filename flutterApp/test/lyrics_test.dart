@@ -553,8 +553,7 @@ void main() {
       expect(
         displayedFrames.last,
         lessThan(61000),
-        reason:
-            'Clock accelerated forward to ${displayedFrames.last} at t=60s',
+        reason: 'Clock accelerated forward to ${displayedFrames.last} at t=60s',
       );
 
       // Trigger backward seek to 30s

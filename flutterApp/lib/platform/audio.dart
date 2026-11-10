@@ -18,13 +18,14 @@ abstract interface class AudioOutput {
 /// Owns one real native playback process. Never substitutes timers for audio.
 class NativeAudioOutput implements AudioOutput {
   NativeAudioOutput({Player? player})
-      : _player = player ??
-            Player(
-              configuration: const PlayerConfiguration(
-                bufferSize: 32 * 1024 * 1024,
-                logLevel: MPVLogLevel.error,
-              ),
-            ) {
+    : _player =
+          player ??
+          Player(
+            configuration: const PlayerConfiguration(
+              bufferSize: 32 * 1024 * 1024,
+              logLevel: MPVLogLevel.error,
+            ),
+          ) {
     _applyNativeProperties();
   }
 
@@ -73,6 +74,7 @@ class NativeAudioOutput implements AudioOutput {
     }
     await _player.open(Media(uri.toString(), httpHeaders: headers));
   }
+
   @override
   Future<void> playPause() => _player.playOrPause();
   @override

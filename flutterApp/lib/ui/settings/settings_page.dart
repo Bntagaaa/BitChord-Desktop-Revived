@@ -7,11 +7,7 @@ import '../theme.dart';
 import 'settings_widgets.dart';
 import 'settings_dialogs.dart';
 
-enum SettingsSubPage {
-  main,
-  contentPreferences,
-  licenses,
-}
+enum SettingsSubPage { main, contentPreferences, licenses }
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, required this.app});
@@ -65,7 +61,14 @@ class _SettingsPageState extends State<SettingsPage> {
       // 1. ACCOUNT
       _SettingsSectionSpec(
         title: 'ACCOUNT',
-        keywords: const ['account', 'integrations', 'spotify', 'discord', 'last.fm', 'listenbrainz'],
+        keywords: const [
+          'account',
+          'integrations',
+          'spotify',
+          'discord',
+          'last.fm',
+          'listenbrainz',
+        ],
         builder: (ctx) => SettingsGroup(
           title: 'ACCOUNT',
           children: [
@@ -109,14 +112,22 @@ class _SettingsPageState extends State<SettingsPage> {
       // 3. SOURCES
       _SettingsSectionSpec(
         title: 'SOURCES',
-        keywords: const ['sources', 'youtube', 'jiosaavn', 'add a source', 'addon'],
+        keywords: const [
+          'sources',
+          'youtube',
+          'jiosaavn',
+          'add a source',
+          'addon',
+        ],
         builder: (ctx) {
           final rawCustom = settings.get('custom_sources', '[]');
           List<Map<String, dynamic>> customSources = [];
           try {
             final decoded = jsonDecode(rawCustom);
             if (decoded is List) {
-              customSources = decoded.whereType<Map<String, dynamic>>().toList();
+              customSources = decoded
+                  .whereType<Map<String, dynamic>>()
+                  .toList();
             }
           } catch (_) {}
 
@@ -171,14 +182,22 @@ class _SettingsPageState extends State<SettingsPage> {
       // 4. AUDIO QUALITY
       _SettingsSectionSpec(
         title: 'AUDIO QUALITY',
-        keywords: const ['audio quality', 'bitrate', 'low', 'medium', 'high', 'lossless'],
+        keywords: const [
+          'audio quality',
+          'bitrate',
+          'low',
+          'medium',
+          'high',
+          'lossless',
+        ],
         builder: (ctx) {
           final quality = settings.get('audio_quality', 'LOSSLESS');
           final qualityDesc = switch (quality) {
             'LOW' => 'Saves data. Streams at 64 kbps AAC/Opus.',
             'MEDIUM' => 'Balanced. Streams at ~171 kbps Opus.',
             'HIGH' => 'High quality. Streams at 320 kbps AAC/Opus.',
-            _ => 'Best available source stream up to uncompressed lossless FLAC.',
+            _ =>
+              'Best available source stream up to uncompressed lossless FLAC.',
           };
           return SettingsGroup(
             title: 'AUDIO QUALITY',
@@ -199,7 +218,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   },
                 ),
               ),
-              Text(qualityDesc, style: TextStyle(color: palette.secondary, fontSize: 13)),
+              Text(
+                qualityDesc,
+                style: TextStyle(color: palette.secondary, fontSize: 13),
+              ),
             ],
           );
         },
@@ -208,9 +230,18 @@ class _SettingsPageState extends State<SettingsPage> {
       // 5. DOWNLOADS
       _SettingsSectionSpec(
         title: 'DOWNLOADS',
-        keywords: const ['downloads', 'download quality', 'standard', 'high', 'lossless'],
+        keywords: const [
+          'downloads',
+          'download quality',
+          'standard',
+          'high',
+          'lossless',
+        ],
         builder: (ctx) {
-          final dlQuality = settings.get('download_quality', settings.get('audio_quality_download', 'STANDARD'));
+          final dlQuality = settings.get(
+            'download_quality',
+            settings.get('audio_quality_download', 'STANDARD'),
+          );
           return SettingsGroup(
             title: 'DOWNLOADS',
             children: [
@@ -238,9 +269,18 @@ class _SettingsPageState extends State<SettingsPage> {
       // 6. OUTPUT PRECISION
       _SettingsSectionSpec(
         title: 'OUTPUT PRECISION',
-        keywords: const ['output precision', 'pcm_16', 'float_32', '16-bit pcm', '32-bit float'],
+        keywords: const [
+          'output precision',
+          'pcm_16',
+          'float_32',
+          '16-bit pcm',
+          '32-bit float',
+        ],
         builder: (ctx) {
-          final precision = settings.get('output_precision', settings.get('output_pcm_mode', 'PCM_16'));
+          final precision = settings.get(
+            'output_precision',
+            settings.get('output_pcm_mode', 'PCM_16'),
+          );
           final caption = precision == 'FLOAT_32'
               ? 'Playing at 48 kHz, 2 channels, 32-bit IEEE float'
               : 'Playing at 48 kHz, 2 channels, 16-bit signed integer PCM';
@@ -262,7 +302,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   },
                 ),
               ),
-              Text(caption, style: TextStyle(color: palette.secondary, fontSize: 13)),
+              Text(
+                caption,
+                style: TextStyle(color: palette.secondary, fontSize: 13),
+              ),
             ],
           );
         },
@@ -271,7 +314,13 @@ class _SettingsPageState extends State<SettingsPage> {
       // 7. AUDIO OUTPUT
       _SettingsSectionSpec(
         title: 'AUDIO OUTPUT',
-        keywords: const ['audio output', 'output device', 'speakers', 'headphones', 'sound'],
+        keywords: const [
+          'audio output',
+          'output device',
+          'speakers',
+          'headphones',
+          'sound',
+        ],
         builder: (ctx) {
           final device = settings.get('audio_output_device', 'SYSTEM_DEFAULT');
           final label = device == 'SYSTEM_DEFAULT' ? 'System default' : device;
@@ -312,11 +361,17 @@ class _SettingsPageState extends State<SettingsPage> {
           'equalizer',
         ],
         builder: (ctx) {
-          final videoBeta = settings.get('music_video_beta', settings.get('video_beta_enabled', false));
+          final videoBeta = settings.get(
+            'music_video_beta',
+            settings.get('video_beta_enabled', false),
+          );
           final automix = settings.get('automix', false);
           final crossfadeSec = settings.get('crossfade_seconds', 0);
           final automixDur = settings.get('automix_duration', 'ADAPTIVE');
-          final automixPerf = settings.get('automix_performance', settings.get('automix_performance_mode', 'STANDARD'));
+          final automixPerf = settings.get(
+            'automix_performance',
+            settings.get('automix_performance_mode', 'STANDARD'),
+          );
           final skipSilence = settings.get('skip_silence', false);
           final spatialAudio = settings.get('spatial_audio', false);
           final dolbyAtmos = settings.get('dolby_atmos', false);
@@ -326,7 +381,8 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               SettingsToggle(
                 title: 'Music video playback (Beta)',
-                subtitle: 'Play video stream instead of audio stream when available.',
+                subtitle:
+                    'Play video stream instead of audio stream when available.',
                 value: videoBeta,
                 onChanged: (val) {
                   unawaited(settings.set('music_video_beta', val));
@@ -336,18 +392,27 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               if (!automix) ...[
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 6.0,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Crossfade: ${crossfadeSec}s',
-                        style: Theme.of(ctx).textTheme.bodyLarge?.copyWith(color: palette.foreground),
+                        style: Theme.of(ctx).textTheme.bodyLarge?.copyWith(
+                          color: palette.foreground,
+                        ),
                       ),
                       const SizedBox(height: 2.0),
                       Text(
-                        crossfadeSec == 0 ? 'Gapless transition' : '${crossfadeSec}s overlap between consecutive tracks',
-                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: palette.secondary),
+                        crossfadeSec == 0
+                            ? 'Gapless transition'
+                            : '${crossfadeSec}s overlap between consecutive tracks',
+                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                          color: palette.secondary,
+                        ),
                       ),
                       SettingsBareSlider(
                         sliderKey: const ValueKey('crossfade_slider'),
@@ -356,7 +421,9 @@ class _SettingsPageState extends State<SettingsPage> {
                         max: 12.0,
                         divisions: 12,
                         onChanged: (val) {
-                          unawaited(settings.set('crossfade_seconds', val.round()));
+                          unawaited(
+                            settings.set('crossfade_seconds', val.round()),
+                          );
                           setState(() {});
                         },
                       ),
@@ -375,11 +442,20 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               if (automix) ...[
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 6.0,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Automix duration', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w500)),
+                      Text(
+                        'Automix duration',
+                        style: TextStyle(
+                          color: palette.foreground,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       const SizedBox(height: 6.0),
                       FilterChipGroup<String>(
                         items: const [
@@ -394,7 +470,13 @@ class _SettingsPageState extends State<SettingsPage> {
                         },
                       ),
                       const SizedBox(height: 8.0),
-                      Text('Automix performance', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w500)),
+                      Text(
+                        'Automix performance',
+                        style: TextStyle(
+                          color: palette.foreground,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       const SizedBox(height: 6.0),
                       FilterChipGroup<String>(
                         items: const [
@@ -405,7 +487,9 @@ class _SettingsPageState extends State<SettingsPage> {
                         selected: automixPerf,
                         onSelected: (val) {
                           unawaited(settings.set('automix_performance', val));
-                          unawaited(settings.set('automix_performance_mode', val));
+                          unawaited(
+                            settings.set('automix_performance_mode', val),
+                          );
                           setState(() {});
                         },
                       ),
@@ -415,7 +499,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
               SettingsToggle(
                 title: 'Skip silence',
-                subtitle: 'Automatically skips dead air at track beginning and end.',
+                subtitle:
+                    'Automatically skips dead air at track beginning and end.',
                 value: skipSilence,
                 onChanged: (val) {
                   unawaited(settings.set('skip_silence', val));
@@ -459,7 +544,14 @@ class _SettingsPageState extends State<SettingsPage> {
       // 9. CONTENT
       _SettingsSectionSpec(
         title: 'CONTENT',
-        keywords: const ['content', 'content preferences', 'recents', 'videos', 'top picks', 'find your mood'],
+        keywords: const [
+          'content',
+          'content preferences',
+          'recents',
+          'videos',
+          'top picks',
+          'find your mood',
+        ],
         builder: (ctx) => SettingsGroup(
           title: 'CONTENT',
           children: [
@@ -489,7 +581,10 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
         builder: (ctx) {
           final autoplay = settings.get('autoplay', true);
-          final shuffle = settings.get('shuffle', settings.get('shuffle_enabled', false));
+          final shuffle = settings.get(
+            'shuffle',
+            settings.get('shuffle_enabled', false),
+          );
           final repeatMode = settings.get('repeat_mode', 'OFF');
           final speed = settings.get('playback_speed', '1.0');
           final directSource = settings.get('direct_source_stream', false);
@@ -520,7 +615,8 @@ class _SettingsPageState extends State<SettingsPage> {
               SettingsRow(
                 icon: Icons.repeat_rounded,
                 title: 'Repeat',
-                subtitle: 'Current mode: $repeatMode (tap to cycle: OFF → ONE → ALL)',
+                subtitle:
+                    'Current mode: $repeatMode (tap to cycle: OFF → ONE → ALL)',
                 onTap: () {
                   final next = switch (repeatMode) {
                     'OFF' => 'ONE',
@@ -534,7 +630,8 @@ class _SettingsPageState extends State<SettingsPage> {
               SettingsRow(
                 icon: Icons.speed_rounded,
                 title: 'Playback speed',
-                subtitle: 'Current speed: ${speed}× (tap to cycle: 0.5× → 1.0× → 1.25× → 1.5× → 2.0×)',
+                subtitle:
+                    'Current speed: $speed× (tap to cycle: 0.5× → 1.0× → 1.25× → 1.5× → 2.0×)',
                 onTap: () {
                   final next = switch (speed) {
                     '0.5' => '1.0',
@@ -549,7 +646,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               SettingsToggle(
                 title: 'Direct source stream',
-                subtitle: 'Connect directly to high priority providers before falling back.',
+                subtitle:
+                    'Connect directly to high priority providers before falling back.',
                 value: directSource,
                 onChanged: (val) {
                   unawaited(settings.set('direct_source_stream', val));
@@ -561,7 +659,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: 'Sleep timer',
                 subtitle: sleepMinutes == 0
                     ? 'Off'
-                    : (sleepMinutes == -1 ? 'End of song' : '${sleepMinutes} minutes'),
+                    : (sleepMinutes == -1
+                          ? 'End of song'
+                          : '$sleepMinutes minutes'),
                 onTap: () {
                   final next = switch (sleepMinutes) {
                     0 => 15,
@@ -616,7 +716,10 @@ class _SettingsPageState extends State<SettingsPage> {
           final appIcon = settings.get('desktop_app_icon', 'DARK');
           final uiScale = settings.get('desktop_ui_scale_percent', 100);
           final oldCards = settings.get('use_old_explore_cards', false);
-          final oldTopPlayer = settings.get('enable_old_top_music_player_style', false);
+          final oldTopPlayer = settings.get(
+            'enable_old_top_music_player_style',
+            false,
+          );
           final reduceBlur = settings.get('reduce_dynamic_blur', false);
           final fullBleed = settings.get('full_bleed_artwork', false);
           final playerTheme = settings.get('player_theme', 'DEFAULT');
@@ -630,7 +733,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Theme', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w500)),
+                    Text(
+                      'Theme',
+                      style: TextStyle(
+                        color: palette.foreground,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 6.0),
                     FilterChipGroup<String>(
                       items: const [
@@ -663,7 +772,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Font', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w500)),
+                    Text(
+                      'Font',
+                      style: TextStyle(
+                        color: palette.foreground,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 6.0),
                     FilterChipGroup<String>(
                       items: const [
@@ -684,7 +799,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('App icon', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w500)),
+                    Text(
+                      'App icon',
+                      style: TextStyle(
+                        color: palette.foreground,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     AppIconPicker(
                       selected: appIcon,
                       onSelected: (val) {
@@ -696,11 +817,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 8.0,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('UI scale', style: TextStyle(color: palette.foreground, fontSize: 15)),
+                    Text(
+                      'UI scale',
+                      style: TextStyle(color: palette.foreground, fontSize: 15),
+                    ),
                     DropdownButton<int>(
                       value: uiScale,
                       dropdownColor: palette.surfaceRaised,
@@ -713,7 +840,9 @@ class _SettingsPageState extends State<SettingsPage> {
                       ],
                       onChanged: (val) {
                         if (val != null) {
-                          unawaited(settings.set('desktop_ui_scale_percent', val));
+                          unawaited(
+                            settings.set('desktop_ui_scale_percent', val),
+                          );
                           setState(() {});
                         }
                       },
@@ -732,10 +861,13 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               SettingsToggle(
                 title: 'Enable old top music player style',
-                subtitle: 'Docked player at the top of the window instead of floating bar.',
+                subtitle:
+                    'Docked player at the top of the window instead of floating bar.',
                 value: oldTopPlayer,
                 onChanged: (val) {
-                  unawaited(settings.set('enable_old_top_music_player_style', val));
+                  unawaited(
+                    settings.set('enable_old_top_music_player_style', val),
+                  );
                   setState(() {});
                 },
               ),
@@ -762,7 +894,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Player theme', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w500)),
+                    Text(
+                      'Player theme',
+                      style: TextStyle(
+                        color: palette.foreground,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 8.0),
                     SettingsSegmentedControl<String>(
                       items: const [
@@ -791,12 +929,14 @@ class _SettingsPageState extends State<SettingsPage> {
               if (canvas) ...[
                 SettingsNavigationRow(
                   title: 'Spotify Canvas setup',
-                  subtitle: 'Configure session cookie for Spotify Canvas streaming.',
+                  subtitle:
+                      'Configure session cookie for Spotify Canvas streaming.',
                   onTap: () {
                     showDesktopDialog(
                       context: ctx,
                       maxWidth: 420.0,
-                      builder: (_) => DesktopSpotifyCanvasDialog(app: widget.app),
+                      builder: (_) =>
+                          DesktopSpotifyCanvasDialog(app: widget.app),
                     );
                   },
                 ),
@@ -819,7 +959,10 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
         builder: (ctx) {
           final synced = settings.get('synced_lyrics', true);
-          final unfocusedAnim = settings.get('animate_lyrics_while_unfocused', false);
+          final unfocusedAnim = settings.get(
+            'animate_lyrics_while_unfocused',
+            false,
+          );
           final blurLyrics = settings.get('lyrics_blur', false);
           final transLang = settings.get('translation_language', '');
 
@@ -840,13 +983,16 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: 'Maintain 60fps lyric smooth gliding in background.',
                 value: unfocusedAnim,
                 onChanged: (val) {
-                  unawaited(settings.set('animate_lyrics_while_unfocused', val));
+                  unawaited(
+                    settings.set('animate_lyrics_while_unfocused', val),
+                  );
                   setState(() {});
                 },
               ),
               SettingsToggle(
                 title: 'Blur unfocused lyrics',
-                subtitle: 'Blurs surrounding lyrics to highlight the current vocal line.',
+                subtitle:
+                    'Blurs surrounding lyrics to highlight the current vocal line.',
                 value: blurLyrics,
                 onChanged: (val) {
                   unawaited(settings.set('lyrics_blur', val));
@@ -866,12 +1012,15 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               SettingsNavigationRow(
                 title: 'Translation language',
-                subtitle: transLang.isEmpty ? 'Follow the app language' : transLang,
+                subtitle: transLang.isEmpty
+                    ? 'Follow the app language'
+                    : transLang,
                 onTap: () {
                   showDesktopDialog(
                     context: ctx,
                     maxWidth: 420.0,
-                    builder: (_) => DesktopTranslationLanguageDialog(app: widget.app),
+                    builder: (_) =>
+                        DesktopTranslationLanguageDialog(app: widget.app),
                   );
                 },
               ),
@@ -899,7 +1048,9 @@ class _SettingsPageState extends State<SettingsPage> {
               SettingsRow(
                 icon: Icons.folder_open_rounded,
                 title: 'Local music folder',
-                subtitle: localFolder.isEmpty ? 'System default Music & Downloads folders' : localFolder,
+                subtitle: localFolder.isEmpty
+                    ? 'System default Music & Downloads folders'
+                    : localFolder,
                 onTap: () async {
                   final selected = await FilePicker.platform.getDirectoryPath();
                   if (selected != null) {
@@ -913,7 +1064,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 SettingsRow(
                   icon: Icons.library_music_rounded,
                   title: 'Use all audio folders',
-                  subtitle: 'Reset to system default Music and Downloads directories.',
+                  subtitle:
+                      'Reset to system default Music and Downloads directories.',
                   onTap: () {
                     unawaited(settings.set('local_music_folder', ''));
                     unawaited(widget.app.scanLocal(''));
@@ -923,7 +1075,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
               SettingsToggle(
                 title: 'Filter non-music audio',
-                subtitle: 'Ignore recordings, voice memos, and clips under 30 seconds.',
+                subtitle:
+                    'Ignore recordings, voice memos, and clips under 30 seconds.',
                 value: filterAudio,
                 onChanged: (val) {
                   unawaited(settings.set('filter_non_music_audio', val));
@@ -952,18 +1105,25 @@ class _SettingsPageState extends State<SettingsPage> {
             title: 'STORAGE',
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 6.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Song cache limit: $cacheLimit MB',
-                      style: Theme.of(ctx).textTheme.bodyLarge?.copyWith(color: palette.foreground),
+                      style: Theme.of(ctx).textTheme.bodyLarge?.copyWith(
+                        color: palette.foreground,
+                      ),
                     ),
                     const SizedBox(height: 2.0),
                     Text(
                       'Keeps media on disk. Playback audio ranges use a separate cache capped at 256 MB.',
-                      style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: palette.secondary),
+                      style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                        color: palette.secondary,
+                      ),
                     ),
                     SettingsBareSlider(
                       sliderKey: const ValueKey('cache_limit_slider'),
@@ -972,7 +1132,9 @@ class _SettingsPageState extends State<SettingsPage> {
                       max: 10240.0,
                       divisions: 18,
                       onChanged: (val) {
-                        unawaited(settings.set('media_cache_limit_mb', val.round()));
+                        unawaited(
+                          settings.set('media_cache_limit_mb', val.round()),
+                        );
                         setState(() {});
                       },
                     ),
@@ -987,7 +1149,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   showDesktopDialog(
                     context: ctx,
                     maxWidth: 480.0,
-                    builder: (_) => DesktopStorageAndDataDialog(app: widget.app),
+                    builder: (_) =>
+                        DesktopStorageAndDataDialog(app: widget.app),
                   );
                 },
               ),
@@ -999,7 +1162,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   showDesktopDialog(
                     context: ctx,
                     maxWidth: 480.0,
-                    builder: (_) => DesktopStorageAndDataDialog(app: widget.app),
+                    builder: (_) =>
+                        DesktopStorageAndDataDialog(app: widget.app),
                   );
                 },
               ),
@@ -1044,7 +1208,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               SettingsToggle(
                 title: 'Tray icon',
-                subtitle: 'Show BitChord icon with media controls in system tray.',
+                subtitle:
+                    'Show BitChord icon with media controls in system tray.',
                 value: trayIcon,
                 onChanged: (val) {
                   unawaited(settings.set('tray_icon', val));
@@ -1054,7 +1219,8 @@ class _SettingsPageState extends State<SettingsPage> {
               if (trayIcon) ...[
                 SettingsToggle(
                   title: 'Keep playing when closed',
-                  subtitle: 'Minimize to system tray instead of closing application.',
+                  subtitle:
+                      'Minimize to system tray instead of closing application.',
                   value: closeToTray,
                   onChanged: (val) {
                     unawaited(settings.set('close_to_tray', val));
@@ -1088,7 +1254,14 @@ class _SettingsPageState extends State<SettingsPage> {
       // 16. LANGUAGE
       _SettingsSectionSpec(
         title: 'LANGUAGE',
-        keywords: const ['language', 'app language', 'english', 'spanish', 'indonesian', 'japanese'],
+        keywords: const [
+          'language',
+          'app language',
+          'english',
+          'spanish',
+          'indonesian',
+          'japanese',
+        ],
         builder: (ctx) {
           final appLang = settings.get('app_language', '');
           final currentLabel = appLang.isEmpty ? 'System default' : appLang;
@@ -1103,7 +1276,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   showDesktopDialog(
                     context: ctx,
                     maxWidth: 420.0,
-                    builder: (_) => DesktopTranslationLanguageDialog(app: widget.app),
+                    builder: (_) =>
+                        DesktopTranslationLanguageDialog(app: widget.app),
                   );
                 },
               ),
@@ -1123,7 +1297,8 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               SettingsToggle(
                 title: 'Show stats for nerds',
-                subtitle: 'Displays codec, bitrate, and audio sample rate in player.',
+                subtitle:
+                    'Displays codec, bitrate, and audio sample rate in player.',
                 value: nerdStats,
                 onChanged: (val) {
                   unawaited(settings.set('show_nerd_stats', val));
@@ -1138,20 +1313,38 @@ class _SettingsPageState extends State<SettingsPage> {
       // 18. APP UPDATES
       _SettingsSectionSpec(
         title: 'APP UPDATES',
-        keywords: const ['app updates', 'automatically check for updates', 'check for updates', 'version 1.9.2'],
+        keywords: const [
+          'app updates',
+          'automatically check for updates',
+          'check for updates',
+          'version 1.9.2',
+        ],
         builder: (ctx) {
-          final autoCheck = settings.get('updates_auto', settings.get('auto_check_updates', true));
+          final autoCheck = settings.get(
+            'updates_auto',
+            settings.get('auto_check_updates', true),
+          );
           return SettingsGroup(
             title: 'APP UPDATES',
             children: [
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 8.0),
-                title: Text('BitChord Version 1.9.2', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w600)),
-                subtitle: Text('Last successful check: Today', style: TextStyle(color: palette.secondary, fontSize: 13)),
+                title: Text(
+                  'BitChord Version 1.9.2',
+                  style: TextStyle(
+                    color: palette.foreground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  'Last successful check: Today',
+                  style: TextStyle(color: palette.secondary, fontSize: 13),
+                ),
               ),
               SettingsToggle(
                 title: 'Automatically check for updates',
-                subtitle: 'Check GitHub releases for application updates on launch.',
+                subtitle:
+                    'Check GitHub releases for application updates on launch.',
                 value: autoCheck,
                 onChanged: (val) {
                   unawaited(settings.set('updates_auto', val));
@@ -1160,7 +1353,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 },
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 8.0,
+                ),
                 child: OutlinedButton(
                   onPressed: () {
                     showDesktopDialog(
@@ -1179,7 +1375,9 @@ class _SettingsPageState extends State<SettingsPage> {
     ];
 
     // Filter matching sections by search query
-    final matchingSpecs = sections.where((spec) => spec.matches(_searchQuery)).toList();
+    final matchingSpecs = sections
+        .where((spec) => spec.matches(_searchQuery))
+        .toList();
 
     return SettingsPageFrame(
       maxWidth: 840.0,
@@ -1195,9 +1393,9 @@ class _SettingsPageState extends State<SettingsPage> {
               Text(
                 'Settings',
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                      color: palette.foreground,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  color: palette.foreground,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               DesktopSearchField(
                 query: _searchQuery,
@@ -1215,9 +1413,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 padding: const EdgeInsets.symmetric(vertical: 64.0),
                 child: Text(
                   'No settings found for "$_searchQuery"',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: palette.secondary,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: palette.secondary),
                 ),
               ),
             )
@@ -1246,9 +1444,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     Text(
                       '1.9.2',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: palette.secondary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        color: palette.secondary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
@@ -1256,23 +1454,45 @@ class _SettingsPageState extends State<SettingsPage> {
                 Wrap(
                   spacing: 16.0,
                   children: [
-                    Text('GitHub', style: TextStyle(color: palette.secondary, fontSize: 13)),
-                    Text('Developer', style: TextStyle(color: palette.secondary, fontSize: 13)),
-                    Text('Discord', style: TextStyle(color: palette.secondary, fontSize: 13)),
+                    Text(
+                      'GitHub',
+                      style: TextStyle(color: palette.secondary, fontSize: 13),
+                    ),
+                    Text(
+                      'Developer',
+                      style: TextStyle(color: palette.secondary, fontSize: 13),
+                    ),
+                    Text(
+                      'Discord',
+                      style: TextStyle(color: palette.secondary, fontSize: 13),
+                    ),
                     GestureDetector(
-                      onTap: () => setState(() => _subPage = SettingsSubPage.licenses),
-                      child: Text('Licenses', style: TextStyle(color: palette.accent, fontSize: 13, decoration: TextDecoration.underline)),
+                      onTap: () =>
+                          setState(() => _subPage = SettingsSubPage.licenses),
+                      child: Text(
+                        'Licenses',
+                        style: TextStyle(
+                          color: palette.accent,
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8.0),
                 Text(
                   '~ YouTube Music Backend',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: palette.secondary),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: palette.secondary),
                 ),
                 if (settings.error != null) ...[
                   const SizedBox(height: 8.0),
-                  Text(settings.error!, style: TextStyle(color: palette.destructive)),
+                  Text(
+                    settings.error!,
+                    style: TextStyle(color: palette.destructive),
+                  ),
                 ],
               ],
             ),

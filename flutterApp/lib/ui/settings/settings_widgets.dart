@@ -20,10 +20,7 @@ class SettingsPageFrame extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        child: Padding(
-          padding: padding,
-          child: child,
-        ),
+        child: Padding(padding: padding, child: child),
       ),
     );
   }
@@ -58,10 +55,10 @@ class SettingsGroup extends StatelessWidget {
             child: Text(
               title.toUpperCase(),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: palette.secondary,
-                    letterSpacing: 0.8,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: palette.secondary,
+                letterSpacing: 0.8,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           ...children,
@@ -110,7 +107,9 @@ class _SettingsRowState extends State<SettingsRow> {
         onTap: widget.onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: (_hovered && isClickable) ? palette.rowHover : Colors.transparent,
+            color: (_hovered && isClickable)
+                ? palette.rowHover
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8.0),
           ),
           padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 8.0),
@@ -135,16 +134,16 @@ class _SettingsRowState extends State<SettingsRow> {
                     Text(
                       widget.title,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: palette.foreground,
-                          ),
+                        color: palette.foreground,
+                      ),
                     ),
                     if (widget.subtitle.isNotEmpty) ...[
                       const SizedBox(height: 2.0),
                       Text(
                         widget.subtitle,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: palette.secondary,
-                            ),
+                          color: palette.secondary,
+                        ),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -157,7 +156,11 @@ class _SettingsRowState extends State<SettingsRow> {
                 widget.trailing!,
               ] else if (isClickable) ...[
                 const SizedBox(width: 10.0),
-                Icon(Icons.chevron_right_rounded, size: 18.0, color: palette.secondary),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18.0,
+                  color: palette.secondary,
+                ),
               ],
             ],
           ),
@@ -196,15 +199,21 @@ class _SettingsToggleState extends State<SettingsToggle> {
     final palette = paletteOf(context);
 
     return MouseRegion(
-      cursor: widget.enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      cursor: widget.enabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.enabled ? () => widget.onChanged?.call(!widget.value) : null,
+        onTap: widget.enabled
+            ? () => widget.onChanged?.call(!widget.value)
+            : null,
         child: Container(
           decoration: BoxDecoration(
-            color: (_hovered && widget.enabled) ? palette.rowHover : Colors.transparent,
+            color: (_hovered && widget.enabled)
+                ? palette.rowHover
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8.0),
           ),
           padding: const EdgeInsets.symmetric(vertical: 13.0, horizontal: 8.0),
@@ -218,16 +227,18 @@ class _SettingsToggleState extends State<SettingsToggle> {
                     Text(
                       widget.title,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: widget.enabled ? palette.foreground : palette.secondary,
-                          ),
+                        color: widget.enabled
+                            ? palette.foreground
+                            : palette.secondary,
+                      ),
                     ),
                     if (widget.subtitle.isNotEmpty) ...[
                       const SizedBox(height: 2.0),
                       Text(
                         widget.subtitle,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: palette.secondary,
-                            ),
+                          color: palette.secondary,
+                        ),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -239,7 +250,7 @@ class _SettingsToggleState extends State<SettingsToggle> {
               Switch(
                 value: widget.value,
                 onChanged: widget.enabled ? widget.onChanged : null,
-                activeColor: palette.accent,
+                activeThumbColor: palette.accent,
                 activeTrackColor: palette.accent.withValues(alpha: 0.5),
               ),
             ],
@@ -297,16 +308,16 @@ class _SettingsNavigationRowState extends State<SettingsNavigationRow> {
                     Text(
                       widget.title,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: palette.foreground,
-                          ),
+                        color: palette.foreground,
+                      ),
                     ),
                     if (widget.subtitle.isNotEmpty) ...[
                       const SizedBox(height: 2.0),
                       Text(
                         widget.subtitle,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: palette.secondary,
-                            ),
+                          color: palette.secondary,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -315,7 +326,11 @@ class _SettingsNavigationRowState extends State<SettingsNavigationRow> {
                 ),
               ),
               const SizedBox(width: 10.0),
-              Icon(Icons.chevron_right_rounded, size: 18.0, color: palette.secondary),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18.0,
+                color: palette.secondary,
+              ),
             ],
           ),
         ),
@@ -327,7 +342,7 @@ class _SettingsNavigationRowState extends State<SettingsNavigationRow> {
 /// Clean desktop slider without tick marks or end-stop dots.
 class SettingsBareSlider extends StatelessWidget {
   const SettingsBareSlider({
-    Key? key,
+    super.key,
     this.sliderKey,
     required this.value,
     required this.onChanged,
@@ -335,7 +350,7 @@ class SettingsBareSlider extends StatelessWidget {
     this.min = 0.0,
     this.max = 1.0,
     this.divisions,
-  }) : super(key: key);
+  });
 
   final Key? sliderKey;
   final double value;
@@ -416,7 +431,9 @@ class FilterChipGroup<T> extends StatelessWidget {
             color: isSelected ? palette.foreground : palette.secondary,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
+          ),
         );
       }).toList(),
     );
@@ -444,7 +461,9 @@ class SettingsSegmentedControl<T> extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24.0),
-        color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.08),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.10)
+            : Colors.black.withValues(alpha: 0.08),
       ),
       padding: const EdgeInsets.all(4.0),
       child: Row(
@@ -459,16 +478,18 @@ class SettingsSegmentedControl<T> extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20.0),
                   color: isChosen
-                      ? (isDark ? Colors.white.withValues(alpha: 0.24) : Colors.white)
+                      ? (isDark
+                            ? Colors.white.withValues(alpha: 0.24)
+                            : Colors.white)
                       : Colors.transparent,
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   item.label,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: palette.foreground,
-                        fontWeight: isChosen ? FontWeight.w600 : FontWeight.w500,
-                      ),
+                    color: palette.foreground,
+                    fontWeight: isChosen ? FontWeight.w600 : FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -534,14 +555,26 @@ class _DesktopSearchFieldState extends State<DesktopSearchField> {
       child: TextField(
         controller: _controller,
         onChanged: widget.onQueryChanged,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: palette.foreground),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: palette.foreground),
         decoration: InputDecoration(
           hintText: widget.placeholder,
-          hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(color: palette.secondary),
-          prefixIcon: Icon(Icons.search_rounded, size: 18.0, color: palette.secondary),
+          hintStyle: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: palette.secondary),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: 18.0,
+            color: palette.secondary,
+          ),
           suffixIcon: widget.query.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, size: 16.0, color: palette.secondary),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: 16.0,
+                    color: palette.secondary,
+                  ),
                   padding: EdgeInsets.zero,
                   onPressed: () {
                     _controller.clear();
@@ -551,7 +584,10 @@ class _DesktopSearchFieldState extends State<DesktopSearchField> {
               : null,
           filled: true,
           fillColor: palette.searchSurface,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 0.0),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12.0,
+            vertical: 0.0,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10.0),
             borderSide: BorderSide(color: palette.barEdge, width: 0.5),
@@ -589,15 +625,33 @@ class AppIconPicker extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
-          _buildIconCard(context, palette, 'DARK', 'Dark', 'assets/icons/app_icon.png'),
+          _buildIconCard(
+            context,
+            palette,
+            'DARK',
+            'Dark',
+            'assets/icons/app_icon.png',
+          ),
           const SizedBox(width: 12.0),
-          _buildIconCard(context, palette, 'LIGHT', 'Light', 'assets/icons/app_icon_light.png'),
+          _buildIconCard(
+            context,
+            palette,
+            'LIGHT',
+            'Light',
+            'assets/icons/app_icon_light.png',
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildIconCard(BuildContext context, AppColors palette, String value, String label, String assetPath) {
+  Widget _buildIconCard(
+    BuildContext context,
+    AppColors palette,
+    String value,
+    String label,
+    String assetPath,
+  ) {
     final isChosen = selected == value;
     return GestureDetector(
       onTap: () => onSelected(value),
@@ -617,15 +671,16 @@ class AppIconPicker extends StatelessWidget {
               assetPath,
               width: 64.0,
               height: 64.0,
-              errorBuilder: (_, __, ___) => const Icon(Icons.music_note_rounded, size: 64.0),
+              errorBuilder: (_, __, ___) =>
+                  const Icon(Icons.music_note_rounded, size: 64.0),
             ),
             const SizedBox(height: 10.0),
             Text(
               label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: palette.foreground,
-                    fontWeight: isChosen ? FontWeight.w600 : FontWeight.w500,
-                  ),
+                color: palette.foreground,
+                fontWeight: isChosen ? FontWeight.w600 : FontWeight.w500,
+              ),
             ),
           ],
         ),

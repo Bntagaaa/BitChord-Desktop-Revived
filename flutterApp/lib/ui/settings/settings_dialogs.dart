@@ -84,7 +84,10 @@ Future<T?> showDesktopDialog<T>({
     transitionDuration: const Duration(milliseconds: 160),
     pageBuilder: (context, _, _) => builder(context),
     transitionBuilder: (context, animation, _, child) {
-      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
       return FadeTransition(
         opacity: curved,
         child: ScaleTransition(
@@ -106,7 +109,8 @@ class DesktopIntegrationsDialog extends StatefulWidget {
   final MusicApplication app;
 
   @override
-  State<DesktopIntegrationsDialog> createState() => _DesktopIntegrationsDialogState();
+  State<DesktopIntegrationsDialog> createState() =>
+      _DesktopIntegrationsDialogState();
 }
 
 class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
@@ -115,10 +119,16 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
     final palette = paletteOf(context);
     final settings = widget.app.settings;
 
-    final spotifyToken = settings.get('spotify_spdc_token', settings.get('spotify_dc', ''));
+    final spotifyToken = settings.get(
+      'spotify_spdc_token',
+      settings.get('spotify_dc', ''),
+    );
     final spotifyConnected = spotifyToken.isNotEmpty;
 
-    final discordRpc = settings.get('discord_rpc_enabled', settings.get('discord_enabled', false));
+    final discordRpc = settings.get(
+      'discord_rpc_enabled',
+      settings.get('discord_enabled', false),
+    );
     final discordDetails = settings.get('discord_use_details', false);
     final discordAdvanced = settings.get('discord_advanced_mode', false);
 
@@ -144,9 +154,9 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
               Text(
                 'Account & integrations',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: palette.foreground,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: palette.foreground,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 18.0),
 
@@ -154,9 +164,9 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
               Text(
                 'SPOTIFY',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: palette.secondary,
-                      letterSpacing: 0.8,
-                    ),
+                  color: palette.secondary,
+                  letterSpacing: 0.8,
+                ),
               ),
               const SizedBox(height: 6.0),
               Container(
@@ -171,26 +181,39 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                       dense: true,
                       title: Text(
                         'Spotify',
-                        style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: palette.foreground,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       subtitle: Text(
                         spotifyConnected ? 'Connected' : 'Not connected',
-                        style: TextStyle(color: spotifyConnected ? Colors.greenAccent : palette.secondary),
+                        style: TextStyle(
+                          color: spotifyConnected
+                              ? Colors.greenAccent
+                              : palette.secondary,
+                        ),
                       ),
                       trailing: TextButton(
                         onPressed: () {
                           showDesktopDialog(
                             context: context,
-                            builder: (_) => DesktopSpotifyCanvasDialog(app: widget.app),
+                            builder: (_) =>
+                                DesktopSpotifyCanvasDialog(app: widget.app),
                           ).then((_) => setState(() {}));
                         },
-                        child: Text(spotifyConnected ? 'Switch account' : 'Connect'),
+                        child: Text(
+                          spotifyConnected ? 'Switch account' : 'Connect',
+                        ),
                       ),
                     ),
                     if (spotifyConnected)
                       ListTile(
                         dense: true,
-                        title: Text('Disconnect', style: TextStyle(color: palette.destructive)),
+                        title: Text(
+                          'Disconnect',
+                          style: TextStyle(color: palette.destructive),
+                        ),
                         onTap: () {
                           unawaited(settings.set('spotify_dc', ''));
                           unawaited(settings.set('spotify_spdc_token', ''));
@@ -206,9 +229,9 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
               Text(
                 'RICH PRESENCE',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: palette.secondary,
-                      letterSpacing: 0.8,
-                    ),
+                  color: palette.secondary,
+                  letterSpacing: 0.8,
+                ),
               ),
               const SizedBox(height: 6.0),
               Container(
@@ -221,13 +244,18 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                   children: [
                     SwitchListTile(
                       dense: true,
-                      title: Text('Show what I am playing', style: TextStyle(color: palette.foreground)),
+                      title: Text(
+                        'Show what I am playing',
+                        style: TextStyle(color: palette.foreground),
+                      ),
                       subtitle: Text(
-                        discordRpc ? 'Sharing presence via Discord' : 'Connect an account or desktop Discord client',
+                        discordRpc
+                            ? 'Sharing presence via Discord'
+                            : 'Connect an account or desktop Discord client',
                         style: TextStyle(color: palette.secondary),
                       ),
                       value: discordRpc,
-                      activeColor: palette.accent,
+                      activeThumbColor: palette.accent,
                       onChanged: (val) {
                         unawaited(settings.set('discord_rpc_enabled', val));
                         unawaited(settings.set('discord_enabled', val));
@@ -238,13 +266,16 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                       Divider(color: palette.divider, height: 1.0),
                       SwitchListTile(
                         dense: true,
-                        title: Text('Lead with the song', style: TextStyle(color: palette.foreground)),
+                        title: Text(
+                          'Lead with the song',
+                          style: TextStyle(color: palette.foreground),
+                        ),
                         subtitle: Text(
                           'Puts the title on the bold line instead of the artist',
                           style: TextStyle(color: palette.secondary),
                         ),
                         value: discordDetails,
-                        activeColor: palette.accent,
+                        activeThumbColor: palette.accent,
                         onChanged: (val) {
                           unawaited(settings.set('discord_use_details', val));
                           setState(() {});
@@ -252,13 +283,16 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                       ),
                       SwitchListTile(
                         dense: true,
-                        title: Text('Customize the card', style: TextStyle(color: palette.foreground)),
+                        title: Text(
+                          'Customize the card',
+                          style: TextStyle(color: palette.foreground),
+                        ),
                         subtitle: Text(
                           'Status, wording and interactive buttons',
                           style: TextStyle(color: palette.secondary),
                         ),
                         value: discordAdvanced,
-                        activeColor: palette.accent,
+                        activeThumbColor: palette.accent,
                         onChanged: (val) {
                           unawaited(settings.set('discord_advanced_mode', val));
                           setState(() {});
@@ -274,9 +308,9 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
               Text(
                 'SCROBBLING',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: palette.secondary,
-                      letterSpacing: 0.8,
-                    ),
+                  color: palette.secondary,
+                  letterSpacing: 0.8,
+                ),
               ),
               const SizedBox(height: 6.0),
               Container(
@@ -289,10 +323,16 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                   children: [
                     SwitchListTile(
                       dense: true,
-                      title: Text('ListenBrainz', style: TextStyle(color: palette.foreground)),
-                      subtitle: Text(lbEnabled ? 'Connected' : 'Enter a token to enable', style: TextStyle(color: palette.secondary)),
+                      title: Text(
+                        'ListenBrainz',
+                        style: TextStyle(color: palette.foreground),
+                      ),
+                      subtitle: Text(
+                        lbEnabled ? 'Connected' : 'Enter a token to enable',
+                        style: TextStyle(color: palette.secondary),
+                      ),
                       value: lbEnabled,
-                      activeColor: palette.accent,
+                      activeThumbColor: palette.accent,
                       onChanged: (val) {
                         unawaited(settings.set('listenbrainz_enabled', val));
                         setState(() {});
@@ -301,13 +341,20 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                     Divider(color: palette.divider, height: 1.0),
                     SwitchListTile(
                       dense: true,
-                      title: Text('Last.fm', style: TextStyle(color: palette.foreground)),
+                      title: Text(
+                        'Last.fm',
+                        style: TextStyle(color: palette.foreground),
+                      ),
                       subtitle: Text(
-                        lastfmEnabled ? (lastfmUser.isNotEmpty ? 'Signed in as $lastfmUser' : 'Connected') : 'Tap to sign in',
+                        lastfmEnabled
+                            ? (lastfmUser.isNotEmpty
+                                  ? 'Signed in as $lastfmUser'
+                                  : 'Connected')
+                            : 'Tap to sign in',
                         style: TextStyle(color: palette.secondary),
                       ),
                       value: lastfmEnabled,
-                      activeColor: palette.accent,
+                      activeThumbColor: palette.accent,
                       onChanged: (val) {
                         unawaited(settings.set('lastfm_enabled', val));
                         setState(() {});
@@ -315,13 +362,19 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                     ),
                     if (lastfmEnabled || lbEnabled) ...[
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 8.0,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Minimum song duration: ${minDuration}s',
-                              style: TextStyle(color: palette.foreground, fontSize: 13),
+                              style: TextStyle(
+                                color: palette.foreground,
+                                fontSize: 13,
+                              ),
                             ),
                             SettingsBareSlider(
                               value: minDuration.toDouble(),
@@ -329,14 +382,22 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                               max: 120.0,
                               divisions: 21,
                               onChanged: (v) {
-                                unawaited(settings.set('scrobble_min_duration', v.round()));
+                                unawaited(
+                                  settings.set(
+                                    'scrobble_min_duration',
+                                    v.round(),
+                                  ),
+                                );
                                 setState(() {});
                               },
                             ),
                             const SizedBox(height: 6.0),
                             Text(
                               'Scrobble delay: ${(scrobbleDelay * 100).round()}%',
-                              style: TextStyle(color: palette.foreground, fontSize: 13),
+                              style: TextStyle(
+                                color: palette.foreground,
+                                fontSize: 13,
+                              ),
                             ),
                             SettingsBareSlider(
                               value: scrobbleDelay,
@@ -344,14 +405,19 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                               max: 1.0,
                               divisions: 9,
                               onChanged: (v) {
-                                unawaited(settings.set('scrobble_delay_percent', v));
+                                unawaited(
+                                  settings.set('scrobble_delay_percent', v),
+                                );
                                 setState(() {});
                               },
                             ),
                             const SizedBox(height: 6.0),
                             Text(
                               'Maximum delay: ${maxDelay}s',
-                              style: TextStyle(color: palette.foreground, fontSize: 13),
+                              style: TextStyle(
+                                color: palette.foreground,
+                                fontSize: 13,
+                              ),
                             ),
                             SettingsBareSlider(
                               value: maxDelay.toDouble(),
@@ -359,7 +425,9 @@ class _DesktopIntegrationsDialogState extends State<DesktopIntegrationsDialog> {
                               max: 300.0,
                               divisions: 27,
                               onChanged: (v) {
-                                unawaited(settings.set('scrobble_max_delay', v.round()));
+                                unawaited(
+                                  settings.set('scrobble_max_delay', v.round()),
+                                );
                                 setState(() {});
                               },
                             ),
@@ -402,12 +470,16 @@ class DesktopListenTogetherDialog extends StatefulWidget {
   final MusicApplication app;
 
   @override
-  State<DesktopListenTogetherDialog> createState() => _DesktopListenTogetherDialogState();
+  State<DesktopListenTogetherDialog> createState() =>
+      _DesktopListenTogetherDialogState();
 }
 
-class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialog> {
+class _DesktopListenTogetherDialogState
+    extends State<DesktopListenTogetherDialog> {
   int _partySize = 5;
-  final TextEditingController _nicknameController = TextEditingController(text: 'Listener');
+  final TextEditingController _nicknameController = TextEditingController(
+    text: 'Listener',
+  );
   final TextEditingController _codeController = TextEditingController();
   final TextEditingController _serverController = TextEditingController();
 
@@ -441,7 +513,8 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                     children: [
                       Text(
                         'Listen together',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
                               color: palette.foreground,
                               fontWeight: FontWeight.w700,
                             ),
@@ -450,8 +523,8 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                       Text(
                         'Everyone hears the same song at the same moment',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: palette.secondary,
-                            ),
+                          color: palette.secondary,
+                        ),
                       ),
                     ],
                   ),
@@ -480,7 +553,8 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                         children: [
                           Text(
                             'Start a party',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
                                   color: palette.foreground,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -488,7 +562,10 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                           const SizedBox(height: 4.0),
                           Text(
                             'Choose how friends see you and how many can join.',
-                            style: TextStyle(color: palette.secondary, fontSize: 13),
+                            style: TextStyle(
+                              color: palette.secondary,
+                              fontSize: 13,
+                            ),
                           ),
                           const SizedBox(height: 16.0),
                           TextField(
@@ -497,7 +574,9 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                             decoration: InputDecoration(
                               labelText: 'Nickname',
                               labelStyle: TextStyle(color: palette.secondary),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10.0),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 16.0),
@@ -507,20 +586,44 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Party size', style: TextStyle(color: palette.foreground)),
-                                  Text('2–10 people', style: TextStyle(color: palette.secondary, fontSize: 12)),
+                                  Text(
+                                    'Party size',
+                                    style: TextStyle(color: palette.foreground),
+                                  ),
+                                  Text(
+                                    '2–10 people',
+                                    style: TextStyle(
+                                      color: palette.secondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
                                 ],
                               ),
                               Row(
                                 children: [
                                   IconButton(
-                                    icon: const Icon(Icons.remove_circle_outline_rounded),
-                                    onPressed: _partySize > 2 ? () => setState(() => _partySize--) : null,
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline_rounded,
+                                    ),
+                                    onPressed: _partySize > 2
+                                        ? () => setState(() => _partySize--)
+                                        : null,
                                   ),
-                                  Text('$_partySize', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.bold, fontSize: 16)),
+                                  Text(
+                                    '$_partySize',
+                                    style: TextStyle(
+                                      color: palette.foreground,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
                                   IconButton(
-                                    icon: const Icon(Icons.add_circle_outline_rounded),
-                                    onPressed: _partySize < 10 ? () => setState(() => _partySize++) : null,
+                                    icon: const Icon(
+                                      Icons.add_circle_outline_rounded,
+                                    ),
+                                    onPressed: _partySize < 10
+                                        ? () => setState(() => _partySize++)
+                                        : null,
                                   ),
                                 ],
                               ),
@@ -534,7 +637,9 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                               style: FilledButton.styleFrom(
                                 backgroundColor: palette.accent,
                                 foregroundColor: palette.onAccent,
-                                padding: const EdgeInsets.symmetric(vertical: 14.0),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14.0,
+                                ),
                               ),
                               child: const Text('Start party'),
                             ),
@@ -559,7 +664,8 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                         children: [
                           Text(
                             'Join a party',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
                                   color: palette.foreground,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -567,18 +673,27 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                           const SizedBox(height: 4.0),
                           Text(
                             'Enter the 6-character party code from your host.',
-                            style: TextStyle(color: palette.secondary, fontSize: 13),
+                            style: TextStyle(
+                              color: palette.secondary,
+                              fontSize: 13,
+                            ),
                           ),
                           const SizedBox(height: 16.0),
                           TextField(
                             controller: _codeController,
                             maxLength: 6,
                             textCapitalization: TextCapitalization.characters,
-                            style: TextStyle(color: palette.foreground, letterSpacing: 4.0, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: palette.foreground,
+                              letterSpacing: 4.0,
+                              fontWeight: FontWeight.bold,
+                            ),
                             decoration: InputDecoration(
                               labelText: 'Party code',
                               labelStyle: TextStyle(color: palette.secondary),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10.0),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 20.0),
@@ -587,7 +702,9 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                             child: OutlinedButton(
                               onPressed: () {},
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14.0),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14.0,
+                                ),
                               ),
                               child: const Text('Look up party'),
                             ),
@@ -602,7 +719,10 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
 
               // Server Settings Row
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 12.0,
+                ),
                 decoration: BoxDecoration(
                   color: palette.cardInsetFill,
                   borderRadius: BorderRadius.circular(12.0),
@@ -610,14 +730,30 @@ class _DesktopListenTogetherDialogState extends State<DesktopListenTogetherDialo
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.dns_rounded, size: 20.0, color: palette.secondary),
+                    Icon(
+                      Icons.dns_rounded,
+                      size: 20.0,
+                      color: palette.secondary,
+                    ),
                     const SizedBox(width: 12.0),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Party relay server', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w500)),
-                          Text('Default relay: online (32 ms)', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                          Text(
+                            'Party relay server',
+                            style: TextStyle(
+                              color: palette.foreground,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'Default relay: online (32 ms)',
+                            style: TextStyle(
+                              color: Colors.greenAccent,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -657,7 +793,8 @@ class DesktopSourceEditorDialog extends StatefulWidget {
   final http.Client? client;
 
   @override
-  State<DesktopSourceEditorDialog> createState() => _DesktopSourceEditorDialogState();
+  State<DesktopSourceEditorDialog> createState() =>
+      _DesktopSourceEditorDialogState();
 }
 
 class _DesktopSourceEditorDialogState extends State<DesktopSourceEditorDialog> {
@@ -682,13 +819,17 @@ class _DesktopSourceEditorDialogState extends State<DesktopSourceEditorDialog> {
 
   bool _validateUrl(String url) {
     final uri = Uri.tryParse(url.trim());
-    return uri != null && (uri.isScheme('http') || uri.isScheme('https')) && uri.host.isNotEmpty;
+    return uri != null &&
+        (uri.isScheme('http') || uri.isScheme('https')) &&
+        uri.host.isNotEmpty;
   }
 
   Future<void> _testEndpoint() async {
     final rawUrl = _urlController.text.trim();
     if (!_validateUrl(rawUrl)) {
-      setState(() => _status = 'Invalid URL: must begin with http:// or https://');
+      setState(
+        () => _status = 'Invalid URL: must begin with http:// or https://',
+      );
       return;
     }
     setState(() {
@@ -740,13 +881,16 @@ class _DesktopSourceEditorDialogState extends State<DesktopSourceEditorDialog> {
   Future<void> _saveSource() async {
     final rawUrl = _urlController.text.trim();
     if (!_validateUrl(rawUrl)) {
-      setState(() => _status = 'Please provide a valid http:// or https:// URL');
+      setState(
+        () => _status = 'Please provide a valid http:// or https:// URL',
+      );
       return;
     }
     final uri = Uri.parse(rawUrl);
     final rawName = _nameController.text.trim();
     final name = rawName.isNotEmpty ? rawName : uri.host;
-    final id = widget.sourceId ?? 'source_${DateTime.now().millisecondsSinceEpoch}';
+    final id =
+        widget.sourceId ?? 'source_${DateTime.now().millisecondsSinceEpoch}';
 
     final sourceMap = <String, dynamic>{
       'id': id,
@@ -764,7 +908,9 @@ class _DesktopSourceEditorDialogState extends State<DesktopSourceEditorDialog> {
       list = [];
     }
 
-    final existingIndex = list.indexWhere((item) => item is Map && item['id'] == id);
+    final existingIndex = list.indexWhere(
+      (item) => item is Map && item['id'] == id,
+    );
     if (existingIndex >= 0) {
       list[existingIndex] = sourceMap;
     } else {
@@ -806,9 +952,9 @@ class _DesktopSourceEditorDialogState extends State<DesktopSourceEditorDialog> {
             Text(
               isNew ? 'Add a source' : 'Edit source',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: palette.foreground,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: palette.foreground,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 16.0),
             TextField(
@@ -818,7 +964,9 @@ class _DesktopSourceEditorDialogState extends State<DesktopSourceEditorDialog> {
                 labelText: 'Addon URL',
                 hintText: 'https://example.com/addon',
                 labelStyle: TextStyle(color: palette.secondary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
               ),
               onChanged: (_) => setState(() => _status = null),
             ),
@@ -835,12 +983,17 @@ class _DesktopSourceEditorDialogState extends State<DesktopSourceEditorDialog> {
                 labelText: 'Name (optional)',
                 hintText: 'My music source',
                 labelStyle: TextStyle(color: palette.secondary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
               ),
             ),
             if (_status != null) ...[
               const SizedBox(height: 12.0),
-              Text(_status!, style: TextStyle(color: palette.accent, fontSize: 13)),
+              Text(
+                _status!,
+                style: TextStyle(color: palette.accent, fontSize: 13),
+              ),
             ],
             const SizedBox(height: 24.0),
             Row(
@@ -849,7 +1002,10 @@ class _DesktopSourceEditorDialogState extends State<DesktopSourceEditorDialog> {
                 if (!isNew)
                   TextButton(
                     onPressed: _removeSource,
-                    child: Text('Remove', style: TextStyle(color: palette.destructive)),
+                    child: Text(
+                      'Remove',
+                      style: TextStyle(color: palette.destructive),
+                    ),
                   )
                 else
                   TextButton(
@@ -892,31 +1048,71 @@ class DesktopAudioOutputDialog extends StatefulWidget {
   final MusicApplication app;
 
   @override
-  State<DesktopAudioOutputDialog> createState() => _DesktopAudioOutputDialogState();
+  State<DesktopAudioOutputDialog> createState() =>
+      _DesktopAudioOutputDialogState();
 }
 
 class _DesktopAudioOutputDialogState extends State<DesktopAudioOutputDialog> {
   bool _showAdvanced = false;
 
   static const _defaultDevices = [
-    {'id': 'SYSTEM_DEFAULT', 'name': 'System default', 'desc': 'Follow OS audio output'},
-    {'id': 'hw_speakers', 'name': 'Speakers (Built-in Audio)', 'desc': 'Realtek High Definition Audio'},
-    {'id': 'hw_headphones', 'name': 'Headphones', 'desc': '3.5mm stereo output jack'},
-    {'id': 'hw_usb_dac', 'name': 'USB Audio DAC', 'desc': 'High-resolution asynchronous USB endpoint'},
+    {
+      'id': 'SYSTEM_DEFAULT',
+      'name': 'System default',
+      'desc': 'Follow OS audio output',
+    },
+    {
+      'id': 'hw_speakers',
+      'name': 'Speakers (Built-in Audio)',
+      'desc': 'Realtek High Definition Audio',
+    },
+    {
+      'id': 'hw_headphones',
+      'name': 'Headphones',
+      'desc': '3.5mm stereo output jack',
+    },
+    {
+      'id': 'hw_usb_dac',
+      'name': 'USB Audio DAC',
+      'desc': 'High-resolution asynchronous USB endpoint',
+    },
   ];
 
   static const _advancedDevices = [
-    {'id': 'alsa_default', 'name': 'ALSA: default', 'desc': 'Advanced Linux Sound Architecture Default PCM'},
-    {'id': 'alsa_plughw_0_0', 'name': 'ALSA: plughw:CARD=PCH,DEV=0', 'desc': 'Direct Hardware subdevice with rate/format conversions'},
-    {'id': 'alsa_hw_0_0', 'name': 'ALSA: hw:CARD=PCH,DEV=0', 'desc': 'Direct Hardware subdevice without software conversions'},
-    {'id': 'pulse_sink', 'name': 'PulseAudio / PipeWire Sink', 'desc': 'PulseAudio / PipeWire audio server route'},
-    {'id': 'jack_system', 'name': 'JACK Audio Connection Kit', 'desc': 'Low-latency real-time professional audio server'},
+    {
+      'id': 'alsa_default',
+      'name': 'ALSA: default',
+      'desc': 'Advanced Linux Sound Architecture Default PCM',
+    },
+    {
+      'id': 'alsa_plughw_0_0',
+      'name': 'ALSA: plughw:CARD=PCH,DEV=0',
+      'desc': 'Direct Hardware subdevice with rate/format conversions',
+    },
+    {
+      'id': 'alsa_hw_0_0',
+      'name': 'ALSA: hw:CARD=PCH,DEV=0',
+      'desc': 'Direct Hardware subdevice without software conversions',
+    },
+    {
+      'id': 'pulse_sink',
+      'name': 'PulseAudio / PipeWire Sink',
+      'desc': 'PulseAudio / PipeWire audio server route',
+    },
+    {
+      'id': 'jack_system',
+      'name': 'JACK Audio Connection Kit',
+      'desc': 'Low-latency real-time professional audio server',
+    },
   ];
 
   @override
   Widget build(BuildContext context) {
     final palette = paletteOf(context);
-    final selectedId = widget.app.settings.get('audio_output_device', 'SYSTEM_DEFAULT');
+    final selectedId = widget.app.settings.get(
+      'audio_output_device',
+      'SYSTEM_DEFAULT',
+    );
 
     final visibleDevices = [
       ..._defaultDevices,
@@ -936,9 +1132,9 @@ class _DesktopAudioOutputDialogState extends State<DesktopAudioOutputDialog> {
             Text(
               'Audio output',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: palette.foreground,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: palette.foreground,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 4.0),
             Text(
@@ -950,23 +1146,39 @@ class _DesktopAudioOutputDialogState extends State<DesktopAudioOutputDialog> {
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: visibleDevices.length,
-                separatorBuilder: (_, __) => Divider(color: palette.divider, height: 1.0),
+                separatorBuilder: (_, __) =>
+                    Divider(color: palette.divider, height: 1.0),
                 itemBuilder: (context, index) {
                   final dev = visibleDevices[index];
                   final isSelected = dev['id'] == selectedId;
                   return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 2.0,
+                    ),
                     title: Text(
                       dev['name']!,
                       style: TextStyle(
                         color: palette.foreground,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                       ),
                     ),
-                    subtitle: Text(dev['desc']!, style: TextStyle(color: palette.secondary, fontSize: 12)),
-                    trailing: isSelected ? Icon(Icons.check_rounded, color: palette.accent) : null,
+                    subtitle: Text(
+                      dev['desc']!,
+                      style: TextStyle(color: palette.secondary, fontSize: 12),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check_rounded, color: palette.accent)
+                        : null,
                     onTap: () {
-                      unawaited(widget.app.settings.set('audio_output_device', dev['id']!));
+                      unawaited(
+                        widget.app.settings.set(
+                          'audio_output_device',
+                          dev['id']!,
+                        ),
+                      );
                       Navigator.of(context).pop();
                     },
                   );
@@ -976,7 +1188,11 @@ class _DesktopAudioOutputDialogState extends State<DesktopAudioOutputDialog> {
             const SizedBox(height: 12.0),
             TextButton(
               onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
-              child: Text(_showAdvanced ? 'Hide advanced audio devices' : 'Show advanced audio devices'),
+              child: Text(
+                _showAdvanced
+                    ? 'Hide advanced audio devices'
+                    : 'Show advanced audio devices',
+              ),
             ),
           ],
         ),
@@ -1036,7 +1252,15 @@ class DesktopEqualizerDialog extends StatefulWidget {
 class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
   int _tabIndex = 0; // 0: Dynamic, 1: Manual
 
-  final List<String> _bandLabels = const ['60', '150', '400', '1k', '2.5k', '6k', '14k'];
+  final List<String> _bandLabels = const [
+    '60',
+    '150',
+    '400',
+    '1k',
+    '2.5k',
+    '6k',
+    '14k',
+  ];
   final List<double> _bandGains = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
   final List<String> _presets = const [
@@ -1065,8 +1289,14 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
     final mode = widget.app.settings.get('equalizer_mode', 'DYNAMIC');
     _tabIndex = mode == 'MANUAL' ? 1 : 0;
 
-    final bandsStr = widget.app.settings.get('equalizer_bands', '0,0,0,0,0,0,0');
-    final parsed = bandsStr.split(',').map((e) => double.tryParse(e) ?? 0.0).toList();
+    final bandsStr = widget.app.settings.get(
+      'equalizer_bands',
+      '0,0,0,0,0,0,0',
+    );
+    final parsed = bandsStr
+        .split(',')
+        .map((e) => double.tryParse(e) ?? 0.0)
+        .toList();
     for (var i = 0; i < 7 && i < parsed.length; i++) {
       _bandGains[i] = parsed[i];
     }
@@ -1126,7 +1356,8 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
                       children: [
                         Text(
                           'Equalizer',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
                                 color: palette.foreground,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -1134,14 +1365,17 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
                         const SizedBox(height: 2.0),
                         Text(
                           'Shapes the sound inside BitChord, before it reaches the system.',
-                          style: TextStyle(color: palette.secondary, fontSize: 13),
+                          style: TextStyle(
+                            color: palette.secondary,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Switch(
                     value: enabled,
-                    activeColor: palette.accent,
+                    activeThumbColor: palette.accent,
                     onChanged: (val) {
                       unawaited(settings.set('equalizer_enabled', val));
                       setState(() {});
@@ -1171,7 +1405,13 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
                 child: IgnorePointer(
                   ignoring: !enabled,
                   child: _tabIndex == 0
-                      ? _buildTonePadView(context, palette, toneX, toneY, focused)
+                      ? _buildTonePadView(
+                          context,
+                          palette,
+                          toneX,
+                          toneY,
+                          focused,
+                        )
                       : _buildManualBandsView(context, palette),
                 ),
               ),
@@ -1182,14 +1422,20 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
               Text(
                 'BALANCE',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: palette.secondary,
-                      letterSpacing: 0.8,
-                    ),
+                  color: palette.secondary,
+                  letterSpacing: 0.8,
+                ),
               ),
               const SizedBox(height: 6.0),
               Row(
                 children: [
-                  Text('L', style: TextStyle(color: palette.secondary, fontWeight: FontWeight.bold)),
+                  Text(
+                    'L',
+                    style: TextStyle(
+                      color: palette.secondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   Expanded(
                     child: SettingsBareSlider(
                       value: balance,
@@ -1202,7 +1448,13 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
                       },
                     ),
                   ),
-                  Text('R', style: TextStyle(color: palette.secondary, fontWeight: FontWeight.bold)),
+                  Text(
+                    'R',
+                    style: TextStyle(
+                      color: palette.secondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 20.0),
@@ -1226,16 +1478,22 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
     );
   }
 
-  Widget _buildTonePadView(BuildContext context, AppColors palette, int toneX, int toneY, bool focused) {
+  Widget _buildTonePadView(
+    BuildContext context,
+    AppColors palette,
+    int toneX,
+    int toneY,
+    bool focused,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'TONE',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: palette.secondary,
-                letterSpacing: 0.8,
-              ),
+            color: palette.secondary,
+            letterSpacing: 0.8,
+          ),
         ),
         const SizedBox(height: 10.0),
         Container(
@@ -1255,8 +1513,12 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
               return GestureDetector(
                 onPanUpdate: (details) {
                   final local = details.localPosition;
-                  final nx = ((local.dx - 16.0) / (w - 32.0) * 10.0 - 5.0).round().clamp(-5, 5);
-                  final ny = (5.0 - (local.dy - 16.0) / (h - 32.0) * 10.0).round().clamp(-5, 5);
+                  final nx = ((local.dx - 16.0) / (w - 32.0) * 10.0 - 5.0)
+                      .round()
+                      .clamp(-5, 5);
+                  final ny = (5.0 - (local.dy - 16.0) / (h - 32.0) * 10.0)
+                      .round()
+                      .clamp(-5, 5);
                   unawaited(widget.app.settings.set('equalizer_tone_x', nx));
                   unawaited(widget.app.settings.set('equalizer_tone_y', ny));
                   setState(() {});
@@ -1270,10 +1532,50 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
                       ),
                     ),
                     // Axis labels
-                    Positioned(left: 12, top: h / 2 - 8, child: Text('Warm', style: TextStyle(color: palette.secondary, fontSize: 11))),
-                    Positioned(right: 12, top: h / 2 - 8, child: Text('Bright', style: TextStyle(color: palette.secondary, fontSize: 11))),
-                    Positioned(left: w / 2 - 18, top: 8, child: Text('Mid-fwd', style: TextStyle(color: palette.secondary, fontSize: 11))),
-                    Positioned(left: w / 2 - 18, bottom: 8, child: Text('Scooped', style: TextStyle(color: palette.secondary, fontSize: 11))),
+                    Positioned(
+                      left: 12,
+                      top: h / 2 - 8,
+                      child: Text(
+                        'Warm',
+                        style: TextStyle(
+                          color: palette.secondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 12,
+                      top: h / 2 - 8,
+                      child: Text(
+                        'Bright',
+                        style: TextStyle(
+                          color: palette.secondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: w / 2 - 18,
+                      top: 8,
+                      child: Text(
+                        'Mid-fwd',
+                        style: TextStyle(
+                          color: palette.secondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: w / 2 - 18,
+                      bottom: 8,
+                      child: Text(
+                        'Scooped',
+                        style: TextStyle(
+                          color: palette.secondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
                     // Draggable puck
                     Positioned(
                       left: puckX - 14.0,
@@ -1304,7 +1606,11 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
         Center(
           child: Text(
             'Tilt: $toneX  ·  Contour: $toneY',
-            style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w600, fontSize: 13),
+            style: TextStyle(
+              color: palette.foreground,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
           ),
         ),
         const SizedBox(height: 12.0),
@@ -1344,9 +1650,9 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
             Text(
               'BANDS',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: palette.secondary,
-                    letterSpacing: 0.8,
-                  ),
+                color: palette.secondary,
+                letterSpacing: 0.8,
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -1357,7 +1663,10 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
                 unawaited(widget.app.settings.set('equalizer_preset', 'Flat'));
                 setState(() {});
               },
-              child: Text('Reset all bands', style: TextStyle(color: palette.accent, fontSize: 12)),
+              child: Text(
+                'Reset all bands',
+                style: TextStyle(color: palette.accent, fontSize: 12),
+              ),
             ),
           ],
         ),
@@ -1371,7 +1680,9 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
                     Text(
                       '${_bandGains[i] > 0 ? "+" : ""}${_bandGains[i].toStringAsFixed(1)}',
                       style: TextStyle(
-                        color: _bandGains[i] != 0 ? palette.accent : palette.secondary,
+                        color: _bandGains[i] != 0
+                            ? palette.accent
+                            : palette.secondary,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1384,9 +1695,13 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
                         child: SliderTheme(
                           data: SliderTheme.of(context).copyWith(
                             trackHeight: 4.0,
-                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 6.0,
+                            ),
                             activeTrackColor: palette.accent,
-                            inactiveTrackColor: palette.accent.withValues(alpha: 0.24),
+                            inactiveTrackColor: palette.accent.withValues(
+                              alpha: 0.24,
+                            ),
                             thumbColor: palette.accent,
                           ),
                           child: Slider(
@@ -1398,7 +1713,12 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
                               setState(() => _bandGains[i] = val);
                               _saveBands();
                               final matched = _matchPreset(_bandGains);
-                              unawaited(widget.app.settings.set('equalizer_preset', matched));
+                              unawaited(
+                                widget.app.settings.set(
+                                  'equalizer_preset',
+                                  matched,
+                                ),
+                              );
                             },
                           ),
                         ),
@@ -1419,21 +1739,37 @@ class _DesktopEqualizerDialogState extends State<DesktopEqualizerDialog> {
           spacing: 6.0,
           runSpacing: 6.0,
           children: _presets.map((preset) {
-            final activePreset = widget.app.settings.get('equalizer_preset', 'Flat');
+            final activePreset = widget.app.settings.get(
+              'equalizer_preset',
+              'Flat',
+            );
             final isChosen = activePreset.toLowerCase() == preset.toLowerCase();
             return ActionChip(
               label: Text(preset),
-              backgroundColor: isChosen ? palette.accent.withValues(alpha: 0.16) : palette.surfaceRaised,
-              side: BorderSide(color: isChosen ? palette.accent : palette.divider),
+              backgroundColor: isChosen
+                  ? palette.accent.withValues(alpha: 0.16)
+                  : palette.surfaceRaised,
+              side: BorderSide(
+                color: isChosen ? palette.accent : palette.divider,
+              ),
               onPressed: () {
                 if (preset.toLowerCase() == 'custom') {
                   return;
                 }
-                final gains = kEqualizerPresetGains[preset] ??
+                final gains =
+                    kEqualizerPresetGains[preset] ??
                     kEqualizerPresetGains.entries
                         .firstWhere(
                           (e) => e.key.toLowerCase() == preset.toLowerCase(),
-                          orElse: () => const MapEntry('Flat', [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+                          orElse: () => const MapEntry('Flat', [
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                          ]),
                         )
                         .value;
 
@@ -1467,8 +1803,16 @@ class _TonePadGridPainter extends CustomPainter {
       ..strokeWidth = 1.0;
 
     // Cross-axis lines
-    canvas.drawLine(Offset(size.width / 2, 10), Offset(size.width / 2, size.height - 10), axisPaint);
-    canvas.drawLine(Offset(10, size.height / 2), Offset(size.width - 10, size.height / 2), axisPaint);
+    canvas.drawLine(
+      Offset(size.width / 2, 10),
+      Offset(size.width / 2, size.height - 10),
+      axisPaint,
+    );
+    canvas.drawLine(
+      Offset(10, size.height / 2),
+      Offset(size.width - 10, size.height / 2),
+      axisPaint,
+    );
 
     // 11x11 dots
     for (var i = 0; i < 11; i++) {
@@ -1494,16 +1838,21 @@ class DesktopSpotifyCanvasDialog extends StatefulWidget {
   final MusicApplication app;
 
   @override
-  State<DesktopSpotifyCanvasDialog> createState() => _DesktopSpotifyCanvasDialogState();
+  State<DesktopSpotifyCanvasDialog> createState() =>
+      _DesktopSpotifyCanvasDialogState();
 }
 
-class _DesktopSpotifyCanvasDialogState extends State<DesktopSpotifyCanvasDialog> {
+class _DesktopSpotifyCanvasDialogState
+    extends State<DesktopSpotifyCanvasDialog> {
   late final TextEditingController _cookieController;
 
   @override
   void initState() {
     super.initState();
-    final existing = widget.app.settings.get('spotify_spdc_token', widget.app.settings.get('spotify_dc', ''));
+    final existing = widget.app.settings.get(
+      'spotify_spdc_token',
+      widget.app.settings.get('spotify_dc', ''),
+    );
     _cookieController = TextEditingController(text: existing);
   }
 
@@ -1529,9 +1878,9 @@ class _DesktopSpotifyCanvasDialogState extends State<DesktopSpotifyCanvasDialog>
             Text(
               'Spotify account',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: palette.foreground,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: palette.foreground,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 8.0),
             Text(
@@ -1551,7 +1900,9 @@ class _DesktopSpotifyCanvasDialogState extends State<DesktopSpotifyCanvasDialog>
               decoration: InputDecoration(
                 labelText: 'sp_dc cookie',
                 labelStyle: TextStyle(color: palette.secondary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
               ),
             ),
             const SizedBox(height: 20.0),
@@ -1566,7 +1917,9 @@ class _DesktopSpotifyCanvasDialogState extends State<DesktopSpotifyCanvasDialog>
                   onPressed: () {
                     final token = _cookieController.text.trim();
                     unawaited(widget.app.settings.set('spotify_dc', token));
-                    unawaited(widget.app.settings.set('spotify_spdc_token', token));
+                    unawaited(
+                      widget.app.settings.set('spotify_spdc_token', token),
+                    );
                     Navigator.of(context).pop();
                   },
                   style: FilledButton.styleFrom(
@@ -1599,16 +1952,21 @@ class DesktopContentPreferencesPage extends StatefulWidget {
   final VoidCallback onBack;
 
   @override
-  State<DesktopContentPreferencesPage> createState() => _DesktopContentPreferencesPageState();
+  State<DesktopContentPreferencesPage> createState() =>
+      _DesktopContentPreferencesPageState();
 }
 
-class _DesktopContentPreferencesPageState extends State<DesktopContentPreferencesPage> {
+class _DesktopContentPreferencesPageState
+    extends State<DesktopContentPreferencesPage> {
   @override
   Widget build(BuildContext context) {
     final palette = paletteOf(context);
     final settings = widget.app.settings;
 
-    final musicOnly = settings.get('content_prefer_music_only', settings.get('prefer_music_only', false));
+    final musicOnly = settings.get(
+      'content_prefer_music_only',
+      settings.get('prefer_music_only', false),
+    );
     final hideRecents = settings.get('content_hide_recents', false);
     final hideHomeVideos = settings.get('content_hide_home_videos', false);
     final hideTopPicks = settings.get('content_hide_top_picks', false);
@@ -1632,9 +1990,9 @@ class _DesktopContentPreferencesPageState extends State<DesktopContentPreference
               Text(
                 'Content Preferences',
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      color: palette.foreground,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  color: palette.foreground,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
@@ -1656,15 +2014,22 @@ class _DesktopContentPreferencesPageState extends State<DesktopContentPreference
                       color: palette.foreground.withValues(alpha: 0.08),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.videocam_rounded, size: 19.0, color: palette.accent),
+                    child: Icon(
+                      Icons.videocam_rounded,
+                      size: 19.0,
+                      color: palette.accent,
+                    ),
                   ),
-                  title: Text('Prefer music-only version', style: TextStyle(color: palette.foreground)),
+                  title: Text(
+                    'Prefer music-only version',
+                    style: TextStyle(color: palette.foreground),
+                  ),
                   subtitle: Text(
                     'Music videos play as their audio version; the next queue item is resolved ahead of time for smoother transitions.',
                     style: TextStyle(color: palette.secondary),
                   ),
                   value: musicOnly,
-                  activeColor: palette.accent,
+                  activeThumbColor: palette.accent,
                   onChanged: (val) {
                     unawaited(settings.set('content_prefer_music_only', val));
                     unawaited(settings.set('prefer_music_only', val));
@@ -1681,11 +2046,18 @@ class _DesktopContentPreferencesPageState extends State<DesktopContentPreference
                       color: palette.foreground.withValues(alpha: 0.08),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.visibility_off_rounded, size: 19.0, color: palette.accent),
+                    child: Icon(
+                      Icons.visibility_off_rounded,
+                      size: 19.0,
+                      color: palette.accent,
+                    ),
                   ),
-                  title: Text('Hide Recents', style: TextStyle(color: palette.foreground)),
+                  title: Text(
+                    'Hide Recents',
+                    style: TextStyle(color: palette.foreground),
+                  ),
                   value: hideRecents,
-                  activeColor: palette.accent,
+                  activeThumbColor: palette.accent,
                   onChanged: (val) {
                     unawaited(settings.set('content_hide_recents', val));
                     setState(() {});
@@ -1701,15 +2073,22 @@ class _DesktopContentPreferencesPageState extends State<DesktopContentPreference
                       color: palette.foreground.withValues(alpha: 0.08),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.visibility_off_rounded, size: 19.0, color: palette.accent),
+                    child: Icon(
+                      Icons.visibility_off_rounded,
+                      size: 19.0,
+                      color: palette.accent,
+                    ),
                   ),
-                  title: Text('Hide videos from Home', style: TextStyle(color: palette.foreground)),
+                  title: Text(
+                    'Hide videos from Home',
+                    style: TextStyle(color: palette.foreground),
+                  ),
                   subtitle: Text(
                     'Video-only shelves are hidden. Search, artists and playlists remain unchanged.',
                     style: TextStyle(color: palette.secondary),
                   ),
                   value: hideHomeVideos,
-                  activeColor: palette.accent,
+                  activeThumbColor: palette.accent,
                   onChanged: (val) {
                     unawaited(settings.set('content_hide_home_videos', val));
                     setState(() {});
@@ -1725,11 +2104,18 @@ class _DesktopContentPreferencesPageState extends State<DesktopContentPreference
                       color: palette.foreground.withValues(alpha: 0.08),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.auto_awesome_rounded, size: 19.0, color: palette.accent),
+                    child: Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 19.0,
+                      color: palette.accent,
+                    ),
                   ),
-                  title: Text('Hide Top Picks for You', style: TextStyle(color: palette.foreground)),
+                  title: Text(
+                    'Hide Top Picks for You',
+                    style: TextStyle(color: palette.foreground),
+                  ),
                   value: hideTopPicks,
-                  activeColor: palette.accent,
+                  activeThumbColor: palette.accent,
                   onChanged: (val) {
                     unawaited(settings.set('content_hide_top_picks', val));
                     setState(() {});
@@ -1745,11 +2131,18 @@ class _DesktopContentPreferencesPageState extends State<DesktopContentPreference
                       color: palette.foreground.withValues(alpha: 0.08),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.star_border_rounded, size: 19.0, color: palette.accent),
+                    child: Icon(
+                      Icons.star_border_rounded,
+                      size: 19.0,
+                      color: palette.accent,
+                    ),
                   ),
-                  title: Text('Hide Find Your Mood', style: TextStyle(color: palette.foreground)),
+                  title: Text(
+                    'Hide Find Your Mood',
+                    style: TextStyle(color: palette.foreground),
+                  ),
                   value: hideHomeMoods,
-                  activeColor: palette.accent,
+                  activeThumbColor: palette.accent,
                   onChanged: (val) {
                     unawaited(settings.set('content_hide_home_moods', val));
                     setState(() {});
@@ -1765,17 +2158,26 @@ class _DesktopContentPreferencesPageState extends State<DesktopContentPreference
                       color: palette.foreground.withValues(alpha: 0.08),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.grid_view_rounded, size: 19.0, color: palette.accent),
+                    child: Icon(
+                      Icons.grid_view_rounded,
+                      size: 19.0,
+                      color: palette.accent,
+                    ),
                   ),
-                  title: Text('Square video thumbnails', style: TextStyle(color: palette.foreground)),
+                  title: Text(
+                    'Square video thumbnails',
+                    style: TextStyle(color: palette.foreground),
+                  ),
                   subtitle: Text(
                     'Display music videos with square covers wherever thumbnail layout supports it.',
                     style: TextStyle(color: palette.secondary),
                   ),
                   value: squareThumbs,
-                  activeColor: palette.accent,
+                  activeThumbColor: palette.accent,
                   onChanged: (val) {
-                    unawaited(settings.set('content_square_video_thumbnails', val));
+                    unawaited(
+                      settings.set('content_square_video_thumbnails', val),
+                    );
                     setState(() {});
                   },
                 ),
@@ -1796,7 +2198,11 @@ class _DesktopContentPreferencesPageState extends State<DesktopContentPreference
 /// Source: com.music.bitchord.data.lyrics.TranslationLanguages (TranslationLanguages.kt:27–160).
 const List<Map<String, String>> kTranslationLanguages = [
   // 0. Default System Option
-  {'code': '', 'name': 'Follow the app language', 'nativeName': 'System default'},
+  {
+    'code': '',
+    'name': 'Follow the app language',
+    'nativeName': 'System default',
+  },
 
   // 1–133. Google Translate Languages in Canonical Alphabetical Order
   {'code': 'af', 'name': 'Afrikaans', 'nativeName': 'Afrikaans'},
@@ -1940,10 +2346,12 @@ class DesktopTranslationLanguageDialog extends StatefulWidget {
   final MusicApplication app;
 
   @override
-  State<DesktopTranslationLanguageDialog> createState() => _DesktopTranslationLanguageDialogState();
+  State<DesktopTranslationLanguageDialog> createState() =>
+      _DesktopTranslationLanguageDialogState();
 }
 
-class _DesktopTranslationLanguageDialogState extends State<DesktopTranslationLanguageDialog> {
+class _DesktopTranslationLanguageDialogState
+    extends State<DesktopTranslationLanguageDialog> {
   String _filter = '';
 
   @override
@@ -1973,9 +2381,9 @@ class _DesktopTranslationLanguageDialogState extends State<DesktopTranslationLan
             Text(
               'Translation language',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: palette.foreground,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: palette.foreground,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 4.0),
             Text(
@@ -1997,11 +2405,28 @@ class _DesktopTranslationLanguageDialogState extends State<DesktopTranslationLan
                   children: [
                     ListTile(
                       dense: true,
-                      title: Text('Follow the app language', style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w600)),
-                      subtitle: Text('Default system language', style: TextStyle(color: palette.secondary, fontSize: 12)),
-                      trailing: (selectedCode.isEmpty || selectedCode == 'system') ? Icon(Icons.check_rounded, color: palette.accent) : null,
+                      title: Text(
+                        'Follow the app language',
+                        style: TextStyle(
+                          color: palette.foreground,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Default system language',
+                        style: TextStyle(
+                          color: palette.secondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing:
+                          (selectedCode.isEmpty || selectedCode == 'system')
+                          ? Icon(Icons.check_rounded, color: palette.accent)
+                          : null,
                       onTap: () {
-                        unawaited(widget.app.settings.set('translation_language', ''));
+                        unawaited(
+                          widget.app.settings.set('translation_language', ''),
+                        );
                         setState(() {});
                       },
                     ),
@@ -2017,10 +2442,23 @@ class _DesktopTranslationLanguageDialogState extends State<DesktopTranslationLan
                               : lang['name']!,
                           style: TextStyle(color: palette.foreground),
                         ),
-                        subtitle: Text(lang['code']!, style: TextStyle(color: palette.secondary, fontSize: 11)),
-                        trailing: selectedCode == lang['code'] ? Icon(Icons.check_rounded, color: palette.accent) : null,
+                        subtitle: Text(
+                          lang['code']!,
+                          style: TextStyle(
+                            color: palette.secondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                        trailing: selectedCode == lang['code']
+                            ? Icon(Icons.check_rounded, color: palette.accent)
+                            : null,
                         onTap: () {
-                          unawaited(widget.app.settings.set('translation_language', lang['code']!));
+                          unawaited(
+                            widget.app.settings.set(
+                              'translation_language',
+                              lang['code']!,
+                            ),
+                          );
                           setState(() {});
                         },
                       ),
@@ -2115,7 +2553,8 @@ class DesktopLicensesPage extends StatelessWidget {
         {
           'name': 'Compose Multiplatform',
           'license': 'Apache-2.0',
-          'note': 'The user interface reference, shared with the original application.',
+          'note':
+              'The user interface reference, shared with the original application.',
           'url': 'https://www.jetbrains.com/lp/compose-multiplatform/',
         },
         {
@@ -2175,9 +2614,9 @@ class DesktopLicensesPage extends StatelessWidget {
                   Text(
                     'Third-party licenses',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: palette.foreground,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      color: palette.foreground,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   Text(
                     'BitChord is free software, and so is everything it is built on.',
@@ -2216,22 +2655,38 @@ class DesktopLicensesPage extends StatelessWidget {
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8.0,
+                                vertical: 2.0,
+                              ),
                               decoration: BoxDecoration(
                                 color: palette.accent.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6.0),
                               ),
                               child: Text(
                                 item['license']!,
-                                style: TextStyle(color: palette.accent, fontSize: 12, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  color: palette.accent,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 4.0),
-                        Text(item['note']!, style: TextStyle(color: palette.secondary, fontSize: 13)),
+                        Text(
+                          item['note']!,
+                          style: TextStyle(
+                            color: palette.secondary,
+                            fontSize: 13,
+                          ),
+                        ),
                         const SizedBox(height: 4.0),
-                        Text(item['url']!, style: TextStyle(color: palette.accent, fontSize: 12)),
+                        Text(
+                          item['url']!,
+                          style: TextStyle(color: palette.accent, fontSize: 12),
+                        ),
                       ],
                     ),
                   ),
@@ -2267,10 +2722,12 @@ class DesktopLyricsSourcesDialog extends StatefulWidget {
   final MusicApplication app;
 
   @override
-  State<DesktopLyricsSourcesDialog> createState() => _DesktopLyricsSourcesDialogState();
+  State<DesktopLyricsSourcesDialog> createState() =>
+      _DesktopLyricsSourcesDialogState();
 }
 
-class _DesktopLyricsSourcesDialogState extends State<DesktopLyricsSourcesDialog> {
+class _DesktopLyricsSourcesDialogState
+    extends State<DesktopLyricsSourcesDialog> {
   static const List<String> _defaultSources = [
     'LRCLIB',
     'YouTube',
@@ -2292,20 +2749,11 @@ class _DesktopLyricsSourcesDialogState extends State<DesktopLyricsSourcesDialog>
     if (raw.isEmpty) return List.of(_defaultSources);
 
     List<String> parsed;
-    if (raw is String) {
-      parsed = raw
-          .split(',')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-    } else if (raw is List) {
-      parsed = raw
-          .map((e) => e.toString().trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-    } else {
-      return List.of(_defaultSources);
-    }
+    parsed = raw
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
 
     if (parsed.isEmpty) return List.of(_defaultSources);
 
@@ -2343,9 +2791,9 @@ class _DesktopLyricsSourcesDialogState extends State<DesktopLyricsSourcesDialog>
             Text(
               'Lyrics sources',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: palette.foreground,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: palette.foreground,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 4.0),
             Text(
@@ -2361,7 +2809,12 @@ class _DesktopLyricsSourcesDialogState extends State<DesktopLyricsSourcesDialog>
                   if (newIndex > oldIndex) newIndex--;
                   final item = _sources.removeAt(oldIndex);
                   _sources.insert(newIndex, item);
-                  unawaited(widget.app.settings.set('lyrics_source_order', _sources.join(',')));
+                  unawaited(
+                    widget.app.settings.set(
+                      'lyrics_source_order',
+                      _sources.join(','),
+                    ),
+                  );
                 });
               },
               children: [
@@ -2369,9 +2822,18 @@ class _DesktopLyricsSourcesDialogState extends State<DesktopLyricsSourcesDialog>
                   ListTile(
                     key: ValueKey(src),
                     dense: true,
-                    leading: Icon(Icons.drag_handle_rounded, color: palette.secondary),
-                    title: Text(src, style: TextStyle(color: palette.foreground)),
-                    trailing: const Icon(Icons.check_rounded, color: Colors.greenAccent),
+                    leading: Icon(
+                      Icons.drag_handle_rounded,
+                      color: palette.secondary,
+                    ),
+                    title: Text(
+                      src,
+                      style: TextStyle(color: palette.foreground),
+                    ),
+                    trailing: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.greenAccent,
+                    ),
                   ),
               ],
             ),
@@ -2380,12 +2842,17 @@ class _DesktopLyricsSourcesDialogState extends State<DesktopLyricsSourcesDialog>
             SwitchListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
-              title: Text('Prioritize syllable lyrics', style: TextStyle(color: palette.foreground, fontSize: 13)),
+              title: Text(
+                'Prioritize syllable lyrics',
+                style: TextStyle(color: palette.foreground, fontSize: 13),
+              ),
               value: prioritize,
-              activeColor: palette.accent,
+              activeThumbColor: palette.accent,
               onChanged: (val) {
                 unawaited(widget.app.settings.set('prioritize_syllables', val));
-                unawaited(widget.app.settings.set('prioritize_syllable_lyrics', val));
+                unawaited(
+                  widget.app.settings.set('prioritize_syllable_lyrics', val),
+                );
                 setState(() {});
               },
             ),
@@ -2398,7 +2865,12 @@ class _DesktopLyricsSourcesDialogState extends State<DesktopLyricsSourcesDialog>
                     setState(() {
                       _sources.clear();
                       _sources.addAll(_defaultSources);
-                      unawaited(widget.app.settings.set('lyrics_source_order', _sources.join(',')));
+                      unawaited(
+                        widget.app.settings.set(
+                          'lyrics_source_order',
+                          _sources.join(','),
+                        ),
+                      );
                     });
                   },
                   child: const Text('Reset to default'),
@@ -2479,7 +2951,9 @@ class BackupCodec {
     }
     final version = decoded['version'];
     if (version is int && version > schemaVersion) {
-      throw const FormatException('That backup was written by a newer version of BitChord');
+      throw const FormatException(
+        'That backup was written by a newer version of BitChord',
+      );
     }
     final rawSettings = decoded['settings'];
     if (rawSettings is! Map<String, dynamic>) {
@@ -2494,7 +2968,9 @@ class BackupCodec {
         final strVal = val['value'] as String?;
         switch (type) {
           case 'bool':
-            if (strVal != null) result[entry.key] = strVal.toLowerCase() == 'true';
+            if (strVal != null) {
+              result[entry.key] = strVal.toLowerCase() == 'true';
+            }
             break;
           case 'int':
           case 'long':
@@ -2533,10 +3009,12 @@ class DesktopStorageAndDataDialog extends StatefulWidget {
   final MusicApplication app;
 
   @override
-  State<DesktopStorageAndDataDialog> createState() => _DesktopStorageAndDataDialogState();
+  State<DesktopStorageAndDataDialog> createState() =>
+      _DesktopStorageAndDataDialogState();
 }
 
-class _DesktopStorageAndDataDialogState extends State<DesktopStorageAndDataDialog> {
+class _DesktopStorageAndDataDialogState
+    extends State<DesktopStorageAndDataDialog> {
   String? _cacheMessage;
   String? _exportStatus;
   String? _importStatus;
@@ -2678,9 +3156,9 @@ class _DesktopStorageAndDataDialogState extends State<DesktopStorageAndDataDialo
             Text(
               'Storage & Data Management',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: palette.foreground,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: palette.foreground,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 4.0),
             Text(
@@ -2690,7 +3168,10 @@ class _DesktopStorageAndDataDialogState extends State<DesktopStorageAndDataDialo
             const SizedBox(height: 16.0),
             Text(
               'Song cache limit: $limit MB',
-              style: TextStyle(color: palette.foreground, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: palette.foreground,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             SettingsBareSlider(
               sliderKey: const ValueKey('dialog_cache_slider'),
@@ -2699,7 +3180,9 @@ class _DesktopStorageAndDataDialogState extends State<DesktopStorageAndDataDialo
               max: 10240.0,
               divisions: 18,
               onChanged: (val) {
-                unawaited(widget.app.settings.set('media_cache_limit_mb', val.round()));
+                unawaited(
+                  widget.app.settings.set('media_cache_limit_mb', val.round()),
+                );
                 setState(() {});
               },
             ),
@@ -2707,8 +3190,14 @@ class _DesktopStorageAndDataDialogState extends State<DesktopStorageAndDataDialo
             ListTile(
               dense: true,
               leading: Icon(Icons.delete_sweep_rounded, color: palette.accent),
-              title: Text('Clear song cache', style: TextStyle(color: palette.foreground)),
-              subtitle: Text(_cacheMessage ?? 'Frees space used by downloaded audio', style: TextStyle(color: palette.secondary)),
+              title: Text(
+                'Clear song cache',
+                style: TextStyle(color: palette.foreground),
+              ),
+              subtitle: Text(
+                _cacheMessage ?? 'Frees space used by downloaded audio',
+                style: TextStyle(color: palette.secondary),
+              ),
               onTap: () {
                 setState(() => _cacheMessage = 'Song cache cleared');
               },
@@ -2716,8 +3205,14 @@ class _DesktopStorageAndDataDialogState extends State<DesktopStorageAndDataDialo
             ListTile(
               dense: true,
               leading: Icon(Icons.photo_library_rounded, color: palette.accent),
-              title: Text('Clear image cache', style: TextStyle(color: palette.foreground)),
-              subtitle: Text('Frees space used by cached album artwork', style: TextStyle(color: palette.secondary)),
+              title: Text(
+                'Clear image cache',
+                style: TextStyle(color: palette.foreground),
+              ),
+              subtitle: Text(
+                'Frees space used by cached album artwork',
+                style: TextStyle(color: palette.secondary),
+              ),
               onTap: () {
                 setState(() => _cacheMessage = 'Image cache cleared');
               },
@@ -2728,9 +3223,13 @@ class _DesktopStorageAndDataDialogState extends State<DesktopStorageAndDataDialo
             ListTile(
               dense: true,
               leading: Icon(Icons.file_upload_rounded, color: palette.accent),
-              title: Text('Export backup', style: TextStyle(color: palette.foreground)),
+              title: Text(
+                'Export backup',
+                style: TextStyle(color: palette.foreground),
+              ),
               subtitle: Text(
-                _exportStatus ?? 'Export settings and playlists to a JSON document',
+                _exportStatus ??
+                    'Export settings and playlists to a JSON document',
                 style: TextStyle(color: palette.secondary),
               ),
               onTap: _busy ? null : _exportBackup,
@@ -2738,9 +3237,13 @@ class _DesktopStorageAndDataDialogState extends State<DesktopStorageAndDataDialo
             ListTile(
               dense: true,
               leading: Icon(Icons.file_download_rounded, color: palette.accent),
-              title: Text('Restore backup', style: TextStyle(color: palette.foreground)),
+              title: Text(
+                'Restore backup',
+                style: TextStyle(color: palette.foreground),
+              ),
               subtitle: Text(
-                _importStatus ?? 'Restore settings and playlists from a JSON document',
+                _importStatus ??
+                    'Restore settings and playlists from a JSON document',
                 style: TextStyle(color: palette.secondary),
               ),
               onTap: _busy ? null : _confirmAndImportBackup,
@@ -2858,11 +3361,7 @@ class SemanticVersion implements Comparable<SemanticVersion> {
 }
 
 class DesktopAppUpdatesDialog extends StatefulWidget {
-  const DesktopAppUpdatesDialog({
-    super.key,
-    required this.app,
-    this.client,
-  });
+  const DesktopAppUpdatesDialog({super.key, required this.app, this.client});
 
   final MusicApplication app;
   final http.Client? client;
@@ -2872,7 +3371,8 @@ class DesktopAppUpdatesDialog extends StatefulWidget {
       'https://api.github.com/repos/bitchord-app/bitchord/releases/latest';
 
   @override
-  State<DesktopAppUpdatesDialog> createState() => _DesktopAppUpdatesDialogState();
+  State<DesktopAppUpdatesDialog> createState() =>
+      _DesktopAppUpdatesDialogState();
 }
 
 class _DesktopAppUpdatesDialogState extends State<DesktopAppUpdatesDialog> {
@@ -2890,21 +3390,24 @@ class _DesktopAppUpdatesDialogState extends State<DesktopAppUpdatesDialog> {
 
     try {
       final uri = Uri.parse(DesktopAppUpdatesDialog.defaultEndpoint);
-      final response = await client.get(
-        uri,
-        headers: const {
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'BitChord-Desktop-Revived',
-        },
-      ).timeout(const Duration(seconds: 4));
+      final response = await client
+          .get(
+            uri,
+            headers: const {
+              'Accept': 'application/vnd.github+json',
+              'User-Agent': 'BitChord-Desktop-Revived',
+            },
+          )
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final dynamic data = jsonDecode(response.body);
         if (data is Map<String, dynamic> && data['tag_name'] is String) {
           final latestTag = (data['tag_name'] as String).trim();
           final latestVer = SemanticVersion.tryParse(latestTag);
-          final currentVer =
-              SemanticVersion.tryParse(DesktopAppUpdatesDialog.currentVersion);
+          final currentVer = SemanticVersion.tryParse(
+            DesktopAppUpdatesDialog.currentVersion,
+          );
 
           String newStatus;
           if (latestVer != null && currentVer != null) {
@@ -2917,8 +3420,8 @@ class _DesktopAppUpdatesDialogState extends State<DesktopAppUpdatesDialog> {
           } else {
             final cleanLatest =
                 latestTag.startsWith('v') || latestTag.startsWith('V')
-                    ? latestTag.substring(1)
-                    : latestTag;
+                ? latestTag.substring(1)
+                : latestTag;
             if (cleanLatest == DesktopAppUpdatesDialog.currentVersion) {
               newStatus =
                   'You are running the latest version (v${DesktopAppUpdatesDialog.currentVersion})';
@@ -2977,9 +3480,9 @@ class _DesktopAppUpdatesDialogState extends State<DesktopAppUpdatesDialog> {
             Text(
               'Application updates',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: palette.foreground,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: palette.foreground,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 4.0),
             Text(
@@ -2999,7 +3502,7 @@ class _DesktopAppUpdatesDialogState extends State<DesktopAppUpdatesDialog> {
                 style: TextStyle(color: palette.secondary, fontSize: 12),
               ),
               value: autoCheck,
-              activeColor: palette.accent,
+              activeThumbColor: palette.accent,
               onChanged: (val) {
                 unawaited(widget.app.settings.set('updates_auto', val));
                 unawaited(widget.app.settings.set('auto_check_updates', val));

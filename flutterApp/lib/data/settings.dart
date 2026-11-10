@@ -68,21 +68,24 @@ class Settings extends ChangeNotifier {
   };
 
   Map<String, dynamic> exportPrefs() {
-    return Map<String, dynamic>.from(_values)
-      ..removeWhere((k, _) => secretKeys.contains(k) || deviceLocalKeys.contains(k));
+    return Map<String, dynamic>.from(_values)..removeWhere(
+      (k, _) => secretKeys.contains(k) || deviceLocalKeys.contains(k),
+    );
   }
 
   Future<void> importPrefs(Map<String, dynamic> incoming) {
     final kept = <String, dynamic>{};
     for (final entry in _values.entries) {
-      if (secretKeys.contains(entry.key) || deviceLocalKeys.contains(entry.key)) {
+      if (secretKeys.contains(entry.key) ||
+          deviceLocalKeys.contains(entry.key)) {
         kept[entry.key] = entry.value;
       }
     }
     _values.clear();
     _values.addAll(kept);
     for (final entry in incoming.entries) {
-      if (!secretKeys.contains(entry.key) && !deviceLocalKeys.contains(entry.key)) {
+      if (!secretKeys.contains(entry.key) &&
+          !deviceLocalKeys.contains(entry.key)) {
         _values[entry.key] = entry.value;
       }
     }

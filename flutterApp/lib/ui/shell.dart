@@ -629,5 +629,4 @@ class _MusicShellState extends State<MusicShell> {
       ),
     );
   }
-
 }
