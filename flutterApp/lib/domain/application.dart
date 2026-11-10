@@ -58,7 +58,11 @@ class MusicApplication extends ChangeNotifier {
         notifyListeners();
       }),
       audio.completed.listen((value) {
-        if (value && _audioGeneration == _playRequest) {
+        if (value &&
+            _audioGeneration == _playRequest &&
+            duration.value > Duration.zero &&
+            duration.value - position.value <=
+                const Duration(milliseconds: 2500)) {
           unawaited(next(automatic: true));
         }
       }),
@@ -244,7 +248,6 @@ class MusicApplication extends ChangeNotifier {
     try {
       final stream = await resolver.resolve(selected);
       if (generation != _playRequest || _closed) return;
-      _audioGeneration = generation;
       _loadingAudio = true;
       try {
         await audio.open(stream.uri, headers: stream.headers);
@@ -252,6 +255,7 @@ class MusicApplication extends ChangeNotifier {
         if (generation == _playRequest) _loadingAudio = false;
       }
       if (generation != _playRequest || _closed) return;
+      _audioGeneration = generation;
       lyricsSession.reportDuration(duration.value);
       history.removeWhere((track) => track.id == selected.id);
       history.insert(0, selected);
@@ -276,9 +280,14 @@ class MusicApplication extends ChangeNotifier {
     await _openCurrent();
   }
 
+  Future<void> seek(Duration target) async {
+    position.value = target;
+    await audio.seek(target);
+  }
+
   Future<void> previous() async {
     if (position.value > const Duration(seconds: 10)) {
-      await audio.seek(Duration.zero);
+      await seek(Duration.zero);
       return;
     }
     if (queue.index > 0) {

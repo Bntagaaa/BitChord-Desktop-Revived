@@ -43,4 +43,5 @@ keystore.properties
 
 # AI agent configuration
 AGENTS.md
+.agents/
 /output/

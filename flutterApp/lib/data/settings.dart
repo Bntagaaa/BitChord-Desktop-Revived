@@ -47,4 +47,61 @@ class Settings extends ChangeNotifier {
         });
     return _writes;
   }
+
+  static const Set<String> secretKeys = {
+    'spotify_spdc_token',
+    'spotify_dc',
+    'lastfm_session_key',
+    'lastfm_api_key',
+    'lastfm_secret',
+    'listenbrainz_token',
+    'paxsenix_api_key',
+  };
+
+  static const Set<String> deviceLocalKeys = {
+    'downloaded_tracks',
+    'downloaded_tracks_metadata',
+    'downloaded_collections',
+    'local_music_folder',
+    'local_music_folder_uri',
+    'last_version_code',
+  };
+
+  Map<String, dynamic> exportPrefs() {
+    return Map<String, dynamic>.from(_values)
+      ..removeWhere((k, _) => secretKeys.contains(k) || deviceLocalKeys.contains(k));
+  }
+
+  Future<void> importPrefs(Map<String, dynamic> incoming) {
+    final kept = <String, dynamic>{};
+    for (final entry in _values.entries) {
+      if (secretKeys.contains(entry.key) || deviceLocalKeys.contains(entry.key)) {
+        kept[entry.key] = entry.value;
+      }
+    }
+    _values.clear();
+    _values.addAll(kept);
+    for (final entry in incoming.entries) {
+      if (!secretKeys.contains(entry.key) && !deviceLocalKeys.contains(entry.key)) {
+        _values[entry.key] = entry.value;
+      }
+    }
+    notifyListeners();
+    final snapshot = jsonEncode(_values);
+    _writes = _writes
+        .then((_) async {
+          final file = _file;
+          if (file == null) return;
+          await file.parent.create(recursive: true);
+          final temporary = File('${file.path}.tmp');
+          await temporary.writeAsString(snapshot, flush: true);
+          await temporary.rename(file.path);
+          error = null;
+        })
+        .catchError((Object failure) {
+          error = 'Could not save settings';
+          notifyListeners();
+        });
+    return _writes;
+  }
 }

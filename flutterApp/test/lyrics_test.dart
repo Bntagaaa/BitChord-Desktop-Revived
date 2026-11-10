@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:bitchord/data/lyric_formats.dart';
+import 'package:bitchord/domain/lyric_clock.dart';
 import 'package:bitchord/domain/lyrics_session.dart';
 import 'package:bitchord/domain/music.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -232,7 +233,7 @@ void main() {
   );
 
   test(
-    'lyric session waits for selected-track duration and rejects stale answers',
+    'lyric session queries on select and refetches when duration arrives, rejecting stale answers',
     () async {
       final calls = <(String, Duration, Completer<List<LyricLine>>)>[];
       final session = LyricsSession((song, duration) {
@@ -241,9 +242,11 @@ void main() {
         return result.future;
       });
       session.select(const Song(id: 'local:first', title: 'First', artist: ''));
-      expect(calls, isEmpty);
+      expect(calls.length, 1);
+      expect(calls.first.$2, Duration.zero);
       session.reportDuration(const Duration(seconds: 20));
-      expect(calls.single.$2.inSeconds, 20);
+      expect(calls.length, 2);
+      expect(calls.last.$2.inSeconds, 20);
       session.select(
         const Song(id: 'local:second', title: 'Second', artist: ''),
       );
@@ -254,7 +257,7 @@ void main() {
       session.reportDuration(
         const Duration(seconds: 31),
       ); // A rendition change does not refetch.
-      expect(calls.length, 2);
+      expect(calls.length, 4);
       calls.last.$3.complete([LyricLine(Duration.zero, 'Selected song')]);
       await Future<void>.delayed(Duration.zero);
       expect(session.lines.single.text, 'Selected song');
@@ -263,8 +266,77 @@ void main() {
         enabled: false,
       );
       session.reportDuration(const Duration(seconds: 10));
-      expect(calls.length, 2);
+      expect(calls.length, 4);
       expect(session.error, 'Synced lyrics are switched off');
+      session.dispose();
+    },
+  );
+
+  test(
+    'LyricsSession queries lyrics immediately when song duration is null or zero',
+    () async {
+      final calls = <(String, Duration, Completer<List<LyricLine>>)>[];
+      final session = LyricsSession((song, duration) {
+        final result = Completer<List<LyricLine>>();
+        calls.add((song.id, duration, result));
+        return result.future;
+      });
+
+      const onlineTrack = Song(
+        id: 'yt:catalog_track',
+        title: 'Online Song',
+        artist: 'Artist',
+        duration: null,
+      );
+      session.select(onlineTrack);
+
+      expect(calls.length, 1);
+      expect(calls.single.$1, 'yt:catalog_track');
+      expect(calls.single.$2, Duration.zero);
+      expect(session.loading, isTrue);
+
+      final lyricsResult = [
+        LyricLine(const Duration(seconds: 2), 'Line 1'),
+        LyricLine(const Duration(seconds: 6), 'Line 2'),
+      ];
+      calls.single.$3.complete(lyricsResult);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(session.loading, isFalse);
+      expect(session.lines.length, 2);
+      expect(session.lines.first.text, 'Line 1');
+      expect(session.error, isNull);
+
+      // Later native duration resolves
+      session.reportDuration(const Duration(seconds: 210));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(session.lines.length, 2);
+      expect(session.lines.first.text, 'Line 1');
+
+      session.dispose();
+    },
+  );
+
+  test(
+    'LyricsSession with enabled=false does not trigger lookup and records disabled status',
+    () {
+      var lookupCalled = false;
+      final session = LyricsSession((song, duration) async {
+        lookupCalled = true;
+        return [];
+      });
+
+      session.select(
+        const Song(id: 'yt:disabled', title: 'Disabled', artist: ''),
+        enabled: false,
+      );
+
+      expect(lookupCalled, isFalse);
+      expect(session.loading, isFalse);
+      expect(session.lines, isEmpty);
+      expect(session.error, 'Synced lyrics are switched off');
+
       session.dispose();
     },
   );
@@ -298,6 +370,216 @@ void main() {
       expect(line.isWordSynced, isTrue);
       expect(line.revealedChars(11000), 2.5);
       expect(line.revealedChars(13500), 8.5);
+    },
+  );
+
+  test(
+    'LyricClock maintains synchronization within 250ms over 60s of continuous playback with 250ms updates',
+    () {
+      final clock = LyricClock(0);
+      const frameMs = 1000.0 / 60.0;
+      var nowMs = 0.0;
+      var previousDisplayed = -1;
+
+      while (nowMs <= 60000.0) {
+        final reportedMs = (nowMs / 250.0).floor() * 250;
+        final displayed = clock.frame(
+          nowMs: nowMs,
+          reportedMs: reportedMs,
+          sampledAtMs: double.nan,
+          discontinuity: 0,
+        );
+
+        expect(
+          displayed,
+          greaterThanOrEqualTo(previousDisplayed),
+          reason:
+              'Clock moved backwards at t=$nowMs ms: $displayed < $previousDisplayed',
+        );
+        previousDisplayed = displayed;
+
+        final error = (displayed - nowMs).abs();
+        expect(
+          error,
+          lessThanOrEqualTo(250.0),
+          reason:
+              'At t=$nowMs ms, displayed $displayed diverged from truth $nowMs by $error ms',
+        );
+
+        if (nowMs >= 2000.0) {
+          expect(
+            error,
+            lessThanOrEqualTo(40.0),
+            reason:
+                'Steady-state error exceeded 40ms at t=$nowMs ms (error: $error ms)',
+          );
+        }
+
+        nowMs += frameMs;
+      }
+
+      expect((previousDisplayed - 60000).abs(), lessThanOrEqualTo(40));
+      expect(
+        previousDisplayed,
+        lessThan(61000),
+        reason:
+            'Clock accelerated forward: displayed=$previousDisplayed at t=60s',
+      );
+    },
+  );
+
+  test(
+    'LyricClock backward seek from 60s to 30s settles cleanly at 30s without shooting forward',
+    () {
+      final clock = LyricClock(0);
+      const frameMs = 1000.0 / 60.0;
+      var nowMs = 0.0;
+
+      // Phase 1: Play 60 seconds
+      while (nowMs <= 60000.0) {
+        final reportedMs = (nowMs / 250.0).floor() * 250;
+        clock.frame(
+          nowMs: nowMs,
+          reportedMs: reportedMs,
+          sampledAtMs: double.nan,
+          discontinuity: 0,
+        );
+        nowMs += frameMs;
+      }
+
+      expect((clock.displayedMs - 60000).abs(), lessThanOrEqualTo(40));
+
+      // Phase 2: Backward seek from 60s to 30s
+      final seekNowMs = nowMs;
+      final seekDisplayed = clock.frame(
+        nowMs: seekNowMs,
+        reportedMs: 30000,
+        sampledAtMs: double.nan,
+        discontinuity: 1,
+      );
+
+      expect(
+        (seekDisplayed - 30000).abs(),
+        lessThanOrEqualTo(250),
+        reason:
+            'Clock failed to settle near 30000ms after seek, was $seekDisplayed ms',
+      );
+      expect(
+        seekDisplayed,
+        lessThan(40000),
+        reason:
+            'Clock shot forward (observed: $seekDisplayed ms) instead of jumping back to 30s',
+      );
+
+      // Phase 3: Verify 2 seconds of smooth forward playback from 30s
+      final postSeekStartMs = seekNowMs;
+      var postNowMs = postSeekStartMs + frameMs;
+      while (postNowMs <= postSeekStartMs + 2000.0) {
+        final elapsedSinceSeek = postNowMs - postSeekStartMs;
+        final reportedMs = 30000 + (elapsedSinceSeek / 250.0).floor() * 250;
+        final displayed = clock.frame(
+          nowMs: postNowMs,
+          reportedMs: reportedMs,
+          sampledAtMs: double.nan,
+          discontinuity: 1,
+        );
+
+        final expected = 30000 + elapsedSinceSeek;
+        final error = (displayed - expected).abs();
+        expect(
+          error,
+          lessThanOrEqualTo(250.0),
+          reason:
+              'Post-seek playback diverged: displayed $displayed vs expected $expected',
+        );
+        postNowMs += frameMs;
+      }
+    },
+  );
+
+  testWidgets(
+    'Ticker driving LyricClock continuously interpolates frames and handles backward seek over long playback',
+    (tester) async {
+      final clock = LyricClock(0);
+      final displayedFrames = <int>[];
+      var reportedPositionMs = 0;
+      var discontinuity = 0;
+
+      final ticker = tester.createTicker((elapsed) {
+        final nowMs = elapsed.inMicroseconds / 1000.0;
+        final displayed = clock.frame(
+          nowMs: nowMs,
+          reportedMs: reportedPositionMs,
+          sampledAtMs: double.nan,
+          discontinuity: discontinuity,
+        );
+        displayedFrames.add(displayed);
+      });
+
+      ticker.start();
+
+      // Play 60 seconds (3600 frames)
+      for (var frame = 0; frame < 3600; frame++) {
+        final elapsedMs = frame * (1000.0 / 60.0);
+        if (frame % 15 == 0) {
+          reportedPositionMs = (elapsedMs / 250.0).floor() * 250;
+        }
+        await tester.pump(const Duration(milliseconds: 16, microseconds: 666));
+      }
+
+      expect(displayedFrames.length, 3600);
+
+      // Check monotonicity
+      for (var i = 1; i < displayedFrames.length; i++) {
+        expect(
+          displayedFrames[i],
+          greaterThanOrEqualTo(displayedFrames[i - 1]),
+          reason: 'Frame $i went backwards',
+        );
+      }
+
+      // Check synchronization error <= 250ms across all frames
+      for (var i = 0; i < displayedFrames.length; i++) {
+        final nowMs = i * (1000.0 / 60.0);
+        final error = (displayedFrames[i] - nowMs).abs();
+        expect(
+          error,
+          lessThanOrEqualTo(250.0),
+          reason: 'Frame $i drifted by $error ms',
+        );
+      }
+
+      expect((displayedFrames.last - 60000).abs(), lessThanOrEqualTo(40));
+      expect(
+        displayedFrames.last,
+        lessThan(61000),
+        reason:
+            'Clock accelerated forward to ${displayedFrames.last} at t=60s',
+      );
+
+      // Trigger backward seek to 30s
+      discontinuity++;
+      reportedPositionMs = 30000;
+
+      // Pump immediate frame after seek
+      await tester.pump(const Duration(milliseconds: 16, microseconds: 666));
+
+      final seekDisplayed = displayedFrames.last;
+      expect(
+        (seekDisplayed - 30000).abs(),
+        lessThanOrEqualTo(250),
+        reason:
+            'Clock failed to settle near 30000ms after seek, was: $seekDisplayed ms',
+      );
+      expect(
+        seekDisplayed,
+        lessThan(40000),
+        reason:
+            'Clock shot forward (observed: $seekDisplayed ms) instead of jumping back to 30s',
+      );
+
+      ticker.stop();
+      ticker.dispose();
     },
   );
 }

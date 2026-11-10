@@ -86,7 +86,11 @@ class StreamResolver {
           !uri.host.endsWith('.googlevideo.com')) {
         continue;
       }
-      final headers = {'User-Agent': _agent};
+      final headers = {
+        'User-Agent': _agent,
+        'Accept-Encoding': 'identity',
+        'Connection': 'keep-alive',
+      };
       if (await _probe(uri, headers)) return AudioStream(uri, headers);
     }
     throw MusicApiException(

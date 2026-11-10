@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../domain/application.dart';
 import '../domain/music.dart';
 import 'player.dart';
+import 'settings/settings_page.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -59,14 +60,15 @@ class _MusicShellState extends State<MusicShell> {
     );
   }
 
-  void _expanded() {
+  void _expanded({PlayerPane initialPane = PlayerPane.main}) {
     if (app.song == null) return;
     unawaited(
       Navigator.of(context).push(
         PageRouteBuilder<void>(
           transitionDuration: const Duration(milliseconds: 360),
           reverseTransitionDuration: const Duration(milliseconds: 360),
-          pageBuilder: (_, _, _) => ImmersivePlayer(app: app),
+          pageBuilder: (_, _, _) =>
+              ImmersivePlayer(app: app, initialPane: initialPane),
           transitionsBuilder: (_, animation, _, child) => SlideTransition(
             position: Tween(begin: const Offset(0, 1), end: Offset.zero)
                 .animate(
@@ -261,7 +263,7 @@ class _MusicShellState extends State<MusicShell> {
 
   Widget _page() {
     final colors = paletteOf(context);
-    if (app.destination == Destination.settings) return _settings();
+    if (app.destination == Destination.settings) return SettingsPage(app: app);
     final songs = switch (app.destination) {
       Destination.localMusic => app.localSongs,
       Destination.history when !app.api.signedIn => app.history,
@@ -538,7 +540,15 @@ class _MusicShellState extends State<MusicShell> {
                         ),
                         const SizedBox(width: 8),
                         if (app.song != null)
-                          Artwork(app.song!.artwork, size: 42, radius: 6),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: _expanded,
+                            child: Artwork(
+                              app.song!.artwork,
+                              size: 42,
+                              radius: 6,
+                            ),
+                          ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: InkWell(
@@ -573,12 +583,16 @@ class _MusicShellState extends State<MusicShell> {
                         TransportButton(
                           'player_transport_lyrics',
                           'Lyrics',
-                          app.song == null ? null : _expanded,
+                          app.song == null
+                              ? null
+                              : () => _expanded(initialPane: PlayerPane.lyrics),
                         ),
                         TransportButton(
                           'player_transport_up_next',
                           'Queue',
-                          app.song == null ? null : _expanded,
+                          app.song == null
+                              ? null
+                              : () => _expanded(initialPane: PlayerPane.queue),
                         ),
                       ],
                     ),
@@ -614,61 +628,4 @@ class _MusicShellState extends State<MusicShell> {
     );
   }
 
-  Widget _settings() => ListView(
-    padding: const EdgeInsets.fromLTRB(28, 26, 28, 132),
-    children: [
-      Text('Settings', style: Theme.of(context).textTheme.displayLarge),
-      const SizedBox(height: 24),
-      DropdownButtonFormField<String>(
-        initialValue: app.settings.get('desktop_theme_mode', 'SYSTEM'),
-        decoration: const InputDecoration(labelText: 'Theme'),
-        items: [
-          for (final value in ['SYSTEM', 'LIGHT', 'DARK'])
-            DropdownMenuItem(
-              value: value,
-              child: Text(value[0] + value.substring(1).toLowerCase()),
-            ),
-        ],
-        onChanged: (value) {
-          if (value != null) {
-            unawaited(app.settings.set('desktop_theme_mode', value));
-          }
-        },
-      ),
-      const SizedBox(height: 16),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Pitch Black'),
-        value: app.settings.get('desktop_pitch_black', false),
-        onChanged: app.settings.get('desktop_theme_mode', 'SYSTEM') != 'DARK'
-            ? null
-            : (value) =>
-                  unawaited(app.settings.set('desktop_pitch_black', value)),
-      ),
-      DropdownButtonFormField<String>(
-        initialValue: app.settings.get('app_font', 'DEFAULT'),
-        decoration: const InputDecoration(labelText: 'Font'),
-        items: const [
-          DropdownMenuItem(value: 'DEFAULT', child: Text('Default')),
-          DropdownMenuItem(value: 'LEGACY', child: Text('Legacy')),
-        ],
-        onChanged: (value) {
-          if (value != null) unawaited(app.settings.set('app_font', value));
-        },
-      ),
-      const SizedBox(height: 30),
-      const Text(
-        'BitChord 1.9.2',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontFamily: 'BintangMusic',
-          fontWeight: FontWeight.w900,
-          fontSize: 32,
-        ),
-      ),
-      const SizedBox(height: 6),
-      const Text('~ YouTube Music Backend', textAlign: TextAlign.center),
-      if (app.settings.error != null) Text(app.settings.error!),
-    ],
-  );
 }

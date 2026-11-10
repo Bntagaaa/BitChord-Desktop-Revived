@@ -47,7 +47,7 @@ class LyricsSession extends ChangeNotifier {
     final duration = _nativeDuration > Duration.zero
         ? _nativeDuration
         : song.duration ?? Duration.zero;
-    if (duration <= Duration.zero || duration == _askedDuration) return;
+    if (duration == _askedDuration) return;
     _askedDuration = duration;
     final request = ++_request;
     unawaited(() async {

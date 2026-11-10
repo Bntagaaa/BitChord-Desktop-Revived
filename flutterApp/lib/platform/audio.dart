@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:media_kit/media_kit.dart';
 
 abstract interface class AudioOutput {
@@ -16,7 +17,36 @@ abstract interface class AudioOutput {
 
 /// Owns one real native playback process. Never substitutes timers for audio.
 class NativeAudioOutput implements AudioOutput {
-  final Player _player = Player();
+  NativeAudioOutput({Player? player})
+      : _player = player ??
+            Player(
+              configuration: const PlayerConfiguration(
+                bufferSize: 32 * 1024 * 1024,
+                logLevel: MPVLogLevel.error,
+              ),
+            ) {
+    _applyNativeProperties();
+  }
+
+  final Player _player;
+
+  void _applyNativeProperties() {
+    try {
+      final platform = _player.platform;
+      if (platform is NativePlayer) {
+        unawaited(
+          platform.setProperty(
+            'demuxer-lavf-o',
+            'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5',
+          ),
+        );
+        unawaited(platform.setProperty('demuxer-readahead-secs', '25'));
+      }
+    } catch (_) {
+      // Safe fallback if NativePlayer or setProperty is unavailable on the platform.
+    }
+  }
+
   @override
   Stream<Duration> get position => _player.stream.position;
   @override
@@ -28,8 +58,21 @@ class NativeAudioOutput implements AudioOutput {
   @override
   Stream<String> get errors => _player.stream.error;
   @override
-  Future<void> open(Uri uri, {Map<String, String> headers = const {}}) =>
-      _player.open(Media(uri.toString(), httpHeaders: headers));
+  Future<void> open(Uri uri, {Map<String, String> headers = const {}}) async {
+    try {
+      final platform = _player.platform;
+      if (platform is NativePlayer) {
+        await platform.setProperty(
+          'demuxer-lavf-o',
+          'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5',
+        );
+        await platform.setProperty('demuxer-readahead-secs', '25');
+      }
+    } catch (_) {
+      // Safe fallback.
+    }
+    await _player.open(Media(uri.toString(), httpHeaders: headers));
+  }
   @override
   Future<void> playPause() => _player.playOrPause();
   @override

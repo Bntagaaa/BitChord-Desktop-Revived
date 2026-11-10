@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../domain/application.dart';
+import '../domain/lyric_clock.dart';
 import '../domain/lyrics.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -35,14 +36,20 @@ class PlayerGeometry {
 }
 
 class ImmersivePlayer extends StatefulWidget {
-  const ImmersivePlayer({super.key, required this.app});
+  const ImmersivePlayer({
+    super.key,
+    required this.app,
+    this.initialPane,
+  });
   final MusicApplication app;
+  final PlayerPane? initialPane;
   @override
   State<ImmersivePlayer> createState() => _ImmersivePlayerState();
 }
 
-class _ImmersivePlayerState extends State<ImmersivePlayer> {
-  PlayerPane _pane = PlayerPane.main;
+class _ImmersivePlayerState extends State<ImmersivePlayer>
+    with TickerProviderStateMixin {
+  late PlayerPane _pane;
   bool _hover = false;
   bool _intro = true;
   String? _track;
@@ -50,21 +57,83 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
   final _lyricsScroll = ScrollController();
   final _lyricsKeys = <int, GlobalKey>{};
   int _active = -1;
+
+  late final LyricClock _lyricClock;
+  late final ValueNotifier<int> _clockNotifier;
+  late final Ticker _ticker;
+  int _discontinuity = 0;
+  double _lastSampledAtMs = double.nan;
+  double _lastReportedPositionMs = double.nan;
+
   MusicApplication get app => widget.app;
+
   @override
   void initState() {
     super.initState();
+    _pane = widget.initialPane ?? PlayerPane.main;
+    final initialPos = app.position.value.inMilliseconds;
+    _lyricClock = LyricClock(initialPos);
+    _clockNotifier = ValueNotifier<int>(initialPos);
+    _ticker = createTicker(_onTick);
+    _lastSampledAtMs = DateTime.now().microsecondsSinceEpoch / 1000.0;
     app.addListener(_changed);
+    app.position.addListener(_onPositionChanged);
     _changed();
+    _syncTicker();
+  }
+
+  void _onPositionChanged() {
+    _lastSampledAtMs = DateTime.now().microsecondsSinceEpoch / 1000.0;
+    if (!app.playing) {
+      _lyricClock.hold(app.position.value.inMilliseconds, _lastSampledAtMs);
+    }
+  }
+
+  void _syncTicker() {
+    final shouldTick = _pane == PlayerPane.lyrics && app.playing;
+    if (shouldTick && !_ticker.isActive) {
+      _lyricClock.restart();
+      _ticker.start();
+    } else if (!shouldTick && _ticker.isActive) {
+      _ticker.stop();
+      final nowMs = DateTime.now().microsecondsSinceEpoch / 1000.0;
+      _lyricClock.hold(app.position.value.inMilliseconds, nowMs);
+    }
+  }
+
+  void _onTick(Duration elapsed) {
+    if (!mounted || _pane != PlayerPane.lyrics) return;
+    final nowMs = DateTime.now().microsecondsSinceEpoch / 1000.0;
+    final reportedMs = app.position.value.inMilliseconds;
+    if (reportedMs != _lastReportedPositionMs) {
+      _lastReportedPositionMs = reportedMs.toDouble();
+      if (_lastSampledAtMs.isNaN) {
+        _lastSampledAtMs = nowMs;
+      }
+    }
+    final displayedMs = _lyricClock.frame(
+      nowMs: nowMs,
+      reportedMs: reportedMs,
+      sampledAtMs: _lastSampledAtMs.isNaN ? nowMs : _lastSampledAtMs,
+      discontinuity: _discontinuity,
+    );
+    _clockNotifier.value = displayedMs;
   }
 
   void _changed() {
     if (_track != app.song?.id) {
       _track = app.song?.id;
+      _discontinuity++;
+      _lyricClock.restart();
       _lyricsKeys.clear();
       _active = -1;
       _reveal();
     }
+    _lastSampledAtMs = DateTime.now().microsecondsSinceEpoch / 1000.0;
+    if (!app.playing) {
+      _clockNotifier.value = app.position.value.inMilliseconds;
+    }
+    _syncTicker();
     if (mounted) setState(() {});
   }
 
@@ -98,8 +167,22 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
   }
 
   @override
+  void didUpdateWidget(ImmersivePlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.app != widget.app) {
+      oldWidget.app.removeListener(_changed);
+      oldWidget.app.position.removeListener(_onPositionChanged);
+      widget.app.addListener(_changed);
+      widget.app.position.addListener(_onPositionChanged);
+    }
+  }
+
+  @override
   void dispose() {
+    _ticker.dispose();
+    _clockNotifier.dispose();
     app.removeListener(_changed);
+    app.position.removeListener(_onPositionChanged);
     _timer?.cancel();
     _lyricsScroll.dispose();
     super.dispose();
@@ -302,8 +385,17 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
             math.max(1, app.duration.value.inMilliseconds).toDouble(),
           ),
           max: math.max(1, app.duration.value.inMilliseconds).toDouble(),
-          onChanged: (value) =>
-              unawaited(app.audio.seek(Duration(milliseconds: value.round()))),
+          onChanged: (value) {
+            _discontinuity++;
+            final targetMs = value.round();
+            _clockNotifier.value = targetMs;
+            _lastReportedPositionMs = targetMs.toDouble();
+            _lastSampledAtMs = DateTime.now().microsecondsSinceEpoch / 1000.0;
+            if (!app.playing) {
+              _lyricClock.hold(targetMs, _lastSampledAtMs);
+            }
+            unawaited(app.seek(Duration(milliseconds: targetMs)));
+          },
         ),
       ),
       Row(
@@ -350,6 +442,7 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
                     : PlayerPane.lyrics;
                 _reveal();
               });
+              _syncTicker();
             },
             size: 44,
             active: _pane == PlayerPane.lyrics,
@@ -391,11 +484,14 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
           TransportButton(
             'player_transport_up_next',
             'Queue',
-            () => setState(
-              () => _pane = _pane == PlayerPane.queue
-                  ? PlayerPane.main
-                  : PlayerPane.queue,
-            ),
+            () {
+              setState(
+                () => _pane = _pane == PlayerPane.queue
+                    ? PlayerPane.main
+                    : PlayerPane.queue,
+              );
+              _syncTicker();
+            },
             size: 44,
             active: _pane == PlayerPane.queue,
           ),
@@ -409,9 +505,9 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
     ],
   );
 
-  Widget _lyrics() => ValueListenableBuilder(
-    valueListenable: app.position,
-    builder: (context, position, _) {
+  Widget _lyrics() => ValueListenableBuilder<int>(
+    valueListenable: _clockNotifier,
+    builder: (context, clockMs, _) {
       final lines = app.lyrics;
       if (lines.isEmpty) {
         return Center(
@@ -422,7 +518,7 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
       }
       var active = -1;
       for (var index = 0; index < lines.length; index++) {
-        if (lines[index].time <= position) {
+        if (lines[index].timeMs <= clockMs) {
           active = index;
         } else {
           break;
@@ -476,8 +572,21 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
                           borderRadius: BorderRadius.circular(10),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
-                            onTap: () =>
-                                unawaited(app.audio.seek(lines[index].time)),
+                            onTap: () {
+                              final line = lines[index];
+                              _discontinuity++;
+                              _clockNotifier.value = line.timeMs;
+                              _lastReportedPositionMs = line.timeMs.toDouble();
+                              _lastSampledAtMs =
+                                  DateTime.now().microsecondsSinceEpoch /
+                                  1000.0;
+                              if (!app.playing) {
+                                _lyricClock.hold(line.timeMs, _lastSampledAtMs);
+                              }
+                              unawaited(
+                                app.seek(Duration(milliseconds: line.timeMs)),
+                              );
+                            },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
@@ -485,7 +594,7 @@ class _ImmersivePlayerState extends State<ImmersivePlayer> {
                               ),
                               child: _SweptLyricText(
                                 line: lines[index],
-                                position: position,
+                                positionMs: clockMs,
                                 isActive: index == active,
                                 isPast: active >= 0 && index < active,
                               ),
@@ -552,7 +661,7 @@ class _GapDotsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     const dots = 3;
-    const radius = 5.0;
+    const radius = 6.0;
     const stride = 18.0;
     final totalWidth = (dots - 1) * stride + radius * 2;
     final startX = (size.width - totalWidth) / 2 + radius;
@@ -576,13 +685,13 @@ class _GapDotsPainter extends CustomPainter {
 class _SweptLyricText extends StatelessWidget {
   const _SweptLyricText({
     required this.line,
-    required this.position,
+    required this.positionMs,
     required this.isActive,
     required this.isPast,
   });
 
   final LyricLine line;
-  final Duration position;
+  final int positionMs;
   final bool isActive;
   final bool isPast;
 
@@ -591,14 +700,17 @@ class _SweptLyricText extends StatelessWidget {
     if (line.isGap) {
       final nextMs = line.endMs;
       final span = math.max(1, nextMs - line.timeMs);
-      final through = ((position.inMilliseconds - line.timeMs) / span).clamp(
+      final through = ((positionMs - line.timeMs) / span).clamp(
         0.0,
         1.0,
       );
-      return SizedBox(
-        height: 38,
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOutCubic,
+        height: isActive ? 40.0 : 0.0,
+        clipBehavior: Clip.hardEdge,
         child: CustomPaint(
-          size: const Size(double.infinity, 38),
+          size: const Size(double.infinity, 40),
           painter: _GapDotsPainter(progress: through, color: Colors.white),
         ),
       );
@@ -612,9 +724,8 @@ class _SweptLyricText extends StatelessWidget {
 
     Widget mainText;
     if (isActive && line.isWordSynced) {
-      final posMs = position.inMilliseconds;
-      final revealed = line.revealedChars(posMs);
-      final isGlow = line.isGrowing(posMs);
+      final revealed = line.revealedChars(positionMs);
+      final isGlow = line.isGrowing(positionMs);
       final progress = line.text.isEmpty
           ? 0.0
           : (revealed / line.text.length).clamp(0.0, 1.0);

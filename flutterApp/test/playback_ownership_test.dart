@@ -28,8 +28,10 @@ class _Audio implements AudioOutput {
   @override
   Future<void> open(Uri uri, {Map<String, String> headers = const {}}) async {
     opened.add(uri);
-    durations.add(Duration(seconds: opened.length == 1 ? 100 : 200));
-    states.add(true);
+    scheduleMicrotask(() {
+      durations.add(Duration(seconds: opened.length == 1 ? 100 : 200));
+      states.add(true);
+    });
   }
 
   @override
@@ -52,6 +54,22 @@ class _Audio implements AudioOutput {
       ends.close(),
       failures.close(),
     ]);
+  }
+}
+
+class _ControllableAudio extends _Audio {
+  Completer<void>? openCompleter;
+
+  @override
+  Future<void> open(Uri uri, {Map<String, String> headers = const {}}) async {
+    opened.add(uri);
+    if (openCompleter != null) {
+      await openCompleter!.future;
+    }
+    scheduleMicrotask(() {
+      durations.add(const Duration(seconds: 120));
+      states.add(true);
+    });
   }
 }
 
@@ -88,7 +106,7 @@ void main() {
         localUri: Uri.file('/second.flac'),
       );
       await app.play(first);
-      expect(lyrics.requests.single, (
+      expect(lyrics.requests.last, (
         'local:first',
         const Duration(seconds: 100),
       ));
@@ -111,6 +129,133 @@ void main() {
         'local:second',
         const Duration(seconds: 200),
       ));
+      await app.close();
+    },
+  );
+
+  test(
+    'completion threshold guard ignores premature socket EOF and advances only near track end',
+    () async {
+      final audio = _Audio(), lyrics = _Lyrics();
+      final app = MusicApplication(
+        settings: Settings.memory(),
+        api: InnerTube(),
+        audio: audio,
+        lyrics: lyrics,
+      );
+      final first = Song(
+        id: 'local:first',
+        title: 'First',
+        artist: '',
+        localUri: Uri.file('/first.flac'),
+      );
+      final second = Song(
+        id: 'local:second',
+        title: 'Second',
+        artist: '',
+        localUri: Uri.file('/second.flac'),
+      );
+      await app.play(first, context: [first, second]);
+      expect(app.song?.id, 'local:first');
+      expect(audio.opened.length, 1);
+
+      // Simulate playing for 5 seconds into a 100-second song (95s remaining > 2.5s)
+      audio.positions.add(const Duration(seconds: 5));
+      expect(app.position.value.inSeconds, 5);
+
+      // Premature EOF event from network drop / socket disconnect:
+      audio.ends.add(true);
+      await Future<void>.delayed(Duration.zero);
+
+      // Playback MUST NOT advance to the second track.
+      expect(app.song?.id, 'local:first');
+      expect(app.queue.index, 0);
+      expect(audio.opened.length, 1);
+
+      // Boundary check: at 97,499ms (remaining: 2501ms > 2500ms), must NOT advance
+      audio.positions.add(const Duration(milliseconds: 97499));
+      audio.ends.add(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(app.song?.id, 'local:first');
+      expect(app.queue.index, 0);
+
+      // Now simulate reaching near the end (98s of 100s, remaining: 2000ms <= 2500ms):
+      audio.positions.add(const Duration(seconds: 98));
+      audio.ends.add(true);
+      await Future<void>.delayed(Duration.zero);
+
+      // Genuine completion fires next track.
+      expect(app.song?.id, 'local:second');
+      expect(app.queue.index, 1);
+      expect(audio.opened.length, 2);
+
+      await app.close();
+    },
+  );
+
+  test(
+    'events arriving while audio.open() is in-flight for a new track cannot skip or poison the track',
+    () async {
+      final audio = _ControllableAudio(), lyrics = _Lyrics();
+      final app = MusicApplication(
+        settings: Settings.memory(),
+        api: InnerTube(),
+        audio: audio,
+        lyrics: lyrics,
+      );
+      final track1 = Song(
+        id: 'local:track1',
+        title: 'Track 1',
+        artist: '',
+        localUri: Uri.file('/track1.flac'),
+      );
+      final track2 = Song(
+        id: 'local:track2',
+        title: 'Track 2',
+        artist: '',
+        localUri: Uri.file('/track2.flac'),
+      );
+      final track3 = Song(
+        id: 'local:track3',
+        title: 'Track 3',
+        artist: '',
+        localUri: Uri.file('/track3.flac'),
+      );
+
+      // 1. Play track 1
+      await app.play(track1, context: [track1, track2, track3]);
+      expect(app.song?.id, 'local:track1');
+
+      // 2. Prepare controllable open for track 2
+      audio.openCompleter = Completer<void>();
+      final switchFuture = app.play(
+        track2,
+        context: [track1, track2, track3],
+        index: 1,
+      );
+
+      // Wait for resolver to resolve and audio.open() to be invoked
+      await Future<void>.delayed(Duration.zero);
+      expect(audio.opened.length, 2);
+
+      // 3. While audio.open() is still in-flight, old native engine emits EOF and error
+      audio.ends.add(true);
+      audio.failures.add('Decoder teardown error');
+      await Future<void>.delayed(Duration.zero);
+
+      // Verify: generation has not yet switched, so EOF did not skip to track 3, and error is not set
+      expect(app.queue.index, 1);
+      expect(app.error, isNull);
+
+      // 4. Now complete audio.open() for track 2
+      audio.openCompleter!.complete();
+      await switchFuture;
+
+      // Track 2 is active, healthy, and queue index is 1
+      expect(app.song?.id, 'local:track2');
+      expect(app.queue.index, 1);
+      expect(app.error, isNull);
+
       await app.close();
     },
   );
