@@ -178,6 +178,20 @@ Phase 1 was authorized with a broader shell/design-system scope than the histori
 
 Current visual differences cannot be measured because neither a Flutter build nor matched reference/Flutter captures exist. No pixel-perfect claim, widget-test result, Windows native behavior or memory improvement is established. See the Phase 1 verification ledger in MIGRATION_PROGRESS for the exact SDK access failure and resumption gates. The original Phase 0 inventory below remains unchanged.
 
+## Phase 1 source implementation status (runtime validation pending)
+
+The earlier “implementation blocked” record describes the SDK/bootstrap state of the preceding attempt. The current continuation has authored the Flutter shell source under `flutterDesktop/` and a GitHub-hosted fallback workflow; the SDK/artifact block still prevents local Flutter validation. The original P01–P38 rows and reference hash inventory remain specification evidence, not accepted parity.
+
+| Reference domains | Source now authored | Verification and remaining gaps |
+|---|---|---|
+| P02/P28 navigation and shell | go_router routes, bounded back history, focus traversal, nonrepeating F11/Escape and navigation shortcuts | Six tests authored overall; none run. No feature-content/search behavior claimed |
+| P29–P31 design/settings | Exact semantic palette values, explicit dark-only pitch-black, source type sizes/default weight mapping, persisted shell preferences, original brand/transport/tab/service glyph assets | Python asset/layer checks pass; SF Pro not redistributed, so typography is fallback. UI/OS theme, hover/motion and glass remain unverified |
+| P24 empty player/shell | 58-high/760-max dock with original transport SVGs, no fake song/position, transport disabled; 220/72 sidebar and transient narrow drawer | No player backend; no genuine rendered/reference comparison or accepted layout parity |
+| P11–P16 native preparation | Pure domain bridge/snapshot/identity/command/error-outcome lifecycle vocabulary only | No FFI implementation, fake engine, decode, DSP, Automix or native playback |
+| P01/P27/P28 lifecycle/platform | Real window_manager adapter and application observer with bounded caches, explicit close and ordered preference drain | Native host generation/build/launch is pending a usable SDK; Windows/Linux capabilities are not verified |
+
+Official platform hosts will be produced solely by `flutter create` through the checked-in initialization tool on an SDK-capable runner. The Actions workflow has not been run here. Package source hashes and Dart grammar parsing cannot prove the code compiles. Standard header/disconnected content, fallback typography, template platform icons, missing Mica/caption materials, unimplemented legacy top player/PiP and incomplete motion are recorded visual gaps. No runtime parity percentage, pixel-perfect claim or RAM improvement is reported. Phase 2 remains unstarted.
+
 ## Complete tracked reference inventory
 
 Generated from the pinned commit's tracked files, excluding generated build outputs and any former Flutter rewrite. SHA-256 records exact content; test entries are verification sources, not passed outcomes. Main/common/JVM sources are primary; Android actuals and Android native JNI/model dependencies are contextual. Every file below is assigned to a parity domain; the matrix supplies behavioral acceptance and planned destination for that domain. Broad classifications are navigation aids, not proof every helper is a separate feature.

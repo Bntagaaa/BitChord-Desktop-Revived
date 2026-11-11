@@ -1,0 +1,108 @@
+name: Flutter desktop foundation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [2.0.0-flutter]
+    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml']
+  pull_request:
+    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: linux
+          - os: windows-2022
+            target: windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: flutterDesktop
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      DART_SUPPRESS_ANALYTICS: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev xvfb xdotool openbox imagemagick
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - name: Generate official platform hosts and record SDK provenance
+        run: |
+          mkdir -p verification
+          flutter doctor -v > verification/doctor.txt 2>&1
+          python tool/initialize_platforms.py
+          python tool/check_boundaries.py
+          python tool/verify_reference_tokens.py
+      - name: Resolve dependencies
+        run: |
+          if [ -f pubspec.lock ]; then
+            flutter pub get --enforce-lockfile
+          else
+            flutter pub get
+          fi
+      # Local SDK access is blocked. Format the bootstrap source and export the
+      # formatted project/lockfile as review artifacts; do not auto-commit to a PR.
+      - name: Format Dart source
+        run: |
+          dart format lib test
+          dart format --output=none --set-exit-if-changed lib test
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+      - name: Run tests and capture rendered shell
+        env:
+          BITCHORD_CAPTURE: '1'
+        run: |
+          set -euo pipefail
+          flutter test --machine | tee verification/tests.json
+      - name: Build release desktop bundle
+        run: flutter build ${{ matrix.target }} --release
+      - name: Linux release launch smoke
+        if: runner.os == 'Linux'
+        run: |
+          python tool/launch_smoke.py build/linux/x64/release/bundle/bitchord_desktop
+      - name: Package generated source for review
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path.cwd()
+          with zipfile.ZipFile(root.parent / ('flutter-source-' + '${{ matrix.target }}' + '.zip'), 'w', zipfile.ZIP_DEFLATED) as archive:
+              for path in root.rglob('*'):
+                  relative = path.relative_to(root)
+                  if path.is_symlink() or any(part in {'build', '.dart_tool', 'ephemeral', 'verification'} for part in relative.parts):
+                      continue
+                  if path.is_file():
+                      archive.write(path, relative)
+          PY
+      - name: Upload validation, generated hosts and formatted source
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: flutter-foundation-${{ matrix.target }}
+          path: |
+            flutterDesktop/verification/
+            flutter-source-${{ matrix.target }}.zip
+            flutterDesktop/build/linux/x64/release/bundle/
+            flutterDesktop/build/windows/x64/runner/Release/
+          if-no-files-found: warn

@@ -1,0 +1,57 @@
+{
+  "flutter_riverpod": {
+    "version": "3.3.2",
+    "environment": {
+      "sdk": "^3.7.0",
+      "flutter": ">=3.0.0"
+    },
+    "repository": "https://github.com/rrousselGit/riverpod",
+    "archive_url": "https://pub.dev/api/archives/flutter_riverpod-3.3.2.tar.gz",
+    "archive_sha256": "9255e1e3ad6e38906a1b4f8287678f95f378744c5b46b1985588543f3f19046e",
+    "source_archive_verified": true
+  },
+  "go_router": {
+    "version": "17.5.0",
+    "environment": {
+      "sdk": "^3.10.0",
+      "flutter": ">=3.38.0"
+    },
+    "repository": "https://github.com/flutter/packages/tree/main/packages/go_router",
+    "archive_url": "https://pub.dev/api/archives/go_router-17.5.0.tar.gz",
+    "archive_sha256": "d7a3576cb312649eaa51f2356450aed686085fb58fcdebda5b359aa951eef7ea",
+    "source_archive_verified": true
+  },
+  "flutter_svg": {
+    "version": "2.3.3",
+    "environment": {
+      "sdk": "^3.11.0",
+      "flutter": ">=3.41.0"
+    },
+    "repository": "https://github.com/flutter/packages/tree/main/third_party/packages/flutter_svg",
+    "archive_url": "https://pub.dev/api/archives/flutter_svg-2.3.3.tar.gz",
+    "archive_sha256": "d02281c22cebba7aa7ac72e75978c946274c8c05f8623e9893e1f5f2eb951713",
+    "source_archive_verified": true
+  },
+  "shared_preferences": {
+    "version": "2.5.6",
+    "environment": {
+      "sdk": "^3.11.0",
+      "flutter": ">=3.41.0"
+    },
+    "repository": "https://github.com/flutter/packages/tree/main/packages/shared_preferences/shared_preferences",
+    "archive_url": "https://pub.dev/api/archives/shared_preferences-2.5.6.tar.gz",
+    "archive_sha256": "1e85e0dccf5b4a016077fea7dfbb4a7cb39c759ac1596fcf60c06deadb7da91f",
+    "source_archive_verified": true
+  },
+  "window_manager": {
+    "version": "0.5.1",
+    "environment": {
+      "sdk": ">=3.0.0 <4.0.0",
+      "flutter": ">=3.3.0"
+    },
+    "repository": "https://github.com/leanflutter/window_manager",
+    "archive_url": "https://pub.dev/api/archives/window_manager-0.5.1.tar.gz",
+    "archive_sha256": "7eb6d6c4164ec08e1bf978d6e733f3cebe792e2a23fb07cbca25c2872bfdbdcd",
+    "source_archive_verified": true
+  }
+}

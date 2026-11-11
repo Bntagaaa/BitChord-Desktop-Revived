@@ -1,0 +1,24 @@
+name: bitchord_desktop
+description: BitChord Desktop Revived Flutter desktop shell.
+publish_to: none
+version: 2.0.0+1
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+  flutter: '>=3.41.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: 3.3.2
+  go_router: 17.5.0
+  flutter_svg: 2.3.3
+  shared_preferences: 2.5.6
+  window_manager: 0.5.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/NOTICE.md
+    - assets/LICENSE_BitChord.txt

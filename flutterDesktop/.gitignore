@@ -1,0 +1,13 @@
+.dart_tool/
+.flutter-plugins-dependencies
+build/
+coverage/
+*.iml
+.idea/
+# Generated exclusively by tool/initialize_platforms.py; retained in CI source artifacts.
+windows/
+linux/
+.metadata
+
+__pycache__/
+verification/

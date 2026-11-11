@@ -135,3 +135,31 @@ This is an external dependency-access blocker to creating, resolving, formatting
 4. Translate measured Kotlin tokens, custom vector geometry, font profiles, actual shell/default states and responsive policies. Preserve no-data/disabled semantics; no invented catalog content or functioning-looking fake playback. Verify asset notices/rights, especially bundled SF Pro, before packaging; report typography differences if reuse cannot be established rather than silently substituting.
 5. Add meaningful layout/focus/theme/lifecycle tests; execute format/analyze/tests; build and launch Linux; establish Windows build/host results in an available Windows environment/CI. Compare actual reference/Flutter captures at 1220×780 and 900×600 logical outer-window dimensions with matching DPI/UI scale/client insets/content/theme. Capture a narrow-window drawer, keyboard navigation and light/dark/pitch-black states. Record visual differences, missing evidence and native-caption differences explicitly.
 6. Commit implementation and verification evidence on this branch only. Acceptance requires a real runnable shell, meaningful passing checks, truthful per-platform results and documented gaps; this documentation-only attempt does not satisfy it. Do not start Phase 2 automatically after resumption.
+
+## Phase 1 continuation — safe source implementation and GitHub-hosted validation prepared
+
+Continued from `3a2b1c22` on `2.0.0-flutter`. The local environment blocker is **not resolved**. A bounded search of workspace, /opt, /usr/local, /usr/lib and user cache/data locations found only the incomplete official toolchain checkout and its launcher wrappers; `bin/cache/dart-sdk` contains no Dart binary. Proxy metadata shows enforced restricted egress through `proxy:8080`; no proxy credentials were printed or changed. Previously denied official URLs were not repeatedly retried.
+
+The `storage.flutter-io.cn` candidate mirror is recognized in the official Flutter source's HTTP-host validator tests, but its release metadata request was also denied with `curl (56) CONNECT tunnel failed, response 403`. The attempted official website documentation URL returned 404; no stronger mirror-provenance claim is made from it. No mirror SDK was accepted, so mirror SDK integrity/version validation could not complete. No TLS verification, checksum check or network security control was bypassed.
+
+Useful independent work now exists under `flutterDesktop/`: real Dart bootstrap, Riverpod state/composition, go_router navigation with 32-entry history, real appearance/sidebar preference storage, native-window adapter, lifecycle/logging/error ports, source-transcribed semantic tokens and glyphs, responsive shell and disabled empty dock, plus future native-audio domain interfaces. No simulated audio/catalog service or old Flutter implementation was used. Fonts remain an explicit visual gap rather than an unlicensed silent asset copy.
+
+No generated Windows/Linux platform files were fabricated. `tool/initialize_platforms.py` requires the pinned official SDK, runs `flutter create` in a temporary directory and preserves Dart source while copying genuine generated hosts. It was tested locally only in its refusal path: without Flutter it exits “Flutter is required; no platform files were generated.” Platform initialization has **not** happened locally.
+
+A new independent workflow `.github/workflows/flutter-desktop.yml` uses `subosito/flutter-action` (pinned source commit) on GitHub-hosted Ubuntu 22.04 / Windows 2022 to perform official initialization, formatting, analysis, tests, release builds and an actual Linux window-launch smoke. It exports the complete generated/formatted project and lockfile for review, plus screenshots/logs/bundles. It never auto-commits code from PRs. The GitHub API probe for repository Actions permissions returned Forbidden; no dispatch, push, GitHub run, download of run evidence or successful platform build is claimed in this session. The workflow must first be published to the remote migration branch and executed there by an authorized actor with Actions access.
+
+| Check | Actual result in this continuation |
+|---|---|
+| Dart source grammar | 14 files parsed using tree-sitter; syntax-only, not compiler/type/API verification |
+| Layer boundaries / asset integrity | Python checks passed: domain/application/presentation import constraints, 19 asset hashes, SVG XML validity; both palettes, nine transport assets and three tab outlines compared with Kotlin source |
+| Python helper syntax | `python3 -m py_compile flutterDesktop/tool/*.py` passed |
+| Direct dependency source provenance | Five selected pub.dev archives SHA-256 verified; API signatures inspected; not `pub get` or a lockfile |
+| `dart format` / `flutter analyze` | Not run: Dart SDK remains unavailable |
+| Flutter tests | Six tests authored, **zero executed**; no passing Flutter tests claimed |
+| Official host generation | Refusal without SDK verified; actual generation not run |
+| Linux / Windows release build | Not run; workflow prepared but not executed |
+| Linux GUI launch / native resizing | Not run; future smoke command authored |
+| Kotlin runtime comparison | Still unavailable due prior JitPack restriction; source-level comparison only |
+| RAM/CPU and full feature parity | Not measured / not established |
+
+Phase 1 remains **in progress and not acceptance-complete**. The next gate is a successful hosted or newly permitted local SDK/official-template run; obtain and review its generated native trees, formatter output and `pubspec.lock`, fix any analyzer/test/build failures, then compare actual captures. See `flutterDesktop/README.md` for commands and explicit visual gaps. Do not start Phase 2 automatically.
