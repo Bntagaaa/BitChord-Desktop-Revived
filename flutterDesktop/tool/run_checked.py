@@ -1,10 +1,7 @@
-"""Preserve command exit status and publish bounded failure context in annotations.
-
-GitHub's public step status/annotations remain readable when API/log access is
-unavailable. Commands here are build/validation tools, never secret-bearing CLI
-requests. Full output is retained in the validation artifact.
-"""
+"""Stream diagnostics, preserve exit status and expose bounded public failure context."""
+from collections import deque
 from pathlib import Path
+import json
 import re
 import shutil
 import subprocess
@@ -25,27 +22,53 @@ def main():
     if not executable:
         print(f'::error::{escape(label + ": executable unavailable: " + command[0])}')
         return 127
-    result = subprocess.run([executable, *command[1:]], text=True,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            encoding='utf-8', errors='replace')
-    # Defend against accidental credential-bearing diagnostic lines. No env dump.
-    output = re.sub(r'(?im)^.*(?:authorization:|bearer\s|gh[opsu]_[a-zA-Z0-9_]+).*$','[redacted diagnostic line]', result.stdout)
-    (evidence / (label + '.log')).write_text(output, encoding='utf-8')
-    print(output, end='')
-    if result.returncode:
-        context = '\n'.join(output.splitlines()[-25:])[-5000:]
+    tail = deque(maxlen=25)
+    counts = {'passed': 0, 'failed': 0, 'skipped': 0}
+    with (evidence / (label + '.log')).open('w', encoding='utf-8') as log:
+        with subprocess.Popen([executable, *command[1:]], text=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              encoding='utf-8', errors='replace') as process:
+            for line in process.stdout:
+                line = re.sub(r'(?im)^.*(?:authorization:|bearer\s|gh[opsu]_[a-zA-Z0-9_]+).*$', '[redacted diagnostic line]', line)
+                tail.append(line.rstrip())
+                log.write(line)
+                log.flush()
+                print(line, end='', flush=True)
+                if label == 'tests':
+                    try:
+                        event = json.loads(line)
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    if not isinstance(event, dict):
+                        continue
+                    if event.get('type') == 'testStart':
+                        name = event.get('test', {}).get('name', '')[:400]
+                        print(f'\n::notice title=test-start::{escape(name)}', flush=True)
+                    if event.get('type') == 'testDone' and not event.get('hidden', False):
+                        if event.get('skipped'):
+                            counts['skipped'] += 1
+                        elif event.get('result') == 'success':
+                            counts['passed'] += 1
+                        elif event.get('result') in {'failure', 'error'}:
+                            counts['failed'] += 1
+            code = process.wait()
+    if code:
+        context = '\n'.join(tail)[-5000:]
         print(f'\n::error title={label}::{escape(context or "Command failed with no output")}', flush=True)
-    return result.returncode
+    if label == 'tests':
+        (evidence / 'test-summary.json').write_text(json.dumps({**counts, 'exit_code': code}, indent=2) + '\n')
+        print(f'\n::notice title=tests::{counts["passed"]} passed; {counts["failed"]} failed; {counts["skipped"]} skipped', flush=True)
+        if code == 0 and counts['passed'] == 0:
+            print('::error title=tests::No executed passing tests were reported.', flush=True)
+            return 1
+    return code
 
 
 if __name__ == '__main__':
-    # Windows consoles can default to cp1252 while Flutter emits Unicode.
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     try:
         raise SystemExit(main())
     except Exception as error:
-        message = f'{type(error).__name__}: {error}'
-        print(f'\n::error title=validation-driver::{escape(message)}', flush=True)
+        print(f'\n::error title=validation-driver::{escape(f"{type(error).__name__}: {error}")}', flush=True)
         raise
-

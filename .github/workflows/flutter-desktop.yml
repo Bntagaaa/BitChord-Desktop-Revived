@@ -41,8 +41,8 @@ jobs:
       - name: Install Linux desktop dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev xvfb xdotool openbox imagemagick
+          python tool/run_checked.py apt-update sudo apt-get update
+          python tool/run_checked.py apt-install sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev xvfb xdotool openbox imagemagick
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.47.9'
@@ -71,6 +71,7 @@ jobs:
       - name: Analyze
         run: python tool/run_checked.py analyze flutter analyze --fatal-infos
       - name: Run tests and capture rendered shell
+        timeout-minutes: 10
         env:
           BITCHORD_CAPTURE: '1'
         run: |
@@ -108,3 +109,78 @@ jobs:
             flutterDesktop/build/linux/x64/release/bundle/
             flutterDesktop/build/windows/x64/runner/Release/
           if-no-files-found: warn
+
+  retain-verified-generation:
+    # Never grant write credentials to PR validation. Retain only an exact-head
+    # trusted-branch build after BOTH platforms and Linux launch have passed.
+    needs: desktop
+    if: github.event_name == 'push' && github.ref == 'refs/heads/2.0.0-flutter' && github.repository == 'Bntagaaa/BitChord-Desktop-Revived'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 2.0.0-flutter
+      - name: Refuse to overwrite newer work
+        env:
+          VALIDATED_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$VALIDATED_SHA"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: flutter-foundation-linux
+          path: ${{ runner.temp }}/flutter-validated
+      - name: Retain officially generated hosts, resolved lockfile and formatter output
+        env:
+          VALIDATED_ARTIFACT: ${{ runner.temp }}/flutter-validated/flutter-source-linux.zip
+          VALIDATED_EVIDENCE: ${{ runner.temp }}/flutter-validated/flutterDesktop/verification
+          VALIDATED_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          VALIDATED_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import zipfile
+          root = Path('flutterDesktop')
+          with zipfile.ZipFile(os.environ['VALIDATED_ARTIFACT']) as archive:
+              names = archive.namelist()
+              for required in ['windows/CMakeLists.txt', 'linux/CMakeLists.txt', '.metadata', 'pubspec.lock', 'tool/platform_generation.json']:
+                  if required not in names:
+                      raise SystemExit('Missing validated generated file: ' + required)
+              provenance = json.loads(archive.read('tool/platform_generation.json'))
+              if provenance['frameworkRevision'] != 'c197ca5199e9ee5661e865596c9c07294dfab51c':
+                  raise SystemExit('Unexpected generator revision')
+              for entry in archive.infolist():
+                  relative = Path(entry.filename)
+                  if relative.is_absolute() or '..' in relative.parts:
+                      raise SystemExit('Unsafe archive path')
+                  allowed = (relative.parts[0] in {'windows', 'linux', 'lib', 'test'} or
+                             entry.filename in {'.metadata', 'pubspec.lock', 'tool/platform_generation.json'})
+                  if not allowed or entry.is_dir():
+                      continue
+                  destination = root / relative
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(archive.read(entry))
+          evidence = Path(os.environ['VALIDATED_EVIDENCE'])
+          target = root / 'verification'
+          target.mkdir(exist_ok=True)
+          for name in ['shell-dark-1220x780.png', 'shell-dark-900x600.png', 'native-linux-1220x780.png', 'native-linux-900x600.png', 'test-summary.json']:
+              data = (evidence / name).read_bytes()
+              if name.endswith('.png') and not data.startswith(b'\x89PNG\r\n\x1a\n'):
+                  raise SystemExit('Invalid render evidence: ' + name)
+              (target / name).write_bytes(data)
+          (target / 'hosted-run.json').write_text(json.dumps({
+              'source_commit': os.environ['VALIDATED_SHA'], 'run_url': os.environ['VALIDATED_RUN_URL'],
+              'linux_job': 'success', 'windows_job': 'success', 'kotlin_visual_comparison': 'not run',
+          }, indent=2) + '\n')
+          PY
+          git add flutterDesktop/lib flutterDesktop/test flutterDesktop/tool/platform_generation.json flutterDesktop/pubspec.lock
+          git add -f flutterDesktop/windows flutterDesktop/linux flutterDesktop/.metadata
+          git add -f flutterDesktop/verification/*.png flutterDesktop/verification/test-summary.json flutterDesktop/verification/hosted-run.json
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m "build: retain verified Flutter generated hosts and formatting"
+            git push origin HEAD:2.0.0-flutter
+          fi

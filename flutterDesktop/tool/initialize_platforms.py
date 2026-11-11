@@ -22,7 +22,7 @@ def main():
     if any(present):
         if not all(present):
             raise SystemExit('Partial host tree exists; inspect it rather than overwrite it.')
-        record = ROOT / 'verification' / 'generator.json'
+        record = ROOT / 'tool' / 'platform_generation.json'
         if not record.is_file() or json.loads(record.read_text())['frameworkRevision'] != EXPECTED_FRAMEWORK:
             raise SystemExit('Existing hosts have no matching generation provenance; refusing overwrite.')
         print('Keeping existing officially generated hosts.')
@@ -40,6 +40,7 @@ def main():
     evidence = ROOT / 'verification'
     evidence.mkdir(exist_ok=True)
     (evidence / 'generator.json').write_text(json.dumps(version, indent=2) + '\n')
+    (ROOT / 'tool' / 'platform_generation.json').write_text(json.dumps(version, indent=2) + '\n')
     print('Hosts generated with official Flutter create. Application source was not overwritten.')
 
 
