@@ -91,7 +91,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          flutter test --reporter expanded --timeout 2m 2>&1 | tee tests.log
+          flutter test --reporter expanded --timeout 30s 2>&1 | tee tests.log
       - name: Publish validation summary
         shell: python
         run: |

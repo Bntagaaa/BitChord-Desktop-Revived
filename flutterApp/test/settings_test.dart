@@ -583,7 +583,7 @@ void main() {
 
       expect(footerWordmark, findsOneWidget);
       expect(find.text('1.9.2'), findsOneWidget);
-      expect(find.textContaining('GitHub'), findsOneWidget);
+      expect(find.text('GitHub'), findsOneWidget);
       expect(find.textContaining('Developer'), findsOneWidget);
       expect(find.textContaining('Discord'), findsOneWidget);
       expect(find.textContaining('Licenses'), findsOneWidget);
@@ -807,11 +807,8 @@ void main() {
         of: find.byType(SettingsSegmentedControl<String>),
         matching: find.text('Legacy'),
       );
-      await tester.scrollUntilVisible(
-        legacyPill,
-        100.0,
-        scrollable: find.byType(Scrollable).first,
-      );
+      await tester.ensureVisible(legacyPill);
+      await tester.pumpAndSettle();
       await tester.tap(legacyPill);
       await tester.pumpAndSettle();
 
@@ -1026,7 +1023,10 @@ void main() {
         // Select Rock preset
         final rockChip = find.widgetWithText(ActionChip, 'Rock');
         expect(rockChip, findsOneWidget);
-        await tester.ensureVisible(rockChip);
+        await Scrollable.ensureVisible(
+          rockChip.evaluate().single,
+          alignment: 0.5,
+        );
         await tester.pumpAndSettle();
         await tester.tap(rockChip);
         await tester.pumpAndSettle();
@@ -1039,7 +1039,10 @@ void main() {
 
         // Select Acoustic preset
         final acousticChip = find.widgetWithText(ActionChip, 'Acoustic');
-        await tester.ensureVisible(acousticChip);
+        await Scrollable.ensureVisible(
+          acousticChip.evaluate().single,
+          alignment: 0.5,
+        );
         await tester.pumpAndSettle();
         await tester.tap(acousticChip);
         await tester.pumpAndSettle();
@@ -1053,7 +1056,10 @@ void main() {
         // Tap Reset all bands
         final resetButton = find.text('Reset all bands');
         expect(resetButton, findsOneWidget);
-        await tester.ensureVisible(resetButton);
+        await Scrollable.ensureVisible(
+          resetButton.evaluate().single,
+          alignment: 0.5,
+        );
         await tester.pumpAndSettle();
         await tester.tap(resetButton);
         await tester.pumpAndSettle();

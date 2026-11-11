@@ -82,15 +82,20 @@ void main() {
         artist: 'Artist',
         localUri: Uri.file('/bitchord-player-navigation-test.flac'),
       );
+      debugPrint('player_navigation first: before app.play');
       await app.play(song);
+      debugPrint('player_navigation first: after app.play');
 
+      debugPrint('player_navigation first: before pumpWidget');
       await tester.pumpWidget(
         MaterialApp(
           theme: appTheme(app.settings, Brightness.dark),
           home: ImmersivePlayer(app: app, initialPane: PlayerPane.lyrics),
         ),
       );
+      debugPrint('player_navigation first: after pumpWidget');
       await tester.pumpAndSettle();
+      debugPrint('player_navigation first: after pumpAndSettle');
 
       expect(find.byType(ImmersivePlayer), findsOneWidget);
       final player = tester.widget<ImmersivePlayer>(
@@ -106,7 +111,9 @@ void main() {
       );
       expect(lyricsButtons.any((b) => b.active), isTrue);
 
+      debugPrint('player_navigation first: before app.close');
       await app.close();
+      debugPrint('player_navigation first: after app.close');
     },
   );
 
