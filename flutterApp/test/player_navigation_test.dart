@@ -62,6 +62,14 @@ class _Lyrics extends LyricsRepository {
   ];
 }
 
+// Player transitions and lyric widgets can schedule continuous frames.
+// Pump a finite interval to verify navigation without waiting for all tickers
+// in the entire widget tree to stop.
+Future<void> _pumpPlayerUi(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
 void main() {
   testWidgets(
     'ImmersivePlayer directly mounts PlayerPane.lyrics when supplied via initialPane',
@@ -94,8 +102,8 @@ void main() {
         ),
       );
       debugPrint('player_navigation first: after pumpWidget');
-      await tester.pumpAndSettle();
-      debugPrint('player_navigation first: after pumpAndSettle');
+      await _pumpPlayerUi(tester);
+      debugPrint('player_navigation first: after bounded UI pumps');
 
       expect(find.byType(ImmersivePlayer), findsOneWidget);
       final player = tester.widget<ImmersivePlayer>(
@@ -144,7 +152,7 @@ void main() {
           home: MusicShell(application: app),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpPlayerUi(tester);
 
       final dockLyricsBtn = find.byWidgetPredicate(
         (w) => w is TransportButton && w.icon == 'player_transport_lyrics',
@@ -152,7 +160,7 @@ void main() {
       expect(dockLyricsBtn, findsOneWidget);
 
       await tester.tap(dockLyricsBtn);
-      await tester.pumpAndSettle();
+      await _pumpPlayerUi(tester);
 
       final playerFinder = find.byType(ImmersivePlayer);
       expect(playerFinder, findsOneWidget);
@@ -190,7 +198,7 @@ void main() {
           home: MusicShell(application: app),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpPlayerUi(tester);
 
       final dockQueueBtn = find.byWidgetPredicate(
         (w) => w is TransportButton && w.icon == 'player_transport_up_next',
@@ -198,7 +206,7 @@ void main() {
       expect(dockQueueBtn, findsOneWidget);
 
       await tester.tap(dockQueueBtn);
-      await tester.pumpAndSettle();
+      await _pumpPlayerUi(tester);
 
       final playerFinder = find.byType(ImmersivePlayer);
       expect(playerFinder, findsOneWidget);
@@ -236,13 +244,13 @@ void main() {
           home: MusicShell(application: app),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpPlayerUi(tester);
 
       final titleFinder = find.text('Test Song');
       expect(titleFinder, findsOneWidget);
 
       await tester.tap(titleFinder);
-      await tester.pumpAndSettle();
+      await _pumpPlayerUi(tester);
 
       final playerFinder = find.byType(ImmersivePlayer);
       expect(playerFinder, findsOneWidget);
@@ -281,7 +289,7 @@ void main() {
           home: ImmersivePlayer(app: app, initialPane: PlayerPane.lyrics),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpPlayerUi(tester);
 
       final line2Finder = find.text('Sample Line 2');
       expect(line2Finder, findsOneWidget);
@@ -333,7 +341,7 @@ void main() {
           home: ImmersivePlayer(app: app, initialPane: PlayerPane.lyrics),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpPlayerUi(tester);
 
       final line1Finder = find.text('Sample Line 1');
       final line2Finder = find.text('Sample Line 2');
