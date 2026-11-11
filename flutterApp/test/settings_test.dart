@@ -1047,7 +1047,9 @@ void main() {
           alignment: 0.5,
         );
         await tester.pumpAndSettle();
-        final acousticAction = tester.widget<ActionChip>(acousticChip).onPressed;
+        final acousticAction = tester
+            .widget<ActionChip>(acousticChip)
+            .onPressed;
         expect(acousticAction, isNotNull);
         acousticAction!();
         await tester.pumpAndSettle();
@@ -1066,9 +1068,11 @@ void main() {
           alignment: 0.5,
         );
         await tester.pumpAndSettle();
-        final resetAction = tester.widget<TextButton>(
-          find.widgetWithText(TextButton, 'Reset all bands'),
-        ).onPressed;
+        final resetAction = tester
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, 'Reset all bands'),
+            )
+            .onPressed;
         expect(resetAction, isNotNull);
         resetAction!();
         await tester.pumpAndSettle();

@@ -72,7 +72,10 @@ Future<void> _pumpPlayerUi(WidgetTester tester) async {
 
 // Widget tests use a fake clock. Unmount observers first, then close
 // native-style asynchronous resources on the real event loop.
-Future<void> _disposePlayerTest(WidgetTester tester, MusicApplication app) async {
+Future<void> _disposePlayerTest(
+  WidgetTester tester,
+  MusicApplication app,
+) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.runAsync(app.close);
 }
