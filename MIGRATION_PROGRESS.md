@@ -16,7 +16,7 @@ Deliverables:
 - [ ] Measure Kotlin performance; Flutter measurements await an implementation.
 - [ ] Establish package/platform compatibility through Phase 1 tooling checks and later spikes.
 
-Commit completion is established by the Git commit containing these four documents; do not put a self-referential commit hash in its own contents. Phase 1 is **not started** and requires a separate instruction.
+Commit completion is established by the Git commit containing these four documents; do not put a self-referential commit hash in its own contents. Phase 1 was subsequently authorized by the visual-shell request; its current blocked status is recorded below.
 
 ## Phase 0 validation record
 
@@ -52,9 +52,9 @@ No backend or audio bridge is implemented. No Kotlin source changes, previous Fl
 4. **Advanced parity (Phase 5):** port native planner and DSP, preserve two-deck state/time and ONNX preprocessing; reuse allowed C++ loop/analysis primitives through new owners. Test feature→plan→PCM chain and gapless/Automix interaction before UI declares availability.
 5. **Finish surfaces/integrations (Phases 6–7):** native clock drives Flutter lyric/video/PiP projections; one engine across windows/OS media/party. Then full parity and matched memory/CPU closure (Phase 8). Gates supplement the existing backlog; no original feature is dropped or moved outside migration scope.
 
-## Exact Phase 1 scope — hybrid tooling and independently buildable foundation
+## Historical Phase 0.5 Phase 1 scope — superseded by visual-shell authorization
 
-Depends on the committed Phase 0/0.5 plan and a separate instruction to proceed. Phase 1 remains unstarted. Deliver only a new, buildable Windows/Linux Flutter foundation in `flutterDesktop/`, plus tooling/architecture documentation and meaningful foundation checks. This is not a feature milestone and cannot be described as visual or functional parity.
+Historical scope preserved for provenance. The subsequent Phase 1 request explicitly expands this tooling-only plan to include the original design system, desktop visual shell and service interfaces; that newer request takes precedence. Deliver only a new, buildable Windows/Linux Flutter foundation in `flutterDesktop/`, plus tooling/architecture documentation and meaningful foundation checks. This is not a feature milestone and cannot be described as visual or functional parity.
 
 1. Verify current stable Flutter/Dart releases and Windows/Linux desktop support; select and pin one SDK and minimal dependency versions after license/maintenance/platform checks. Document installation/activation and required compilers (Windows MSVC/CMake/Ninja; Linux Clang/CMake/Ninja/pkg-config/GTK development prerequisites as supported by the chosen SDK). Run `flutter doctor -v` on both platforms or explicitly block the unavailable platform gate.
 2. Create the project from the official Flutter desktop template **only** in `flutterDesktop/` with Windows and Linux hosts. Select stable app identifiers and display name consistent with BitChord and document package identity decisions; no old Flutter code/assets/config are imported. Kotlin stays byte-for-byte unchanged.
@@ -97,3 +97,41 @@ Each phase ends with an evidence ledger per P-ID and explicit unresolved items. 
 ## Completion discipline
 
 For each P-ID record implementation commit, fixtures/reference SHA, Windows/Linux commands and versions, result counts, artifacts, known gaps and reviewer acceptance. Mark states separately: planned, implemented, statically checked, fixture-tested, platform-verified, parity-accepted. Missing credentials or external services are blocked, not passed. Phase 0.5 ends with a documentation-only commit on `2.0.0-flutter`; it does not authorize Phase 1, source edits, pushing a branch, merging or publishing a release.
+
+## Phase 1 — Flutter foundation and visual shell: started, toolchain blocked
+
+The user authorized implementation on the actual migration branch `2.0.0-flutter` after Phase 0.5 commit `bc800fc0`. The revised scope includes the reusable design system, sidebar/navigation, top bar/content region, empty player dock, responsive layout, OS-theme/focus/window lifecycle, and future service interfaces. This supersedes the historical restriction to a neutral foundation screen; backend/DSP/Automix implementation, real catalog/search/library features and Phase 2 remain unauthorized. No previous Flutter rewrite has been consulted.
+
+### Work performed and observed blocker
+
+- Confirmed branch and clean worktree, read the four plans, and inspected the pinned Kotlin theme, typography/font mapping, sidebar/frame/dock, window modes and UI-scale/width policies.
+- Discovered neither Flutter nor Dart on PATH. The required Linux build prerequisites also lack Clang, Ninja and GTK3 development metadata (`pkg-config --modversion gtk+-3.0` fails). Existing user-owned CMake from onboarding remains available after activation; no system installation is claimed.
+- Read the enforced environment network policy. `storage.googleapis.com` is absent from its allowed destinations. A request to the official Linux release metadata at `https://storage.googleapis.com/flutter_infra_release/flutter/releases/releases_linux.json` failed with `curl: (56) CONNECT tunnel failed, response 403`.
+- Successfully checked out the official Flutter **toolchain source**, outside the project at `/workspace/.toolchains/flutter`. Stable points to `c197ca5199e9ee5661e865596c9c07294dfab51c`, source tag `3.47.9`, engine `89c39edfdfae2949f6806e4a315c0c08522238b7`. This identifies a candidate SDK; it is not an executable/version-validated SDK installation or a project pin.
+- Ran that checkout's `bin/flutter --version` with analytics suppressed and a workspace pub cache. Exit **56**: the official bootstrap could not download its Linux x64 Dart SDK because the proxy returned HTTP 403. Log: `/workspace/.cloud-setup/phase1-flutter-bootstrap.log` (local, not committed).
+- The environment draft read failed twice with “The current environment draft could not be verified.” No configuration edit/persistence is claimed, and no unknown allowlist was replaced. No network-policy bypass or disabled TLS verification was attempted.
+
+This is an external dependency-access blocker to creating, resolving, formatting, analyzing, testing or building the official Flutter project. No `flutterDesktop/` application, handmade template, mock screen, native stub or placeholder feature has been created. Only source-audit and status documentation is committed. Phase 1 is **not complete** and no runnable Flutter foundation is claimed.
+
+### Verification ledger
+
+| Required check | Result in this attempt |
+|---|---|
+| Branch/reference preservation | Confirmed `2.0.0-flutter`; Kotlin source unchanged |
+| Flutter toolchain bootstrap / version | Failed before Dart SDK installation: proxy 403 |
+| `dart format` | Not run: Dart unavailable |
+| `flutter analyze` | Not run: Flutter bootstrap blocked |
+| Widget/layout tests | Not implemented or run: toolchain unavailable; no test pass claim |
+| Linux release build / graphical launch | Not run: SDK unavailable; Linux development prerequisites also need setup |
+| Windows release build / native behavior | Not run: no Windows executor; later CI/native validation required |
+| Same-dimension Kotlin/Flutter comparison | Not run: Flutter unavailable and reference build still has the prior JitPack dependency blocker |
+| Performance | Not measured; no RAM-reduction claim |
+
+### Exact resume actions and acceptance
+
+1. Add **`storage.googleapis.com`** to this environment's allowed destinations in environment settings, retaining existing package-manager access. **`jitpack.io`** is also required to unblock the Kotlin reference build for the requested visual comparison. Credentials are not the diagnosed issue. The failed draft read means these changes were not saved by the agent.
+2. Recheck current policy and retry the official Flutter bootstrap with fresh connections. Verify the candidate stable SDK/version against official release metadata/checksum, then pin the selected working SDK and project dependencies. Install Linux desktop development prerequisites (Clang, CMake, Ninja, pkg-config, GTK3 development libraries and their dependencies) through supported environment/user-owned package setup. Do not assume the presence of GTK runtime libraries means development headers are available.
+3. Generate Windows/Linux hosts with the official Flutter template into `flutterDesktop/` only. Implement initialization, owned lifecycle/error/logging services, Riverpod composition and go_router navigation with distinct UI/application/data/platform layers. Interfaces describe the Phase 0.5 native ABI ownership/time/generation contracts; no native backend implementation or fake production service.
+4. Translate measured Kotlin tokens, custom vector geometry, font profiles, actual shell/default states and responsive policies. Preserve no-data/disabled semantics; no invented catalog content or functioning-looking fake playback. Verify asset notices/rights, especially bundled SF Pro, before packaging; report typography differences if reuse cannot be established rather than silently substituting.
+5. Add meaningful layout/focus/theme/lifecycle tests; execute format/analyze/tests; build and launch Linux; establish Windows build/host results in an available Windows environment/CI. Compare actual reference/Flutter captures at 1220×780 and 900×600 logical outer-window dimensions with matching DPI/UI scale/client insets/content/theme. Capture a narrow-window drawer, keyboard navigation and light/dark/pitch-black states. Record visual differences, missing evidence and native-caption differences explicitly.
+6. Commit implementation and verification evidence on this branch only. Acceptance requires a real runnable shell, meaningful passing checks, truthful per-platform results and documented gaps; this documentation-only attempt does not satisfy it. Do not start Phase 2 automatically after resumption.

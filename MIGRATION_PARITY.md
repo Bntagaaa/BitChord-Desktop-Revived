@@ -153,6 +153,31 @@ The reference has multiple fallback constants in different layers: DesktopAudioE
 
 Phase 0.5 verification: `python3 tools/automix-validation/verify-upstream.py` passed, verifying 25 canonical AutoMix source/model files against `b690dc146009d4815825fa4a20815ef2e4ee8898`. This confirms manifest identity only, not audio quality, model accuracy or runtime parity. The earlier JitPack-blocked JVM test outcome remains unchanged evidence; no tests were rerun merely to reproduce that known access failure. No backend, bridge or Flutter feature was implemented.
 
+## Phase 1 shell extraction — source evidence, implementation blocked
+
+Phase 1 was authorized with a broader shell/design-system scope than the historical Phase 0.5 tooling-only plan. The official SDK bootstrap is currently blocked; all Flutter parity workstreams remain planned. These additional source findings prepare implementation without claiming screenshots or a runnable shell.
+
+| Surface | Pinned Kotlin source anchor | Exact requirement for the Flutter shell |
+|---|---|---|
+| Window | D `Main.kt:desktopMain`, `MIN_WINDOW_WIDTH_DP`, `MIN_WINDOW_HEIGHT_DP` | Initial 1220×780; minimum 900×600; decorated, opaque, resizable native window. Match logical size and account for OS client insets/DPI |
+| Window restoration | D `Main.kt`, `DesktopWindowMode.kt` | In-session placement/fullscreen restore with stale native placement guards; no persisted width/height/position restore found in Main's initial WindowState. Do not invent persisted geometry as reference parity |
+| Sidebar | D `DesktopApp.kt:DesktopSidebar` | Expanded 220 dp, collapsed 72 dp; 180 ms width tween. Opaque surface, no sidebar blur; Windows wallpaper-tinted Mica is a separate native capability |
+| Rail/drawer | D `DesktopSidebarWidthPolicy.kt`, `DesktopFrame` | Width below 980 dp automatically uses rail; transient expanded drawer overlays without shifting content. Auto-collapse does not overwrite stored `sidebar_collapsed`; resizing wide clears a stale drawer request |
+| Sidebar rows | D `DesktopSidebarItem`, `DesktopPrimaryNavigationIcons.kt`; U `ui/icons/BitChordIcons.kt` | Home/New/Search/Library use exact custom tab vectors. History/Downloads/Local Music/Spotify remain distinct. Selected surface and 3×18 dp rose indicator; collapsed rows 42 high, radius 7; tooltips and accessible labels |
+| Empty sidebar data | D `DesktopSidebar` | No invented playlist names; reference text is “Your playlists will appear here.” Account/backend actions must not pretend sign-in is implemented |
+| Dock | D `DesktopMiniPlayer` | Maximum 760 wide, 58 high, radius 16; empty state centers original 48 dp brand mark, without fake title/artwork. Artwork when populated is 42 dp; transport uses supplied SVG geometry; disabled/unavailable controls must be truthful |
+| Dock spacing | D `DesktopBottomChrome`, `DesktopFrame` | Outer padding 10 horizontally, 8 top, 20 bottom; reference content generally reserves 132 dp under floating player. Preserve parent/sidebar coordinate system when centering |
+| Legacy top player | D `DesktopTopBar`, `DesktopAppearanceSettings.kt` | Legacy top playback bar is 64 dp and opt-in (`enableOldTopMusicPlayerStyle` defaults false); do not add duplicate playback chrome in default floating-player mode. Legacy control breakpoints refer to available content width: 720/430/350 dp |
+| Page spacing | U `ui/components/Common.kt:PAGE_GUTTER` | 16 dp shared page gutter; do not assume Material default page padding matches |
+| Theme | D `DesktopTheme.kt` | System follows OS by default; explicit Light/Dark; pitch-black applies only to explicit Dark. Reuse all semantic palette values rather than one generic dark ColorScheme |
+| Typography | D `DesktopTypography.kt`, `DesktopFontSettings.kt`; U `ui/theme/BitChordTypography.kt` | SF Pro Display regular/medium/semibold/bold/heavy cuts. Default profile maps requested 500→400, 600→500, 700→600, 800→700; Legacy uses physical requested weight. Disable synthetic bold; glyph metrics still require comparison |
+| Type scale | Same typography sources | Customized roles: display 34/800, headline large 30/800, headline medium 22/700, title large 20/700, title medium 16/600, body large 16/400, body medium 14/400, label medium 12/600, label small 11/600, with role/profile-specific tracking. Other inherited roles must be audited before use |
+| UI zoom | D `DesktopUiScaleSettings.kt` | 80/90/100/110/125%, default 100; independent of OS DPI/text scale. Sidebar wordmark compensates below 100% to retain physical legibility |
+| Interaction/motion | D `DesktopHover.kt`, `DesktopShortcuts.kt` | Circular hover wash 120 ms; no-hover song-row background 170 ms FastOutSlowIn; reduced-animation zeros these durations. Reproduce keyboard editor/modal exceptions; do not claim a single generic button animation covers all surfaces |
+| Asset provenance | `desktopApp/PLAYER_TRANSPORT_ICONS.md` | Nine supplied transport SVGs have documented upstream geometry and GPL attribution. Custom tab vectors must be translated faithfully; not replaced with generic Material tabs. SF Pro redistribution permission is not established by the existing asset files alone |
+
+Current visual differences cannot be measured because neither a Flutter build nor matched reference/Flutter captures exist. No pixel-perfect claim, widget-test result, Windows native behavior or memory improvement is established. See the Phase 1 verification ledger in MIGRATION_PROGRESS for the exact SDK access failure and resumption gates. The original Phase 0 inventory below remains unchanged.
+
 ## Complete tracked reference inventory
 
 Generated from the pinned commit's tracked files, excluding generated build outputs and any former Flutter rewrite. SHA-256 records exact content; test entries are verification sources, not passed outcomes. Main/common/JVM sources are primary; Android actuals and Android native JNI/model dependencies are contextual. Every file below is assigned to a parity domain; the matrix supplies behavioral acceptance and planned destination for that domain. Broad classifications are navigation aids, not proof every helper is a separate feature.
