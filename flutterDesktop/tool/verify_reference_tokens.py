@@ -21,7 +21,10 @@ def main():
         actual = dict(re.findall(r"'(\w+)': Color\((0x[0-9A-Fa-f]+)\)", section))
         assert expected == actual, name
     for path in (REFERENCE / 'desktopApp/src/main/composeResources/drawable').glob('player_transport_*.svg'):
-        assert hashlib.sha256(path.read_bytes()).digest() == hashlib.sha256((ROOT / 'assets/icons' / path.name).read_bytes()).digest(), path
+        # Reference checkout may use CRLF on Windows; compare canonical SVG text.
+        original = path.read_bytes().replace(b'\r\n', b'\n')
+        copied = (ROOT / 'assets/icons' / path.name).read_bytes().replace(b'\r\n', b'\n')
+        assert hashlib.sha256(original).digest() == hashlib.sha256(copied).digest(), path
     glyphs = (REFERENCE / 'sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/icons/BitChordIcons.kt').read_text()
     for name in ('TabExplore', 'TabSearch', 'TabLibrary'):
         block = glyphs.split(f'val {name}: ImageVector by lazy {{')[1].split('\n    }')[0]

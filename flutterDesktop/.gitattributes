@@ -1,0 +1,8 @@
+# Preserve canonical text bytes for cross-platform asset provenance.
+*.svg text eol=lf
+*.json text eol=lf
+*.dart text eol=lf
+*.py text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.webp binary

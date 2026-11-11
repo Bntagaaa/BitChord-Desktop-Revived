@@ -58,30 +58,30 @@ jobs:
       - name: Resolve dependencies
         run: |
           if [ -f pubspec.lock ]; then
-            flutter pub get --enforce-lockfile
+            python tool/run_checked.py dependencies flutter pub get --enforce-lockfile
           else
-            flutter pub get
+            python tool/run_checked.py dependencies flutter pub get
           fi
       # Local SDK access is blocked. Format the bootstrap source and export the
       # formatted project/lockfile as review artifacts; do not auto-commit to a PR.
       - name: Format Dart source
         run: |
-          dart format lib test
-          dart format --output=none --set-exit-if-changed lib test
+          python tool/run_checked.py format dart format lib test
+          python tool/run_checked.py format-check dart format --output=none --set-exit-if-changed lib test
       - name: Analyze
-        run: flutter analyze --fatal-infos
+        run: python tool/run_checked.py analyze flutter analyze --fatal-infos
       - name: Run tests and capture rendered shell
         env:
           BITCHORD_CAPTURE: '1'
         run: |
           set -euo pipefail
-          flutter test --machine | tee verification/tests.json
+          python tool/run_checked.py tests flutter test --machine | tee verification/tests.json
       - name: Build release desktop bundle
-        run: flutter build ${{ matrix.target }} --release
+        run: python tool/run_checked.py build flutter build ${{ matrix.target }} --release
       - name: Linux release launch smoke
         if: runner.os == 'Linux'
         run: |
-          python tool/launch_smoke.py build/linux/x64/release/bundle/bitchord_desktop
+          python tool/run_checked.py launch python tool/launch_smoke.py build/linux/x64/release/bundle/bitchord_desktop
       - name: Package generated source for review
         if: always()
         run: |
