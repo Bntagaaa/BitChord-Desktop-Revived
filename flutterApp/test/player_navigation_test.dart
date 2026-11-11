@@ -70,6 +70,13 @@ Future<void> _pumpPlayerUi(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
 }
 
+// Widget tests use a fake clock. Unmount observers first, then close
+// native-style asynchronous resources on the real event loop.
+Future<void> _disposePlayerTest(WidgetTester tester, MusicApplication app) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.runAsync(app.close);
+}
+
 void main() {
   testWidgets(
     'ImmersivePlayer directly mounts PlayerPane.lyrics when supplied via initialPane',
@@ -120,7 +127,7 @@ void main() {
       expect(lyricsButtons.any((b) => b.active), isTrue);
 
       debugPrint('player_navigation first: before app.close');
-      await app.close();
+      await _disposePlayerTest(tester, app);
       debugPrint('player_navigation first: after app.close');
     },
   );
@@ -167,7 +174,7 @@ void main() {
       final playerWidget = tester.widget<ImmersivePlayer>(playerFinder);
       expect(playerWidget.initialPane, PlayerPane.lyrics);
 
-      await app.close();
+      await _disposePlayerTest(tester, app);
     },
   );
 
@@ -213,7 +220,7 @@ void main() {
       final playerWidget = tester.widget<ImmersivePlayer>(playerFinder);
       expect(playerWidget.initialPane, PlayerPane.queue);
 
-      await app.close();
+      await _disposePlayerTest(tester, app);
     },
   );
 
@@ -257,7 +264,7 @@ void main() {
       final playerWidget = tester.widget<ImmersivePlayer>(playerFinder);
       expect(playerWidget.initialPane, PlayerPane.main);
 
-      await app.close();
+      await _disposePlayerTest(tester, app);
     },
   );
 
@@ -309,7 +316,7 @@ void main() {
       expect(app.position.value, Duration.zero);
       expect(audio.lastSeek, Duration.zero);
 
-      await app.close();
+      await _disposePlayerTest(tester, app);
     },
   );
 
@@ -353,7 +360,7 @@ void main() {
       expect(app.position.value, const Duration(seconds: 4));
       expect(audio.lastSeek, const Duration(seconds: 4));
 
-      await app.close();
+      await _disposePlayerTest(tester, app);
     },
   );
 }

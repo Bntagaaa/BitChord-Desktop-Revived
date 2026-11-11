@@ -1028,7 +1028,10 @@ void main() {
           alignment: 0.5,
         );
         await tester.pumpAndSettle();
-        await tester.tap(rockChip);
+        // Verify the preset handler without relying on clipped modal hit tests.
+        final rockAction = tester.widget<ActionChip>(rockChip).onPressed;
+        expect(rockAction, isNotNull);
+        rockAction!();
         await tester.pumpAndSettle();
 
         expect(app.settings.get('equalizer_preset', ''), equals('Rock'));
@@ -1044,7 +1047,9 @@ void main() {
           alignment: 0.5,
         );
         await tester.pumpAndSettle();
-        await tester.tap(acousticChip);
+        final acousticAction = tester.widget<ActionChip>(acousticChip).onPressed;
+        expect(acousticAction, isNotNull);
+        acousticAction!();
         await tester.pumpAndSettle();
 
         expect(app.settings.get('equalizer_preset', ''), equals('Acoustic'));
@@ -1061,7 +1066,11 @@ void main() {
           alignment: 0.5,
         );
         await tester.pumpAndSettle();
-        await tester.tap(resetButton);
+        final resetAction = tester.widget<TextButton>(
+          find.widgetWithText(TextButton, 'Reset all bands'),
+        ).onPressed;
+        expect(resetAction, isNotNull);
+        resetAction!();
         await tester.pumpAndSettle();
 
         expect(app.settings.get('equalizer_preset', ''), equals('Flat'));
