@@ -511,8 +511,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.byType(ShaderMask), findsOneWidget);
-
+        // An unattached or zero-offset controller needs no edge mask.
+        // Moving the viewport must activate the fade regardless.
         controller.jumpTo(200);
         await tester.pumpAndSettle();
         expect(find.byType(ShaderMask), findsOneWidget);

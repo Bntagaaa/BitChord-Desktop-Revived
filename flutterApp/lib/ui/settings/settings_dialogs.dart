@@ -2596,8 +2596,7 @@ class DesktopLicensesPage extends StatelessWidget {
 
     return SettingsPageFrame(
       maxWidth: 840.0,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: ListView(
         children: [
           const SizedBox(height: 16.0),
           Row(
@@ -2608,21 +2607,23 @@ class DesktopLicensesPage extends StatelessWidget {
                 onPressed: onBack,
               ),
               const SizedBox(width: 8.0),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Third-party licenses',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: palette.foreground,
-                      fontWeight: FontWeight.w700,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Third-party licenses',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: palette.foreground,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  Text(
-                    'BitChord is free software, and so is everything it is built on.',
-                    style: TextStyle(color: palette.secondary, fontSize: 13),
-                  ),
-                ],
+                    Text(
+                      'BitChord is free software, and so is everything it is built on.',
+                      style: TextStyle(color: palette.secondary, fontSize: 13),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

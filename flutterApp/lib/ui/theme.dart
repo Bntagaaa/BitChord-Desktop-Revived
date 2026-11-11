@@ -182,5 +182,8 @@ class PaletteExtension extends ThemeExtension<PaletteExtension> {
         );
 }
 
-AppColors paletteOf(BuildContext context) =>
-    Theme.of(context).extension<PaletteExtension>()!.colors;
+AppColors paletteOf(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.extension<PaletteExtension>()?.colors ??
+      (theme.brightness == Brightness.dark ? AppColors.dark : AppColors.light);
+}

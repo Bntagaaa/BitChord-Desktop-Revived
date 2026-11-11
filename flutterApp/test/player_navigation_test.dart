@@ -76,7 +76,12 @@ void main() {
         audio: _Audio(),
         lyrics: _Lyrics(),
       );
-      const song = Song(id: 's1', title: 'Test Song', artist: 'Artist');
+      final song = Song(
+        id: 'local:s1',
+        title: 'Test Song',
+        artist: 'Artist',
+        localUri: Uri.file('/bitchord-player-navigation-test.flac'),
+      );
       await app.play(song);
 
       await tester.pumpWidget(
@@ -118,7 +123,12 @@ void main() {
         audio: _Audio(),
         lyrics: _Lyrics(),
       );
-      const song = Song(id: 's1', title: 'Test Song', artist: 'Artist');
+      final song = Song(
+        id: 'local:s1',
+        title: 'Test Song',
+        artist: 'Artist',
+        localUri: Uri.file('/bitchord-player-navigation-test.flac'),
+      );
       await app.play(song);
 
       await tester.pumpWidget(
@@ -159,7 +169,12 @@ void main() {
         audio: _Audio(),
         lyrics: _Lyrics(),
       );
-      const song = Song(id: 's1', title: 'Test Song', artist: 'Artist');
+      final song = Song(
+        id: 'local:s1',
+        title: 'Test Song',
+        artist: 'Artist',
+        localUri: Uri.file('/bitchord-player-navigation-test.flac'),
+      );
       await app.play(song);
 
       await tester.pumpWidget(
@@ -200,7 +215,12 @@ void main() {
         audio: _Audio(),
         lyrics: _Lyrics(),
       );
-      const song = Song(id: 's1', title: 'Test Song', artist: 'Artist');
+      final song = Song(
+        id: 'local:s1',
+        title: 'Test Song',
+        artist: 'Artist',
+        localUri: Uri.file('/bitchord-player-navigation-test.flac'),
+      );
       await app.play(song);
 
       await tester.pumpWidget(
@@ -240,7 +260,12 @@ void main() {
         audio: audio,
         lyrics: _Lyrics(),
       );
-      const song = Song(id: 's1', title: 'Test Song', artist: 'Artist');
+      final song = Song(
+        id: 'local:s1',
+        title: 'Test Song',
+        artist: 'Artist',
+        localUri: Uri.file('/bitchord-player-navigation-test.flac'),
+      );
       await app.play(song);
 
       await tester.pumpWidget(
@@ -287,7 +312,12 @@ void main() {
         audio: audio,
         lyrics: _Lyrics(),
       );
-      const song = Song(id: 's1', title: 'Test Song', artist: 'Artist');
+      final song = Song(
+        id: 'local:s1',
+        title: 'Test Song',
+        artist: 'Artist',
+        localUri: Uri.file('/bitchord-player-navigation-test.flac'),
+      );
       await app.play(song);
 
       await tester.pumpWidget(

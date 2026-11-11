@@ -50,10 +50,17 @@ class MusicApplication extends ChangeNotifier {
         if (_audioGeneration == _playRequest) {
           duration.value = value;
           if (!_loadingAudio) lyricsSession.reportDuration(value);
+        } else if (_loadingAudio) {
+          // Native metadata may be emitted before open() resolves. Adopt it
+          // only after the new playback generation has opened successfully.
+          _openingDuration = value;
         }
       }),
       audio.playing.listen((value) {
-        if (_audioGeneration != _playRequest) return;
+        if (_audioGeneration != _playRequest) {
+          if (_loadingAudio) _openingPlaying = value;
+          return;
+        }
         playing = value;
         notifyListeners();
       }),
@@ -106,6 +113,8 @@ class MusicApplication extends ChangeNotifier {
   int _playRequest = 0;
   int? _audioGeneration;
   bool _loadingAudio = false;
+  Duration? _openingDuration;
+  bool? _openingPlaying;
   bool _closed = false;
   String? browseId;
   Song? get song => queue.current;
@@ -238,6 +247,9 @@ class MusicApplication extends ChangeNotifier {
     loadingTrack = true;
     error = null;
     _audioGeneration = null;
+    _loadingAudio = false;
+    _openingDuration = null;
+    _openingPlaying = null;
     duration.value = Duration.zero;
     position.value = Duration.zero;
     lyricsSession.select(
@@ -248,6 +260,8 @@ class MusicApplication extends ChangeNotifier {
     try {
       final stream = await resolver.resolve(selected);
       if (generation != _playRequest || _closed) return;
+      _openingDuration = null;
+      _openingPlaying = null;
       _loadingAudio = true;
       try {
         await audio.open(stream.uri, headers: stream.headers);
@@ -256,6 +270,10 @@ class MusicApplication extends ChangeNotifier {
       }
       if (generation != _playRequest || _closed) return;
       _audioGeneration = generation;
+      if (_openingDuration != null) duration.value = _openingDuration!;
+      if (_openingPlaying != null) playing = _openingPlaying!;
+      _openingDuration = null;
+      _openingPlaying = null;
       lyricsSession.reportDuration(duration.value);
       history.removeWhere((track) => track.id == selected.id);
       history.insert(0, selected);

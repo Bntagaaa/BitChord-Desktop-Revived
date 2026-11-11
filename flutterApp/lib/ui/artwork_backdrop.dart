@@ -112,17 +112,22 @@ class FullArtworkBackdrop extends StatefulWidget {
 
 class _FullArtworkBackdropState extends State<FullArtworkBackdrop>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _alpha = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 320),
-  );
-  late final CurvedAnimation _fade = CurvedAnimation(
-    parent: _alpha,
-    curve: Curves.fastOutSlowIn,
-  );
+  late final AnimationController _alpha;
+  late final CurvedAnimation _fade;
   ui.Image? _image;
   int _generation = 0;
   String? _loaded;
+
+  @override
+  void initState() {
+    super.initState();
+    _alpha = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    _fade = CurvedAnimation(parent: _alpha, curve: Curves.fastOutSlowIn);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();

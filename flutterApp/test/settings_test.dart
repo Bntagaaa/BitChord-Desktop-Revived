@@ -264,7 +264,7 @@ void main() {
 
         for (final entry in catalogKeys.entries) {
           expect(
-            settings.get(entry.key, null),
+            settings.get<Object?>(entry.key, null),
             equals(entry.value),
             reason: 'Failed to verify key: ${entry.key}',
           );
@@ -556,21 +556,15 @@ void main() {
           'APP UPDATES',
         ];
 
-        for (final sectionTitle in expectedSections) {
-          final groupFinder = find.widgetWithText(SettingsGroup, sectionTitle);
-          if (groupFinder.evaluate().isEmpty) {
-            await tester.scrollUntilVisible(
-              groupFinder,
-              300.0,
-              scrollable: find.byType(Scrollable).first,
-            );
-          }
-          expect(
-            groupFinder,
-            findsOneWidget,
-            reason: 'Expected SettingsGroup with title: $sectionTitle',
-          );
-        }
+        // The section widgets live in the ListView delegate even before
+        // the viewport lays out off-screen groups.
+        final listView = tester.widget<ListView>(find.byType(ListView).first);
+        final sectionTitles =
+            (listView.childrenDelegate as SliverChildListDelegate).children
+                .whereType<SettingsGroup>()
+                .map((group) => group.title)
+                .toList();
+        expect(sectionTitles, expectedSections);
       },
     );
 
@@ -588,7 +582,7 @@ void main() {
       );
 
       expect(footerWordmark, findsOneWidget);
-      expect(find.textContaining('1.9.2'), findsOneWidget);
+      expect(find.text('1.9.2'), findsOneWidget);
       expect(find.textContaining('GitHub'), findsOneWidget);
       expect(find.textContaining('Developer'), findsOneWidget);
       expect(find.textContaining('Discord'), findsOneWidget);
@@ -634,7 +628,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.widgetWithText(SettingsGroup, 'PLAYBACK'), findsOneWidget);
-      expect(find.text('Equalizer'), findsOneWidget);
+      expect(
+        find.widgetWithText(SettingsNavigationRow, 'Equalizer'),
+        findsOneWidget,
+      );
       expect(find.widgetWithText(SettingsGroup, 'ACCOUNT'), findsNothing);
       expect(find.widgetWithText(SettingsGroup, 'LOCAL MUSIC'), findsNothing);
     });
@@ -669,7 +666,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.widgetWithText(SettingsGroup, 'STORAGE'), findsOneWidget);
-        expect(find.text('Song cache limit'), findsOneWidget);
+        expect(find.textContaining('Song cache limit:'), findsOneWidget);
         expect(find.widgetWithText(SettingsGroup, 'LANGUAGE'), findsNothing);
       },
     );
@@ -806,7 +803,10 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
 
-      final legacyPill = find.text('Legacy');
+      final legacyPill = find.descendant(
+        of: find.byType(SettingsSegmentedControl<String>),
+        matching: find.text('Legacy'),
+      );
       await tester.scrollUntilVisible(
         legacyPill,
         100.0,
@@ -1026,6 +1026,8 @@ void main() {
         // Select Rock preset
         final rockChip = find.widgetWithText(ActionChip, 'Rock');
         expect(rockChip, findsOneWidget);
+        await tester.ensureVisible(rockChip);
+        await tester.pumpAndSettle();
         await tester.tap(rockChip);
         await tester.pumpAndSettle();
 
@@ -1037,6 +1039,8 @@ void main() {
 
         // Select Acoustic preset
         final acousticChip = find.widgetWithText(ActionChip, 'Acoustic');
+        await tester.ensureVisible(acousticChip);
+        await tester.pumpAndSettle();
         await tester.tap(acousticChip);
         await tester.pumpAndSettle();
 
@@ -1049,6 +1053,8 @@ void main() {
         // Tap Reset all bands
         final resetButton = find.text('Reset all bands');
         expect(resetButton, findsOneWidget);
+        await tester.ensureVisible(resetButton);
+        await tester.pumpAndSettle();
         await tester.tap(resetButton);
         await tester.pumpAndSettle();
 
@@ -1083,7 +1089,10 @@ void main() {
         await tester.enterText(searchField, 'Japanese');
         await tester.pumpAndSettle();
 
-        final japaneseOption = find.textContaining('Japanese');
+        final japaneseOption = find.descendant(
+          of: find.byType(ListView),
+          matching: find.textContaining('Japanese'),
+        );
         expect(japaneseOption, findsOneWidget);
         await tester.tap(japaneseOption);
         await tester.pumpAndSettle();
@@ -1094,7 +1103,10 @@ void main() {
         await tester.enterText(searchField, 'Spanish');
         await tester.pumpAndSettle();
 
-        final spanishOption = find.textContaining('Spanish');
+        final spanishOption = find.descendant(
+          of: find.byType(ListView),
+          matching: find.textContaining('Spanish'),
+        );
         expect(spanishOption, findsOneWidget);
         await tester.tap(spanishOption);
         await tester.pumpAndSettle();
