@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [2.0.0-flutter]
-    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml']
+    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml', 'AGENTS.md', '.codex/phases/**']
   pull_request:
     paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml']
 

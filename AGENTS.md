@@ -42,7 +42,7 @@ These instructions apply to this repository when working on the clean Flutter De
 4. Run available checks: `dart format`, `flutter analyze`, Flutter tests, and applicable Windows/Linux builds and native GUI smoke tests. Record commands, platform, versions, and observed outcomes. Use GitHub Actions when local SDK bootstrap is unavailable.
 5. Compare reference/Flutter UI with matching windows, DPI, content states, and theme; distinguish widget-test captures from real desktop visual parity.
 6. Update `MIGRATION_PARITY.md` and `MIGRATION_PROGRESS.md` for affected P-IDs and blockers. Update architecture/performance documentation only when decisions or actual measurements change.
-7. At completion, summarize changed paths, tests/builds that actually ran, any failures or skipped checks, parity gaps, and the next concrete action. Commit/push only when instructed or already explicitly authorized for the task; never force-push.
+7. At completion, summarize changed paths, tests/builds that actually ran, any failures or skipped checks, parity gaps, and the next concrete action. For user-authorized phase execution, commit task-related verified changes and push normally to `2.0.0-flutter` (the user has authorized automatic push/build for Phases 2–8). Never force-push, overwrite unrelated work, publish releases or claim CI success before checking the run.
 
 ## Safety, verification, and resource limits
 
@@ -50,3 +50,11 @@ These instructions apply to this repository when working on the clean Flutter De
 - If `storage.googleapis.com` or `jitpack.io` is blocked locally, note the HTTP status and try supported CI/toolchain routes; do not fabricate successful Flutter/Kotlin execution.
 - Keep iterative local work practical for an 8 GB RAM Linux machine: prefer targeted tests, avoid concurrent heavyweight Kotlin/Flutter builds, and use CI for Windows/release matrix builds.
 - Do not delete unrelated files, overwrite user work, commit secrets, or make unrequested releases.
+
+## Phase execution playbooks and automated delivery
+
+The phase-specific instructions are in `.codex/phases/phase-2.md` through `phase-8.md`. Do **not** execute them all automatically. When the user requests a particular phase, open only that phase playbook along with the migration source documents; cross-check against the current roadmap because verified facts can change.
+
+For **authorized Phase 2–8 work**, proactively run relevant local checks, commit task-related changes and `git push origin 2.0.0-flutter` without asking for a second push confirmation. The GitHub Actions workflow `.github/workflows/flutter-desktop.yml` triggers on relevant pushes, builds/tests Windows + Linux, and uploads artifacts. After pushing, obtain and inspect the actual workflow run and correct in-scope failures before declaring completion. The existing workflow's trusted retention job can commit verified generated host files after the matrix succeeds; do not interfere with its branch/SHA guard. If there are blockers, push honest partial work/docs where appropriate and mark the phase INCOMPLETE/BLOCKED. A pushed commit never proves successful build or parity.
+
+Suggested Codex CLI request: `Read .codex/phases/phase-2.md, follow AGENTS.md, implement only Phase 2, then commit, push and inspect GitHub Actions.`
