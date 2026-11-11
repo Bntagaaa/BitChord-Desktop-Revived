@@ -2613,10 +2613,11 @@ class DesktopLicensesPage extends StatelessWidget {
                   children: [
                     Text(
                       'Third-party licenses',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: palette.foreground,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: palette.foreground,
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                     Text(
                       'BitChord is free software, and so is everything it is built on.',
