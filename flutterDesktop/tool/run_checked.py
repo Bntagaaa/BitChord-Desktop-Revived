@@ -34,9 +34,18 @@ def main():
     print(output, end='')
     if result.returncode:
         context = '\n'.join(output.splitlines()[-25:])[-5000:]
-        print(f'::error title={label}::{escape(context or "Command failed with no output")}', flush=True)
+        print(f'\n::error title={label}::{escape(context or "Command failed with no output")}', flush=True)
     return result.returncode
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    # Windows consoles can default to cp1252 while Flutter emits Unicode.
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    try:
+        raise SystemExit(main())
+    except Exception as error:
+        message = f'{type(error).__name__}: {error}'
+        print(f'\n::error title=validation-driver::{escape(message)}', flush=True)
+        raise
+
