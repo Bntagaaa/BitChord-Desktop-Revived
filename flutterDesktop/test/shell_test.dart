@@ -125,13 +125,19 @@ void main() {
       await mount(tester, size, capture: key, settings: const ShellSettings(appearance: Appearance.dark));
       expect(tester.takeException(), isNull);
       if (Platform.environment['BITCHORD_CAPTURE'] == '1') {
-        final boundary = key.currentContext!.findRenderObject()! as rendering.RenderRepaintBoundary;
-        final image = await boundary.toImage(pixelRatio: 1);
-        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-        final output = File('verification/shell-dark-${size.width.toInt()}x${size.height.toInt()}.png');
-        output.parent.createSync(recursive: true);
-        output.writeAsBytesSync(bytes!.buffer.asUint8List());
-        image.dispose();
+        // Image rasterization/PNG encoding uses engine threads, not fake time.
+        await tester.runAsync(() async {
+          final boundary = key.currentContext!.findRenderObject()! as rendering.RenderRepaintBoundary;
+          final image = await boundary.toImage(pixelRatio: 1);
+          try {
+            final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+            if (bytes == null) throw StateError('PNG encoding returned no data');
+            final output = File('verification/shell-dark-${size.width.toInt()}x${size.height.toInt()}.png');
+            output.parent.createSync(recursive: true);
+            output.writeAsBytesSync(bytes.buffer.asUint8List());
+          } finally { image.dispose(); }
+        });
+        expect(tester.takeException(), isNull);
       }
       await tester.pumpWidget(const SizedBox());
     }
