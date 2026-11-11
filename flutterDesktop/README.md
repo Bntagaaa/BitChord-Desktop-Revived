@@ -57,3 +57,36 @@ Locally executed: Python layer/provenance checks, Python syntax checks and third
 - Native Windows Mica/caption material, exact app/taskbar icons, fullscreen behavior on real compositors, OS-theme propagation and DPI/accessibility need platform tests. Generated platform runner metadata/icons retain official template defaults until reviewed customization.
 - Glass uses bounded Flutter blur, but its renderer does not establish equivalence to Compose Haze. Reduced blur/animation state exists; remaining original per-surface motion/interaction policies are not all implemented.
 - No native audio, playback, tray/media integration, provider access or performance measurement is claimed. No Phase 2 work began.
+
+## Current verification status — 2026-11-11
+
+Last confirmed pushed implementation: `529c8d60`.
+
+Windows hosted validation succeeded: official Flutter generation, dependency
+resolution, formatting, analysis, six tests, and release build.
+
+Verification run:
+https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43041242897
+
+The final Linux result and native launch checks have not been confirmed.
+Retention of generated platform files and verification artifacts has not
+been confirmed.
+
+Local Flutter installation remains blocked by inaccessible SDK artifacts.
+The desktop application has not been confirmed running interactively in the
+local environment.
+
+The application provides the Phase 1 foundation and visual shell. Audio
+controls remain disabled because the native audio backend is not implemented.
+No invented library content or simulated playback is provided.
+
+Pixel-perfect parity, Kotlin runtime comparison, and memory improvements
+remain unverified. Phase 2 has not started.
+
+### Later CI verification — 2026-11-12
+
+Run `43041242897` has completed: Windows succeeded, Linux failed during
+`Install Linux desktop dependencies`, and `retain-verified-generation`
+was skipped. Earlier pending language above reflects the 2026-11-11 snapshot.
+No Linux GUI launch or visual parity has been verified.
+

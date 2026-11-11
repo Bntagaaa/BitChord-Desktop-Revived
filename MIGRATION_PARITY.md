@@ -981,3 +981,39 @@ Inventory contains **779 tracked files**. Full paths and SHA-256 values allow re
 | `tools/automix-validation/verify-upstream.py` | P15/P16 | implementation / contract | `893a8f2e9c1c341041aaf65c16423cc5afa134a44fb114395e74f2b8369b5ad2` |
 
 Inventory scope includes all desktop source/resources/tests/packaging, both shared modules including Android contextual actuals, native and vendored sources, model/JNI assets, Go backend, Automix verification and platform CI. It does not treat generated outputs as evidence. Matrix row acceptance applies to these groups; implementation must further split rows into testable assertions rather than use group counts as a parity score.
+
+## Phase 1 evidence update — 2026-11-11
+
+Evidence source: GitHub Actions run 43041242897,
+implementation commit `529c8d60`.
+
+| Area | Confirmed evidence | Remaining verification |
+| --- | --- | --- |
+| Windows foundation | Official generation, dependency resolution, analysis, six passing tests, release build | Native GUI launch and comparison with Kotlin |
+| Linux foundation | CI execution started | Final build, tests, and native launch results |
+| Expanded shell | Widget layout checks at 1220×780 | Comparison with Kotlin at identical dimensions |
+| Narrow shell | Widget layout checks at 900×600 | Reference behavior and native resizing comparison |
+| Settings and navigation | Tests cover theme behavior, persistence, bounded history, navigation and keyboard actions | Complete reference interaction audit |
+| Assets | Source and asset provenance checks passed in Windows CI | Runtime appearance comparison |
+| Player dock | Empty layout with disabled transport controls | Playback belongs to future phases |
+| Typography | Fallback typography is implemented | SF Pro redistribution rights and visual matching |
+
+These results establish foundation checks, not complete feature or visual parity.
+
+### Known visual gaps
+
+- SF Pro font binaries have not been redistributed; typography uses fallbacks.
+- Native decorated windows and current application chrome still require
+  comparison with the Kotlin reference.
+- Blur, gradients, shadows, focus states, animation timing, and icon rendering
+  require runtime comparison.
+- Flutter test captures do not replace Kotlin-versus-Flutter comparison.
+
+The Kotlin reference remains unchanged. No previous Flutter rewrite was used.
+
+### Later CI status — 2026-11-12
+
+Run `43041242897` finished with Windows **success** and Linux **failure**
+at `Install Linux desktop dependencies`. Linux native visual verification
+remains unperformed; generated-platform retention was skipped.
+

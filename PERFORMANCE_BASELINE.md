@@ -92,3 +92,32 @@ Predeclare sample/plan/timing tolerances from reference oracle precision and tes
 No new benchmark trial ran in Phase 0.5. The offline canonical-file verifier passed; it establishes source/model identity, not throughput, RAM savings, gapless quality, model accuracy or platform output readiness.
 
 Phase 1 continuation note: Dart shell source and validation workflow now exist, but no SDK-capable local or hosted run was completed. All performance result cells remain unmeasured. Source cache limits and absence of a native engine in this shell do not demonstrate memory savings relative to a functioning Kotlin player.
+
+## Measurement availability update — 2026-11-11
+
+No Kotlin or Flutter RAM, CPU, startup-time, audio-latency, or long-duration
+resource-retention measurements have been collected.
+
+| Target | Validation status | Performance measurements |
+| --- | --- | --- |
+| Kotlin 1.9.2 | Runtime validation blocked by JitPack dependency resolution | Not measured |
+| Flutter Windows | Hosted analysis, six tests, and release build succeeded | Not measured |
+| Flutter Linux | Final hosted result not confirmed | Not measured |
+
+A successful build or widget test is not a performance measurement.
+
+Do not claim reduced memory usage. Run the existing benchmark protocol using
+matched hardware, release builds, window dimensions, datasets, and workloads
+when both applications can run.
+
+Record the application commit, toolchain, operating system, hardware, sampling
+method, warm-up period, workload duration, and repeated-run results with every
+measurement. Benchmark advanced playback only after the real native backend
+is available.
+
+### Later CI status — 2026-11-12
+
+Linux hosted validation in run `43041242897` finished with **failure** during
+desktop dependency installation. No Linux runtime or performance measurement
+was obtained; all performance measurements remain unavailable.
+

@@ -177,3 +177,60 @@ These instrumentation changes were pushed and triggered follow-up runs. They do 
 Run `43037846942` exposed `boundaries: Asset differs: Clock.svg` on Windows after official host generation. This was a Git CRLF checkout difference, not a changed icon or codec artifact. Commit `22a48743` pins new Flutter text assets to LF and compares reference SVG text with checkout CRLF normalized. Expected asset hashes were not changed; local palette/glyph/provenance checks still pass. In follow-up [run 43038447764](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43038447764), Windows passed SDK setup, official generation/source checks, dependency resolution, formatting and analysis. Tests had started but had no terminal result at the time of the next instrumentation update; no pass/failure count is inferred from that.
 
 The validation driver now streams output instead of buffering it until a potentially long test finishes, publishes test-start/count notices, and rejects successful processes that execute no passing tests. These counting rules were checked with controlled JSON protocol fixtures, not described as Flutter results. A separate retention job is restricted to trusted push events on this repository's migration branch, requires the complete Linux/Windows matrix (including Linux graphical smoke) to pass, checks that the branch still matches the validated SHA, and only then commits official generated hosts, the resolved lockfile, formatter output and bounded render evidence. PR validation remains read-only; newer work is never force-overwritten. This avoids hand-fabricating platform files or needing inaccessible authenticated artifact downloads locally.
+
+## Phase 1 verification update — 2026-11-11
+
+Last confirmed pushed implementation commit: `529c8d60`
+Branch: `2.0.0-flutter`
+
+GitHub Actions run:
+https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43041242897
+
+### Confirmed results
+
+The Windows job completed successfully:
+
+- Flutter SDK installation using subosito/flutter-action.
+- Official Flutter project generation.
+- Architecture boundary and reference asset checks.
+- Dependency resolution.
+- Dart formatting.
+- Flutter analysis.
+- Six tests passed, with zero failures and zero skipped tests.
+- Windows release build.
+- Artifact upload.
+
+The six tests cover theme policy, settings persistence and bounded navigation,
+expanded shell layout, narrow-window navigation, settings and keyboard actions,
+and rendered shell captures at 1220×780 and 900×600.
+
+### Pending verification
+
+The Linux job was last observed installing desktop build dependencies.
+Its final outcome has not been confirmed.
+
+The Linux native launch and screenshot checks have not been confirmed.
+The workflow job that retains generated platform files, formatting, lockfile,
+and verification artifacts has not been confirmed.
+
+### Blockers and limitations
+
+- Local Flutter bootstrap remains blocked by HTTP 403 responses for SDK artifacts.
+- The candidate Flutter artifact mirror was also inaccessible.
+- TLS verification and integrity checks were not disabled.
+- Kotlin runtime comparison remains blocked by JitPack dependency resolution.
+- No identical-dimension Kotlin-versus-Flutter visual comparison is complete.
+- Windows release compilation does not establish native GUI launch verification.
+- No audio backend or Phase 2 functionality has been implemented.
+
+Phase 1 remains incomplete until the outstanding verification and visual
+acceptance criteria are resolved. Do not begin Phase 2 automatically.
+
+### Later GitHub verification — 2026-11-12
+
+Run `43041242897` has now completed with **failure**. Windows finished
+successfully; Linux failed during **Install Linux desktop dependencies**,
+before native launch and screenshot checks. `retain-verified-generation`
+was skipped. The earlier pending-status paragraph above is retained as the
+historical 2026-11-11 observation, not the current run status.
+
