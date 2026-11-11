@@ -88,7 +88,10 @@ jobs:
               if re.search(r'^\s*(error|warning|info)\s+•', line) or 'Could not find an option' in line:
                   print('::error::' + line)
       - name: Unit and widget tests
-        run: flutter test --reporter expanded > tests.log 2>&1
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded --timeout 2m 2>&1 | tee tests.log
       - name: Publish validation summary
         shell: python
         run: |
