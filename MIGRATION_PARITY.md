@@ -1017,3 +1017,22 @@ Run `43041242897` finished with Windows **success** and Linux **failure**
 at `Install Linux desktop dependencies`. Linux native visual verification
 remains unperformed; generated-platform retention was skipped.
 
+### Phase 1 resumption evidence — 2026-11-12
+
+Run [43121851901](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43121851901)
+at `3c9abb6a` supersedes the prior build status: Linux and Windows both passed
+analysis, six tests (zero failed/skipped), and release builds. Linux's mapped
+window capture was black and the smoke failed; retention did not run.
+
+- P01/P28: native lifecycle remains unaccepted. Linux capture/log handling is
+  corrected for GL child surfaces and bounded paint readiness; a Windows native
+  smoke is added. Their results must be inspected after push.
+- P02/P24/P29–P31: widget captures use Ahem test glyphs, so they verify structural
+  layout, not typography or actual desktop appearance. Native captures and a
+  matched pinned-Kotlin comparison are still required. Existing font, native
+  caption/Mica/icon, focus/DPI and motion gaps remain open.
+- All 779 recorded reference hashes were rechecked locally against
+  `348b613a0c3db1a54de56483ea6f8748d6465211`; no Kotlin source changed.
+
+No P-ID is parity-accepted from these build results; no Phase 2 work has begun.
+

@@ -234,3 +234,34 @@ before native launch and screenshot checks. `retain-verified-generation`
 was skipped. The earlier pending-status paragraph above is retained as the
 historical 2026-11-11 observation, not the current run status.
 
+## Phase 1 resumption — 2026-11-12
+
+User authorized completing Phase 1, committing/pushing to `2.0.0-flutter`, and
+monitoring Actions. Started from clean `3c9abb6a`; fetched remote branch and
+confirmed the same head. Phase 2 is not authorized.
+
+Latest inspected pre-change run: [43121851901](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43121851901),
+source `3c9abb6a`. **Both platforms passed** official host generation, dependency
+resolution, format, analysis, six tests (zero failed/skipped), and release build.
+Linux failed the painted-window check; generated-host retention was skipped.
+Downloaded Linux artifacts confirm a black native capture; widget captures use
+the test Ahem font and establish layout only. They are not reference goldens.
+
+The older Linux setup failure was DNS resolution of `azure.archive.ubuntu.com`,
+followed by stale indexes and installation timeout, not a Dart/compiler failure.
+The CI setup now scopes signed official Ubuntu HTTPS repositories to its own
+APT commands and fails on index errors. Linux smoke uses an isolated profile,
+D-Bus/Xvfb/Openbox, a larger virtual display, bounded paint polling, visible-screen
+client capture (including GL children), actual image dimensions, and separate
+application/stage logs. A Windows smoke now checks visible painted client windows,
+two client sizes and native close/exit. These changes await hosted execution;
+no passing result is inferred from their source.
+
+Local checks: Python compilation; layer/19-asset integrity; reference palettes,
+nine transport SVGs and three custom glyphs; all 779 inventory SHA-256 entries
+verified against the pinned reference; `git diff --check`. No local Flutter SDK
+is on PATH. Kotlin paths remain unchanged. Remaining gates include successful
+native lifecycle evidence, retained/reviewed official hosts and lockfile,
+matched Kotlin/Flutter captures, DPI/native-theme/focus verification and explicit
+font/material/icon/motion gaps. Phase 1 remains **INCOMPLETE** pending evidence.
+
