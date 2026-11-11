@@ -49,10 +49,10 @@ jobs:
       - name: Generate official platform hosts and record SDK provenance
         run: |
           mkdir -p verification
-          flutter doctor -v > verification/doctor.txt 2>&1
-          python tool/initialize_platforms.py
-          python tool/check_boundaries.py
-          python tool/verify_reference_tokens.py
+          python tool/run_checked.py doctor flutter doctor -v
+          python tool/run_checked.py initialize python tool/initialize_platforms.py
+          python tool/run_checked.py boundaries python tool/check_boundaries.py
+          python tool/run_checked.py reference python tool/verify_reference_tokens.py
       - name: Resolve dependencies
         run: |
           if [ -f pubspec.lock ]; then
