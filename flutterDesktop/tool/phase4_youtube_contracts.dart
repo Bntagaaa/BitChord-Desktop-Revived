@@ -337,15 +337,17 @@ Future<void> youtubeContracts() async {
       '${portable.path}/server/node_modules/bgutils-js/package.json',
     ).writeAsString('{}');
     final detected = YouTubeResolver.fromBundleDirectory(bundle);
+    if (detected == null) {
+      throw StateError('Bundled resolver was not discovered');
+    }
     require(
-      detected != null &&
-          detected!.executable.endsWith(binary) &&
+      detected.executable.endsWith(binary) &&
           detected.node!.endsWith(nodeName) &&
           detected.poTokenServerHome != null &&
           detected.poTokenPluginDirectory != null,
       'Portable resolver should auto-configure without environment',
     );
-    final builtArgs = detected!.arguments(selected, AudioQuality.high);
+    final builtArgs = detected.arguments(selected, AudioQuality.high);
     require(
       builtArgs.any(
         (arg) => arg.contains('youtubepot-bgutilscript:server_home=') &&
