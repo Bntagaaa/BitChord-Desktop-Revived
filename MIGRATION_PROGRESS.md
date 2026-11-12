@@ -1135,3 +1135,11 @@ access with a dedicated authorized account, verify actual byte delivery and
 native output on both OSs, then complete collection/library mutations and the
 remaining reference interaction/recovery contracts. This handoff does not
 advance to Phase 5.
+
+## Phase 4 supported opt-in GVS PO Token provider integration — 2026-11-12
+
+Commit [`d9701dbe`](https://github.com/Bntagaaa/BitChord-Desktop-Revived/commit/d9701dbea9211dce8fc93e3fa4b181ffdaf39309) extends the bounded external YouTube extractor path to load a **user-selected trusted local yt-dlp PO Token provider plugin directory**. Default plugin discovery and ambient configuration remain disabled. The opt-in path uses upstream's recommended `mweb` client with per-video GVS PO Token provider support. No plugin, browser, token server or extractor binary is bundled or silently installed. No shell login cookie or private session is passed to the process. Failed 403 media byte-range probes are still refused before adopting a native audio source with a user-actionable status; a URL alone is never a playback pass.
+
+**CI validation:** [run 43231288388](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43231288388) completed **SUCCESS** for Windows, Linux and trusted retention. Existing Flutter/native/HTTP/YouTube contracts, analyzers, release builds and GUI lifecycle gates all passed. Dedicated controlled contracts now verify the explicit plugin directory, client argument, disabled implicit plugins/config/cookie export and redacted 403 guidance. Implementation details and secure setup instructions are in `flutterDesktop/verification/phase4/README.md`.
+
+**Phase 4 remains INCOMPLETE.** This is an **opt-in integration capability** and automated fixture/build result, **not an observed live YouTube playback success**. The previously recorded live YouTube HTTP 403 remains unresolved until a trusted provider is installed and live 206 media ranges plus native output are verified with a dedicated user-authorized session on Linux and Windows. Protected account persistence/browser sign-in, full artist/playlist mutation/source policy and other Phase 4 gaps remain open. Phase 5 has not started.

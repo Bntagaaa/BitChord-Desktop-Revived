@@ -1459,3 +1459,9 @@ and native fullscreen/appearance/close (exit 0). Windows physical output remains
 blocked (no WASAPI endpoint). Live catalogs/native artwork are not evidence of
 working YouTube media or full reference parity. **Phase 4 INCOMPLETE; no whole
 P-ID PARITY_ACCEPTED, no Phase 5 work and no RAM-saving claim.**
+
+### Phase 4 opt-in GVS PO Token provider capability and CI — 2026-11-12
+
+Commit `d9701dbe`, [workflow 43231288388](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43231288388): Linux/Windows/retention **SUCCESS** after adding a narrowly scoped, **explicitly configured trusted yt-dlp PO Token provider plugin directory** and `mweb` extractor selection. The resolver still enforces real CDN media-range preflight, origin/header filters, no account cookie transfer, redaction, cancellation, and timeout. Default external plugins/config remain disabled. A media HTTP 403 is now reported with actionable diagnostic text rather than called playback success. Contracts cover disabled ambient plugins, optional trusted directory selection, relative-path refusal and no credential import.
+
+For P19/P11/P12, mark this **IMPLEMENTED and FIXTURE_TESTED / PLATFORM_VERIFIED for adapter configuration and regression**, not a completed online audio source. **Authenticated/guest YouTube playback remains UNVERIFIED**: prior live HTTP 403 and zero media bytes still stand until new authorized live proof with a running provider. Phase 4 INCOMPLETE, Phase 5 not started.
