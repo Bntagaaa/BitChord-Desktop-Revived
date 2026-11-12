@@ -2,6 +2,7 @@
 import json
 import math
 import os
+import shutil
 from pathlib import Path
 import struct
 import subprocess
@@ -65,7 +66,10 @@ def main():
                     out.setparams((2, 2, 48000, 0, 'NONE', 'not compressed'))
                     out.writeframes(b''.join(struct.pack('<hh', i % 8000 - 4000, 4000 - i % 8000) for i in range(144000)))
                 library = native / ('Release/bitchord_audio.dll' if os.name == 'nt' else 'libbitchord_audio.so')
-                trial = subprocess.run(['dart', 'tool/phase3_sink.dart', str(library), str(longer), str(audio), *endpoint],
+                dart = Path(shutil.which('dart'))
+                if os.name == 'nt':
+                    dart = dart.with_suffix('.exe')
+                trial = subprocess.run([str(dart), 'tool/phase3_sink.dart', str(library), str(longer), str(audio), *endpoint],
                                        capture_output=True, text=True, timeout=40, check=True)
                 report['sink_contract'] = json.loads(trial.stdout.strip().splitlines()[-1])
 

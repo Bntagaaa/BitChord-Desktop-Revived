@@ -2,6 +2,7 @@
 from collections import deque
 from pathlib import Path
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -22,6 +23,11 @@ def main():
     if not executable:
         print(f'::error::{escape(label + ": executable unavailable: " + command[0])}')
         return 127
+    # shutil.which on Windows uses PATHEXT's uppercase .EXE spelling. Dart's
+    # hook runner treats that spelling as extensionless and appends .exe again.
+    # Invoke the real SDK executable with its canonical lowercase extension.
+    if os.name == 'nt' and command[0].lower() == 'dart' and Path(executable).suffix.lower() == '.exe':
+        executable = str(Path(executable).with_suffix('.exe'))
     tail = deque(maxlen=25)
     counts = {'passed': 0, 'failed': 0, 'skipped': 0}
     with (evidence / (label + '.log')).open('w', encoding='utf-8') as log:

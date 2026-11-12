@@ -790,3 +790,11 @@ Native WASAPI/Pulse endpoint notifications and bounded reconfiguration from the
 last presented source position have been implemented. They do not establish
 physical hotplug acceptance. A normal push of `9f91955e` hit a transient GitHub
 DNS failure and is being retried; no successful delivery is inferred from it.
+
+Run `43196267710` at `3c34fc01`: **Linux succeeded** through native codec/protocol,
+Pulse software-sink checks, FFI/import, Flutter tests/analyze, release build and
+native launch/close. Windows passed native build/CTest/platform probe and reached
+Dart integration; its SDK hook runner failed trying to execute `dart.EXE.exe`.
+The Python command resolver's Windows PATHEXT spelling is normalized to the real
+`dart.exe` filename; no SDK files, hooks or tests are disabled. Final Windows
+validation is pending the corrective workflow run.
