@@ -1,19 +1,8 @@
 {
+  "display": "GitHub Windows hosted desktop",
+  "source_commit": "4d17527a4e3a0b2f34e827a2b22c2a66bedb6aa3",
   "dpi": 96,
-  "captures": [
-    {
-      "width": 1220,
-      "logo_contrast": 0.39869281045751637,
-      "height": 780,
-      "sampled_colors": 104
-    },
-    {
-      "width": 900,
-      "logo_contrast": 0.39869281045751637,
-      "height": 600,
-      "sampled_colors": 85
-    }
-  ],
+  "exit_code": 0,
   "appearance_captures": [
     {
       "expected_theme": "any",
@@ -71,7 +60,18 @@
     }
   ],
   "fullscreen": "F11 entered; Escape restored 900x600",
-  "display": "GitHub Windows hosted desktop",
-  "exit_code": 0,
-  "source_commit": "a7efddee649494e89df45c9c93eec008bb2e1b5d"
+  "captures": [
+    {
+      "logo_contrast": 0.39869281045751637,
+      "sampled_colors": 104,
+      "height": 780,
+      "width": 1220
+    },
+    {
+      "logo_contrast": 0.39869281045751637,
+      "sampled_colors": 85,
+      "height": 600,
+      "width": 900
+    }
+  ]
 }
