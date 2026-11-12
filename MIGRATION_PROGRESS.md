@@ -381,3 +381,17 @@ CMake/Ninja/GNU configure and verbose compilation separately; it leaves all
 protected reference source untouched and retains the actual compiler output.
 Results are pending. No Phase 2 implementation has begun.
 
+Focused diagnostic [43129985058](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43129985058)
+proved that the analyzer DLL itself compiles/links with hosted GNU 14.2. The
+failing target is `bitchord_smtc`: the hosted MinGW WinRT headers expose ambiguous
+`TimeSpan` and incomplete/missing stream-reference, controls2 and timeline types
+when compiling the pinned `smtc_abi.cpp`. CMake's header-presence checks pass,
+but do not prove those interfaces compile. No reference source was changed.
+
+The reference already provides an MSVC/C++/WinRT implementation in its CMake
+files. A CI-only external Gradle init script now selects that supported compiler
+for both native tasks, builds all original targets, and requires analysis, SMTC
+and window DLLs. No native target or test is skipped. This is an explicit build
+environment adaptation, not a fix to the protected reference or an audio migration.
+Reference test/package results for the MSVC route are pending.
+

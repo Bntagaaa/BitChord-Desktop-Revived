@@ -36,6 +36,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: runner.os == 'Windows'
+        with:
+          path: migration-tools
+          sparse-checkout: flutterDesktop/tool/reference_msvc.init.gradle
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: Diagnose Windows native configuration with the reference toolchain
         if: runner.os == 'Windows'
         shell: pwsh
@@ -54,12 +61,16 @@ jobs:
           java -version 2>&1 | tee verification/java.log
           display=()
           if [ "$RUNNER_OS" = Linux ]; then display=(xvfb-run -a); fi
-          "${display[@]}" bash gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test --no-daemon --max-workers=2 --console=plain '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' 2>&1 | tee verification/tests.log
+          native_tools=()
+          if [ "$RUNNER_OS" = Windows ]; then native_tools=(-I ../migration-tools/flutterDesktop/tool/reference_msvc.init.gradle); fi
+          "${display[@]}" bash gradlew "${native_tools[@]}" :shared:jvmTest :sharedUi:jvmTest :desktopApp:test --no-daemon --max-workers=2 --console=plain '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' 2>&1 | tee verification/tests.log
       - name: Build pinned reference for visual comparison
         if: success() || failure()
         run: |
           set -euo pipefail
-          bash gradlew :desktopApp:createDistributable --no-daemon --max-workers=2 --console=plain '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' -Pbitchord.version=1.9.2 2>&1 | tee verification/build.log
+          native_tools=()
+          if [ "$RUNNER_OS" = Windows ]; then native_tools=(-I ../migration-tools/flutterDesktop/tool/reference_msvc.init.gradle); fi
+          bash gradlew "${native_tools[@]}" :desktopApp:createDistributable --no-daemon --max-workers=2 --console=plain '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' -Pbitchord.version=1.9.2 2>&1 | tee verification/build.log
       - name: Verify reference preservation
         if: always()
         run: |

@@ -1,0 +1,37 @@
+// CI-only toolchain adapter for the immutable Kotlin Windows reference.
+// The reference CMake files already implement an MSVC/C++/WinRT backend.
+// Build ALL original targets and keep every reference test enabled; change only
+// the two Gradle tasks that hard-code the incompatible hosted MinGW headers.
+gradle.projectsEvaluated {
+    def desktop = gradle.rootProject.project(':desktopApp')
+    if (!System.getProperty('os.name').startsWith('Windows')) {
+        throw new GradleException('The reference MSVC adapter is Windows-only')
+    }
+    [buildAnalysisNative: 'native', buildWindowNative: 'native/window'].each { taskName, source ->
+        desktop.tasks.named(taskName).configure { task ->
+            task.setActions([{ ignored ->
+                def output = desktop.layout.buildDirectory.dir(
+                    taskName == 'buildAnalysisNative' ? 'native/windows' : 'native-window/windows'
+                ).get().asFile
+                desktop.exec {
+                    commandLine 'cmake', '-S', desktop.file(source).absolutePath,
+                        '-B', output.absolutePath, '--fresh', '-G', 'Visual Studio 17 2022',
+                        '-A', 'x64', '-DCMAKE_BUILD_TYPE=Release'
+                    environment 'JAVA_HOME', System.getProperty('java.home')
+                }.assertNormalExitValue()
+                desktop.exec {
+                    commandLine 'cmake', '--build', output.absolutePath,
+                        '--config', 'Release', '--parallel', '2', '--verbose'
+                    environment 'JAVA_HOME', System.getProperty('java.home')
+                }.assertNormalExitValue()
+                def names = taskName == 'buildAnalysisNative' ?
+                    ['bitchord_analysis.dll', 'bitchord_smtc.dll'] : ['bitchord_window.dll']
+                names.each { name ->
+                    if (!new File(output, name).isFile()) {
+                        throw new GradleException('Missing complete reference native target: ' + name)
+                    }
+                }
+            } as org.gradle.api.Action])
+        }
+    }
+}
