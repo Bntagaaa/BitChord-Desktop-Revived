@@ -2,6 +2,9 @@ name: Phase 1 pinned Kotlin reference validation
 
 on:
   workflow_dispatch:
+  push:
+    branches: [2.0.0-flutter]
+    paths: ['.github/workflows/flutter-phase1-reference.yml']
 
 permissions:
   contents: read
