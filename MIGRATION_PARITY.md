@@ -1050,3 +1050,47 @@ results are pending. Neither hosted captures nor source tokens replace the
 missing pinned-Kotlin comparison, font rights/metrics, full DPI/focus/motion,
 native caption/Mica/icon or accessibility gates (P02/P24/P29–P31).
 
+### Current Phase 1 acceptance evidence — 2026-11-12
+
+[43126969435](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43126969435)
+at `ea6b5c90` passed the full Windows/Linux matrix: generation, resolution,
+format/analyze, **8 tests per OS with zero failures/skips**, release builds,
+both painted client sizes/landmarks and native close/exit 0. Retention commit
+`6f67ac2f` contains official hosts, lockfile, formatter output and the actual
+native PNG/JSON/test evidence. P01/P28's foundation lifecycle is now
+platform-verified for these hosted environments; full feature/shortcut parity
+is not accepted.
+
+The pinned Linux Kotlin reference passed 857 tests (78 shared, 85 sharedUi,
+694 desktop, no failures/errors/skips) and built its distributable in
+[43125482870](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43125482870).
+Windows reference tests/build fail `:desktopApp:buildAnalysisNative` with CMake
+exit 1 in that run and [43126572145](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43126572145).
+The diagnostic standalone configuration succeeds with GNU 14.2 and JDK 21,
+but Gradle's native build fails. No protected reference source was changed to
+work around this blocker.
+
+Actual local Linux light-theme pairs at 1220×780 and 900×600 are retained in
+[`flutterDesktop/verification/phase1-local-comparison/`](flutterDesktop/verification/phase1-local-comparison/).
+`capture.json` records source/run/image hashes, actual client dimensions and
+limits. Temporary test-owned profiles contained no accounts; Kotlin welcome was
+completed in its isolated Preferences, and Flutter Light was selected through
+real controls. The Flutter comparison artifact is `72dd48d6` (UI unchanged by
+the subsequent close fix). Both apps used the same KDE/XWayland session; local
+numeric DPI was not independently measured. XWayland allowed client drawable
+capture, not root-screen capture. Cleanup via SIGTERM is not lifecycle proof.
+Kotlin loaded a genuine anonymous live catalog and Flutter shows its honest
+disconnected page; this is a common-shell review, not a full-frame golden.
+
+| P-ID / region | Observed common-shell comparison / remaining gap |
+|---|---|
+| P02 Home header | Flutter's extra 48-dp navigation/status row moves its heading down; reference Home starts directly at the page gutter |
+| P02/P29 sidebar | 220/72 widths hold; brand sizing, text metrics and vertical spacing differ; the account row/additional rail action is missing |
+| P24 empty dock | 760×58 bounds hold; Flutter brand mark is visibly larger/darker; reference has additional actions/volume and different empty-control appearance |
+| P29 typography/icons | SF Pro remains solely in the reference; fallback text differs. Native template taskbar/app icons remain uncustomized |
+| P30 glass/motion | Different feed backgrounds prevent blur equivalence; reference feed-under-dock fade/other motion/material behavior remains unmatched |
+| P28–P31 platform | Windows Kotlin pairing is blocked; full DPI/theme/focus/fullscreen/accessibility and caption/Mica checks remain unverified |
+
+**Phase 1 foundation checks pass; visual acceptance remains INCOMPLETE/BLOCKED.**
+No P-ID's full parity, memory reduction or Phase 2 completion is inferred.
+

@@ -1,0 +1,57 @@
+{
+  "reference_sha": "348b613a0c3db1a54de56483ea6f8748d6465211",
+  "flutter_sha": "72dd48d6285bdd74b07e4f39d56300f33d402ee2",
+  "session": "KDE Wayland / XWayland; client drawable capture (root-screen capture unavailable)",
+  "theme": "light",
+  "profiles": "isolated temporary, no accounts, onboarding completed in test-owned Java Preferences",
+  "records": [
+    {
+      "app": "kotlin",
+      "requested_client": [
+        1220,
+        780
+      ],
+      "captured": "1220 780",
+      "file": "kotlin-light-1220x780.png"
+    },
+    {
+      "app": "kotlin",
+      "requested_client": [
+        900,
+        600
+      ],
+      "captured": "900 600",
+      "file": "kotlin-light-900x600.png"
+    },
+    {
+      "app": "flutter",
+      "requested_client": [
+        1220,
+        780
+      ],
+      "captured": "1220 780",
+      "file": "flutter-light-1220x780.png"
+    },
+    {
+      "app": "flutter",
+      "requested_client": [
+        900,
+        600
+      ],
+      "captured": "900 600",
+      "file": "flutter-light-900x600.png"
+    }
+  ],
+  "shutdown": "capture cleanup via SIGTERM, not lifecycle acceptance",
+  "catalog_state": "Kotlin anonymous live Home feed; Flutter disconnected-service page. Compare common shell regions only; no catalog or full-frame parity score.",
+  "local_dpi": "Same XWayland session, numerical DPI not independently measured; client raster sizes verified. Not a DPI acceptance result.",
+  "flutter_appearance": "Light selected through real settings UI; captured content background checked light.",
+  "reference_validation_run": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43125482870",
+  "flutter_artifact_run": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43126119556",
+  "sha256": {
+    "kotlin-light-1220x780.png": "f6e9ff86a672f1a95f5368f155cd125cf177424b7c0e35ef15398c83e18e6b4c",
+    "kotlin-light-900x600.png": "a4d2cc0b29b8618e7704cb5a59d7043f19b3451e249b25564f61a45121f50078",
+    "flutter-light-1220x780.png": "867686ebfa7e95c157fa6d6f3193f5a269ed47d27ec6ba8eea8c1fae045156e7",
+    "flutter-light-900x600.png": "150e483a52f136b062343728d7c287ccb6b6a9b7d4eb7da019e55644821464d1"
+  }
+}

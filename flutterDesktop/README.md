@@ -30,8 +30,9 @@ python3 tool/launch_smoke.py build/linux/x64/release/bundle/bitchord_desktop
 `flutter create --empty --no-pub --platforms=windows,linux` in a temporary
 project. It copies only generated hosts/metadata and never overwrites Dart
 application source. Existing hosts require matching generation provenance.
-Generated files, resolved lockfile and formatter output are retained by the
-trusted CI job only after the complete matrix and native smoke checks pass.
+Official hosts, resolved lockfile and formatter output were retained in
+`6f67ac2f` after the complete matrix and native smoke checks passed. Subsequent
+CI checks formatting without rewriting source and enforces the committed lockfile.
 
 Linux needs Clang, CMake, Ninja, pkg-config, GTK3/liblzma development packages
 and a C++ runtime. The hosted smoke also needs D-Bus, Xvfb, Xauth, Openbox,
@@ -44,8 +45,8 @@ The smoke requires a visible display large enough for both client sizes at
 ## Verification and artifact interpretation
 
 The workflow `.github/workflows/flutter-desktop.yml` generates official hosts,
-records `flutter doctor -v`/SDK provenance, resolves packages, formats, analyzes,
-runs six real tests and builds release bundles on Linux and Windows. Native
+records `flutter doctor -v`/SDK provenance, resolves packages, checks formatting,
+analyzes, runs eight tests and builds release bundles on Linux and Windows. Native
 smokes launch the release executable, capture painted 1220×780 and 900×600
 **client** surfaces, check responsive sidebar/dock landmarks and close through
 the native window path with exit code zero. These are hosted lifecycle checks,
@@ -60,20 +61,26 @@ Neither is a Kotlin golden. The retention job is restricted to trusted migration
 branch pushes, requires both platform jobs, checks the validated SHA against the
 branch head and never force-pushes.
 
-Build/analysis/six-test passes on both platforms were reconfirmed in
-[43125383087](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43125383087).
-That run's native checks failed: Linux's crop check misread PNG page-origin
-metadata despite a correctly painted client, and Windows's 1024×768 display
-clamped the requested size. The capture helpers/display setup are corrected;
-follow-up validation is pending. See `../MIGRATION_PROGRESS.md` for the current
-acceptance ledger rather than treating this historical run as an acceptance pass.
+[43126969435](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43126969435)
+at `ea6b5c90` passed on both OSs: official generation, dependency resolution,
+format/analyze, **eight tests each** (zero failed/skipped), release build,
+painted client captures at both sizes and native close/exit 0. Generated hosts,
+lockfile, formatted source and Windows/Linux capture/JSON evidence are checked in
+under `verification/`. Earlier black/stale capture, small-display and Windows
+force-quit failures are recorded with their fixes in `../MIGRATION_PROGRESS.md`.
+This verifies the foundation and lifecycle, not full visual parity.
 
 Local checks on 2026-11-12 passed Python compilation, layer/asset verification
 and all 779 recorded reference hashes. Flutter/Dart are absent locally; the older
 cloud SDK HTTP 403 is historical. This workstation has under 1 GiB workspace
 free disk and only full JDK 27. Local offline reference tests failed before
-execution on that JDK. JitPack currently responds HTTP 200 locally; hosted pinned
-reference validation is tracked separately in `flutter-phase1-reference.yml`.
+execution on that JDK. JitPack currently responds HTTP 200 locally. Hosted pinned
+Kotlin Linux validation passed **857 tests** and built a distributable in
+[43125482870](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43125482870).
+The Windows reference Gradle native build failed in that run and the diagnostic
+retry [43126572145](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43126572145);
+standalone GNU 14.2 native configuration succeeded, but the Gradle native build
+still exited 1. This blocks the Windows reference comparison; Kotlin is unchanged.
 No local Flutter format/analyze/test/build or native GUI pass is claimed.
 
 ## Ownership and source provenance
@@ -97,8 +104,14 @@ future audio architecture; no native audio library is loaded here.
 
 ## Open visual and platform gates
 
-No paired pinned-Kotlin/Flutter desktop captures exist yet. SF Pro redistribution
-rights remain unresolved; platform fallback metrics/weights need review. Native
+Local Linux light-theme pairs at both client sizes are in
+[`verification/phase1-local-comparison/`](verification/phase1-local-comparison/),
+with provenance/limits in `capture.json`. They compare common shell regions:
+Kotlin's anonymous live catalog differs from Flutter's disconnected body. Local
+numeric DPI is unmeasured; Windows reference pairing remains blocked. The extra
+Flutter 48-dp header, sidebar spacing/account row, larger/darker dock mark and
+missing dock actions/volume differ visibly. SF Pro redistribution rights and
+fallback metrics remain unresolved. Native
 Mica/caption material, template app/taskbar icons, OS theme changes, focus and
 fullscreen restoration, 100/125/150/200% DPI, glass/motion and accessibility still
 need matched platform checks. Widget font rectangles must not be called text

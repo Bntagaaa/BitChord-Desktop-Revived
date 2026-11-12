@@ -83,9 +83,9 @@ Each phase ends with an evidence ledger per P-ID and explicit unresolved items. 
 
 | ID | Evidence / uncertainty | Required resolution and affected work |
 |---|---|---|
-| B01 | JitPack HTTP 403 blocks reference tests/build | Enable `jitpack.io` in environment network settings and rerun reference suite/build; prerequisite for current baseline and reference capture |
-| B02 | No Windows executor/device/display evidence | Run Windows CI plus interactive reference/Flutter capture, WASAPI/hotplug/SMTC/caption/PiP/updater tests; required before Windows acceptance |
-| B03 | No Flutter toolchain/platform package audit | Phase 1 pins supported versions and establishes both host toolchains; candidates are not guaranteed working dependencies |
+| B01 | Historical JitPack 403; hosted Linux reference now builds and passes 857 tests in run `43125482870` | Dependency access is verified for that runner/reference; do not generalize to every environment. Windows reference native build remains blocked separately |
+| B02 | Windows Flutter build, eight tests and native lifecycle now pass; pinned Windows Kotlin reference native build fails | Obtain a runnable pinned Windows reference for matched capture. Physical DPI/theme/accessibility and later WASAPI/SMTC/PiP/updater gates remain open |
+| B03 | Flutter 3.47.9/Dart 3.13.7 and shell packages now pass both hosted toolchains with committed lockfile | Foundation compatibility is verified; future audio/browser/multi-window package capabilities still need their own gates |
 | B04 | JVM resolver libraries/JavaFX/GraalJS have no proved Dart equivalents | Phase 4 browser, JS and resolver spikes; preserve exact headers/client/cipher/fallback semantics or report parity blocked |
 | B05 | Native algorithm/FFI reuse and assets require provenance/license review | Keep native reference and notices; assess font/model/codec rights and independent C ABI before distribution; no silent substitutions |
 | B06 | Flutter multi-window choice may start another engine | Measure PiP ownership/latency/RAM; one transport authority; choose native host or explicit IPC architecture only with evidence |
@@ -320,4 +320,53 @@ repeated close and failed-drain cleanup; their hosted execution is pending.
 Linux smoke logs also contain GTK accessibility/initial-frame and implicit-view
 teardown warnings; passing exit/paint checks do not establish accessibility or
 physical GPU correctness.
+
+## Phase 1 acceptance audit — 2026-11-12, foundation verified; visual acceptance BLOCKED
+
+Successful run: [43126969435](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43126969435),
+source `ea6b5c90`; trusted retention commit `6f67ac2f` was fetched and reviewed.
+The native-close change resolved Windows exit `0xC000041D` without weakening the
+exit-code assertion. Both platforms now close normally with exit 0.
+
+| Gate | Observed result |
+|---|---|
+| Official Windows/Linux hosts, SDK pin and lockfile | PASS; official generator output/provenance, resolved lockfile and formatted source retained in `6f67ac2f`; no restart or handcrafted host |
+| Format, analyzer and architecture/asset checks | PASS on both hosted OSs; future pushes check formatting without silently repairing it |
+| Foundation tests | PASS, 8 per OS, zero failed/skipped; includes two new ordered-drain/idempotent/failure-close regressions |
+| Linux release build/native lifecycle | PASS, Ubuntu 22.04, Clang 14, CMake/Ninja, Xvfb/Openbox/software GL; actual 1220×780 and 900×600 client captures, responsive landmarks, native close/exit 0 |
+| Windows release build/native lifecycle | PASS, Server 2022/VS 2022, hosted 1600×1200 display at 96 DPI; both client sizes/landmarks and native close/exit 0 |
+| Retained capture evidence | PASS; `flutterDesktop/verification/hosted-run.json`, native PNG/JSON and test summary; widget captures explicitly use Ahem |
+| Runnable pinned Kotlin Linux reference | PASS; run `43125482870`: shared 78 + sharedUi 85 + desktop 694 = 857 tests, zero failures/errors/skips, plus distributable. Retry `43126572145` also passed Linux |
+| Pinned Kotlin Windows reference | BLOCKED; both reference runs fail `:desktopApp:buildAnalysisNative` with CMake exit 1, before a usable reference distributable. Diagnostic standalone configure succeeded with GNU 14.2/JDK 21; Gradle native build still fails. No test/visual pass is inferred |
+| Matched visual acceptance | INCOMPLETE; limited local Linux light-theme client comparison captured at both sizes; anonymous Kotlin catalog differs from disconnected Flutter body, so only common shell regions were reviewed. Windows reference pairing is unavailable |
+| Native theme/DPI/focus/fullscreen/accessibility matrix | UNVERIFIED beyond hosted 96-DPI lifecycle and widget shortcut/theme tests; no physical-compositor acceptance inferred |
+| Reference/data preservation | PASS; no tracked Kotlin/shared/native changes; all 779 recorded reference hashes checked; local reference captures used temporary Java Preferences/user-home and Flutter profiles |
+| Performance/full features | NOT MEASURED/NOT IMPLEMENTED; no audio, mock catalog or Phase 2 implementation introduced |
+
+Local Linux capture evidence is in
+`flutterDesktop/verification/phase1-local-comparison/`, with app/source/run hashes,
+actual raster sizes and limitations in `capture.json`. Both builds were opened
+sequentially in the same KDE Wayland/XWayland session. The Kotlin profile was
+fresh, welcome-completed and explicitly Light; Flutter Light was selected through
+its real settings page. Native root-screen capture was unavailable on XWayland,
+so client drawable capture was used. Each saved image's dimensions and SHA-256
+were checked. Numerical local DPI was not independently measured. These captures
+were cleaned up with SIGTERM and **are not native-close evidence**; native close
+is established separately by the passing hosted smokes. Logs, account data,
+tokens and profiles were not retained.
+
+Observed P02/P24/P29–P31 gaps: the extra 48-dp Flutter status/navigation row moves
+the Home heading down; fallback font metrics and sidebar row spacing differ;
+the reference account row/additional rail action are missing; the dock's mark is
+larger/darker and several reference controls/volume and feed-under-dock effects
+are absent. The 220/72 sidebar and 760×58 dock bounds match structural checks,
+but this is not pixel parity. Content differs by implementation scope and blur
+cannot be accepted against different backgrounds. SF Pro rights, native icons/
+caption/Mica, motion/focus and full DPI/theme/accessibility checks remain open.
+
+**Phase 1 remains INCOMPLETE/BLOCKED for visual acceptance.** Foundation CI and
+native lifecycle gates are verified. Next concrete prerequisite: obtain/diagnose
+a runnable pinned Windows reference without changing the protected reference,
+then execute the remaining matched visual/platform checks and resolve the
+recorded shell differences. Phase 2 has not started and is not authorized.
 
