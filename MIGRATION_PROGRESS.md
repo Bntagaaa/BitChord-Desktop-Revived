@@ -632,3 +632,28 @@ differences, exact material/motion work, and unavailable physical Windows/Linux
 compositor/DPI/focus/accessibility coverage. The current shell is buildable and
 its hosted lifecycle passes, but full visual acceptance remains **INCOMPLETE**.
 No Phase 2 work has begun.
+
+## Phase 1 handoff correction and user review — 2026-11-12
+
+This entry supersedes earlier *current-status* statements for Phase 1 while preserving the historical CI/audit records above. The user requested documentation reconciliation **before starting Phase 2**, not implementation of Phase 2 and not a premature Phase 1 parity sign-off.
+
+### What is verified
+
+- The earlier Kotlin Windows native toolchain/reference failure was resolved by the verified MSVC + Windows SDK setup without modifying the pinned protected Kotlin reference. Full reference test/package and 96-DPI window capture evidence are recorded above.
+- The Kotlin-vs-Flutter shell comparisons at 1220×780 and 900×600 establish useful baseline geometry at matched 100% scale, but not full visual/feature equivalence.
+- Flutter workflow [43163359448](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43163359448) passed Windows + Linux desktop jobs and trusted retention with strict Dart formatting, tests, release bundles and native shell smoke evidence.
+- Subsequent Phase 1 code changes include a responsive compact dock (small-width test), `NoTransitionPage` navigation to remove Android-style Material page transitions, explicit desktop font fallbacks, and Linux drawer smoke interaction repair. The user has not yet approved the rendered result.
+- The most recent font-family change is [`c9cfdb1e`](https://github.com/Bntagaaa/BitChord-Desktop-Revived/commit/c9cfdb1e55ef7e7bc3b058303eb6289968e9dcec). Its workflow [43169153250](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43169153250) was **in progress at this documentation update**; do not infer its final result. A later reviewer must check it explicitly.
+
+### Corrected visual observations
+
+- The user's earlier impression that Kotlin sidebar navigation spacing was larger was caused by comparing **Kotlin UI Scale 110%** to **Flutter 100%**. At a matched 100% scale, the user reports that the spacing is the same. **Do not increase sidebar padding or mark 100% row spacing as a known defect based on the unmatched comparison.** The Kotlin item uses 7 dp vertical padding and the Flutter geometry is intentionally retained.
+- Kotlin also supports user-controlled UI Scale (including 110%). Matching the source's scaling behavior and testing 100%/110% and broader DPI values remain future visual-system work, not proof of current Flutter parity.
+- The user supplied five static font cuts named `bitchord-sans`: Regular 400, Medium 500, Semibold 600, Bold 700 and Heavy 800. Flutter now prefers that installed system family rather than `SF Pro Display`, but **the font binaries are not bundled** and weight/glyph parity is not validated. Do not ship or redistribute supplied fonts until their license/provenance and redistribution permissions are established. The source Kotlin desktop's physical font-cut mapping remains the reference for typography.
+- Android-style route transitions were reported by the user; the Flutter route implementation was changed to `NoTransitionPage`. Passing navigation tests do not replace the user's manual perception check.
+
+### Phase status and next authorization boundary
+
+**Phase 1 foundation: VERIFIED by hosted Windows/Linux CI. Phase 1 visual parity/manual acceptance: OPEN, awaiting user review.** Do not mark the entire phase 100% complete. Outstanding checks include font availability and real glyph/wrapping parity, material/Haze/motion, native chrome/Mica/icons and wider DPI/focus/accessibility tests. Full catalog/music/audio behavior remains out of this phase.
+
+**Phase 2 implementation: NOT STARTED in this handoff.** The requested next action is to use the existing `.codex/phases/phase-2.md` playbook only after the user chooses to start it. Carry unresolved visual evidence into Phase 2 with explicit owners/status rather than treating it as already accepted. Do not automatically move to Phase 3.

@@ -154,3 +154,16 @@ parity. Material appearance controls and the disconnected
 page body are Phase 1 infrastructure; legacy top player, full player/side panels,
 account/data screens and PiP remain later work. No RAM improvement is measured.
 Phase 1 remains incomplete for visual acceptance; Phase 2 has not started.
+
+## Latest Phase 1 handoff — 2026-11-12
+
+The Phase 1 Flutter desktop **foundation** has passed hosted Windows/Linux release, tests, and native GUI/lifecycle smoke checks in [run 43163359448](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43163359448). This does **not** mean the user has accepted full visual equivalence.
+
+Follow-up changes:
+- Tab destinations use `NoTransitionPage` to avoid mobile-style Material route animations.
+- A compact empty dock keeps core transport visible at very small widths.
+- The user clarified that the apparent sidebar spacing mismatch was an invalid comparison of Kotlin **110% UI Scale** against Flutter **100%**; matched 100% spacing is reported correct. Preserve the source geometry, including 7 dp vertical navigation-item padding.
+- User-supplied five-cut static `bitchord-sans` (400/500/600/700/800) is the preferred **installed** system font family. The TTF files are **not bundled or committed** without verified redistributable licensing, and appearance still depends on installed fonts/platform fallback. Font/glyph fidelity remains open.
+- The latest `bitchord-sans` code change is commit `c9cfdb1e`. Its [GitHub Actions workflow 43169153250](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43169153250) had not yet completed when this note was written. Recheck actual terminal CI status before stating a final build result.
+
+Manual visual review is still required for typography, tab transitions, scaling, glass/Haze, OS chrome, DPI/focus/accessibility and matching reference screenshots. Phase 2 has not been implemented by this documentation change. Consult `MIGRATION_PROGRESS.md`, `MIGRATION_PARITY.md` and `.codex/phases/phase-2.md` before beginning authorized Phase 2 work.

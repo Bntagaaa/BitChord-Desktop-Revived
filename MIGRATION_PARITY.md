@@ -1222,3 +1222,18 @@ with a metric assertion for both platforms and a Linux widget bounds assertion;
 that final adjustment awaits hosted
 native captures. No
 Windows reference lifecycle pass is inferred from capture-only termination.
+
+## Phase 1 user-corrected visual parity ledger — 2026-11-12
+
+This section updates the interpretation of earlier screenshots without deleting source-trace evidence.
+
+| Area | Latest implementation/evidence | Remaining acceptance |
+| --- | --- | --- |
+| Sidebar 100% spacing (P02/P24) | Kotlin 110% vs Flutter 100% was an invalid spacing comparison; the user reports matched 100% looks the same. Keep reference 7-dp vertical row padding and current Flutter geometry | Recheck matched visual states if layout changes |
+| UI scaling (P29–P31) | Kotlin offers UI Scale 110%; Flutter 100% comparison is not evidence of 110% support | Implement and verify original scale semantics with matching 100%/110%/DPI fixtures |
+| Navigation motion (P01/P02) | Flutter routes changed from Material's default page transition to `NoTransitionPage`; regression test added | User manual test of tab switch; native motion/focus checks |
+| Typography (P29–P31) | User provided static `bitchord-sans` font cuts 400/500/600/700/800. Code prefers installed `bitchord-sans` and retains platform fallback; binaries not packaged | Confirm font license/redistribution rights, installed-family resolution, weight mapping, glyph ink/wrapping and reference parity |
+| Player dock responsive behavior (P24) | Compact layout added for constrained width with dedicated widget regression; original normal-width dock preserved | Native very-small-width and 100%/110% inspection; player functionality belongs later |
+| Windows/Linux foundation | Hosted matrix [43163359448](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43163359448) PASS for both platforms, release bundles, tests, native shell checks and retention | Latest font-specific CI [43169153250](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43169153250) was still running when recorded; manual visual approval outstanding |
+
+The user has **not accepted Phase 1 visual parity**, and this table does not claim completed Phase 2 implementation. Kotlin reference files remain the specification. Do not record source-font binaries as licensed, embedded, or verified merely because the font family name is configured.
