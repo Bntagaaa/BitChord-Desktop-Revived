@@ -1049,3 +1049,29 @@ selectable HTTPS URL/SABR warning. These observations do not prove a single
 root cause. Current upstream describes client/token enforcement; no header-only
 fix or stale-client fallback is claimed. PoToken/browser runtime, authenticated
 media, real Windows/Linux provider playback and failure recovery remain gates.
+
+### Continuation first matrix and smoke correction
+
+[945d4299 / 43221707248](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43221707248):
+Linux completed SUCCESS; Windows passed format, fatal analysis, **38 tests**,
+controlled/native checks and release build, then failed native drawer appearance
+sampling. The actual Windows screenshot shows the drawer correctly open; its
+old sample `(880,400)` lies on newly loaded Home artwork, giving catalog-dependent
+RGB `(57,57,57)` rather than empty-page scrim color. Both smoke scripts now sample
+the empty margin `(880,500)` below the content viewport and above the dock.
+The expected exact theme/scrim colors and lifecycle assertions are unchanged.
+The actual new Windows drawer screenshot gives `(183,184,186)` at that point;
+Linux captures give all expected colors there. The subsequent matrix must verify
+both native smokes, including Windows clean close/fullscreen, before promotion.
+
+The follow-up also prevents shelf-local tokens from paging the whole feed,
+restricts shelf navigation to actual header/button targets, tests album primary
+track isolation and fences requests begun during account verification. Rejected
+API sessions are cleared on provider authorization failure; account data cannot
+be attached to a fixture/overridden origin. Focused contracts and analysis pass.
+The follow-up anonymous live catalog check retrieved 9 primary album tracks
+(with related releases excluded), playlist continuation and **8177 actual image
+bytes** through the production artwork service. Later native Linux frames show
+real loaded artwork; initial frames may show the loading surface. These captures
+are not matched Kotlin visual acceptance. Media HTTP 403 and full Phase 4 gaps
+remain unresolved.

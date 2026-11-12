@@ -250,3 +250,12 @@ is saved. Full new Flutter/Windows/Linux checks await the exact-SHA CI result.
 Matched reference desktop visual evidence, browser auth/PoToken, owned playlist
 mutations, multi-track collection playback and complete Phase 4 acceptance remain
 open. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
+
+First continuation matrix [43221707248](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43221707248)
+passed Linux and 38 tests/builds on both platforms. Windows native drawer smoke
+failed because its old pixel probe hit newly loaded artwork. New native captures
+confirm the drawer works. The probe is moved to the clear margin, preserving
+exact expected colors and all lifecycle assertions; the follow-up run must pass
+before any Windows native promotion. Follow-up contracts cover album primary
+tracks and shelf-local token isolation. Anonymous actual artwork transfer was
+8177 bytes; the redacted follow-up counts are appended to the live JSON record.

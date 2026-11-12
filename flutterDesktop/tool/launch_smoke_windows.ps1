@@ -188,8 +188,9 @@ try {
       $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
       try {
         $graphics.CopyFromScreen($origin.X,$origin.Y,0,0,$bitmap.Size)
-        # Empty page background, clear of UI Scale choices at y=300.
-        $pixel = $bitmap.GetPixel(880,400)
+        # Empty right margin below the catalog viewport and above the dock.
+        # y=400 is now live Home artwork; its scrim color varies by catalog.
+        $pixel = $bitmap.GetPixel(880,500)
         $rgb = @([int]$pixel.R,[int]$pixel.G,[int]$pixel.B)
         $valid = $theme -eq 'any' -or ($theme -eq 'drawer' -and $pixel.R -eq 183 -and $pixel.G -eq 184 -and $pixel.B -eq 186) -or ($theme -eq 'light' -and ($rgb | Measure-Object -Minimum).Minimum -ge 230) -or ($theme -eq 'dark' -and $pixel.R -eq 32 -and $pixel.G -eq 32 -and $pixel.B -eq 32) -or ($theme -eq 'black' -and ($rgb | Measure-Object -Maximum).Maximum -le 2)
         $bitmap.Save("$evidence/$OutputPrefix-$name-900x600.png",[System.Drawing.Imaging.ImageFormat]::Png)

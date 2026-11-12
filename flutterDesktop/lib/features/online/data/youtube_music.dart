@@ -18,11 +18,15 @@ final class YouTubeMusic implements CatalogProvider {
   int _accountGeneration = 0;
   bool get signedIn => _session != null;
   Future<void> signIn(String cookie, RequestScope scope) async {
+    if (origin.origin != YouTubeSession.origin)
+      throw const ProviderFailure(ProviderProblem.unsupported);
     final generation = ++_accountGeneration;
     final session = await YouTubeSession.verify(cookie, http, scope);
     scope.check();
     if (generation != _accountGeneration)
       throw const ProviderFailure(ProviderProblem.cancelled);
+    // Also fence queries begun while verification was in flight.
+    ++_accountGeneration;
     _session = session;
     _version = session.version;
   }
@@ -66,32 +70,41 @@ final class YouTubeMusic implements CatalogProvider {
     if (generation != _accountGeneration)
       throw const ProviderFailure(ProviderProblem.cancelled);
     final session = _session;
-    final data = await http.json(
-      origin.resolve('/youtubei/v1/$endpoint?prettyPrint=false'),
-      scope,
-      headers: {
-        'Origin': origin.origin,
-        if (session != null && origin.origin == YouTubeSession.origin)
-          ...session.headers(),
-        'X-YouTube-Client-Name': '67',
-        'X-YouTube-Client-Version': _version!,
-      },
-      body: {
-        'context': {
-          'client': {
-            'clientName': 'WEB_REMIX',
-            'clientVersion': _version,
-            'hl': 'en',
-            'gl': 'US',
-            if (session?.visitorData != null)
-              'visitorData': session!.visitorData,
-          },
-          if (session?.dataSyncId != null)
-            'user': {'onBehalfOfUser': session!.dataSyncId},
+    Map<String, dynamic> data;
+    try {
+      data = await http.json(
+        origin.resolve('/youtubei/v1/$endpoint?prettyPrint=false'),
+        scope,
+        headers: {
+          'Origin': origin.origin,
+          if (session != null && origin.origin == YouTubeSession.origin)
+            ...session.headers(),
+          'X-YouTube-Client-Name': '67',
+          'X-YouTube-Client-Version': _version!,
         },
-        ...body,
-      },
-    );
+        body: {
+          'context': {
+            'client': {
+              'clientName': 'WEB_REMIX',
+              'clientVersion': _version,
+              'hl': 'en',
+              'gl': 'US',
+              if (session?.visitorData != null)
+                'visitorData': session!.visitorData,
+            },
+            if (session?.dataSyncId != null)
+              'user': {'onBehalfOfUser': session!.dataSyncId},
+          },
+          ...body,
+        },
+      );
+    } on ProviderFailure catch (e) {
+      if (e.problem == ProviderProblem.unauthorized &&
+          generation == _accountGeneration &&
+          _session != null)
+        signOut();
+      rethrow;
+    }
     scope.check();
     if (generation != _accountGeneration)
       throw const ProviderFailure(ProviderProblem.cancelled);
@@ -287,7 +300,16 @@ final class YouTubeMusic implements CatalogProvider {
           final entries = _entries(content);
           if (entries.isEmpty) continue;
           final endpoint =
-              nodes(header, 'browseEndpoint').firstOrNull ??
+              nodes(header['title'], 'browseEndpoint').firstOrNull ??
+              nodes(
+                header['moreContentButton'],
+                'browseEndpoint',
+              ).firstOrNull ??
+              nodes(header['endIcons'], 'browseEndpoint').firstOrNull ??
+              nodes(
+                header['navigationEndpoint'],
+                'browseEndpoint',
+              ).firstOrNull ??
               nodes(shelf['bottomEndpoint'], 'browseEndpoint').firstOrNull ??
               nodes(shelf['bottomButton'], 'browseEndpoint').firstOrNull;
           final title = text(header['title']);
@@ -341,11 +363,25 @@ final class YouTubeMusic implements CatalogProvider {
         nodes(root, 'sectionListContinuation').firstOrNull ??
         nodes(root, 'sectionListRenderer').firstOrNull ??
         nodes(root, 'musicShelfContinuation').firstOrNull ??
+        nodes(root, 'musicShelfRenderer').firstOrNull ??
+        nodes(root, 'appendContinuationItemsAction').firstOrNull ??
         root;
     // Only the feed/collection continuation, never an individual carousel's token.
-    Object? continuations = continuationRoot;
-    if (continuationRoot is Map && continuationRoot['continuations'] != null) {
+    Object? continuations;
+    if (continuationRoot is Map) {
       continuations = continuationRoot['continuations'];
+      if (continuations == null) {
+        final children =
+            continuationRoot['contents'] ??
+            continuationRoot['continuationItems'];
+        if (children is List) {
+          continuations = [
+            for (final child in children)
+              if (child is Map && child['continuationItemRenderer'] != null)
+                child['continuationItemRenderer'],
+          ];
+        }
+      }
     }
     final token =
         nodes(continuations, 'continuationCommand').firstOrNull?['token']

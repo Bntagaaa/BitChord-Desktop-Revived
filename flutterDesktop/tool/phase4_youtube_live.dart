@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../lib/features/online/data/artwork_loader.dart';
 import 'dart:io';
 import '../lib/features/online/data/provider_http.dart';
 import '../lib/features/online/data/youtube_music.dart';
@@ -25,6 +26,23 @@ Future<void> main(List<String> args) async {
       'shelves': home.shelves.length,
       'artwork': home.entries.where((e) => e.artwork != null).length,
     };
+    final image = home.entries
+        .where((e) => e.artwork != null)
+        .firstOrNull
+        ?.artwork;
+    if (image != null) {
+      try {
+        report['first_artwork_bytes'] = (await ArtworkLoader().load(
+          image,
+          scope,
+        )).length;
+      } on ProviderFailure catch (e) {
+        report['artwork_failure'] = {
+          'failure': e.problem.name,
+          'status': e.status,
+        };
+      }
+    }
     final songs = await provider.search(
       'Beethoven',
       scope,

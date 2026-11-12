@@ -4,14 +4,39 @@
   "authenticated": false,
   "extractor": "yt-dlp 2026.10.26, Node 22.23.5; previously publisher-hash-verified temporary executables",
   "production_probe": {
-    "home": {"entries": 30, "shelves": 2, "artwork": 30},
+    "home": {
+      "entries": 30,
+      "shelves": 2,
+      "artwork": 30
+    },
     "songs": 20,
-    "albums": {"entries": 20},
-    "albums_detail": {"entries": 19, "shelves": 2, "header": true, "continuation": false},
-    "artists": {"entries": 20},
-    "artists_detail": {"entries": 25, "shelves": 3, "header": true, "continuation": false},
-    "playlists": {"entries": 20},
-    "playlists_detail": {"entries": 100, "shelves": 0, "header": true, "continuation": true},
+    "albums": {
+      "entries": 20
+    },
+    "albums_detail": {
+      "entries": 19,
+      "shelves": 2,
+      "header": true,
+      "continuation": false
+    },
+    "artists": {
+      "entries": 20
+    },
+    "artists_detail": {
+      "entries": 25,
+      "shelves": 3,
+      "header": true,
+      "continuation": false
+    },
+    "playlists": {
+      "entries": 20
+    },
+    "playlists_detail": {
+      "entries": 100,
+      "shelves": 0,
+      "header": true,
+      "continuation": true
+    },
     "failure": "expired",
     "http_status": 403
   },
@@ -21,5 +46,42 @@
     "web_embedded": "Missing HTTPS URLs; extractor reports possible SABR-only experiment",
     "android_sdkless": "Unsupported client, default fallback extracted Opus/audio-only; media HTTP 403, zero bytes"
   },
-  "limits": "No account used. No YouTube media was played. Album detail above predates the follow-up primary-track isolation fix; recommended collections were still counted. Client diagnostics do not establish the sole cause of HTTP 403. No signed URLs, credentials, raw catalogs or resolver binaries retained. Windows live-provider access unverified."
+  "limits": "No account used. No YouTube media was played. Album detail above predates the follow-up primary-track isolation fix; recommended collections were still counted. Client diagnostics do not establish the sole cause of HTTP 403. No signed URLs, credentials, raw catalogs or resolver binaries retained. Windows live-provider access unverified.",
+  "followup_catalog_probe": {
+    "authenticated": false,
+    "home": {
+      "entries": 30,
+      "shelves": 2,
+      "artwork": 30
+    },
+    "first_artwork_bytes": 8177,
+    "songs": 20,
+    "albums": {
+      "entries": 20
+    },
+    "albums_detail": {
+      "entries": 9,
+      "shelves": 0,
+      "header": true,
+      "continuation": false
+    },
+    "artists": {
+      "entries": 20
+    },
+    "artists_detail": {
+      "entries": 35,
+      "shelves": 4,
+      "header": true,
+      "continuation": false
+    },
+    "playlists": {
+      "entries": 20
+    },
+    "playlists_detail": {
+      "entries": 100,
+      "shelves": 0,
+      "header": true,
+      "continuation": true
+    }
+  }
 }

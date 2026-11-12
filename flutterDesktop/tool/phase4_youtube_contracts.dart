@@ -127,6 +127,42 @@ Future<void> youtubeContracts() async {
     'Artwork/feed continuation',
   );
   require(feed.shelves.last.layout == ShelfLayout.tracks, 'Track shelf layout');
+  final localToken = YouTubeMusic.parsePage({
+    'contents': {
+      'sectionListRenderer': {
+        'contents': [
+          {
+            'musicCarouselShelfRenderer': {
+              'contents': [card('MPRElocal')],
+              'continuations': [
+                {
+                  'nextContinuationData': {'continuation': 'shelf-only'},
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+  require(
+    localToken.continuation == null,
+    'Carousel token must not page the feed',
+  );
+  final album = YouTubeMusic.parsePage({
+    'contents': {
+      'musicShelfRenderer': {
+        'contents': [track('aaaaaaaaaaa')],
+      },
+      'musicCarouselShelfRenderer': {
+        'contents': [card('MPRErecommendation')],
+      },
+    },
+  }, browseId: 'MPREalbum');
+  require(
+    album.entries.length == 1 && album.entries.single.kind == CatalogKind.track,
+    'Album primary songs must exclude related releases',
+  );
   final playlist = YouTubeMusic.parsePage({
     'contents': {
       'musicPlaylistShelfRenderer': {
