@@ -33,7 +33,8 @@ def capture_state(evidence, window, name, theme='any'):
     deadline = time.monotonic() + 8
     while True:
         subprocess.run(['import', '-screen', '-window', window, '-depth', '8', str(capture)], check=True, timeout=10)
-        value = subprocess.check_output(['convert', str(capture), '-format', '%[pixel:p{500,300}]', 'info:'], text=True, timeout=10)
+        # Probe empty page background, clear of the UI Scale choices at y=300.
+        value = subprocess.check_output(['convert', str(capture), '-format', '%[pixel:p{880,400}]', 'info:'], text=True, timeout=10)
         match = re.search(r'\((\d+),(\d+),(\d+)', value)
         if not match:
             raise RuntimeError('Unexpected native pixel format: ' + value)

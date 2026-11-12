@@ -703,3 +703,12 @@ screenshots and launch.log, retained the assertion, and added explicit shell
 focus restoration plus the exact coordinate/keyboard sequence as a regression
 test. Added a legacy preference decode/save/restart regression test as well.
 Subsequent CI must verify the repair; this failed attempt is not acceptance.
+
+Repair run `43177083038` passed **26 Linux tests**, analysis and release build,
+and advanced through Accounts/drawer, confirming that transition's repair.
+Its dark-theme smoke exposed a separate probe collision: pixel (500,300) now
+falls inside the new UI Scale controls (13/13/15) rather than the page background.
+Inspected the actual native PNG: Dark was correctly selected and the page was
+32/32/32. Both platform probes move to empty page pixel (880,400), preserving
+all exact Light/Dark/Pitch-black/drawer RGB assertions. No assertion is weakened.
+The first run's Windows failure was this same dark probe collision.
