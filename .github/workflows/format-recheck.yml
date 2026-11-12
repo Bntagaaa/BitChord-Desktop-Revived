@@ -19,6 +19,7 @@ jobs:
       - name: Format exactly as app CI, return one inspected file
         working-directory: flutterDesktop
         run: |
+          flutter pub get --enforce-lockfile
           dart format lib test
           python - <<'PY'
           import json
