@@ -769,29 +769,36 @@ class _EmptyDock extends StatelessWidget {
   final bool reduceBlur;
 
   @override
-  Widget build(BuildContext context) => ConstrainedBox(
-    constraints: const BoxConstraints(maxWidth: ShellMetrics.dockWidth),
-    child: GlassSurface(
-      palette: palette,
-      reduceBlur: reduceBlur,
-      child: SizedBox(
-        key: const Key('player-dock'),
-        height: ShellMetrics.dockHeight,
-        child: Stack(
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      // Keep the full Kotlin-style dock at normal desktop widths. A smaller
+      // viewport cannot fit all controls and the centered artwork safely.
+      final compact = constraints.maxWidth < 520;
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: ShellMetrics.dockWidth),
+        child: GlassSurface(
+          palette: palette,
+          reduceBlur: reduceBlur,
+          child: SizedBox(
+            key: const Key('player-dock'),
+            height: ShellMetrics.dockHeight,
+            child: Stack(
           alignment: Alignment.center,
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
-                  _DockButton(
-                    'shuffle',
-                    label: 'Shuffle',
-                    palette: palette,
-                    width: 34,
-                    glyphSize: 18,
-                  ),
-                  const SizedBox(width: 4),
+                  if (!compact) ...[
+                    _DockButton(
+                      'shuffle',
+                      label: 'Shuffle',
+                      palette: palette,
+                      width: 34,
+                      glyphSize: 18,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   _DockButton(
                     'previous',
                     label: 'Previous',
@@ -819,39 +826,44 @@ class _EmptyDock extends StatelessWidget {
                     tint: palette['foreground'],
                   ),
                   const SizedBox(width: 4),
-                  _DockButton(
-                    'repeat',
-                    label: 'Repeat',
-                    palette: palette,
-                    width: 34,
-                    glyphSize: 18,
-                  ),
-                  const SizedBox(width: 4),
+                  if (!compact) ...[
+                    _DockButton(
+                      'repeat',
+                      label: 'Repeat',
+                      palette: palette,
+                      width: 34,
+                      glyphSize: 18,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   const Spacer(),
                   Row(
                     spacing: 1,
                     children: [
                       _DockButton('lyrics', label: 'Lyrics', palette: palette),
-                      _DockButton(
-                        'pip',
-                        label: 'Picture in picture',
-                        palette: palette,
-                        icon: Icons.picture_in_picture_alt_rounded,
-                      ),
+                      if (!compact)
+                        _DockButton(
+                          'pip',
+                          label: 'Picture in picture',
+                          palette: palette,
+                          icon: Icons.picture_in_picture_alt_rounded,
+                        ),
                       _DockButton('up_next', label: 'Queue', palette: palette),
-                      _DockButton(
-                        'details',
-                        label: 'Now playing details',
-                        palette: palette,
-                        icon: Icons.info_rounded,
-                      ),
-                      _DockButton(
-                        'audio-output',
-                        label: 'Audio output',
-                        palette: palette,
-                        icon: Icons.headphones_rounded,
-                      ),
-                      Tooltip(
+                      if (!compact) ...[
+                        _DockButton(
+                          'details',
+                          label: 'Now playing details',
+                          palette: palette,
+                          icon: Icons.info_rounded,
+                        ),
+                        _DockButton(
+                          'audio-output',
+                          label: 'Audio output',
+                          palette: palette,
+                          icon: Icons.headphones_rounded,
+                        ),
+                      ],
+                      if (!compact) Tooltip(
                         message: 'Volume — playback is unavailable',
                         child: Semantics(
                           key: const Key('dock-volume'),
@@ -897,10 +909,12 @@ class _EmptyDock extends StatelessWidget {
                 color: palette['foreground'].withValues(alpha: .12),
               ),
             ),
-          ],
+              ],
+            ),
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 

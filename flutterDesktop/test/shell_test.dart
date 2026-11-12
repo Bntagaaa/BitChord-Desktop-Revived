@@ -147,6 +147,33 @@ void main() {
     },
   );
   testWidgets(
+    'Compact dock fits small desktop windows without hiding core transport',
+    (tester) async {
+      await mount(tester, const Size(480, 600));
+      expect(find.byKey(const Key('player-dock')), findsOneWidget);
+      for (final action in ['previous', 'play', 'next', 'lyrics', 'up_next']) {
+        expect(find.byKey(Key('transport-$action')), findsOneWidget);
+      }
+      for (final action in [
+        'shuffle',
+        'repeat',
+        'pip',
+        'details',
+        'audio-output',
+      ]) {
+        expect(find.byKey(Key('transport-$action')), findsNothing);
+      }
+      expect(find.byKey(const Key('dock-volume')), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      tester.view.physicalSize = const Size(1220, 780);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('transport-shuffle')), findsOneWidget);
+      expect(find.byKey(const Key('dock-volume')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
     'Narrow drawer is transient and cannot overwrite collapse preference',
     (tester) async {
       final container = await mount(tester, const Size(900, 600));
