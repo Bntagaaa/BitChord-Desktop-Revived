@@ -568,7 +568,7 @@ class OnlineTransport extends ConsumerWidget {
                     Text(
                       snapshot.phase == AudioPhase.failed
                           ? 'Playback failed (${snapshot.error})'
-                          : '${snapshot.phase.name} · ${position ~/ 60}:${(position % 60).toString().padLeft(2, '0')}',
+                          : '${snapshot.phase.name} · ${position ~/ 60}:${(position % 60).toString().padLeft(2, '0')} · ${port?.currentSubtitle ?? ''}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],

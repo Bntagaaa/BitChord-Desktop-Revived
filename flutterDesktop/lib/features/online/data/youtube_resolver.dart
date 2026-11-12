@@ -155,6 +155,32 @@ final class YouTubeResolver {
     ];
   }
 
+  // Keep extractor diagnostics private. Only report a fixed, redacted failure
+  // category: yt-dlp debug output can contain signed locations or tokens.
+  static ProviderFailure classifyExtractorFailure(String stderr) {
+    final value = stderr.toLowerCase();
+    if (RegExp(
+      r'sign in to confirm|sign in to verify|login_required|login required|'
+      r'cookies are needed|please log in|requires authentication|'
+      r'confirm you are not a bot',
+    ).hasMatch(value)) {
+      return const ProviderFailure(ProviderProblem.loginRequired);
+    }
+    if (RegExp(
+      r'failed to generate[^\\n]*po token|'
+      r'po token[^\\n]*(?:generation|generator)[^\\n]*(?:error|fail)|'
+      r'(?:error|failed)[^\\n]*bgutil',
+    ).hasMatch(value)) {
+      return const ProviderFailure(ProviderProblem.tokenUnavailable);
+    }
+    if (value.contains('requested format is not available') ||
+        value.contains('no video formats found') ||
+        value.contains('only images are available')) {
+      return const ProviderFailure(ProviderProblem.formatUnavailable);
+    }
+    return const ProviderFailure(ProviderProblem.unavailable);
+  }
+
   Future<ResolvedMedia> resolve(
     CatalogEntry track,
     AudioQuality quality,
@@ -168,6 +194,7 @@ final class YouTubeResolver {
     final processArguments = arguments(track, quality);
     Process? process;
     final output = StringBuffer();
+    var stderrTail = '';
     var bytes = 0;
     var oversized = false;
     void Function() detach = () {};
@@ -215,7 +242,14 @@ final class YouTubeResolver {
           output.write(utf8.decode(part, allowMalformed: true));
         }
       }).asFuture<void>();
-      final stderrDone = running.stderr.listen((_) {}).asFuture<void>();
+      final stderrDone = running.stderr.listen((part) {
+        // Bounded, in-memory diagnostic context. Never forward any of it to
+        // UI, console, preferences, persistence, fixtures or app telemetry.
+        stderrTail += utf8.decode(part, allowMalformed: true);
+        if (stderrTail.length > 96000) {
+          stderrTail = stderrTail.substring(stderrTail.length - 96000);
+        }
+      }).asFuture<void>();
       final exit = await (() async {
         final code = await running.exitCode;
         await Future.wait([stdoutDone, stderrDone]);
@@ -223,7 +257,7 @@ final class YouTubeResolver {
       })().timeout(timeout);
       scope.check();
       if (oversized) throw const ProviderFailure(ProviderProblem.malformed);
-      if (exit != 0) throw const ProviderFailure(ProviderProblem.unavailable);
+      if (exit != 0) throw classifyExtractorFailure(stderrTail);
       final decoded = jsonDecode(output.toString());
       if (decoded is! Map<String, dynamic>) throw const FormatException();
       final media = parse(decoded, track);

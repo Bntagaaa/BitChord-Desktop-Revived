@@ -3,6 +3,7 @@ import 'dart:io';
 import '../lib/features/online/data/youtube_music.dart';
 import '../lib/features/online/data/youtube_resolver.dart';
 import '../lib/features/online/data/youtube_session.dart';
+import '../lib/features/online/data/recording_fallback.dart';
 import '../lib/features/online/data/provider_http.dart';
 import '../lib/features/online/domain/catalog.dart';
 
@@ -373,6 +374,82 @@ Future<void> youtubeContracts() async {
   } finally {
     await bundle.delete(recursive: true);
   }
+
+  const targetRecording = CatalogEntry(
+    provider: 'youtube',
+    id: 'aaaaaaaaaaa',
+    title: 'Shape of You (Official Audio)',
+    subtitle: 'Song • Ed Sheeran • Divide',
+    durationSeconds: 233,
+  );
+  const sameRecording = CatalogEntry(
+    provider: 'jiosaavn',
+    id: 'matched-track',
+    title: 'Shape of You',
+    subtitle: 'Ed Sheeran',
+    durationSeconds: 235,
+  );
+  require(
+    RecordingFallback.match(targetRecording, [sameRecording])?.id ==
+        'matched-track',
+    'Conservative Kotlin-inspired source matching',
+  );
+  for (final other in <CatalogEntry>[
+    const CatalogEntry(
+      provider: 'jiosaavn', id: 'wrong-artist', title: 'Shape of You',
+      subtitle: 'Other Artist', durationSeconds: 233,
+    ),
+    const CatalogEntry(
+      provider: 'jiosaavn', id: 'wrong-version', title: 'Shape of You (Live)',
+      subtitle: 'Ed Sheeran', durationSeconds: 233,
+    ),
+    const CatalogEntry(
+      provider: 'jiosaavn', id: 'wrong-length', title: 'Shape of You',
+      subtitle: 'Ed Sheeran', durationSeconds: 330,
+    ),
+  ]) {
+    require(
+      RecordingFallback.match(targetRecording, [other]) == null,
+      'Never substitute a different recording',
+    );
+  }
+  require(
+    RecordingFallback.match(
+      const CatalogEntry(provider: 'youtube', id: 'ccccccccccc',
+        title: 'Shape of You', subtitle: 'Ed Sheeran', isVideo: true),
+      [sameRecording],
+    ) == null,
+    'Video sources must not be substituted with album audio',
+  );
+  require(
+    RecordingFallback.match(
+      const CatalogEntry(provider: 'youtube', id: 'ddddddddddd',
+        title: 'Shape of You', subtitle: 'Ed Sheeran'),
+      [sameRecording, const CatalogEntry(provider: 'jiosaavn',
+        id: 'ambiguous-cut', title: 'Shape of You',
+        subtitle: 'Ed Sheeran', durationSeconds: 180)],
+    ) == null,
+    'Reject ambiguous cuts when duration is missing',
+  );
+  require(
+    YouTubeResolver.classifyExtractorFailure(
+      'ERROR: Sign in to confirm you are not a bot '
+      'https://secret.invalid/?token=private',
+    ).problem == ProviderProblem.loginRequired,
+    'Login-required extraction must not collapse to generic unavailable',
+  );
+  require(
+    YouTubeResolver.classifyExtractorFailure(
+      'ERROR: requested format is not available',
+    ).problem == ProviderProblem.formatUnavailable,
+    'No progressive format must be reported explicitly',
+  );
+  require(
+    !YouTubeResolver.classifyExtractorFailure(
+      'ERROR: Sign in to confirm you are not a bot https://secret.invalid',
+    ).toString().contains('secret.invalid'),
+    'Never surface URL-bearing extractor diagnostics',
+  );
 
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final bodies = <Map<String, dynamic>>[];

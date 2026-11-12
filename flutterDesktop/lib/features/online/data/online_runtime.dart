@@ -14,6 +14,7 @@ import 'source_broker.dart';
 import 'youtube_music.dart';
 import 'jiosaavn.dart';
 import 'youtube_resolver.dart';
+import 'recording_fallback.dart';
 import 'artwork_loader.dart';
 import '../../../core/platform/audio/native_api.dart';
 
@@ -54,6 +55,7 @@ final class OnlineRuntime
   Future<void> _tail = Future.value();
   bool _closed = false;
   int _entry = 0;
+  bool _matchedAlternate = false;
   // Playback/persistence has a single coordinator across polls, commands, close.
   Future<T> _ordered<T>(Future<T> Function() work) {
     final result = _tail.then((_) {
@@ -67,7 +69,10 @@ final class OnlineRuntime
   @override
   String get currentTitle => playback.state.queue.current?.title ?? '';
   @override
-  String get currentSubtitle => playback.state.queue.current?.artist ?? '';
+  String get currentSubtitle {
+    final artist = playback.state.queue.current?.artist ?? '';
+    return _matchedAlternate ? '$artist · Source: JioSaavn (matched)' : artist;
+  }
   @override
   List<String> get providers => List.unmodifiable(_providers.keys);
   CatalogProvider _provider(String id) =>
@@ -111,11 +116,38 @@ final class OnlineRuntime
     RequestScope scope,
   ) async {
     final provider = _provider(entry.provider);
-    final media = await provider.resolve(entry, quality, scope);
+    var sourceProvider = provider;
+    var sourceEntry = entry;
+    var matchedAlternate = false;
+    ResolvedMedia media;
+    try {
+      media = await provider.resolve(entry, quality, scope);
+    } on ProviderFailure catch (primaryError) {
+      if (entry.provider != 'youtube' ||
+          ![
+            ProviderProblem.unavailable,
+            ProviderProblem.loginRequired,
+            ProviderProblem.mediaRefused,
+            ProviderProblem.tokenUnavailable,
+            ProviderProblem.formatUnavailable,
+          ].contains(primaryError.problem)) rethrow;
+      final alternative = await RecordingFallback.resolve(
+        entry,
+        _provider('jiosaavn'),
+        quality,
+        scope,
+      );
+      if (alternative == null) rethrow; // preserve the real YouTube failure
+      sourceProvider = _provider('jiosaavn');
+      sourceEntry = alternative.entry;
+      media = alternative.media;
+      matchedAlternate = true;
+    }
     scope.check();
+    final activeProvider = sourceProvider, activeEntry = sourceEntry;
     final broker = await SourceBroker.open(
       media,
-      refresh: () => provider.resolve(entry, quality, scope),
+      refresh: () => activeProvider.resolve(activeEntry, quality, scope),
     );
     try {
       scope.check();
@@ -128,12 +160,13 @@ final class OnlineRuntime
                 'online:${DateTime.now().microsecondsSinceEpoch}:${++_entry}',
             catalogId: entry.id,
             renditionId: media.rendition,
-            sourceId: entry.provider,
+            sourceId: media.provider,
             title: entry.title,
             artist: entry.subtitle,
           ),
           broker.path,
         );
+        _matchedAlternate = matchedAlternate;
         _broker = broker;
         await old?.close();
       });

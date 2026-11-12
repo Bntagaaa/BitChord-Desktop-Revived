@@ -38,6 +38,9 @@ enum ProviderProblem {
   expired,
   integrity,
   mediaRefused,
+  loginRequired,
+  tokenUnavailable,
+  formatUnavailable,
 }
 
 final class ProviderFailure implements Exception {
@@ -47,8 +50,20 @@ final class ProviderFailure implements Exception {
   @override
   String toString() {
     if (problem == ProviderProblem.mediaRefused) {
-      return 'YouTube media refused (HTTP 403). A trusted GVS PO Token '
-          'provider may be required.';
+      return 'YouTube media refused (HTTP 403). A fresh GVS PO Token '
+          'or an authorized session may be required.';
+    }
+    if (problem == ProviderProblem.loginRequired) {
+      return 'YouTube requested sign-in or blocked anonymous playback '
+          'on this connection. The song was not opened.';
+    }
+    if (problem == ProviderProblem.tokenUnavailable) {
+      return 'YouTube PO Token generation failed. The media source '
+          'is not usable.';
+    }
+    if (problem == ProviderProblem.formatUnavailable) {
+      return 'YouTube returned no playable progressive audio '
+          'format for this track.';
     }
     return 'Provider ${problem.name}${status == null ? '' : ' (HTTP $status)'}';
   }
