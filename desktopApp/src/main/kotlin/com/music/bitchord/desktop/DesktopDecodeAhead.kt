@@ -82,6 +82,24 @@ internal class DesktopDecodeAhead(
         wake.signalAll()
     }
 
+    /**
+     * Wait for actual decoded PCM before handing an upgraded rendition to the audio thread.
+     * This does not consume the queued samples. Call only on a background dispatcher: the
+     * currently playing decoder must keep feeding the output while a new stream primes.
+     *
+     * A returned false means timeout, EOF or decoder failure. The caller must keep the
+     * previous rendition alive and close this speculative decoder instead of swapping.
+     */
+    fun awaitBuffered(minSamples: Int, timeoutMillis: Long): Boolean = lock.withLock {
+        require(minSamples > 0) { "minSamples must be positive" }
+        require(timeoutMillis >= 0L) { "timeoutMillis must not be negative" }
+        var remaining = TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
+        while (queuedSamples < minSamples && lifecycle == DesktopDecodeState.RUNNING && remaining > 0L) {
+            remaining = ready.awaitNanos(remaining)
+        }
+        queuedSamples >= minSamples
+    }
+
     /** The next decoded block, waiting for the decoder only if it has fallen behind. */
     fun readSamples(): FloatArray? = readSamples(Long.MAX_VALUE)
 
