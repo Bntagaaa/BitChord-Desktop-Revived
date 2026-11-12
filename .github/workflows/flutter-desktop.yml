@@ -161,7 +161,7 @@ jobs:
           except (ValueError, subprocess.TimeoutExpired, OSError):
               report = {'media': 'PROBE_UNAVAILABLE', 'probe_process_exit': 'UNVERIFIED'}
           Path('verification/youtube-bundle-live.json').write_text(
-              json.dumps(report, indent=2) + '\\n')
+              json.dumps(report, indent=2) + '\n')
           print(json.dumps(report))
           PY
       - name: Linux release launch smoke
