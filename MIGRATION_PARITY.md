@@ -1438,3 +1438,24 @@ Implementation commit is the commit containing this entry; new CI pending.
 **Phase 4 remains INCOMPLETE.** New Windows/Linux platform promotion awaits
 inspection of the exact-SHA matrix. Whole P-IDs are not PARITY_ACCEPTED.
 Phase 5 is not authorized or started.
+
+### Phase 4 continuation final exact-SHA platform promotion
+
+Final source `bcb214c72220c3d8d8aced97fa353fbae9064c94`,
+[43227659469](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43227659469):
+Windows, Linux and retention **SUCCESS**; both final artifacts inspected.
+Verified evidence retained by `575dc47d`; root-document handoff adds no app code.
+
+| IDs | Final scoped status | Evidence / limits |
+|---|---|---|
+| P03/P04/P05 | PLATFORM_VERIFIED for delivered shelf/search/detail subset | 38 Flutter tests per OS, parser/filter/target/continuation contracts; native Home cards/artwork on both OSs; Linux anonymous Home/filter/album/artist/playlist live calls. Exact reference visual acceptance, suggestions/restoration, full library/mutations and collection queue behavior still open |
+| P06/P20 | FIXTURE_TESTED session-only subset; UI PLATFORM_VERIFIED | Session validation/signing/scope/redaction contracts and native Accounts form on both OSs. Requires actual signed-in shell; first false declaration wins. No live authorized account, browser sign-in, protected persistence/import/refresh or Spotify result |
+| P19/P11/P12 | Optional extractor IMPLEMENTED; YouTube media BLOCKED | Format/CDN/header isolation fixtures on both OSs; Linux real production extraction reached media **HTTP 403**, no YouTube output. Cross-platform extractor packaging/execution, PoToken and authenticated-media proof remain open |
+| P08/P35/P36 | Prior progressive-source/storage subset PLATFORM_VERIFIED | Both OSs pass full controlled HTTP/download recovery/FFmpeg broker suite (384000 exact frames, zero live decoders). Artwork bounds implemented; full resource/manifest/download/source-policy and measured RAM gates remain open |
+
+Both OSs also passed native CTests 2/2, export checks 3/3, real FFI/SQLite/import,
+450 pinned-reference queue transitions, fatal analysis/format/lockfile, release
+and native fullscreen/appearance/close (exit 0). Windows physical output remains
+blocked (no WASAPI endpoint). Live catalogs/native artwork are not evidence of
+working YouTube media or full reference parity. **Phase 4 INCOMPLETE; no whole
+P-ID PARITY_ACCEPTED, no Phase 5 work and no RAM-saving claim.**

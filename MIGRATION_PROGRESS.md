@@ -989,7 +989,7 @@ presented as a working integration or as solely an external testing blocker.
 ## Phase 4 continuation — shelves, session validation and refused-media checks — 2026-11-12
 
 **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** Starting tree was clean on
-`2.0.0-flutter`, head `3c9c3b11`; latest verified application matrix remains
+`2.0.0-flutter`, head `3c3d5b11`; latest verified application matrix remains
 [a20f6f4b / 43212024128](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43212024128).
 This increment's Windows/Linux result is pending its own exact-SHA run.
 
@@ -1075,3 +1075,63 @@ bytes** through the production artwork service. Later native Linux frames show
 real loaded artwork; initial frames may show the loading surface. These captures
 are not matched Kotlin visual acceptance. Media HTTP 403 and full Phase 4 gaps
 remain unresolved.
+
+## Phase 4 continuation final platform evidence — 2026-11-12
+
+**Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** Final application source:
+`bcb214c72220c3d8d8aced97fa353fbae9064c94` (includes the final signed-out-shell
+regression at `2d4524db`).
+[Run 43227659469](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43227659469)
+finished **SUCCESS** for Linux, Windows and trusted retention. Retention commit
+`575dc47d` was fast-forwarded normally; its changes contain generated evidence,
+not new application logic. The subsequent root-document handoff changes no
+validated application source and does not trigger another application matrix.
+
+Both final artifacts were downloaded and inspected at
+`/tmp/phase4-continuation-final-linux` and
+`/tmp/phase4-continuation-final-windows`. Verified on Ubuntu 22.04 x64 and Windows
+Server 2022 x64 with the pinned Flutter 3.47.9/Dart 3.13.7 toolchain:
+
+| Executed check | Linux | Windows |
+|---|---|---|
+| Enforced lockfile, format, fatal analyzer, boundaries/reference assets | PASS | PASS |
+| Flutter controller/widget/shell tests | **38 passed**, 0 failed/skipped | **38 passed**, 0 failed/skipped |
+| Native CTests; read-only export checks | **2/2** and **3/3** PASS | **2/2** and **3/3** PASS |
+| Real FFI/SQLite/import and pinned Kotlin queue corpus | PASS; **450 transitions** | PASS; **450 transitions** |
+| New catalog/session/resolver contracts; production HTTP/add-on/JioSaavn/range/download recovery fixtures | PASS | PASS |
+| Native FFmpeg decoding through production source broker | **384000 exact PCM frames**, zero live decoders afterward | **384000 exact PCM frames**, zero live decoders afterward |
+| Release bundle, native resize/appearance/drawer/accounts/fullscreen/restore/close | PASS, native exit 0 | PASS, native exit 0 |
+
+Inspected final test/HTTP/native/FFI/analyzer/build/launch logs and JSON, plus
+native captures. Both OS captures show actual loaded guest artwork and the new
+Home shelf/card layout; catalog content is live and variable, not a matched
+Kotlin fixture. Reference typography/complete Home/artist/interactions and full
+visual parity are **not accepted** by these native smokes. The initial Windows
+smoke's artwork-dependent sample failure remains in the earlier record; both
+subsequent corrected matrices passed without weakening expected colors or
+lifecycle assertions.
+
+Session fixtures require the **first** shell `LOGGED_IN` declaration to be true,
+matching Kotlin; a signed-out declaration followed by a later true is rejected.
+This is fixture and implementation evidence only. No live authorized account,
+Google browser sign-in, protected persistence/import/refresh or authenticated
+YouTube media scenario was executed. No Windows extractor/live-provider or
+physical-speaker pass is claimed. Hosted Windows still has no WASAPI endpoint
+(error 105); prior hotplug/latency/soak gates stay open.
+
+The highest-priority unresolved gate remains **actual YouTube media HTTP 403**.
+The optional extractor can attempt real resolution and rejects refused media
+before native adoption, but no YouTube audio played. PoToken/browser/client
+compatibility still needs a supported cross-platform implementation and actual
+media proof. Protected persistent auth/Spotify, suggestions/quick search,
+owned-playlist mutations, multi-track collection playback, source-policy/module
+and manifest/download parity remain unfinished Phase 4 work. Existing sessions
+are supported only as ephemeral, server-verified catalog cookies; they are not a
+replacement for those missing integrations. No fake playback/sign-in, secrets,
+reference-source modifications, release or RAM-saving claim was introduced.
+
+Next concrete work remains in Phase 4: prove browser-bound token/session media
+access with a dedicated authorized account, verify actual byte delivery and
+native output on both OSs, then complete collection/library mutations and the
+remaining reference interaction/recovery contracts. This handoff does not
+advance to Phase 5.
