@@ -192,3 +192,16 @@ The user explicitly reported **testing all items in the Phase 2 manual audit che
 Windows/Linux automated tests and native smoke were successful in [run 43179670749](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670749), with 26 passing tests per OS. Full media functionality and exact cross-platform Haze/Mica/DPI/accessibility/font-licensing verification remain future work.
 
 **Phase 3 explicitly authorized**: start `../.codex/phases/phase-3.md` for local domain, persistence and C++17 native PCM foundation. No Phase 3 code was implemented by this documentation update. Phase 4 must not start automatically.
+
+## Phase 3 local PCM foundation
+
+Real native C++17/FFmpeg decode and WASAPI/libpulse/ALSA output now live in
+`native/audio/`. Bootstrap loads the packaged native library in its own Dart
+service isolate and closes it after native quiescence. SQLite local state is
+separate from Kotlin Preferences. The normal shell remains disconnected from
+catalog/player surfaces; local output can be exercised with the real packaged
+`bitchord_audio_probe <file>` or `bitchord_desktop --local-file=/absolute/file.wav`.
+No playback is simulated. See [the Phase 3 ledger](verification/phase3/README.md)
+for reproducible commands, native dependency licenses, imported-state subset
+and physical/device/precision blockers. **Phase 3 is INCOMPLETE** pending its
+platform/physical acceptance gates. Do not start Phase 4.

@@ -213,3 +213,23 @@ Shutdown sequence: detach UI/OS command producers → reject new admissions → 
 Windows: WASAPI shared mode with source-rate request and system conversion flags as in `desktopApp/native/window/window_jni.cpp`; COM/MMDevice notification handling in an engine-owned adapter, no JNI or window-decoration dependency. Retain route selection, unplug/default changes, pause/flush/drain, precision conversion and continuous played-frame accounting. Reference Java Sound fallback is replaced by a native compatibility path with the same negotiated ladder where possible; if no native route works, surface the same failure category rather than require a JVM. Linux: libpulse stream timing/latency and endpoint APIs for PulseAudio/PipeWire compatibility, ALSA fallback for devices/systems lacking Pulse. Keep server default and explicit endpoint semantics distinct, and move only this app's streams. No unrelated application's route changes. Validate timing latency estimates against loopback; Linux reference uses Java Sound/ALSA plus best-effort `pactl`, not an existing direct libpulse engine.
 
 Preserve the reference negotiation preference: source rate/shape first, float→S16 fallback, 48 kHz/44.1 kHz alternatives, then stereo fallback when needed; expose the actual accepted format and conversion. No exclusive WASAPI, ASIO, native PipeWire-only requirement or fixed 48 kHz pipeline is silently introduced. A later backend-specific negotiated path must pass the same format/quality corpus. Keep native runtime/codec DLL/SO loading, portable roots, Linux minimum glibc/system dependencies and Windows runtime linkage explicit in release CI. Align FFmpeg codec/build configuration and ONNX/model versions to reference fixtures before changing versions. Device capability support and library packaging remain tests to run, not verified facts.
+
+## Phase 3 implementation decisions
+
+The first local persistence adapter uses SQLite through the same narrow native
+library rather than adding Drift/code generation to the runtime dependency graph.
+SQL stays in `native/audio/src/store.cpp`; data adapters call it from short-lived
+storage isolates. A WAL/FULL, revision-checked transaction commits a versioned
+local document containing queue/cursor/settings/import checkpoint together. This
+is a local foundation; relational catalog/history query tables remain future
+work. Small shell appearance flags keep their existing separate namespace.
+
+The actual ABI 1 header is `flutterDesktop/native/audio/include/bitchord_audio.h`.
+Fixed x64 layouts are verified by native static assertions and generated Dart
+`sizeOf` negotiation. Commands are copied UTF-8 bounded records; native owns all
+PCM, decoder and sink resources. A single audio-service isolate owns one engine;
+no callback enters Dart. Dedicated push output uses prepared PCM, not an OS
+real-time callback. Current float-at-source-format adapters explicitly fail
+unsupported formats/devices; the complete negotiated precision/channel ladder
+remains a Phase 3 acceptance gap. Native resampling rate is distinguished from
+Kotlin's pitch-preserving speed (Phase 5).

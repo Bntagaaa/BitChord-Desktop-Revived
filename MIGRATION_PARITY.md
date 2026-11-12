@@ -1287,3 +1287,27 @@ listed in its ledger. No Phase 3 implementation or memory result is included.
 Keep evidence provenance clear: no per-item screenshots or independent measurement logs were provided with that attestation. Hosted CI run [43179670749](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670749) separately verified 26 tests per OS, builds and native lifecycle. User sign-off does **not** turn deferred whole-app P-IDs, pixel-perfect Haze/Mica, fonts' redistribution permissions, accessibility or native multi-DPI reference fixtures into experimentally proven `PARITY_ACCEPTED` states.
 
 Phase 3 is now authorized to begin. No Phase 3 implementation or Phase 4 authorization is implied by this documentation entry.
+
+## Phase 3 foundation evidence
+
+Pinned reference remains `348b613a0c3db1a54de56483ea6f8748d6465211`.
+See `flutterDesktop/verification/phase3/README.md` for exact source paths,
+implementation paths, commands, platform limits and required follow-up evidence.
+
+- P10: FIXTURE_TESTED, 450 transitions against executed original Kotlin queue
+  sources, plus duplicate identity, seeded shuffle restoration and repeat tests.
+- P35: FIXTURE_TESTED, versioned local SQLite CAS and read-only selected-key import
+  with verified private backup; pinned Kotlin encoder fixture. Accounts/secrets
+  and broader data migration remain open; source Preferences/music are untouched.
+- P07/P11/P12/P36 foundation: FIXTURE_TESTED on Linux for real local WAV decode,
+  exact frames/samples/seek, bounded ring cancellation, ABI command/event ownership,
+  repeated shutdown and caller-buffer allocation balance. Full local feature rows
+  and sustained resource/codec matrices remain open.
+- P13: IMPLEMENTED, new direct WASAPI/libpulse/ALSA adapters; platform results are
+  pending, and physical audibility/loopback/hotplug gates are BLOCKED.
+- P14: IMPLEMENTED for native volume/resampling-rate primitives only. Reference
+  pitch-preserving speed and advanced DSP remain Phase 5.
+
+Phase 3 **INCOMPLETE**; no whole feature is marked PARITY_ACCEPTED. Hosted software
+sink output and decoder sample tests are not speaker/loopback proof. Phase 4 has
+not started.

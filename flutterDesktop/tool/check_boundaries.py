@@ -31,7 +31,7 @@ def main():
             raise SystemExit(f'Asset differs: {name}')
         if path.suffix == '.svg':
             ET.fromstring(path.read_text())
-    assert not (ROOT / 'native').exists(), 'Phase 1 must not implement an audio backend'
+    assert (ROOT / 'native/audio/include/bitchord_audio.h').is_file(), 'Phase 3 ABI header missing'
     print(f'Validated layer imports and {len(manifest)} asset hashes/XML documents.')
 
 

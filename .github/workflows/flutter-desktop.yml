@@ -26,7 +26,7 @@ jobs:
           - os: windows-2022
             target: windows
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 75
     defaults:
       run:
         shell: bash
@@ -47,11 +47,33 @@ jobs:
           flutter-version: '3.47.9'
           channel: stable
           cache: true
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: runner.os == 'Windows'
+        with:
+          repository: microsoft/vcpkg
+          ref: ef7dbf94b9198bc58f45951adcf1f041fcbc5ea0
+          path: .native-vcpkg
+      - name: Build pinned LGPL native dependencies on Windows
+        if: runner.os == 'Windows'
+        timeout-minutes: 50
+        run: |
+          "$GITHUB_WORKSPACE/.native-vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          "$GITHUB_WORKSPACE/.native-vcpkg/vcpkg.exe" install --triplet x64-windows --x-manifest-root="$GITHUB_WORKSPACE/flutterDesktop/native/audio" --x-install-root="$RUNNER_TEMP/bitchord-deps"
+          echo "BC_DEPENDENCY_ROOT=$RUNNER_TEMP/bitchord-deps/x64-windows" >> "$GITHUB_ENV"
+          echo "CMAKE_PREFIX_PATH=$RUNNER_TEMP/bitchord-deps/x64-windows" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/bitchord-deps/x64-windows/bin" >> "$GITHUB_PATH"
+      - name: Configure, build and test real native PCM foundation
+        run: |
+          python tool/run_checked.py native-configure cmake -S native/audio -B build/native -DCMAKE_BUILD_TYPE=Release
+          python tool/run_checked.py native-build cmake --build build/native --config Release --parallel 2
+          python tool/run_checked.py native-tests ctest --test-dir build/native -C Release --output-on-failure
+          python tool/run_checked.py native-platform python tool/phase3_platform.py
       - name: Generate official platform hosts and record SDK provenance
         run: |
           mkdir -p verification
           python tool/run_checked.py doctor flutter doctor -v
           python tool/run_checked.py initialize python tool/initialize_platforms.py
+          python tool/run_checked.py audio-host python tool/integrate_audio_host.py
           python tool/run_checked.py boundaries python tool/check_boundaries.py
           python tool/run_checked.py reference python tool/verify_reference_tokens.py
           git fetch --no-tags --depth=1 origin 348b613a0c3db1a54de56483ea6f8748d6465211
@@ -68,6 +90,8 @@ jobs:
       - name: Check Dart formatting
         run: |
           python tool/run_checked.py format-check dart format --output=none --set-exit-if-changed lib test
+      - name: Check real FFI, transactional import and queue corpus
+        run: python tool/run_checked.py phase3-ffi dart run tool/phase3_check.dart
       - name: Analyze
         run: python tool/run_checked.py analyze flutter analyze --fatal-infos
       - name: Run tests and capture rendered shell

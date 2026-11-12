@@ -28,7 +28,10 @@ def main():
         subprocess.run([*command, 'install', '-y', '--no-install-recommends',
                         'clang', 'cmake', 'ninja-build', 'pkg-config', 'libgtk-3-dev',
                         'liblzma-dev', 'libstdc++-12-dev', 'xvfb', 'xauth', 'xdotool',
-                        'openbox', 'imagemagick', 'dbus-x11', 'x11-utils'], check=True)
+                        'openbox', 'imagemagick', 'dbus-x11', 'x11-utils',
+                        'libavformat-dev', 'libavcodec-dev', 'libavutil-dev',
+                        'libswresample-dev', 'libpulse-dev', 'libasound2-dev',
+                        'libsqlite3-dev', 'pulseaudio', 'pulseaudio-utils', 'ffmpeg'], check=True)
 
 
 if __name__ == '__main__':

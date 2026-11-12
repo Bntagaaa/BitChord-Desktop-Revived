@@ -747,3 +747,22 @@ the pinned reference, using test-owned profiles and matching scale/font state.
 - Automatic evidence remains separate: Flutter [run 43179670749](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670749) succeeded for Windows/Linux and retention with 26 tests per OS, release builds and native smoke. Pinned Kotlin reference validation [43179670856](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670856) also succeeded.
 - This scoped acceptance does **not** prove pixel-perfect whole-app parity, physical multi-DPI/assistive-technology coverage, matched Kotlin/Flutter native motion traces, source-compatible font licensing or real audio/media services. Preserve these as tracked future validation/feature work, not as blockers to the user's accepted Phase 2 scope.
 - **Phase 1 ACCEPTED. Phase 2 USER_ACCEPTED after user-reported complete manual checklist testing. Phase 3 explicitly AUTHORIZED but not yet implemented in this documentation commit.** Execute Phase 3 using `.codex/phases/phase-3.md` and `MIGRATION_ARCHITECTURE.md`; do not begin Phase 4 automatically.
+
+## Phase 3 execution — local domain and real native PCM foundation
+
+The user explicitly authorized Phase 3 and confirmed manual Phase 1/2 acceptance.
+Entry CI baseline rechecked: `43182198217` at `f80d5bee` succeeded on Windows/Linux.
+Only Phase 3 is in scope; no Phase 4 provider/network work is started.
+
+Implementation and file-level P07/P10–P14/P35–P36 evidence are in
+`flutterDesktop/verification/phase3/README.md`. Local checks have executed the
+pinned Kotlin queue source (450 transitions), exact WAV samples/seek/tails and
+bounded cancellation, SQLite CAS/import/backup, ABI/FFI and lifecycle checks.
+The native library performs real FFmpeg local decode and WASAPI/libpulse/ALSA
+output. Missing devices return an error and never simulate playback.
+
+**Phase 3 is INCOMPLETE:** Windows/Linux CI for this implementation must still be
+inspected; audible output/loopback timing/physical hotplug are explicitly blocked
+until physical test evidence exists. Full precision/device negotiation and codec
+corpus/soak remain open. The native rate primitive is resampling, not acceptance
+of Kotlin's pitch-preserving speed. No Automix, online audio or RAM-saving claim.

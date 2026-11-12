@@ -1,9 +1,18 @@
 import 'dart:ui' as ui;
+import 'dart:io';
+
+import 'core/platform/audio/audio_service.dart';
+import 'core/platform/audio/native_api.dart';
+import 'features/local_data/data/sqlite_repository.dart';
+import 'features/local_music/data/local_files.dart';
+import 'features/playback/application/local_playback.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'app/app.dart';
 import 'core/platform/desktop_host.dart';
 import 'core/platform/diagnostics.dart';
@@ -11,7 +20,7 @@ import 'features/shell/application/shell_controller.dart';
 import 'features/shell/data/preferences_store.dart';
 import 'features/shell/domain/shell_settings.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   foundation.LicenseRegistry.addLicense(() async* {
     yield foundation.LicenseEntryWithLineBreaks([
@@ -43,6 +52,27 @@ Future<void> main() async {
     diagnostics.failure('initialize desktop', error);
     rethrow;
   }
+  final audio = await AudioService.start();
+  final root = Directory(SqliteLocalRepository.storageRoot());
+  await root.create(recursive: true);
+  final playback = LocalPlayback(
+    SqliteLocalRepository(
+      path: '${root.path}/local-v1.sqlite3',
+      libraryPath: NativeApi.bundledLibrary,
+    ),
+    audio,
+  );
+  try {
+    await playback.initialize();
+    final files = arguments.where((value) => value.startsWith('--local-file='));
+    if (files.isNotEmpty)
+      await playback.playLocal(
+        await LocalFiles.entry(files.single.substring(13)),
+      );
+  } catch (_) {
+    await audio.close();
+    rethrow;
+  }
   final container = ProviderContainer(
     overrides: [
       settingsStoreProvider.overrideWithValue(store),
@@ -53,6 +83,7 @@ Future<void> main() async {
   );
   host.beforeClose = () async {
     await container.read(shellProvider.notifier).flush();
+    await playback.close();
     container.dispose();
   };
   runApp(

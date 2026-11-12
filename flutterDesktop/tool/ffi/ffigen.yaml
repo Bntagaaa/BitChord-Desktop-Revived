@@ -1,0 +1,22 @@
+name: BitchordBindings
+description: 'Generated from ABI 1. Do not edit; run ffigen with tool/ffi pins.'
+output: '../../lib/core/platform/audio/bindings.g.dart'
+headers:
+  entry-points:
+    - '../../native/audio/include/bitchord_audio.h'
+functions:
+  include:
+    - 'bc_.*'
+structs:
+  include:
+    - 'bc_.*'
+macros:
+  include:
+    - 'BC_.*'
+comments:
+  style: any
+  length: full
+silence-enum-warning: true
+typedefs:
+  exclude:
+    - '.*'
