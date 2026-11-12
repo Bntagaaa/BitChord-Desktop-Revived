@@ -1264,3 +1264,18 @@ full paths/scenarios/gaps are in `flutterDesktop/verification/phase2/README.md`.
 No P-ID is promoted to PARITY_ACCEPTED. Widget/platform results must be read
 with the specific subsequent CI evidence; static extracted expressions are not
 proof that runtime defaults and visibility have been exercised.
+
+### Phase 2 platform verification result
+
+Tested implementation `4d17527a4e3a0b2f34e827a2b22c2a66bedb6aa3` passed
+[43179670749](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670749)
+on Windows/Linux: 26 tests each, no failures/skips, format/analyze, release
+builds and native appearance/drawer/fullscreen/restore/close smoke. Both downloaded
+artifacts' test summaries and native JSON were inspected. Evidence retention
+`83e5007a` includes source/run provenance and both platforms' PNG/JSON.
+P02/P24/P28/P29/P30/P31 **shell-only implemented scenarios** are now
+PLATFORM_VERIFIED at hosted 96 DPI; P01/P03–P05 remain STATICALLY_CHECKED for
+source cataloguing only. Whole feature rows are not complete or PARITY_ACCEPTED.
+DPR 100/125/150/200% widget checks and 110% zoom interaction are FIXTURE_TESTED,
+not native multi-DPI acceptance. Phase 2 remains INCOMPLETE for the visual gates
+listed in its ledger. No Phase 3 implementation or memory result is included.

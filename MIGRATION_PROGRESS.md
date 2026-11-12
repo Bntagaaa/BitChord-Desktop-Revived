@@ -712,3 +712,29 @@ Inspected the actual native PNG: Dark was correctly selected and the page was
 32/32/32. Both platform probes move to empty page pixel (880,400), preserving
 all exact Light/Dark/Pitch-black/drawer RGB assertions. No assertion is weakened.
 The first run's Windows failure was this same dark probe collision.
+
+### Phase 2 final verified platform result
+
+[Run 43179670749](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670749)
+finished **SUCCESS** for Windows, Linux and guarded retention. Tested source:
+`4d17527a4e3a0b2f34e827a2b22c2a66bedb6aa3`. Downloaded and inspected both artifacts:
+**26 tests passed per OS, 0 failed, 0 skipped**, strict format/analyze, pinned
+reference extraction, release builds and native GUI smoke all succeeded.
+Each native JSON records 1220×780 and 900×600 client captures, Accounts/drawer/
+Settings/Light/Dark/Pitch-black states, F11 -> Escape restoring 900×600, and
+native close/exit 0. Windows DPI 96; Linux Xvfb/Openbox/software GL at 96 DPI.
+Retained source provenance, images/JSON and summary in `flutterDesktop/verification/`
+via trusted commit `83e5007a`, fetched and fast-forwarded locally. The first two
+failed attempts above remain part of the evidence history.
+
+**Phase 2 status: INCOMPLETE for full visual-system acceptance; platform checks
+are VERIFIED.** Source inventory/resource structure/zoom and scoped shell
+interaction work are implemented and tested. Remaining Phase 2 gates are a new
+matched Kotlin/Flutter native DPI and motion capture pass, focus/accessibility
+and font/glyph rights/metrics review, exact Haze/Mica/native icon/material work,
+and the broader presentation-state comparisons itemized in the gap ledger.
+Existing reference fixtures provide geometry baselines; Flutter-only passing
+CI cannot close these gaps. No performance improvement or full P-ID parity is
+claimed. Next action: finish that Phase 2 capture/visual comparison pass against
+the pinned reference, using test-owned profiles and matching scale/font state.
+**Phase 3 has not started.**
