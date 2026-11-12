@@ -490,11 +490,15 @@ class _Sidebar extends StatelessWidget {
                               children: [
                                 Text(
                                   'Sign in',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(fontWeight: FontWeight.w500),
                                 ),
                                 Text(
                                   'Connect account',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(color: palette['secondary']),
                                 ),
@@ -556,6 +560,7 @@ class _AccountPanel extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     key: const Key('account-panel'),
     scopesRoute: true,
+    explicitChildNodes: true,
     namesRoute: true,
     label: 'Accounts',
     child: GlassSurface(

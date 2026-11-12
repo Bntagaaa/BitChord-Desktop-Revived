@@ -40,7 +40,10 @@ jobs:
         if: runner.os == 'Windows'
         with:
           path: migration-tools
-          sparse-checkout: flutterDesktop/tool/reference_msvc.init.gradle
+          sparse-checkout: |
+            flutterDesktop/tool/reference_msvc.init.gradle
+            flutterDesktop/tool/launch_smoke_windows.ps1
+            flutterDesktop/tool/SeedReferenceProfile.java
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Diagnose Windows native configuration with the reference toolchain
@@ -76,6 +79,27 @@ jobs:
         run: |
           git diff --exit-code
           git status --short > verification/worktree.txt
+      - name: Verify packaged Windows reference JNI and original models
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        run: |
+          foreach ($name in @('bitchord_analysis.dll','bitchord_smtc.dll')) {
+            if (-not (Test-Path "desktopApp/build/native/windows/$name")) { throw "Missing reference target $name" }
+          }
+          if (-not (Test-Path desktopApp/build/native-window/windows/bitchord_window.dll)) { throw 'Missing reference window/audio DLL' }
+          ./desktopApp/packaging/tests/windows-automix-check.ps1
+      - name: Configure hosted Windows reference display
+        if: runner.os == 'Windows' && !cancelled()
+        shell: powershell
+        run: Set-DisplayResolution -Width 1600 -Height 1200 -Force
+      - name: Capture pinned Windows reference shell with a fresh hosted profile
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        run: |
+          $executable = (Resolve-Path desktopApp/build/compose/binaries/main/app/BitChord/BitChord.exe).Path
+          java ../migration-tools/flutterDesktop/tool/SeedReferenceProfile.java $executable
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ../migration-tools/flutterDesktop/tool/launch_smoke_windows.ps1 -Executable $executable -EvidenceDirectory "$pwd/verification" -OutputPrefix reference-windows -CaptureOnly -SourceCommit 348b613a0c3db1a54de56483ea6f8748d6465211
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

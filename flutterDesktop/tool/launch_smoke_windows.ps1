@@ -1,4 +1,10 @@
-param([Parameter(Mandatory=$true)][string]$Executable)
+param(
+  [Parameter(Mandatory=$true)][string]$Executable,
+  [string]$EvidenceDirectory = (Join-Path $PSScriptRoot '../verification'),
+  [string]$SourceCommit = $env:GITHUB_SHA,
+  [ValidatePattern('^[a-z-]+$')][string]$OutputPrefix = 'native-windows',
+  [switch]$CaptureOnly
+)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms
@@ -17,19 +23,22 @@ public class SmokeWindow {
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int height, uint flags);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
 }
 '@
 [void][SmokeWindow]::SetProcessDPIAware()
-$evidence = Join-Path $PSScriptRoot '../verification'
+$evidence = [System.IO.Path]::GetFullPath($EvidenceDirectory)
 [void](New-Item -ItemType Directory -Force $evidence)
-$app = Start-Process -FilePath (Resolve-Path $Executable) -PassThru -RedirectStandardOutput "$evidence/native-windows.stdout.log" -RedirectStandardError "$evidence/native-windows.stderr.log"
+$privateLogs = if ($CaptureOnly) { Join-Path $env:TEMP ([Guid]::NewGuid().ToString()) } else { $evidence }
+[void](New-Item -ItemType Directory -Force $privateLogs)
+$app = Start-Process -FilePath (Resolve-Path $Executable) -PassThru -RedirectStandardOutput "$privateLogs/$OutputPrefix.stdout.log" -RedirectStandardError "$privateLogs/$OutputPrefix.stderr.log"
 try {
   $deadline = [DateTime]::UtcNow.AddSeconds(30)
   do {
     $app.Refresh()
     if ($app.HasExited) { throw "Application exited before showing: $($app.ExitCode)" }
     $handle = $app.MainWindowHandle
-    if ($handle -ne [IntPtr]::Zero -and [SmokeWindow]::IsWindowVisible($handle)) { break }
+    if ($handle -ne [IntPtr]::Zero -and [SmokeWindow]::IsWindowVisible($handle) -and $app.MainWindowTitle -eq 'BitChord') { break }
     Start-Sleep -Milliseconds 200
   } while ([DateTime]::UtcNow -lt $deadline)
   if ($handle -eq [IntPtr]::Zero) { throw 'No visible native BitChord window' }
@@ -83,21 +92,49 @@ try {
           }
         }
         $logoContrast = $maximum - $minimum
-        $bitmap.Save("$evidence/native-windows-$($size[0])x$($size[1]).png", [System.Drawing.Imaging.ImageFormat]::Png)
+        $bitmap.Save("$evidence/$OutputPrefix-$($size[0])x$($size[1]).png", [System.Drawing.Imaging.ImageFormat]::Png)
       } finally { $graphics.Dispose(); $bitmap.Dispose() }
       if ($colors.Count -ge 50 -and $edgePainted -and $logoContrast -ge 0.25) { break }
     } while ([DateTime]::UtcNow -lt $deadline)
     if ($client.Right -ne $size[0] -or $client.Bottom -ne $size[1] -or $colors.Count -lt 50 -or -not $edgePainted -or $logoContrast -lt 0.25) { throw 'Client did not resize and paint shell landmarks' }
     $captures += @{width=$client.Right; height=$client.Bottom; sampled_colors=$colors.Count; logo_contrast=$logoContrast}
   }
+  if ($CaptureOnly) {
+    @{source_commit=$SourceCommit; dpi=$dpi; captures=$captures; display='GitHub Windows hosted desktop'; lifecycle='not tested; force-stop after reference capture'} | ConvertTo-Json -Depth 5 | Set-Content "$evidence/$OutputPrefix.json"
+    Write-Output 'PASS: reference client captures only; native close/fullscreen not asserted.'
+    return
+  }
+  # Actual OS keyboard input must reach the Dart window adapter and restore the
+  # last client size. Keep this independent of widget-test window fakes.
+  [void][SmokeWindow]::SetForegroundWindow($handle)
+  [SmokeWindow]::keybd_event(0x7A,0,0,[UIntPtr]::Zero)
+  [SmokeWindow]::keybd_event(0x7A,0,2,[UIntPtr]::Zero)
+  $deadline = [DateTime]::UtcNow.AddSeconds(10)
+  do {
+    Start-Sleep -Milliseconds 200
+    [void][SmokeWindow]::GetClientRect($handle, [ref]$client)
+    $screen = [System.Windows.Forms.Screen]::FromHandle($handle).Bounds
+    if ($client.Right -eq $screen.Width -and $client.Bottom -eq $screen.Height) { break }
+  } while ([DateTime]::UtcNow -lt $deadline)
+  if ($client.Right -ne $screen.Width -or $client.Bottom -ne $screen.Height) { throw 'F11 did not enter native fullscreen' }
+  [SmokeWindow]::keybd_event(0x1B,0,0,[UIntPtr]::Zero)
+  [SmokeWindow]::keybd_event(0x1B,0,2,[UIntPtr]::Zero)
+  $deadline = [DateTime]::UtcNow.AddSeconds(10)
+  do {
+    Start-Sleep -Milliseconds 200
+    [void][SmokeWindow]::GetClientRect($handle, [ref]$client)
+    if ($client.Right -eq 900 -and $client.Bottom -eq 600) { break }
+  } while ([DateTime]::UtcNow -lt $deadline)
+  if ($client.Right -ne 900 -or $client.Bottom -ne 600) { throw 'Escape did not restore the prior client size' }
   # WM_CLOSE exercises the real window listener and preference flush, rather
   # than killing a compiled process and calling that lifecycle verification.
   [void][SmokeWindow]::PostMessage($handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
   if (-not $app.WaitForExit(10000)) { throw 'Native close timed out' }
   if ($app.ExitCode -ne 0) { throw "Native close exit code: $($app.ExitCode)" }
-  @{dpi=$dpi; captures=$captures; exit_code=$app.ExitCode; display='GitHub Windows hosted desktop'} | ConvertTo-Json -Depth 5 | Set-Content "$evidence/native-windows.json"
-  Write-Output 'PASS: visible painted Windows client, two resizes, native close, exit 0.'
+  @{source_commit=$SourceCommit; dpi=$dpi; captures=$captures; exit_code=$app.ExitCode; fullscreen='F11 entered; Escape restored 900x600'; display='GitHub Windows hosted desktop'} | ConvertTo-Json -Depth 5 | Set-Content "$evidence/$OutputPrefix.json"
+  Write-Output 'PASS: painted Windows client, two resizes, fullscreen/restore, native close, exit 0.'
 } finally {
   $app.Refresh()
   if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force }
+  if ($CaptureOnly) { Remove-Item -LiteralPath $privateLogs -Recurse -Force }
 }

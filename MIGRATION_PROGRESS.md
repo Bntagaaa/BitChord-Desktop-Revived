@@ -427,3 +427,13 @@ the publisher checksum, and used to format/check source at the project's 3.11
 language version. Local Python boundary/20-asset/reference checks pass; Flutter
 analysis/tests/builds still use hosted runners, given local disk/RAM limits.
 
+Run `43132090172` passed analysis but failed three new Flutter tests: the
+account caption wrapped with Ahem instead of honoring Kotlin's single-line
+ellipsis policy, and menu route semantics lacked `explicitChildNodes`. Those
+implementation issues are corrected; the layout assertions remain unchanged.
+Reference run `43131467099` again reached the window native task failure with
+GNU. The MSVC adapter now supplies the Windows SDK's `propkeydef.h` via `/FI`
+for that bridge, preserving the reference files and all target/test checks.
+This header prerequisite corrects include order, not application/audio logic;
+its compile/test results are pending.
+

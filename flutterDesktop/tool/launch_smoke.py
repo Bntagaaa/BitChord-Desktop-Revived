@@ -32,7 +32,7 @@ def main():
         raise SystemExit('This smoke check requires an X11 Linux runner.')
     executable = Path(sys.argv[-1]).resolve()
     if '--inside' not in sys.argv:
-        subprocess.run(['dbus-run-session', '--', 'xvfb-run', '-a', '-s', '-screen 0 1600x1000x24',
+        subprocess.run(['dbus-run-session', '--', 'xvfb-run', '-a', '-s', '-screen 0 1600x1000x24 -dpi 96',
                         sys.executable, __file__, '--inside', str(executable)], check=True)
         return
     evidence = ROOT / 'verification'
@@ -84,14 +84,35 @@ def main():
                 geometry = subprocess.check_output(['xdotool', 'getwindowgeometry', '--shell', window], text=True, timeout=10)
                 observations.append({'width': actual_width, 'height': actual_height,
                                      'colors': colors, 'geometry': geometry})
+            subprocess.run(['xdotool', 'windowactivate', '--sync', window, 'key', 'F11'], check=True, timeout=10)
+            for expected_fullscreen, key in [(True, None), (False, 'Escape')]:
+                if key:
+                    subprocess.run(['xdotool', 'key', key], check=True, timeout=10)
+                deadline = time.monotonic() + 10
+                while True:
+                    state = subprocess.check_output(['xprop', '-id', window, '_NET_WM_STATE'], text=True, timeout=5)
+                    if ('_NET_WM_STATE_FULLSCREEN' in state) == expected_fullscreen:
+                        break
+                    if time.monotonic() > deadline:
+                        raise RuntimeError('Native fullscreen keyboard transition did not finish: ' + state)
+                    time.sleep(.2)
+            deadline = time.monotonic() + 10
+            while True:
+                restored = subprocess.check_output(['xdotool', 'getwindowgeometry', '--shell', window], text=True, timeout=5)
+                if 'WIDTH=900\n' in restored and 'HEIGHT=600\n' in restored:
+                    break
+                if time.monotonic() > deadline:
+                    raise RuntimeError('Escape did not restore the prior client size: ' + restored)
+                time.sleep(.2)
             subprocess.run(['xdotool', 'windowactivate', '--sync', window, 'key', 'Alt+F4'], check=True, timeout=10)
             app.wait(timeout=10)
             if app.returncode != 0:
                 raise RuntimeError(f'Close failed: {app.returncode}')
             (evidence / 'launch-result.txt').write_text('PASS: visible painted window, two resizes, native close, exit 0.\n')
             (evidence / 'native-linux.json').write_text(json.dumps({
-                'display': 'Xvfb 1600x1000x24 / Openbox / software GL',
+                'display': 'Xvfb 1600x1000x24, 96 DPI / Openbox / software GL',
                 'captures': observations, 'exit_code': app.returncode,
+                'fullscreen': 'F11 entered; Escape restored 900x600',
             }, indent=2) + '\n')
         finally:
             for process in (app, manager):

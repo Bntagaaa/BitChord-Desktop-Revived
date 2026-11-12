@@ -28,7 +28,7 @@ def main():
         subprocess.run([*command, 'install', '-y', '--no-install-recommends',
                         'clang', 'cmake', 'ninja-build', 'pkg-config', 'libgtk-3-dev',
                         'liblzma-dev', 'libstdc++-12-dev', 'xvfb', 'xauth', 'xdotool',
-                        'openbox', 'imagemagick', 'dbus-x11'], check=True)
+                        'openbox', 'imagemagick', 'dbus-x11', 'x11-utils'], check=True)
 
 
 if __name__ == '__main__':

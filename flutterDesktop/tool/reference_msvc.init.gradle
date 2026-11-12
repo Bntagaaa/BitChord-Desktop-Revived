@@ -1,23 +1,28 @@
 // CI-only toolchain adapter for the immutable Kotlin Windows reference.
 // The reference CMake files already implement an MSVC/C++/WinRT backend.
 // Build ALL original targets and keep every reference test enabled; change only
-// the analyzer/SMTC task that hard-codes incompatible hosted MinGW headers.
-// Keep buildWindowNative's original GNU action; its SDK include order expects it.
+// the native task toolchains. The window bridge needs the SDK's property-key
+// declarations before functiondiscoverykeys_devpkey.h; supply that header via
+// the compiler's forced-include option rather than editing protected source.
 gradle.projectsEvaluated {
     def desktop = gradle.rootProject.project(':desktopApp')
     if (!System.getProperty('os.name').startsWith('Windows')) {
         throw new GradleException('The reference MSVC adapter is Windows-only')
     }
-    [buildAnalysisNative: 'native'].each { taskName, source ->
+    [buildAnalysisNative: 'native', buildWindowNative: 'native/window'].each { taskName, source ->
         desktop.tasks.named(taskName).configure { task ->
             task.setActions([{ ignored ->
                 def output = desktop.layout.buildDirectory.dir(
                     taskName == 'buildAnalysisNative' ? 'native/windows' : 'native-window/windows'
                 ).get().asFile
                 desktop.exec {
-                    commandLine 'cmake', '-S', desktop.file(source).absolutePath,
+                    def command = ['cmake', '-S', desktop.file(source).absolutePath,
                         '-B', output.absolutePath, '--fresh', '-G', 'Visual Studio 17 2022',
-                        '-A', 'x64', '-DCMAKE_BUILD_TYPE=Release'
+                        '-A', 'x64', '-DCMAKE_BUILD_TYPE=Release']
+                    if (taskName == 'buildWindowNative') {
+                        command.add('-DCMAKE_CXX_FLAGS=/FIpropkeydef.h')
+                    }
+                    commandLine command
                     environment 'JAVA_HOME', System.getProperty('java.home')
                 }.assertNormalExitValue()
                 desktop.exec {
