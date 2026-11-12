@@ -507,3 +507,16 @@ data are not retained. The Linux smoke now waits for overlay dismissal and
 asserts both the dark drawer scrim and the light Settings page before accepting
 those labeled captures. Results are pending; no Windows reference image or new
 state-capture pass is inferred.
+
+Focused capture retry [43155307079](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43155307079)
+succeeded against the verified Windows package from `43134106568`. It found the
+visible `BitChord` window in the launcher's process tree and captured real
+1220×780 and 900×600 clients at 96 DPI from the pinned commit, with a fresh
+light/100% hosted profile. Those PNGs and run/dimension/hash provenance are in
+`flutterDesktop/verification/phase1-shell-correction/`. Capture-only force-stop
+is explicitly not lifecycle evidence; native close/fullscreen is verified by the
+separate Flutter desktop smokes. Visual review surfaced an 11-pixel Home heading
+ink offset on Windows, so the Flutter Home top gutter has been adjusted from 16
+to 10 dp to match the Kotlin HomeTitle's 8 dp padding plus platform font inset.
+The layout assertion now checks the new measured heading location. Cross-platform
+build/test/capture verification of this final spacing adjustment is pending.

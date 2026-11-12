@@ -1163,3 +1163,16 @@ DPI/theme/focus/accessibility/motion checks, native caption/Mica/app/taskbar ico
 font rights/metrics and exact material behavior. Account/data/content/player
 functionality is outside this foundation. No full parity or memory reduction
 is claimed. Phase 1 visual acceptance remains **INCOMPLETE**.
+
+### Actual pinned Windows reference capture
+
+Capture-only run [43155307079](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43155307079)
+reused the Windows package only after its 857 tests, distributable, protected
+source and JNI/model checks passed in run `43134106568`. It captured the actual
+pinned executable at 1220×780 and 900×600 client sizes at 96 DPI. Captures and
+SHA-256/run provenance are retained under
+[`phase1-shell-correction/`](flutterDesktop/verification/phase1-shell-correction/).
+The process-window enumeration fixes the previous helper's `.NET MainWindowHandle`
+false negative. The first paired shell review confirmed the Home title was lower
+in Flutter; its gutter adjustment to 10 dp is pending both platform CI. No
+Windows reference lifecycle pass is inferred from capture-only termination.

@@ -207,7 +207,7 @@ void main() {
     await mount(tester, const Size(1220, 780));
     expect(
       tester.getTopLeft(find.byKey(const Key('page-heading'))),
-      const Offset(236, 16),
+      const Offset(236, 10),
     );
     expect(
       find.text('Home'),

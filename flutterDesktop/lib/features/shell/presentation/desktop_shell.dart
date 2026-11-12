@@ -206,9 +206,11 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                               children: [
                                 Expanded(
                                   child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
+                                    padding: EdgeInsets.fromLTRB(
                                       16,
-                                      16,
+                                      widget.destination == Destination.home
+                                          ? 10
+                                          : 16,
                                       16,
                                       ShellMetrics.contentBottomReserve,
                                     ),

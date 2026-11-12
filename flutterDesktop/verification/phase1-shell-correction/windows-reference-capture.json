@@ -1,0 +1,26 @@
+{
+  "run_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43155307079",
+  "source_commit": "348b613a0c3db1a54de56483ea6f8748d6465211",
+  "dpi": 96,
+  "display": "GitHub Windows hosted desktop",
+  "lifecycle": "not tested; force-stop after reference capture",
+  "client_captures": [
+    {
+      "client": [
+        1220,
+        780
+      ],
+      "file": "kotlin-windows-1220x780.png",
+      "sha256": "ce0e9fb7d70490d028416a07917ed7ddc1536859c7def0a43f68d1c5ecc5c086"
+    },
+    {
+      "client": [
+        900,
+        600
+      ],
+      "file": "kotlin-windows-900x600.png",
+      "sha256": "8ab77046ab5475a340f12e0acb20f47af06836deb2091e51594acbcf4635a755"
+    }
+  ],
+  "profile": "fresh ephemeral hosted Windows profile, Light at 100% scale, no accounts or queue"
+}
