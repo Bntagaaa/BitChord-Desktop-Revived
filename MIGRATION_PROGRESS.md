@@ -526,3 +526,12 @@ final heading therefore uses measured 5 dp and 9 dp top gutters on those systems
 respectively, with an added platform-specific widget assertion. The Windows pixel
 comparison and local Linux client captures supply the measurements; the complete
 refreshed matrix must pass before this adjustment is verified.
+
+Run `43156122632` reached formatting on both platforms and stopped because the
+two just-edited Dart files needed formatter changes; no analyze, widget test,
+build or smoke results are inferred from that run. The official standalone
+Dart 3.13.7 archive was re-downloaded from storage.googleapis.com, checked against
+the publisher SHA-256 `eb99aed266efbcb615c6ae21c12f52cfe935b9f208bccc5fea7f64c21e867229`,
+and used to format only `desktop_shell.dart` and `shell_test.dart`. All 15 Dart
+files now pass the local language-version-3.11 formatter check. A fresh full
+Windows/Linux run with thirteen tests is pending.

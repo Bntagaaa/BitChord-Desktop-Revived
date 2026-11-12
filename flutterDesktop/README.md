@@ -127,8 +127,9 @@ numeric DPI is unmeasured. The targeted continuation removes the extra 48-dp
 header, matches sidebar/header/row/footer dimensions, restores the account
 avatar/empty menu and rail action, uses the original gray dock asset and adds
 the original action slots and unavailable volume track. Typography roles now
-match the source's sizes, physical weights and line-height policy. Twelve tests
-and the full release/native/retention matrix passed in run
+match the source's sizes, physical weights and line-height policy. Thirteen tests
+are defined, including separate Linux and Windows Home-heading offsets; twelve
+tests and the earlier full release/native/retention matrix passed in run
 [43134106705](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106705).
 Repeated local Linux pairs are in
 [`verification/phase1-shell-correction/`](verification/phase1-shell-correction/),

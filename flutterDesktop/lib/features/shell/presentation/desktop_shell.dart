@@ -213,9 +213,9 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                           // desktop OS; these settle HomeTitle's
                                           // first visible baseline to Kotlin.
                                           ? Theme.of(context).platform ==
-                                                TargetPlatform.windows
-                                              ? 5
-                                              : 9
+                                                    TargetPlatform.windows
+                                                ? 5
+                                                : 9
                                           : 16,
                                       16,
                                       ShellMetrics.contentBottomReserve,
