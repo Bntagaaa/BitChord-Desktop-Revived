@@ -1,0 +1,30 @@
+name: YouTube resolver diagnostics (redacted)
+on:
+  push:
+    branches: [2.0.0-flutter]
+    paths:
+      - '.github/workflows/youtube-resolver-probe.yml'
+      - 'flutterDesktop/tool/youtube_probe.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  linux-public-media:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: flutter-foundation-linux
+          run-id: 43252681732
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/validated-flutter
+      - name: Diagnose verified bundled extraction without disclosing sources
+        working-directory: flutterDesktop
+        timeout-minutes: 5
+        run: |
+          python tool/youtube_probe.py "${{ runner.temp }}/validated-flutter"
