@@ -259,3 +259,56 @@ exact expected colors and all lifecycle assertions; the follow-up run must pass
 before any Windows native promotion. Follow-up contracts cover album primary
 tracks and shelf-local token isolation. Anonymous actual artwork transfer was
 8177 bytes; the redacted follow-up counts are appended to the live JSON record.
+
+## Phase 4 follow-up: opt-in GVS PO Token provider path — 2026-11-12
+
+This change is a **supported resolver integration path**, not an observed
+YouTube playback pass. Live media previously refused direct extraction with
+HTTP 403. Current upstream yt-dlp guidance recommends a per-video GVS PO Token
+provider for the `mweb` client; changing a User-Agent or merely extracting a
+signed URL does not demonstrate media access.
+
+BitChord now supports a **user-selected trusted yt-dlp plugin directory**,
+without loading default plugins or user config. No plugin is downloaded,
+installed or bundled. A plugin executes code in the external extractor process:
+only use a provider you independently trust and have vetted. The plugin may
+require an independently started local token service or a browser. The complete
+token generation process is not provided by BitChord.
+
+Set absolute paths before launching BitChord on Linux:
+
+```sh
+export BITCHORD_YTDLP=/absolute/path/to/yt-dlp
+export BITCHORD_YTDLP_NODE=/absolute/path/to/node
+export BITCHORD_YTDLP_POT_PLUGIN_DIR=/absolute/path/to/trusted/yt-dlp-plugin-directory
+./bitchord_desktop
+```
+
+The selected directory must exist and be an absolute path containing the
+provider's `yt_dlp_plugins` package or correctly installed plugin archive.
+When supplied, the sandboxed extractor explicitly clears default plugin dirs
+and loads only that directory; its client uses
+`youtube:player_client=mweb` so upstream can obtain fresh **per-video** GVS
+tokens through the selected provider. Browser environment variables are
+forwarded only for this explicit opt-in. No BitChord YouTube account cookie
+is sent to the extractor, and extraction stays config-free, download-free,
+timeout-bounded and metadata-limited with no remote components.
+
+If media still returns HTTP 403, playback is **refused before native adoption**
+with an actionable `YouTube media refused (HTTP 403)` message; there is no
+fake playback fallback. Redirect, header/credential filtering, signed-location
+redaction, and actual byte-range verification remain in force. A PO Token is
+not guaranteed to resolve all 403 responses (IP, account, client and rollout
+limitations also exist). Never log or store tokens, signed URLs or cookies.
+
+Controlled contracts now assert that plugins cannot be discovered implicitly,
+the explicit directory and `mweb` flag are correctly scoped, relative paths
+are rejected, credential import is disabled, and the 403 error is actionable.
+Physical YouTube audio **still requires a new authorized live test on Linux and
+Windows**, with the trusted external provider actually running and returning
+real 206 media ranges. Phase 4 remains **INCOMPLETE**, Phase 5 not started.
+
+Upstream references:
+- https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide
+- https://github.com/yt-dlp/yt-dlp/wiki/Extractors
+- https://github.com/yt-dlp/yt-dlp#installing-plugins

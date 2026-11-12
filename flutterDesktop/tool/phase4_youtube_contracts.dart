@@ -259,6 +259,61 @@ Future<void> youtubeContracts() async {
     }
   }
 
+  // A trusted plugin must be selected explicitly. No ambient yt-dlp plugins,
+  // config files, signed URLs or account credentials may be picked up.
+  final unconfigured = YouTubeResolver('/path/to/yt-dlp');
+  final baseArgs = unconfigured.arguments(selected, AudioQuality.high);
+  require(
+    baseArgs.contains('--no-plugin-dirs') &&
+        !baseArgs.contains('--plugin-dirs') &&
+        !baseArgs.contains('--extractor-args'),
+    'No implicit PO Token plugin or extractor overrides',
+  );
+  final pluginDir = await Directory.systemTemp.createTemp('bitchord-pot-');
+  try {
+    final enabled = YouTubeResolver(
+      '/path/to/yt-dlp',
+      poTokenPluginDirectory: pluginDir.path,
+    );
+    final args = enabled.arguments(selected, AudioQuality.medium);
+    final pluginAt = args.indexOf('--plugin-dirs');
+    final extractorAt = args.indexOf('--extractor-args');
+    require(
+      pluginAt > args.indexOf('--no-plugin-dirs') &&
+          args[pluginAt + 1] == pluginDir.path &&
+          extractorAt > pluginAt &&
+          args[extractorAt + 1] == 'youtube:player_client=mweb' &&
+          args.contains('bestaudio[protocol=https][abr<=128]') &&
+          !args.any((argument) => argument.contains('fixture-secret')),
+      'Trusted mweb per-video token provider configuration',
+    );
+    require(
+      !args.contains('--cookies-from-browser') &&
+          !args.contains('--cookies'),
+      'No account secret import into external extractor',
+    );
+  } finally {
+    await pluginDir.delete(recursive: true);
+  }
+  try {
+    YouTubeResolver(
+      '/path/to/yt-dlp',
+      poTokenPluginDirectory: '../untrusted',
+    ).arguments(selected, AudioQuality.high);
+    throw StateError('Relative plugin directory accepted');
+  } on ProviderFailure catch (e) {
+    require(
+      e.problem == ProviderProblem.unsupported,
+      'Unsafe plugin directory classification',
+    );
+  }
+  require(
+    const ProviderFailure(ProviderProblem.mediaRefused, 403)
+        .toString()
+        .contains('PO Token'),
+    'Actionable redacted media 403 guidance',
+  );
+
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final bodies = <Map<String, dynamic>>[];
   server.listen((r) async {

@@ -37,6 +37,7 @@ enum ProviderProblem {
   unsupported,
   expired,
   integrity,
+  mediaRefused,
 }
 
 final class ProviderFailure implements Exception {
@@ -44,8 +45,13 @@ final class ProviderFailure implements Exception {
   final ProviderProblem problem;
   final int? status;
   @override
-  String toString() =>
-      'Provider ${problem.name}${status == null ? '' : ' (HTTP $status)'}';
+  String toString() {
+    if (problem == ProviderProblem.mediaRefused) {
+      return 'YouTube media refused (HTTP 403). A trusted GVS PO Token '
+          'provider may be required.';
+    }
+    return 'Provider ${problem.name}${status == null ? '' : ' (HTTP $status)'}';
+  }
 }
 
 // Cancellation closes owned transport, and account/query generations fence late results.

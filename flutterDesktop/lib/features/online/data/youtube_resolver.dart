@@ -13,20 +13,74 @@ final class YouTubeResolver {
   YouTubeResolver(
     this.executable, {
     this.node,
+    this.poTokenPluginDirectory,
     this.timeout = const Duration(seconds: 45),
   });
   final String executable;
   final String? node;
+  // Explicitly trusted local yt-dlp plugin code. Default discovery stays off.
+  final String? poTokenPluginDirectory;
   final Duration timeout;
 
   static YouTubeResolver? fromEnvironment() {
     final path = Platform.environment['BITCHORD_YTDLP'];
     if (path == null || !File(path).isAbsolute) return null;
     final node = Platform.environment['BITCHORD_YTDLP_NODE'];
+    final plugin = Platform.environment['BITCHORD_YTDLP_POT_PLUGIN_DIR'];
     return YouTubeResolver(
       path,
       node: node != null && File(node).isAbsolute ? node : null,
+      poTokenPluginDirectory: plugin != null && plugin.isNotEmpty
+          ? plugin
+          : null,
+      timeout: plugin != null && plugin.isNotEmpty
+          ? const Duration(seconds: 90)
+          : const Duration(seconds: 45),
     );
+  }
+
+  // Dedicated per-video PO Token providers are opt-in because yt-dlp plugins
+  // execute external code. Without an explicit directory, disable every plugin
+  // search location and never load ambient config or account cookies.
+  List<String> arguments(CatalogEntry track, AudioQuality quality) {
+    final plugin = poTokenPluginDirectory;
+    if (plugin != null &&
+        (!Directory(plugin).isAbsolute || !Directory(plugin).existsSync())) {
+      throw const ProviderFailure(ProviderProblem.unsupported);
+    }
+    final ceiling = switch (quality) {
+      AudioQuality.low => 64,
+      AudioQuality.medium => 128,
+      _ => 1000,
+    };
+    return [
+      '--ignore-config',
+      '--no-plugin-dirs',
+      if (plugin != null) ...[
+        '--plugin-dirs',
+        plugin,
+        '--extractor-args',
+        'youtube:player_client=mweb',
+      ],
+      '--no-remote-components',
+      '--no-cache-dir',
+      '--no-playlist',
+      '--skip-download',
+      '--dump-single-json',
+      '--no-warnings',
+      '--socket-timeout',
+      '10',
+      '--retries',
+      '0',
+      '--extractor-retries',
+      '0',
+      '--no-js-runtimes',
+      if (node != null) ...['--js-runtimes', 'node:$node'],
+      '-f',
+      'bestaudio[protocol=https][abr<=$ceiling]',
+      '--',
+      'https://www.youtube.com/watch?v=${track.id}',
+    ];
   }
 
   Future<ResolvedMedia> resolve(
@@ -39,11 +93,7 @@ final class YouTubeResolver {
         track.kind != CatalogKind.track) {
       throw const ProviderFailure(ProviderProblem.unsupported);
     }
-    final ceiling = switch (quality) {
-      AudioQuality.low => 64,
-      AudioQuality.medium => 128,
-      _ => 1000,
-    };
+    final processArguments = arguments(track, quality);
     Process? process;
     final output = StringBuffer();
     var bytes = 0;
@@ -52,28 +102,7 @@ final class YouTubeResolver {
     try {
       process = await Process.start(
         executable,
-        [
-          '--ignore-config',
-          '--no-plugin-dirs',
-          '--no-remote-components',
-          '--no-cache-dir',
-          '--no-playlist',
-          '--skip-download',
-          '--dump-single-json',
-          '--no-warnings',
-          '--socket-timeout',
-          '10',
-          '--retries',
-          '0',
-          '--extractor-retries',
-          '0',
-          '--no-js-runtimes',
-          if (node != null) ...['--js-runtimes', 'node:$node'],
-          '-f',
-          'bestaudio[protocol=https][abr<=$ceiling]',
-          '--',
-          'https://www.youtube.com/watch?v=${track.id}',
-        ],
+        processArguments,
         runInShell: false,
         includeParentEnvironment: false,
         environment: {
@@ -84,6 +113,17 @@ final class YouTubeResolver {
             'TEMP',
             'TMP',
             'TMPDIR',
+            if (poTokenPluginDirectory != null) ...[
+              'HOME',
+              'USERPROFILE',
+              'APPDATA',
+              'LOCALAPPDATA',
+              'DISPLAY',
+              'WAYLAND_DISPLAY',
+              'XDG_RUNTIME_DIR',
+              'XAUTHORITY',
+              'DBUS_SESSION_BUS_ADDRESS',
+            ],
           ])
             if (Platform.environment[key] != null)
               key: Platform.environment[key]!,
@@ -120,7 +160,12 @@ final class YouTubeResolver {
       if (source.total! > 1024 * 1024) await source.chunk(2);
       scope.check();
       return media;
-    } on ProviderFailure {
+    } on ProviderFailure catch (e) {
+      // A signed URL does not establish usable media. In particular, GVS may
+      // reject clients without a fresh per-video PO Token even after extraction.
+      if (e.status == 403) {
+        throw const ProviderFailure(ProviderProblem.mediaRefused, 403);
+      }
       rethrow;
     } on TimeoutException {
       throw const ProviderFailure(ProviderProblem.timeout);

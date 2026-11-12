@@ -18,7 +18,13 @@ Future<void> main(List<String> args) async {
       const ProviderHttp(),
       resolver: args.isEmpty
           ? null
-          : YouTubeResolver(args[0], node: args.length > 1 ? args[1] : null),
+          : YouTubeResolver(
+          args[0],
+          node: args.length > 1 ? args[1] : null,
+          poTokenPluginDirectory:
+              Platform.environment['BITCHORD_YTDLP_POT_PLUGIN_DIR'],
+          timeout: const Duration(seconds: 90),
+        ),
     );
     final home = await provider.browse('FEmusic_home', scope);
     report['home'] = {
