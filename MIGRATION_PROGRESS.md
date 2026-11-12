@@ -307,3 +307,17 @@ with Gradle 8.11.1 and a separate `/tmp` cache: the sandbox first blocked its
 daemon socket; the permitted retry then failed before tests with Java version
 `27.0.1.0.3`. No local test pass is claimed.
 
+Run [43126119556](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43126119556)
+at `72dd48d6`: Linux passed all checks, including both reviewed native captures,
+responsive landmarks and native close/exit 0. Windows passed analysis/six tests,
+release build, hosted 1600×1200 display setup and both painted client-size checks,
+but close exited with `-1073740771` (`0xC000041D`). Retention was correctly skipped.
+The application now flushes settings, removes its listener, releases close
+prevention and requests a normal native close instead of the plugin's force-quit
+path. The pinned plugin source shows that force-quit posts WM_QUIT while its
+HWND remains alive. Two new lifecycle tests cover pending-drain ordering,
+repeated close and failed-drain cleanup; their hosted execution is pending.
+Linux smoke logs also contain GTK accessibility/initial-frame and implicit-view
+teardown warnings; passing exit/paint checks do not establish accessibility or
+physical GPU correctness.
+

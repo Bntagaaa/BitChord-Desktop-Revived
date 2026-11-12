@@ -50,7 +50,10 @@ final class DesktopHost with WindowListener implements DesktopWindow {
       diagnostics.failure('shutdown', error);
     } finally {
       windowManager.removeListener(this);
-      await windowManager.destroy();
+      // Let the native runner destroy its window/controller in the normal
+      // order. Force-quit posts WM_QUIT on Windows while its HWND is still live.
+      await windowManager.setPreventClose(false);
+      await windowManager.close();
     }
   }
   @override

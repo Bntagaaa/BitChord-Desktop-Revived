@@ -1036,3 +1036,17 @@ window capture was black and the smoke failed; retention did not run.
 
 No P-ID is parity-accepted from these build results; no Phase 2 work has begun.
 
+### Native lifecycle evidence — 2026-11-12
+
+Run [43126119556](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43126119556)
+at `72dd48d6` passed Linux analysis, six tests, release build and native
+1220×780/900×600 client paint/resize/close checks (exit 0). Both Linux captures
+were reviewed: expanded sidebar, automatic rail, original glyphs and empty
+disabled dock are present. Windows passed compilation/six tests and captured
+both clients at 96 DPI on a 1600×1200 hosted display; close crashed with
+`0xC000041D`. P01/P28 therefore remains unaccepted pending shutdown correction.
+The native-close path and two drain/idempotence/failure tests address this;
+results are pending. Neither hosted captures nor source tokens replace the
+missing pinned-Kotlin comparison, font rights/metrics, full DPI/focus/motion,
+native caption/Mica/icon or accessibility gates (P02/P24/P29–P31).
+
