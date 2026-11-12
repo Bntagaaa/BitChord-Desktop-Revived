@@ -738,3 +738,12 @@ CI cannot close these gaps. No performance improvement or full P-ID parity is
 claimed. Next action: finish that Phase 2 capture/visual comparison pass against
 the pinned reference, using test-owned profiles and matching scale/font state.
 **Phase 3 has not started.**
+
+## Phase 2 full manual checklist acceptance and Phase 3 authorization — 2026-11-12
+
+**User report and acceptance:** The user explicitly confirmed they **manually tested all items in the Phase 2 manual audit checklist** and that **all of them were OK**, then requested proceeding to the next phase. Record this as **Phase 2: USER_ACCEPTED (manual test checklist passed, user-reported)** for the currently delivered Flutter shell and visual-system scope. This replaces the earlier status of awaiting the user's manual Phase 2 audit; do not reinterpret it as simply permission to skip testing.
+
+- Manual review covered the previously provided Phase 2 checklist: navigation/sidebar/drawer and keyboard basics; UI zoom/scaling/window resizing; fonts, colors and appearance modes; Settings, Accounts overlay and preference persistence. All items were reported satisfactory by the user. No individual screenshots, device logs, test timestamps or measured pixel differences were provided, so **manual PASS is a user attestation, not independent instrumented verification**.
+- Automatic evidence remains separate: Flutter [run 43179670749](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670749) succeeded for Windows/Linux and retention with 26 tests per OS, release builds and native smoke. Pinned Kotlin reference validation [43179670856](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670856) also succeeded.
+- This scoped acceptance does **not** prove pixel-perfect whole-app parity, physical multi-DPI/assistive-technology coverage, matched Kotlin/Flutter native motion traces, source-compatible font licensing or real audio/media services. Preserve these as tracked future validation/feature work, not as blockers to the user's accepted Phase 2 scope.
+- **Phase 1 ACCEPTED. Phase 2 USER_ACCEPTED after user-reported complete manual checklist testing. Phase 3 explicitly AUTHORIZED but not yet implemented in this documentation commit.** Execute Phase 3 using `.codex/phases/phase-3.md` and `MIGRATION_ARCHITECTURE.md`; do not begin Phase 4 automatically.

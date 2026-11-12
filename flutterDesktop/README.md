@@ -184,3 +184,11 @@ exist). UI zoom matches the source 80/90/100/110/125% choices and remains separa
 from display DPI. No fonts are redistributed, and no live music service or native
 audio implementation is added. Full phase acceptance remains incomplete pending
 the evidence ledger; Phase 3 does not start automatically.
+
+## Phase 2 manually tested and accepted — 2026-11-12
+
+The user explicitly reported **testing all items in the Phase 2 manual audit checklist and finding everything OK**. Mark the currently delivered Phase 2 shell/design-system/navigation/scaling/Settings scope **USER_ACCEPTED (manual checklist passed as reported by user)**. This is a stronger statement than a general visual approval; it should not be conflated with independent instrumented pixel-level or physical-platform verification.
+
+Windows/Linux automated tests and native smoke were successful in [run 43179670749](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670749), with 26 passing tests per OS. Full media functionality and exact cross-platform Haze/Mica/DPI/accessibility/font-licensing verification remain future work.
+
+**Phase 3 explicitly authorized**: start `../.codex/phases/phase-3.md` for local domain, persistence and C++17 native PCM foundation. No Phase 3 code was implemented by this documentation update. Phase 4 must not start automatically.

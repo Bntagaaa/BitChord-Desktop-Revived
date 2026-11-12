@@ -1279,3 +1279,11 @@ source cataloguing only. Whole feature rows are not complete or PARITY_ACCEPTED.
 DPR 100/125/150/200% widget checks and 110% zoom interaction are FIXTURE_TESTED,
 not native multi-DPI acceptance. Phase 2 remains INCOMPLETE for the visual gates
 listed in its ledger. No Phase 3 implementation or memory result is included.
+
+### Phase 2 complete user-reported manual checklist — 2026-11-12
+
+**Phase 2 scoped shell/visual manual audit: USER_ACCEPTED / ALL CHECKLIST ITEMS REPORTED PASS.** The user stated that they had tested **everything in the manual Phase 2 checklist** and all was OK, then approved advancement to Phase 3. This includes navigation/sidebar and overlays, scaling/window behavior, font/theme/material presentation, Settings interaction and persistence *as judged by the user*. Record the full manual-test report rather than merely marking acceptance without testing.
+
+Keep evidence provenance clear: no per-item screenshots or independent measurement logs were provided with that attestation. Hosted CI run [43179670749](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43179670749) separately verified 26 tests per OS, builds and native lifecycle. User sign-off does **not** turn deferred whole-app P-IDs, pixel-perfect Haze/Mica, fonts' redistribution permissions, accessibility or native multi-DPI reference fixtures into experimentally proven `PARITY_ACCEPTED` states.
+
+Phase 3 is now authorized to begin. No Phase 3 implementation or Phase 4 authorization is implied by this documentation entry.
