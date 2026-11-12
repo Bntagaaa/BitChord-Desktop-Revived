@@ -864,7 +864,7 @@ class _EmptyDock extends StatelessWidget {
                             ),
                           ],
                           if (!compact)
-                        Tooltip(
+                            Tooltip(
                             message: 'Volume — playback is unavailable',
                             child: Semantics(
                               key: const Key('dock-volume'),
