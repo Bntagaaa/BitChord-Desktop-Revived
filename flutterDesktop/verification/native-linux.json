@@ -29,18 +29,18 @@
       "state": "drawer",
       "expected_theme": "any",
       "background_rgb": [
-        183,
-        184,
-        186
+        247,
+        248,
+        251
       ]
     },
     {
       "state": "settings",
       "expected_theme": "any",
       "background_rgb": [
-        247,
-        248,
-        251
+        183,
+        184,
+        186
       ]
     },
     {

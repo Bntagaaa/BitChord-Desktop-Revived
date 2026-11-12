@@ -1,77 +1,77 @@
 {
   "display": "GitHub Windows hosted desktop",
-  "exit_code": 0,
-  "fullscreen": "F11 entered; Escape restored 900x600",
   "dpi": 96,
-  "source_commit": "3b2a8747327fe611bcb92a75ced96373bc90c60e",
+  "captures": [
+    {
+      "height": 780,
+      "sampled_colors": 102,
+      "width": 1220,
+      "logo_contrast": 0.39869281045751637
+    },
+    {
+      "height": 600,
+      "sampled_colors": 83,
+      "width": 900,
+      "logo_contrast": 0.39869281045751637
+    }
+  ],
+  "fullscreen": "F11 entered; Escape restored 900x600",
+  "exit_code": 0,
   "appearance_captures": [
     {
       "expected_theme": "any",
-      "state": "accounts",
       "background_rgb": [
         247,
         248,
         251
-      ]
+      ],
+      "state": "accounts"
     },
     {
       "expected_theme": "any",
-      "state": "drawer",
       "background_rgb": [
         183,
         184,
         186
-      ]
+      ],
+      "state": "drawer"
     },
     {
       "expected_theme": "any",
-      "state": "settings",
       "background_rgb": [
         247,
         248,
         251
-      ]
+      ],
+      "state": "settings"
     },
     {
       "expected_theme": "dark",
-      "state": "dark",
       "background_rgb": [
         32,
         32,
         32
-      ]
+      ],
+      "state": "dark"
     },
     {
       "expected_theme": "black",
-      "state": "pitch-black",
       "background_rgb": [
         0,
         0,
         0
-      ]
+      ],
+      "state": "pitch-black"
     },
     {
       "expected_theme": "light",
-      "state": "light",
       "background_rgb": [
         247,
         248,
         251
-      ]
+      ],
+      "state": "light"
     }
   ],
-  "captures": [
-    {
-      "sampled_colors": 102,
-      "logo_contrast": 0.39869281045751637,
-      "width": 1220,
-      "height": 780
-    },
-    {
-      "sampled_colors": 83,
-      "logo_contrast": 0.39869281045751637,
-      "width": 900,
-      "height": 600
-    }
-  ]
+  "source_commit": "0cfe1744dbfdc774a613c93ab367f13ced33a385"
 }
