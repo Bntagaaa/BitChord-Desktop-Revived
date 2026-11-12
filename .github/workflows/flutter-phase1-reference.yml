@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [2.0.0-flutter]
-    paths: ['.github/workflows/flutter-phase1-reference.yml', 'flutterDesktop/tool/reference_msvc.init.gradle']
+    paths: ['.github/workflows/flutter-phase1-reference.yml', 'flutterDesktop/tool/reference_msvc.init.gradle', 'flutterDesktop/tool/launch_smoke_windows.ps1', 'flutterDesktop/tool/SeedReferenceProfile.java']
 
 permissions:
   contents: read
