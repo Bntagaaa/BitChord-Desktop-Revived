@@ -1,19 +1,19 @@
 {
-  "display": "GitHub Windows hosted desktop",
   "exit_code": 0,
+  "display": "GitHub Windows hosted desktop",
   "dpi": 96,
   "captures": [
     {
       "sampled_colors": 77,
-      "logo_contrast": 0.8143790849673203,
       "width": 1220,
-      "height": 780
+      "height": 780,
+      "logo_contrast": 0.8143790849673203
     },
     {
       "sampled_colors": 61,
-      "logo_contrast": 0.8143790849673203,
       "width": 900,
-      "height": 600
+      "height": 600,
+      "logo_contrast": 0.8143790849673203
     }
   ]
 }
