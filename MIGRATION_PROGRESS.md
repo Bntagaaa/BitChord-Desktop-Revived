@@ -402,3 +402,28 @@ keeps its original GNU toolchain/action. All three native libraries remain
 required, with all reference tests enabled. This mixed supported-toolchain
 reference build is awaiting execution; no protected source was edited.
 
+Source audit for the Phase 1 shell correction: `DesktopApp.kt` Sidebar/SidebarItem,
+MiniPlayer/BottomChrome/Frame and Alt+Left handling; `DesktopAccountUi.kt`;
+`DesktopPipUi.kt`; `DesktopThinSlider.kt`; `DesktopTypography.kt`/font mapping;
+shared `BitChordTypography.kt` and `HomeScreen.kt` compact heading policy
+(P01/P02/P24/P28–P31). The empty dock uses the distinct padded gray
+`bitchord_no_music.svg`, not the sidebar's full-size white logo.
+
+Flutter source now removes the default 48-dp navigation row, preserves back via
+Alt+Left, matches sidebar 45/51-dp headers and 32/42-dp rows/dividers/footer,
+restores the playlist rail action and account avatar/empty menu, and uses the
+original gray dock asset, original button dimensions, all dock action slots and
+an explicitly unavailable volume track. Backend/auth actions remain unavailable;
+no fake playback or sign-in is introduced. The dock/menu use the source's chrome
+tint/blur settings; exact Haze noise/renderer equivalence is not claimed.
+
+Typography corrects compact headings to 30 sp, removes inherited Material line
+heights from customized roles and maps less-obvious default role weights/metrics.
+SF Pro binaries remain unbundled: no redistribution permission was established,
+and numeric/typeface parity is still open. Four new tests cover reference layout
+bounds, account-menu behavior/rail policy and typography. Execution is pending.
+Official standalone Dart 3.13.7 was downloaded to `/tmp`, SHA-256 checked against
+the publisher checksum, and used to format/check source at the project's 3.11
+language version. Local Python boundary/20-asset/reference checks pass; Flutter
+analysis/tests/builds still use hosted runners, given local disk/RAM limits.
+

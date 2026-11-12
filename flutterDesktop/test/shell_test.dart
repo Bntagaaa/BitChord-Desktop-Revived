@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' as rendering;
 import 'package:flutter/services.dart';
@@ -9,6 +10,7 @@ import 'package:bitchord_desktop/core/domain/failure_reporter.dart';
 import 'package:bitchord_desktop/app/app.dart';
 import 'package:bitchord_desktop/app/router.dart';
 import 'package:bitchord_desktop/design_system/palette.dart';
+import 'package:bitchord_desktop/design_system/theme.dart';
 import 'package:bitchord_desktop/features/shell/application/shell_controller.dart';
 import 'package:bitchord_desktop/features/shell/domain/shell_settings.dart';
 
@@ -172,12 +174,106 @@ void main() {
       await tester.tap(find.widgetWithText(ChoiceChip, 'dark'));
       await tester.pumpAndSettle();
       expect(container.read(shellProvider).appearance, Appearance.dark);
-      await tester.tap(find.byTooltip('Back'));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
       await tester.pumpAndSettle();
       expect(find.text('Music services are not connected.'), findsOneWidget);
       await tester.sendKeyEvent(LogicalKeyboardKey.f11);
       await tester.pumpAndSettle();
       expect(window.toggles, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  test(
+    'Reference typography avoids inherited Material heading line heights',
+    () {
+      final text = bitChordTheme(
+        BitChordPalette.light,
+        Brightness.light,
+      ).textTheme;
+      expect(text.headlineLarge!.fontSize, 30);
+      expect(text.headlineLarge!.fontWeight, FontWeight.w700);
+      expect(text.headlineLarge!.letterSpacing, -.4);
+      expect(text.headlineLarge!.height, ui.kTextHeightNone);
+      expect(text.bodySmall!.fontSize, 12);
+      expect(text.bodySmall!.height, 16 / 12);
+      expect(text.labelLarge!.fontWeight, FontWeight.w400);
+    },
+  );
+  testWidgets('Default page, sidebar and dock use measured reference bounds', (
+    tester,
+  ) async {
+    await mount(tester, const Size(1220, 780));
+    expect(
+      tester.getTopLeft(find.byKey(const Key('page-heading'))),
+      const Offset(236, 16),
+    );
+    expect(
+      find.text('Home'),
+      findsNWidgets(2),
+    ); // Sidebar label and page heading only.
+    expect(find.byTooltip('Music services are not connected'), findsNothing);
+    expect(tester.getRect(find.byKey(const Key('nav-listen-now'))).top, 61);
+    expect(tester.getRect(find.byKey(const Key('nav-history'))).top, 208);
+    expect(tester.getRect(find.byKey(const Key('sidebar-account'))).top, 682);
+    expect(
+      tester.getRect(find.byKey(const Key('player-dock'))),
+      const Rect.fromLTWH(340, 702, 760, 58),
+    );
+    expect(
+      tester.getSize(find.byKey(const Key('empty-dock-mark'))),
+      const Size(48, 48),
+    );
+    for (final action in ['play', 'next', 'pip', 'details', 'audio-output']) {
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(Key('transport-$action')))
+            .onPressed,
+        isNull,
+      );
+    }
+    expect(tester.getSize(find.byKey(const Key('dock-volume'))).width, 72);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+    'Account menu is honest, anchored and dismisses before fullscreen',
+    (tester) async {
+      final window = TestWindow();
+      await mount(tester, const Size(1220, 780), window: window);
+      expect(find.text('Sign in'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('sidebar-account')));
+      await tester.pumpAndSettle();
+      final panel = tester.getRect(find.byKey(const Key('account-panel')));
+      expect(panel.left, 24);
+      expect(panel.width, 292);
+      expect(panel.bottom, 716);
+      expect(find.text('Add account'), findsOneWidget);
+      await tester.tap(find.text('Add account'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('account-panel')), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('account-panel')), findsNothing);
+      expect(window.exits, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'Rail playlist affordance and account footer preserve the width policy',
+    (tester) async {
+      final container = await mount(tester, const Size(900, 600));
+      expect(tester.getRect(find.byKey(const Key('nav-listen-now'))).top, 67);
+      expect(tester.getRect(find.byKey(const Key('nav-history'))).top, 254);
+      expect(tester.getRect(find.byKey(const Key('sidebar-account'))).top, 494);
+      await tester.tap(find.byKey(const Key('browse-playlists')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('drawer-scrim')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('sidebar-account')).last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('drawer-scrim')), findsNothing);
+      expect(find.byKey(const Key('account-panel')), findsOneWidget);
+      expect(container.read(shellProvider).sidebarCollapsed, isFalse);
       expect(tester.takeException(), isNull);
     },
   );

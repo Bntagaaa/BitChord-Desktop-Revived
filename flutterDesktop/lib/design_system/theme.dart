@@ -1,5 +1,7 @@
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+
 import 'palette.dart';
 
 abstract final class ShellMetrics {
@@ -13,6 +15,7 @@ abstract final class ShellMetrics {
   static const dockWidth = 760.0;
   static const dockHeight = 58.0;
   static const pageGutter = 16.0;
+  static const contentBottomReserve = 132.0;
   static const sidebarDuration = Duration(milliseconds: 180);
 }
 
@@ -24,6 +27,9 @@ ThemeData bitChordTheme(BitChordPalette palette, Brightness brightness) {
     fontWeight: weight,
     letterSpacing: tracking,
     color: palette['foreground'],
+    // Kotlin's customized roles use fresh TextStyles, without inherited
+    // Material line heights. Keep natural font metrics for those roles.
+    height: ui.kTextHeightNone,
   );
   return ThemeData(
     brightness: brightness,
@@ -40,12 +46,18 @@ ThemeData bitChordTheme(BitChordPalette palette, Brightness brightness) {
         ),
     textTheme: TextTheme(
       displayLarge: role(34, FontWeight.w700, -.5),
+      displayMedium: role(45, FontWeight.w400, 0).copyWith(height: 52 / 45),
+      displaySmall: role(36, FontWeight.w400, 0).copyWith(height: 44 / 36),
       headlineLarge: role(30, FontWeight.w700, -.4),
       headlineMedium: role(22, FontWeight.w600, -.25),
+      headlineSmall: role(24, FontWeight.w400, 0).copyWith(height: 32 / 24),
       titleLarge: role(20, FontWeight.w600, -.2),
       titleMedium: role(16, FontWeight.w500, .05),
+      titleSmall: role(14, FontWeight.w400, .1).copyWith(height: 20 / 14),
       bodyLarge: role(16, FontWeight.w400, .2),
       bodyMedium: role(14, FontWeight.w400, .3),
+      bodySmall: role(12, FontWeight.w400, .4).copyWith(height: 16 / 12),
+      labelLarge: role(14, FontWeight.w400, .1).copyWith(height: 20 / 14),
       labelMedium: role(12, FontWeight.w500, .25),
       labelSmall: role(11, FontWeight.w500, .3),
     ),
@@ -61,26 +73,41 @@ class GlassSurface extends StatelessWidget {
     required this.palette,
     required this.reduceBlur,
     required this.child,
+    this.tintAlpha = .55,
+    this.blurRadius = 30,
+    this.solidToken = 'floatingPlayerSurface',
   });
   final BitChordPalette palette;
   final bool reduceBlur;
   final Widget child;
+  final double tintAlpha;
+  final double blurRadius;
+  final String solidToken;
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(16),
-    child: BackdropFilter(
-      filter: ui.ImageFilter.blur(
-        sigmaX: reduceBlur ? 0 : 20,
-        sigmaY: reduceBlur ? 0 : 20,
+  Widget build(BuildContext context) {
+    final fill = DecoratedBox(
+      decoration: BoxDecoration(
+        // DesktopFrosted tints the blurred page with chromeSurface at 0.55;
+        // barGlass is used only on the reference's no-Haze fallback path.
+        color: reduceBlur
+            ? palette[solidToken]
+            : palette['chromeSurface'].withValues(alpha: tintAlpha),
+        border: Border.all(color: palette['barEdge'], width: .5),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: palette[reduceBlur ? 'floatingPlayerSurface' : 'barGlass'],
-          border: Border.all(color: palette['barEdge'], width: .5),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: child,
-      ),
-    ),
-  );
+      child: child,
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: reduceBlur
+          ? fill
+          : BackdropFilter(
+              filter: ui.ImageFilter.blur(
+                sigmaX: blurRadius,
+                sigmaY: blurRadius,
+              ),
+              child: fill,
+            ),
+    );
+  }
 }

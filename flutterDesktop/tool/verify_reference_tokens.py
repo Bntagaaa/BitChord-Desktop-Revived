@@ -25,13 +25,16 @@ def main():
         original = path.read_bytes().replace(b'\r\n', b'\n')
         copied = (ROOT / 'assets/icons' / path.name).read_bytes().replace(b'\r\n', b'\n')
         assert hashlib.sha256(original).digest() == hashlib.sha256(copied).digest(), path
+    mark = 'bitchord_no_music.svg'
+    assert ((REFERENCE / 'desktopApp/src/main/composeResources/drawable' / mark).read_bytes().replace(b'\r\n', b'\n') ==
+            (ROOT / 'assets/icons' / mark).read_bytes().replace(b'\r\n', b'\n')), mark
     glyphs = (REFERENCE / 'sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/icons/BitChordIcons.kt').read_text()
     for name in ('TabExplore', 'TabSearch', 'TabLibrary'):
         block = glyphs.split(f'val {name}: ImageVector by lazy {{')[1].split('\n    }')[0]
         expected = ''.join(re.findall(r'"(M[^\"]+)"', block))
         actual = ET.parse(ROOT / 'assets/icons' / f'{name}.svg').getroot()[0].attrib['d']
         assert actual == expected, name
-    print('Both semantic palettes, nine transport SVGs and three tab path outlines match reference source.')
+    print('Both palettes, nine transport SVGs, the original gray dock mark and three tab outlines match reference source.')
 
 
 if __name__ == '__main__':

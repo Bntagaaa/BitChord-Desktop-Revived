@@ -1,5 +1,5 @@
 Assets originate solely from Kotlin 1.9.2 commit 348b613a0c3db1a54de56483ea6f8748d6465211.
-BitChord brand and Home/Clock/Download/Library vectors: repository GPL-3.0; see ../../LICENSE.
+BitChord brand, gray no-music dock mark and Home/Clock/Download/Library vectors: repository GPL-3.0; see ../../LICENSE.
 Transport SVGs: preserved original bytes; see ../../desktopApp/PLAYER_TRANSPORT_ICONS.md.
 TabExplore/TabSearch/TabLibrary: exact path strings from sharedUi BitChordIcons.kt,
 which attributes these outlines to cupertino_icons (MIT). Preserve the MIT notice below.
