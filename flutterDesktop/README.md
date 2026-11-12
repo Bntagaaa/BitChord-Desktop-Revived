@@ -128,9 +128,15 @@ header, matches sidebar/header/row/footer dimensions, restores the account
 avatar/empty menu and rail action, uses the original gray dock asset and adds
 the original action slots and unavailable volume track. Typography roles now
 match the source's sizes, physical weights and line-height policy. Thirteen tests
-are defined, including separate Linux and Windows Home-heading offsets; twelve
-tests and the earlier full release/native/retention matrix passed in run
-[43134106705](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106705).
+are defined, including separate Linux and Windows Home-heading offsets. The
+refreshed matrix passed all thirteen tests on both platforms, release builds,
+appearance captures and native lifecycle checks in
+[43156992243](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43156992243).
+The retained final Windows Flutter captures can be compared with the pinned
+Kotlin Windows captures under
+[`verification/phase1-shell-correction/`](verification/phase1-shell-correction/);
+the latest Linux Flutter capture is hosted, but a same-session Linux Kotlin
+pair after the final heading adjustment has not been recorded.
 Repeated local Linux pairs are in
 [`verification/phase1-shell-correction/`](verification/phase1-shell-correction/),
 alongside focused Windows native provenance. This does not establish full
@@ -142,5 +148,4 @@ need matched platform checks. Widget font rectangles must not be called text
 parity. Material appearance controls and the disconnected
 page body are Phase 1 infrastructure; legacy top player, full player/side panels,
 account/data screens and PiP remain later work. No RAM improvement is measured.
-Phase 1 is incomplete until its remaining gates have evidence; Phase 2 has not
-started.
+Phase 1 remains incomplete for visual acceptance; Phase 2 has not started.

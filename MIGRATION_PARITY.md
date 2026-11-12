@@ -153,9 +153,12 @@ The reference has multiple fallback constants in different layers: DesktopAudioE
 
 Phase 0.5 verification: `python3 tools/automix-validation/verify-upstream.py` passed, verifying 25 canonical AutoMix source/model files against `b690dc146009d4815825fa4a20815ef2e4ee8898`. This confirms manifest identity only, not audio quality, model accuracy or runtime parity. The earlier JitPack-blocked JVM test outcome remains unchanged evidence; no tests were rerun merely to reproduce that known access failure. No backend, bridge or Flutter feature was implemented.
 
-## Phase 1 shell extraction — source evidence, implementation blocked
+## Phase 1 shell extraction — initial source audit (historical)
 
-Phase 1 was authorized with a broader shell/design-system scope than the historical Phase 0.5 tooling-only plan. The official SDK bootstrap is currently blocked; all Flutter parity workstreams remain planned. These additional source findings prepare implementation without claiming screenshots or a runnable shell.
+This records the 2026-11-11 checkpoint, when SDK bootstrap was blocked and
+implementation had not begun. The later implementation, hosted validation and
+remaining gaps are recorded in the Phase 1 updates below and in
+`MIGRATION_PROGRESS.md`.
 
 | Surface | Pinned Kotlin source anchor | Exact requirement for the Flutter shell |
 |---|---|---|
@@ -176,11 +179,18 @@ Phase 1 was authorized with a broader shell/design-system scope than the histori
 | Interaction/motion | D `DesktopHover.kt`, `DesktopShortcuts.kt` | Circular hover wash 120 ms; no-hover song-row background 170 ms FastOutSlowIn; reduced-animation zeros these durations. Reproduce keyboard editor/modal exceptions; do not claim a single generic button animation covers all surfaces |
 | Asset provenance | `desktopApp/PLAYER_TRANSPORT_ICONS.md` | Nine supplied transport SVGs have documented upstream geometry and GPL attribution. Custom tab vectors must be translated faithfully; not replaced with generic Material tabs. SF Pro redistribution permission is not established by the existing asset files alone |
 
-Current visual differences cannot be measured because neither a Flutter build nor matched reference/Flutter captures exist. No pixel-perfect claim, widget-test result, Windows native behavior or memory improvement is established. See the Phase 1 verification ledger in MIGRATION_PROGRESS for the exact SDK access failure and resumption gates. The original Phase 0 inventory below remains unchanged.
+At this initial checkpoint, visual differences could not be measured because
+neither a Flutter build nor matched captures existed. The later hosted evidence
+and its limits are recorded below. The original Phase 0 inventory remains
+unchanged.
 
-## Phase 1 source implementation status (runtime validation pending)
+## Phase 1 source implementation status — historical pre-CI snapshot
 
-The earlier “implementation blocked” record describes the SDK/bootstrap state of the preceding attempt. The current continuation has authored the Flutter shell source under `flutterDesktop/` and a GitHub-hosted fallback workflow; the SDK/artifact block still prevents local Flutter validation. The original P01–P38 rows and reference hash inventory remain specification evidence, not accepted parity.
+The rows below describe the implementation before hosted runtime validation.
+They preserve that checkpoint's authored scope; the hosted shell evidence
+update that follows supersedes their pending-test/build statements. P01–P38
+and the reference hash inventory remain specifications, not accepted feature
+parity.
 
 | Reference domains | Source now authored | Verification and remaining gaps |
 |---|---|---|
@@ -191,6 +201,31 @@ The earlier “implementation blocked” record describes the SDK/bootstrap stat
 | P01/P27/P28 lifecycle/platform | Real window_manager adapter and application observer with bounded caches, explicit close and ordered preference drain | Native host generation/build/launch is pending a usable SDK; Windows/Linux capabilities are not verified |
 
 Official platform hosts will be produced solely by `flutter create` through the checked-in initialization tool on an SDK-capable runner. The Actions workflow has not been run here. Package source hashes and Dart grammar parsing cannot prove the code compiles. Standard header/disconnected content, fallback typography, template platform icons, missing Mica/caption materials, unimplemented legacy top player/PiP and incomplete motion are recorded visual gaps. No runtime parity percentage, pixel-perfect claim or RAM improvement is reported. Phase 2 remains unstarted.
+
+### Phase 1 hosted shell evidence update — 2026-11-12
+
+The Windows/Linux Flutter foundation is now buildable and launch-verified in
+GitHub Actions run
+[43156992243](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43156992243):
+13 tests per OS, zero failures/skips, release bundles, two client sizes, six
+appearance/account/drawer states, fullscreen restoration and successful native
+close. The complete pinned Kotlin Windows/Linux tests and package builds passed
+in [43156276992](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43156276992),
+including protected-source preservation, native DLL/JNI/model checks, and a
+fresh-profile Windows shell capture. The prior Windows `buildAnalysisNative`
+failure is resolved using MSVC and externally supplied Windows SDK headers;
+protected reference source remains unchanged.
+
+At matched hosted Windows client sizes, the extra Flutter navigation row is
+removed and sidebar, account footer, and dock geometry align closely with the
+Kotlin shell. The Home title ink starts at y=16 in both Windows captures, though
+fallback glyph shape and width still differ. Live Kotlin home-feed content and
+the disconnected Flutter placeholder are different states and are excluded
+from common-shell parity judgments. The current hosted Linux Flutter heading
+starts at y=15; its prior local Kotlin pairing predates this final offset change.
+SF Pro redistribution permission, exact Haze/noise/feed material and motion,
+native caption/Mica/icons, and broad DPI/focus/accessibility verification remain
+open. This evidence does not establish full visual parity or authorize Phase 2.
 
 ## Complete tracked reference inventory
 

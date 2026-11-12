@@ -542,3 +542,50 @@ test used the removed `debugDefaultTargetPlatformOverride` test API. That test
 now checks both platform-to-gutter measurements directly, while the existing
 Linux widget bounds test confirms the gutter in layout. No build/test result is
 inferred from the failed analyzer run; a fresh matrix is pending.
+
+## Phase 1 latest verification — 2026-11-12
+
+The fresh Flutter matrix [43156992243](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43156992243)
+completed successfully on source `8d607663`. Windows and Linux each passed
+formatting, analysis, all **13 tests** (zero failed/skipped), release packaging,
+actual shell launch, 1220×780 and 900×600 client captures, six named account,
+drawer and appearance states, and F11/Escape restoration. Both native close
+smokes exited with code 0. The GitHub retention job passed and its verified
+evidence commit `b50c5788` is on this branch. The retained Windows JSON records
+the hosted 96-DPI display and the Linux JSON records Xvfb/Openbox at 96 DPI.
+
+The full pinned Kotlin reference workflow [43156276992](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43156276992)
+also completed successfully. Linux and Windows each passed all 857 tests with
+zero failures/errors/skips and built the distributable. The Windows native
+analysis, SMTC, and window DLL tasks, JNI/model packaging audit, protected-source
+preservation check, and fresh-profile 1220×780/900×600 shell capture all passed.
+The `:desktopApp:buildAnalysisNative` failure was diagnosed as a toolchain/header
+configuration issue: MinGW's C++/WinRT path fails on ambiguous/incomplete
+Windows Runtime types. The reference build now uses MSVC with the required
+Windows SDK headers supplied by external Gradle initialization; no protected
+Kotlin or native reference source was changed. The reference tree remains
+byte-identical to the pinned commit for all 700 tracked files in the protected
+desktopApp/shared/sharedUi/native paths.
+
+The Flutter native captures are retained under `flutterDesktop/verification/`.
+Review against the pinned Windows images in
+`flutterDesktop/verification/phase1-shell-correction/` at matching client sizes
+confirmed that the extra navigation row is gone, sidebar width/dividers/footer
+and dock placement align closely, account controls are present in the expanded
+sidebar, and the Home title ink now begins at y=16 in both 96-DPI Windows
+captures. The title still differs in x/width and glyph shape (fallback font);
+matching its top coordinate does not establish typography parity. The 900×600
+Kotlin home has live catalog content while Flutter deliberately shows its
+disconnected placeholder, so body pixels are not comparable. The earlier local
+Linux Kotlin/Flutter pair is not a post-adjustment pair; the final hosted Linux
+Flutter capture shows the heading at y=15, but no refreshed same-session Linux
+Kotlin pairing has been recorded.
+
+Remaining visual acceptance gaps are explicit: SF Pro redistribution rights
+are not established and fallback glyph widths/wrapping differ; exact Haze/noise,
+feed material and motion are not reproduced; native Windows caption/Mica/icon
+behavior is not part of the Flutter client capture; and a broader physical DPI,
+focus, accessibility and native-theme matrix remains unverified. No full-frame
+visual parity is claimed. Foundation and hosted lifecycle gates pass, while
+Phase 1 visual acceptance remains **INCOMPLETE** pending these gaps and a final
+matched Linux capture review. Phase 2 remains unstarted.
