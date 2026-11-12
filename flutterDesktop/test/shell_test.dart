@@ -207,7 +207,7 @@ void main() {
     await mount(tester, const Size(1220, 780));
     expect(
       tester.getTopLeft(find.byKey(const Key('page-heading'))),
-      const Offset(236, 10),
+      const Offset(236, 9),
     );
     expect(
       find.text('Home'),
@@ -234,6 +234,16 @@ void main() {
       );
     }
     expect(tester.getSize(find.byKey(const Key('dock-volume'))).width, 72);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('Windows Home title matches the pinned glyph top', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await mount(tester, const Size(1220, 780));
+    expect(
+      tester.getTopLeft(find.byKey(const Key('page-heading'))),
+      const Offset(236, 5),
+    );
     expect(tester.takeException(), isNull);
   });
   testWidgets(

@@ -209,7 +209,13 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                     padding: EdgeInsets.fromLTRB(
                                       16,
                                       widget.destination == Destination.home
-                                          ? 10
+                                          // Fallback font ink metrics differ by
+                                          // desktop OS; these settle HomeTitle's
+                                          // first visible baseline to Kotlin.
+                                          ? Theme.of(context).platform ==
+                                                TargetPlatform.windows
+                                              ? 5
+                                              : 9
                                           : 16,
                                       16,
                                       ShellMetrics.contentBottomReserve,

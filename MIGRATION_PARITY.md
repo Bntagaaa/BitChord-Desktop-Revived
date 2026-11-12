@@ -1174,5 +1174,9 @@ SHA-256/run provenance are retained under
 [`phase1-shell-correction/`](flutterDesktop/verification/phase1-shell-correction/).
 The process-window enumeration fixes the previous helper's `.NET MainWindowHandle`
 false negative. The first paired shell review confirmed the Home title was lower
-in Flutter; its gutter adjustment to 10 dp is pending both platform CI. No
+in Flutter. Pixel checks at 96 DPI found Home title ink at y=16 in Kotlin; the
+prior Flutter captures were at y=27 on Windows and y=23 on local Linux due to
+fallback font insets. The final code measures 5 dp for Windows and 9 dp for Linux,
+with a widget assertion for each platform; that final adjustment awaits hosted
+native captures. No
 Windows reference lifecycle pass is inferred from capture-only termination.

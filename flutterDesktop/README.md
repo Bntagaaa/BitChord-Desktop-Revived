@@ -50,7 +50,7 @@ The smoke requires a visible display large enough for both client sizes at
 
 The workflow `.github/workflows/flutter-desktop.yml` generates official hosts,
 records `flutter doctor -v`/SDK provenance, resolves packages, checks formatting,
-analyzes, runs twelve tests and builds release bundles on Linux and Windows. Native
+analyzes, runs thirteen tests and builds release bundles on Linux and Windows. Native
 smokes launch the release executable, capture painted 1220×780 and 900×600
 **client** surfaces, check responsive sidebar/dock landmarks and close through
 the native window path with exit code zero. Actual F11/Escape input verifies

@@ -520,3 +520,9 @@ ink offset on Windows, so the Flutter Home top gutter has been adjusted from 16
 to 10 dp to match the Kotlin HomeTitle's 8 dp padding plus platform font inset.
 The layout assertion now checks the new measured heading location. Cross-platform
 build/test/capture verification of this final spacing adjustment is pending.
+
+The native font fallback ink inset also differs between Windows and Linux. The
+final heading therefore uses measured 5 dp and 9 dp top gutters on those systems,
+respectively, with an added platform-specific widget assertion. The Windows pixel
+comparison and local Linux client captures supply the measurements; the complete
+refreshed matrix must pass before this adjustment is verified.
