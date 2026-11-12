@@ -200,8 +200,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
   test('Desktop typography uses explicit, rights-safe font fallbacks', () {
-    final typography =
-        bitChordTheme(BitChordPalette.light, Brightness.light).textTheme;
+    final typography = bitChordTheme(
+      BitChordPalette.light,
+      Brightness.light,
+    ).textTheme;
     expect(typography.bodyMedium!.fontFamily, 'SF Pro Display');
     expect(typography.bodyMedium!.fontFamilyFallback, contains('Inter'));
     expect(typography.bodyMedium!.fontFamilyFallback, contains('Segoe UI'));

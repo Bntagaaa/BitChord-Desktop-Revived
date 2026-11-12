@@ -789,7 +789,10 @@ class _EmptyDock extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       if (!compact) ...[
@@ -843,7 +846,11 @@ class _EmptyDock extends StatelessWidget {
                       Row(
                         spacing: 1,
                         children: [
-                          _DockButton('lyrics', label: 'Lyrics', palette: palette),
+                          _DockButton(
+                            'lyrics',
+                            label: 'Lyrics',
+                            palette: palette,
+                          ),
                           if (!compact)
                             _DockButton(
                               'pip',
@@ -851,7 +858,11 @@ class _EmptyDock extends StatelessWidget {
                               palette: palette,
                               icon: Icons.picture_in_picture_alt_rounded,
                             ),
-                          _DockButton('up_next', label: 'Queue', palette: palette),
+                          _DockButton(
+                            'up_next',
+                            label: 'Queue',
+                            palette: palette,
+                          ),
                           if (!compact) ...[
                             _DockButton(
                               'details',
@@ -868,28 +879,31 @@ class _EmptyDock extends StatelessWidget {
                           ],
                           if (!compact)
                             Tooltip(
-                            message: 'Volume — playback is unavailable',
-                            child: Semantics(
-                              key: const Key('dock-volume'),
-                              label: 'Volume',
-                              enabled: false,
-                              child: SizedBox(
-                                width: 72,
-                                height: 29,
-                                child: Center(
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: palette['foreground'].withValues(
-                                        alpha: .30,
+                              message: 'Volume — playback is unavailable',
+                              child: Semantics(
+                                key: const Key('dock-volume'),
+                                label: 'Volume',
+                                enabled: false,
+                                child: SizedBox(
+                                  width: 72,
+                                  height: 29,
+                                  child: Center(
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: palette['foreground'].withValues(
+                                          alpha: .30,
+                                        ),
+                                        borderRadius: BorderRadius.circular(2),
                                       ),
-                                      borderRadius: BorderRadius.circular(2),
+                                      child: const SizedBox(
+                                        width: 72,
+                                        height: 4,
+                                      ),
                                     ),
-                                    child: const SizedBox(width: 72, height: 4),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ],

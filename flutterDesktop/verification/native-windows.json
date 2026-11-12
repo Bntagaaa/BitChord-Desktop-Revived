@@ -1,77 +1,77 @@
 {
-  "dpi": 96,
-  "display": "GitHub Windows hosted desktop",
+  "fullscreen": "F11 entered; Escape restored 900x600",
   "appearance_captures": [
     {
       "expected_theme": "any",
+      "state": "accounts",
       "background_rgb": [
         247,
         248,
         251
-      ],
-      "state": "accounts"
+      ]
     },
     {
       "expected_theme": "drawer",
+      "state": "drawer",
       "background_rgb": [
         183,
         184,
         186
-      ],
-      "state": "drawer"
+      ]
     },
     {
       "expected_theme": "light",
+      "state": "settings",
       "background_rgb": [
         247,
         248,
         251
-      ],
-      "state": "settings"
+      ]
     },
     {
       "expected_theme": "dark",
+      "state": "dark",
       "background_rgb": [
         32,
         32,
         32
-      ],
-      "state": "dark"
+      ]
     },
     {
       "expected_theme": "black",
+      "state": "pitch-black",
       "background_rgb": [
         0,
         0,
         0
-      ],
-      "state": "pitch-black"
+      ]
     },
     {
       "expected_theme": "light",
+      "state": "light",
       "background_rgb": [
         247,
         248,
         251
-      ],
-      "state": "light"
+      ]
     }
   ],
-  "fullscreen": "F11 entered; Escape restored 900x600",
   "exit_code": 0,
   "captures": [
     {
-      "logo_contrast": 0.39869281045751637,
       "sampled_colors": 104,
       "height": 780,
-      "width": 1220
+      "width": 1220,
+      "logo_contrast": 0.39869281045751637
     },
     {
-      "logo_contrast": 0.39869281045751637,
       "sampled_colors": 85,
       "height": 600,
-      "width": 900
+      "width": 900,
+      "logo_contrast": 0.39869281045751637
     }
   ],
-  "source_commit": "6b41e03315c7cb88142e282889ce7911d2385a9f"
+  "dpi": 96,
+  "display": "GitHub Windows hosted desktop",
+  "source_commit": "5b009ddf9147621701688704b905fc78a8bfe9f4"
 }
