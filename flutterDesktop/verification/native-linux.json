@@ -4,14 +4,14 @@
     {
       "width": 1220,
       "height": 780,
-      "colors": 923,
-      "geometry": "WINDOW=2097155\nX=42\nY=100\nWIDTH=1220\nHEIGHT=780\nSCREEN=0\n"
+      "colors": 1813,
+      "geometry": "WINDOW=4194307\nX=42\nY=100\nWIDTH=1220\nHEIGHT=780\nSCREEN=0\n"
     },
     {
       "width": 900,
       "height": 600,
-      "colors": 678,
-      "geometry": "WINDOW=2097155\nX=42\nY=100\nWIDTH=900\nHEIGHT=600\nSCREEN=0\n"
+      "colors": 42349,
+      "geometry": "WINDOW=4194307\nX=42\nY=100\nWIDTH=900\nHEIGHT=600\nSCREEN=0\n"
     }
   ],
   "exit_code": 0,
