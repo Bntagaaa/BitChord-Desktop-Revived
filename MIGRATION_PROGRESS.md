@@ -929,3 +929,59 @@ media removed afterward. Numeric/status-only evidence is retained under
 `verification/phase4/local-jiosaavn-live.json`. Follow-up safeguards add LRU/
 credential-origin/weak-validator tests and stale offline-selection fencing;
 these need the follow-up exact-SHA CI run before their platform promotion.
+
+## Phase 4 final verified handoff for this increment — 2026-11-12
+
+**Phase 4 status: INCOMPLETE. Phase 5 NOT STARTED.** This handoff delivers the
+implemented catalog/progressive-source/download increment and deferred probe
+correction. It does not claim completion of the entire Phase 4 playbook.
+
+Final application validation:
+[a20f6f4bfb2af70e7c1ed7b7c36197d5f3881756 / run 43212024128](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43212024128),
+terminal **SUCCESS** for Linux, Windows and trusted retention. Both complete
+artifacts were downloaded and inspected under `/tmp/phase4-final-linux` and
+`/tmp/phase4-final-windows` (local paths, no binaries committed). Verified
+retention commit `6b4f6cf5` was fast-forwarded without overwriting work. This
+subsequent root-document handoff does not modify validated application code.
+
+| Executed check | Linux x64 / Ubuntu 22.04 | Windows x64 / Server 2022 |
+|---|---|---|
+| Enforced dependency lock, format, fatal analyzer | PASS | PASS |
+| Flutter controller/widget/shell tests | **35 passed**, 0 failed/skipped | **35 passed**, 0 failed/skipped |
+| Native CTests, including seven-codec corpus and ABI lifecycle | **2/2 PASS** | **2/2 PASS** |
+| Read-only export checks; real FFI/SQLite/import; Kotlin queue corpus | 3/3 PASS; 450 transitions PASS | 3/3 PASS; 450 transitions PASS |
+| Production HTTP/add-on/JioSaavn protocol fixtures, credential isolation, LRU/validator/expiry/cancel/deadline/download recovery | PASS | PASS |
+| Actual FFmpeg decode through isolated HTTP broker | **384000 exact PCM frames**, zero live decoders afterward | **384000 exact PCM frames**, zero live decoders afterward |
+| Release bundle and native GUI/fullscreen/appearance/close | PASS, native exit 0 | PASS, native exit 0 |
+| Probe default EOF beyond old 30-second limit | **31.25-second WAV**, 1500000 exact presented frames; timeout/failure/usage regressions PASS | Argument/missing-file cases PASS; long output **BLOCKED: no WASAPI endpoint**, error 105, zero frames |
+
+Both artifact `phase4-http.json`, `phase3-platform.json`, native/FFI/test/analyze/
+build/launch logs and native GUI JSON were inspected. Captures show actual guest
+Home catalog rows on both platforms, but are not matching reference content or
+full visual parity evidence. Local new broker decoder process also passed
+ASan/UBSan/leak checks (GCC 16.2.1, FFmpeg n9.0.2; standalone Dart 3.13.7). Original Kotlin application/shared/native trees have no
+task diff. No full local Flutter build was claimed; CI used the pinned SDK.
+
+Additional **Linux-only live/fixture evidence**: anonymous YouTube Music search/
+Home catalog calls; JioSaavn catalog→resolution→bounded range→native software
+sink; 12487540-byte live download→hash-verified offline reopen→native software
+sink; 32.5-second FLAC EOF with `--timeout 45` and 1433250 exact presented frames.
+Test media was temporary and removed. These are software-sink/network results,
+not new physical speaker, calibrated latency or Windows live-provider results.
+
+**Open implementation and acceptance gates:** YouTube player cipher/client/
+PoToken integration (evaluated resolver returned a URL but media HTTP 403/zero
+bytes); Google/Spotify accounts, protected storage/import/refresh and library;
+custom-module runtime; reference source matching/order/racing/upgrades; full
+shelf/filter/suggestions/artist/owned-playlist mutations and visual parity;
+manifest download/remux, download queue/quality/settings parity; complete native
+source-purpose/durable span-cache and failure matrix. The current catalog UI
+explicitly reports its 800-item paging bound. Windows physical output and prior
+Phase 3 hotplug/latency/soak gates remain open. No whole feature row is declared
+PARITY_ACCEPTED and no RAM reduction is claimed.
+
+Next concrete work stays in **Phase 4**: establish a verified protected desktop
+account/browser/PoToken path with dedicated authorized sessions, verify actual
+YouTube media access, then complete source-policy/manifest/catalog gaps and their
+cross-platform recovery scenarios. The missing functionality above is not
+presented as a working integration or as solely an external testing blocker.

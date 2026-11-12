@@ -1396,3 +1396,28 @@ P08 progressive-file subset has additional local **live-provider evidence**:
 JioSaavn 12487540-byte download, verified offline reopen and actual native
 software-sink frames from the saved file. This does not close manifest downloads,
 account isolation, Windows live output or the broader download lifecycle gates.
+
+### Phase 4 final increment platform ledger — 2026-11-12
+
+Authoritative final code: **a20f6f4bfb2af70e7c1ed7b7c36197d5f3881756**;
+[run 43212024128](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43212024128)
+Windows/Linux/retention **SUCCESS**, both artifacts inspected. Retention
+`6b4f6cf5` adds verified generated evidence. 35 Flutter tests per OS, 2 native
+CTests, 3 export checks, real FFI/SQLite/import/450-transition corpus, enforced
+lock/format/analyze, release builds and native GUI/close passed.
+
+| IDs / subset | Final evidence class | Limits |
+|---|---|---|
+| P03/P04/P05 guest catalog/list/detail | PLATFORM_VERIFIED for delivered adapter/UI subset; Linux anonymous calls live-checked | Home native captures contain real guest rows on both OSs; full shelf/artwork/filter/artist/mutation/visual parity and paging beyond 800 remain open |
+| P17/P18 HTTP add-on/JioSaavn subset | PLATFORM_VERIFIED controlled protocols; JioSaavn live-checked on Linux | No custom module runtime or full matching/order/race/direct-source/upgrade policy. Server addresses are session-only |
+| P19/P11/P12 broker transport | PLATFORM_VERIFIED for controlled HTTP→native decode, 384000 exact frames per OS | Explicit cancellation/deadline/validator/expiry/credential-origin/capability isolation; full native source-purpose/cache/manifest contract incomplete. YouTube media spike HTTP 403/zero bytes is **not a playback pass** |
+| P08/P35/P36 progressive download/cache subset | PLATFORM_VERIFIED controlled recovery; additional Linux live-provider download/offline output | LRU eviction, weak-validator rejection, interruption/resume, corrupt-file rejection and offline reopen/removal verified. No manifest/remux, full download queue/settings, account or complete disk-fault matrix acceptance |
+| P11/P13 deferred probe | PLATFORM_VERIFIED for Linux software-sink >30-second EOF and CLI outcomes; local FLAC FIXTURE_TESTED | Default EOF and configurable positive timeout; 31.25-second WAV/32.5-second FLAC exact frames. Windows long output BLOCKED/no endpoint; prior physical gates unchanged |
+| P06/P20/P21 and account-specific portions | PLANNED / not implemented or integration-verified | Protected Google/Spotify sessions/browser import/refresh/library and dedicated account scenarios remain outstanding |
+
+Local new HTTP decoder process passed ASan/UBSan/leak verification. No Kotlin
+reference changes, fake catalog/playback/login success, secret-bearing fixtures,
+matched process-memory result or whole-P-ID PARITY_ACCEPTED claim. **Phase 4 is
+INCOMPLETE** for the explicitly listed implementation and acceptance gaps;
+**Phase 5 has not started**. MIGRATION_PROGRESS's final Phase 4 handoff provides
+the complete platform table and concrete next work.
