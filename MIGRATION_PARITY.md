@@ -1177,6 +1177,7 @@ false negative. The first paired shell review confirmed the Home title was lower
 in Flutter. Pixel checks at 96 DPI found Home title ink at y=16 in Kotlin; the
 prior Flutter captures were at y=27 on Windows and y=23 on local Linux due to
 fallback font insets. The final code measures 5 dp for Windows and 9 dp for Linux,
-with a widget assertion for each platform; that final adjustment awaits hosted
+with a metric assertion for both platforms and a Linux widget bounds assertion;
+that final adjustment awaits hosted
 native captures. No
 Windows reference lifecycle pass is inferred from capture-only termination.

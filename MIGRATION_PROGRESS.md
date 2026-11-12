@@ -523,8 +523,8 @@ build/test/capture verification of this final spacing adjustment is pending.
 
 The native font fallback ink inset also differs between Windows and Linux. The
 final heading therefore uses measured 5 dp and 9 dp top gutters on those systems,
-respectively, with an added platform-specific widget assertion. The Windows pixel
-comparison and local Linux client captures supply the measurements; the complete
+respectively, with platform-metric and Linux widget-geometry assertions. The
+Windows pixel comparison and local Linux client captures supply the measurements; the complete
 refreshed matrix must pass before this adjustment is verified.
 
 Run `43156122632` reached formatting on both platforms and stopped because the
@@ -535,3 +535,10 @@ the publisher SHA-256 `eb99aed266efbcb615c6ae21c12f52cfe935b9f208bccc5fea7f64c21
 and used to format only `desktop_shell.dart` and `shell_test.dart`. All 15 Dart
 files now pass the local language-version-3.11 formatter check. A fresh full
 Windows/Linux run with thirteen tests is pending.
+
+That run [43156599265](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43156599265)
+passed formatting but failed analysis because the new Windows-position widget
+test used the removed `debugDefaultTargetPlatformOverride` test API. That test
+now checks both platform-to-gutter measurements directly, while the existing
+Linux widget bounds test confirms the gutter in layout. No build/test result is
+inferred from the failed analyzer run; a fresh matrix is pending.

@@ -212,10 +212,9 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                           // Fallback font ink metrics differ by
                                           // desktop OS; these settle HomeTitle's
                                           // first visible baseline to Kotlin.
-                                          ? Theme.of(context).platform ==
-                                                    TargetPlatform.windows
-                                                ? 5
-                                                : 9
+                                          ? desktopHomeHeadingTopPadding(
+                                              Theme.of(context).platform,
+                                            )
                                           : 16,
                                       16,
                                       ShellMetrics.contentBottomReserve,
@@ -1003,3 +1002,6 @@ class _AppearancePanel extends ConsumerWidget {
     );
   }
 }
+
+double desktopHomeHeadingTopPadding(TargetPlatform platform) =>
+    platform == TargetPlatform.windows ? 5 : 9;

@@ -13,6 +13,7 @@ import 'package:bitchord_desktop/design_system/palette.dart';
 import 'package:bitchord_desktop/design_system/theme.dart';
 import 'package:bitchord_desktop/features/shell/application/shell_controller.dart';
 import 'package:bitchord_desktop/features/shell/domain/shell_settings.dart';
+import 'package:bitchord_desktop/features/shell/presentation/desktop_shell.dart';
 
 final class TestDiagnostics implements FailureReporter {
   final failures = <String>[];
@@ -236,17 +237,9 @@ void main() {
     expect(tester.getSize(find.byKey(const Key('dock-volume'))).width, 72);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('Windows Home title matches the pinned glyph top', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    await mount(tester, const Size(1220, 780));
-    expect(
-      tester.getTopLeft(find.byKey(const Key('page-heading'))),
-      const Offset(236, 5),
-    );
-    expect(tester.takeException(), isNull);
+  test('Home heading offsets follow platform font fallback measurements', () {
+    expect(desktopHomeHeadingTopPadding(TargetPlatform.windows), 5);
+    expect(desktopHomeHeadingTopPadding(TargetPlatform.linux), 9);
   });
   testWidgets(
     'Account menu is honest, anchored and dismisses before fullscreen',
