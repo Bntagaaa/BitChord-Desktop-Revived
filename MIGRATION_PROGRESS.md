@@ -901,3 +901,31 @@ catalog/shelf/artist/mutation/quick-search parity, manifest downloads and comple
 recovery/platform scenarios. Required account scenarios cannot be verified
 without authorized test sessions. These are explicit unfinished Phase 4 gates;
 compiled code or fixture success does not resolve them.
+
+### Phase 4 first platform result and live limits
+
+First implementation matrix **SUCCESS**:
+[43209360258](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43209360258)
+at `a343213ef267592a49e0156fe9b61c89cc560a96`; Linux, Windows and retention all
+passed. Both artifacts inspected: 32 Flutter tests per OS, 2 native CTests,
+3 export checks, FFI/SQLite/import/450 queue transitions, format/analyze/lockfile,
+release and native GUI/close. Both OSs decoded 384000 exact PCM frames through
+the real HTTP broker. Linux long WAV EOF passed at 1500000 frames; Windows
+no-device 105 remains a blocked physical/long-output gate.
+
+Additional local Linux proof: a 32.5-second FLAC reached EOF under `--timeout 45`
+with 1433250 presented frames. Real JioSaavn search/resolution/range and a native
+software-sink stream trial passed (39093 frames before deliberate timeout).
+YouTube's independently evaluated, hash-verified yt-dlp/Node resolver produced
+an Opus URL, but **actual media returned HTTP 403 with zero bytes**; do not call
+that working YouTube audio. No resolver binaries or signed data are committed.
+Protected accounts/Spotify/PoToken/module/runtime and other listed gaps remain
+open. Phase 4 remains **INCOMPLETE**, with no automatic Phase 5 advancement.
+
+Additional real Linux JioSaavn download/offline trial: 12487540 bytes saved into
+a temporary test-owned directory, all hashes verified on reopen, native offline
+software-sink output 41759 presented frames before intentional timeout; test
+media removed afterward. Numeric/status-only evidence is retained under
+`verification/phase4/local-jiosaavn-live.json`. Follow-up safeguards add LRU/
+credential-origin/weak-validator tests and stale offline-selection fencing;
+these need the follow-up exact-SHA CI run before their platform promotion.

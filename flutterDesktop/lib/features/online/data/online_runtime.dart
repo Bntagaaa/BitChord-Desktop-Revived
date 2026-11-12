@@ -151,12 +151,14 @@ final class OnlineRuntime implements OnlinePort {
       .map((d) => DownloadedEntry(d.entry, d.bytes))
       .toList();
   @override
-  Future<void> playOffline(CatalogEntry entry) async {
+  Future<void> playOffline(CatalogEntry entry, RequestScope scope) async {
     final rows = await store.list();
+    scope.check();
     final download = rows.where((d) => d.entry.key == entry.key).firstOrNull;
     if (download == null)
       throw const ProviderFailure(ProviderProblem.integrity);
     await _ordered(() async {
+      scope.check();
       await playback.playLocal(
         QueueEntry(
           entryId:

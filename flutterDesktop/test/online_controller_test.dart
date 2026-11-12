@@ -12,6 +12,8 @@ import '../lib/features/online/presentation/catalog_surface.dart';
 final class ControlledCatalog implements OnlinePort {
   final requests = <String, Completer<CatalogPage>>{};
   final scopes = <String, RequestScope>{};
+  Completer<void>? offlineGate;
+  RequestScope? offlineScope;
   @override
   List<String> get providers => ['youtube', 'addon', 'jiosaavn'];
   @override
@@ -52,7 +54,12 @@ final class ControlledCatalog implements OnlinePort {
     RequestScope scope,
   ) async => throw const ProviderFailure(ProviderProblem.unsupported);
   @override
-  Future<void> playOffline(CatalogEntry entry) async {}
+  Future<void> playOffline(CatalogEntry entry, RequestScope scope) async {
+    offlineScope = scope;
+    await offlineGate?.future;
+    scope.check();
+  }
+
   @override
   Future<void> pause() async {}
   @override
@@ -105,6 +112,61 @@ void main() {
     expect(container.read(catalogProvider).entries.single.id, 'new');
     expect(container.read(catalogProvider).provider, 'addon');
   });
+  test('catalog bound is explicit and stops further continuation', () async {
+    final port = ControlledCatalog();
+    final container = ProviderContainer(
+      overrides: [onlinePortProvider.overrideWithValue(port)],
+    );
+    addTearDown(container.dispose);
+    final pending = container
+        .read(catalogProvider.notifier)
+        .load(query: 'large');
+    port.requests['large']!.complete(
+      CatalogPage(
+        List.generate(
+          801,
+          (i) => CatalogEntry(provider: 'youtube', id: '$i', title: 'Track $i'),
+        ),
+        continuation: 'more',
+      ),
+    );
+    await pending;
+    expect(container.read(catalogProvider).entries.length, 800);
+    expect(container.read(catalogProvider).error, contains('first 800'));
+    expect(container.read(catalogProvider).continuation, isNull);
+  });
+  test('superseded offline selection is cancelled before adoption', () async {
+    final port = ControlledCatalog()..offlineGate = Completer<void>();
+    final container = ProviderContainer(
+      overrides: [onlinePortProvider.overrideWithValue(port)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(catalogProvider.notifier);
+    const track = CatalogEntry(provider: 'youtube', id: 'id', title: 'Track');
+    final old = controller.play(track, offline: true);
+    await controller.play(track);
+    expect(port.offlineScope!.cancelled, isTrue);
+    port.offlineGate!.complete();
+    expect(await old, contains('cancelled'));
+  });
+  test(
+    'missing bootstrap port cannot report successful provider actions',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(catalogProvider.notifier);
+      expect(
+        await controller.connect('https://example.invalid'),
+        contains('unavailable'),
+      );
+      expect(
+        await controller.play(
+          const CatalogEntry(provider: 'youtube', id: 'id', title: 'Track'),
+        ),
+        contains('unavailable'),
+      );
+    },
+  );
   test('unsupported resolution stays an explicit failure', () async {
     final container = ProviderContainer(
       overrides: [onlinePortProvider.overrideWithValue(ControlledCatalog())],

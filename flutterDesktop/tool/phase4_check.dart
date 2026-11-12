@@ -34,6 +34,13 @@ Future<void> fails(
 Future<void> main(List<String> arguments) async {
   final directory = await Directory.systemTemp.createTemp('bitchord-phase4-');
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  final cross = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  var crossOriginRequests = 0;
+  cross.listen((r) async {
+    crossOriginRequests++;
+    r.response.write('{}');
+    await r.response.close();
+  });
   final base = Uri.parse('http://127.0.0.1:${server.port}/');
   final bytes = Uint8List(44 + 384000 * 4);
   final wav = ByteData.sublistView(bytes);
@@ -60,6 +67,14 @@ Future<void> main(List<String> arguments) async {
   server.listen((r) async {
     try {
       final path = r.uri.path;
+      if (path == '/redirect') {
+        r.response.statusCode = 302;
+        r.response.headers.set(
+          'Location',
+          'http://127.0.0.1:${cross.port}/secret',
+        );
+        return;
+      }
       if (path == '/slow') {
         await Future<void>.delayed(const Duration(seconds: 1));
         r.response.write('{}');
@@ -146,7 +161,10 @@ Future<void> main(List<String> arguments) async {
         );
         return;
       }
-      if (path == '/media' || path == '/wrong-range' || path == '/changed') {
+      if (path == '/media' ||
+          path == '/wrong-range' ||
+          path == '/changed' ||
+          path == '/large') {
         final match = RegExp(
           r'^bytes=(\d+)-(\d+)$',
         ).firstMatch(r.headers.value('range') ?? '');
@@ -160,15 +178,20 @@ Future<void> main(List<String> arguments) async {
           r.response.statusCode = 503;
           return;
         }
-        final end = askedEnd < bytes.length ? askedEnd : bytes.length - 1;
+        final total = path == '/large' ? 12 * RangeSource.span : bytes.length;
+        final end = askedEnd < total ? askedEnd : total - 1;
         r.response.statusCode = 206;
         r.response.headers.set('ETag', tag);
         r.response.headers.set(
           'Content-Range',
-          'bytes ${path == '/wrong-range' ? start + 1 : start}-$end/${bytes.length}',
+          'bytes ${path == '/wrong-range' ? start + 1 : start}-$end/$total',
         );
         r.response.contentLength = end - start + 1;
-        r.response.add(bytes.sublist(start, end + 1));
+        r.response.add(
+          path == '/large'
+              ? Uint8List(end - start + 1)
+              : bytes.sublist(start, end + 1),
+        );
         return;
       }
       r.response.statusCode = 404;
@@ -293,6 +316,37 @@ Future<void> main(List<String> arguments) async {
     );
     report['youtube_parser'] =
         'PASS: rows, duplicates, continuation (synthetic fixture, not live parity)';
+    await fails(
+      () => http.request(
+        base.resolve('redirect'),
+        RequestScope(),
+        headers: {'X-Api-Key': 'fixture-secret'},
+      ),
+      ProviderProblem.unsupported,
+    );
+    check(
+      crossOriginRequests == 0,
+      'Credentialed redirect blocked before request',
+    );
+    final eviction = source('large');
+    requests.clear();
+    for (var i = 0; i < 9; i++) {
+      await eviction.chunk(i);
+    }
+    await eviction.chunk(0);
+    check(
+      requests.where((offset) => offset == 0).length == 2,
+      'Eight-span LRU eviction',
+    );
+    eviction.close();
+    requests.clear();
+    tag = 'W/"weak-validator"';
+    final weak = source();
+    await weak.chunk(0);
+    check(weak.validator == null, 'Weak ETag must not authorize byte resume');
+    weak.close();
+    tag = '"revision-1"';
+    requests.clear();
     final range = source();
     check((await range.chunk(0)).length == RangeSource.span, 'Span size');
     await range.chunk(0);
@@ -331,7 +385,7 @@ Future<void> main(List<String> arguments) async {
       ProviderProblem.timeout,
     );
     report['transport'] =
-        'PASS: cache, bounded spans/body, validator/range corruption, expiry renewal, cancellation, timeout';
+        'PASS: LRU eviction, credential-origin isolation, bounded spans/body, validator/range corruption, expiry renewal, cancellation, timeout';
     final store = DownloadStore(Directory('${directory.path}/downloads'));
     final entry = page.entries.single;
     failAt = RangeSource.span;
@@ -409,6 +463,7 @@ Future<void> main(List<String> arguments) async {
     stdout.writeln(jsonEncode(report));
   } finally {
     await server.close(force: true);
+    await cross.close(force: true);
     await directory.delete(recursive: true);
   }
 }

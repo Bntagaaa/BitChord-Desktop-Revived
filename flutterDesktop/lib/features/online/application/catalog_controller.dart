@@ -32,7 +32,7 @@ final class CatalogView {
 }
 
 final class CatalogController extends Notifier<CatalogView> {
-  RequestScope? _queryScope, _playScope, _downloadScope;
+  RequestScope? _queryScope, _playScope, _downloadScope, _connectScope;
   int _generation = 0;
   bool _disposed = false;
   OnlinePort? get port => ref.read(onlinePortProvider);
@@ -50,6 +50,7 @@ final class CatalogController extends Notifier<CatalogView> {
     _queryScope?.cancel();
     _downloadScope?.cancel();
     _playScope?.cancel();
+    _connectScope?.cancel();
   }
 
   String _message(Object e) =>
@@ -89,11 +90,17 @@ final class CatalogController extends Notifier<CatalogView> {
               params: params,
             );
       if (_disposed || generation != _generation || scope.cancelled) return;
+      final combined = [if (more) ...before.entries, ...page.entries];
+      final limited =
+          combined.length > 800 ||
+          (combined.length == 800 && page.continuation != null);
       state = CatalogView(
-        entries: List.unmodifiable(
-          [if (more) ...before.entries, ...page.entries].take(800),
-        ),
-        continuation: page.continuation == before.continuation && more
+        entries: List.unmodifiable(combined.take(800)),
+        error: limited
+            ? 'Showing the first 800 items. Further paging is not yet supported.'
+            : null,
+        continuation:
+            limited || (page.continuation == before.continuation && more)
             ? null
             : page.continuation,
         provider: provider,
@@ -122,9 +129,12 @@ final class CatalogController extends Notifier<CatalogView> {
     more: true,
   );
   Future<String?> connect(String url) async {
-    final scope = RequestScope();
+    final api = port;
+    if (api == null) return 'Music services are unavailable.';
+    _connectScope?.cancel();
+    final scope = _connectScope = RequestScope();
     try {
-      await port?.connectAddon(url, scope);
+      await api.connectAddon(url, scope);
       return null;
     } catch (e) {
       return _message(e);
@@ -134,13 +144,15 @@ final class CatalogController extends Notifier<CatalogView> {
   }
 
   Future<String?> play(CatalogEntry entry, {bool offline = false}) async {
+    final api = port;
+    if (api == null) return 'Music services are unavailable.';
     _playScope?.cancel();
     final scope = _playScope = RequestScope();
     try {
       if (offline) {
-        await port?.playOffline(entry);
+        await api.playOffline(entry, scope);
       } else {
-        await port?.play(entry, AudioQuality.lossless, scope);
+        await api.play(entry, AudioQuality.lossless, scope);
       }
       return null;
     } catch (e) {
@@ -152,10 +164,12 @@ final class CatalogController extends Notifier<CatalogView> {
     CatalogEntry entry,
     void Function(int, int) progress,
   ) async {
+    final api = port;
+    if (api == null) return 'Music services are unavailable.';
     if (_downloadScope != null) return 'A download is already active.';
     final scope = _downloadScope = RequestScope();
     try {
-      await port?.download(entry, AudioQuality.lossless, scope, progress);
+      await api.download(entry, AudioQuality.lossless, scope, progress);
       return null;
     } catch (e) {
       return _message(e);

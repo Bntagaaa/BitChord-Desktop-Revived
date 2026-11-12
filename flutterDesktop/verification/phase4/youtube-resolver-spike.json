@@ -1,0 +1,18 @@
+{
+  "yt_dlp": "2026.10.26",
+  "node": "22.23.5",
+  "authenticated": false,
+  "resolver_exit": 0,
+  "js_failed": false,
+  "login_required": false,
+  "unavailable": false,
+  "audio_codec": "opus",
+  "video_codec": "none",
+  "media_status": 403,
+  "content_length": "0",
+  "content_range": null,
+  "redirect": false,
+  "failure": "expired",
+  "http_status": null,
+  "evidence_class": "local Linux software/network trial; physical audibility unverified"
+}

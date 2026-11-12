@@ -1,0 +1,17 @@
+{
+  "outcome": "EOF",
+  "shutdown_ok": true,
+  "phase": 4,
+  "error": 0,
+  "backend": 1,
+  "timing_quality": 2,
+  "position_us": 32500000,
+  "submitted_frames": 1433250,
+  "played_frames": 1433250,
+  "pcm_high_water": 705600,
+  "physical_audio": "unverified",
+  "fixture_seconds": 32.5,
+  "fixture_codec": "FLAC",
+  "configured_timeout": 45,
+  "evidence_class": "local Linux software/network trial; physical audibility unverified"
+}

@@ -1374,3 +1374,25 @@ commit adding this entry; platform results are pending exact-SHA CI inspection.
 
 **Phase 4 INCOMPLETE.** No whole feature row is PARITY_ACCEPTED. Phase 5 has not
 started and no memory improvement is claimed.
+
+### Phase 4 first exact-SHA matrix promotion and live results
+
+`a343213e` / [43209360258](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43209360258):
+Windows/Linux/retention SUCCESS, both artifacts inspected, 32 Flutter tests each,
+2 native CTests, real HTTP broker/384000 exact PCM frames, FFI/import corpus,
+release and GUI lifecycle. Promote the **implemented controlled HTTP/download/
+native-broker subsets** of P08/P11/P12/P17/P18/P19/P35/P36 to PLATFORM_VERIFIED;
+this is not promotion of whole feature rows or YouTube resolver support.
+P03/P04/P05 guest UI/catalog remains limited: real native Home captures show
+catalog rows on both OSs, without matched reference visual/semantic parity.
+Local JioSaavn catalog→resolution→range→native software-sink output is live-checked
+on Linux only. YouTube resolver spike URL→media returned 403/zero bytes, hence
+streaming **FAILED/UNVERIFIED**, and accounts/Spotify/module integration remain
+PLANNED/unimplemented. Local FLAC 32.5-second EOF is FIXTURE_TESTED; hosted Linux
+31.25-second EOF is PLATFORM_VERIFIED for a software sink. Windows no-device and
+all remaining physical gates stay open. Follow-up code requires its own CI SHA.
+
+P08 progressive-file subset has additional local **live-provider evidence**:
+JioSaavn 12487540-byte download, verified offline reopen and actual native
+software-sink frames from the saved file. This does not close manifest downloads,
+account isolation, Windows live output or the broader download lifecycle gates.

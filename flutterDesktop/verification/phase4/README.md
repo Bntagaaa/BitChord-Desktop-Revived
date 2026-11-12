@@ -120,3 +120,63 @@ Phase 4 cannot be accepted until real account/provider/resolver/audio and failur
 recovery have evidence on both platforms. No whole P-ID is PARITY_ACCEPTED, and
 no RAM saving, physical Windows sound, authenticated provider integration or
 custom-module execution is claimed. Next work remains in Phase 4.
+
+## Verified first Windows/Linux matrix and additional live evidence
+
+[a343213e / run 43209360258](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43209360258)
+finished **SUCCESS** on both OSs and retention. Both downloaded artifacts were
+inspected: **32 Flutter tests each**, 2/2 native CTests, 3/3 Kotlin export tests,
+real FFI/SQLite/import/450-transition corpus, fatal analyzer/format/lockfile,
+release bundle and native GUI/fullscreen/appearance/close (exit 0). Both OSs
+passed real HTTP/native broker decoding with **384000 exact PCM frames** and
+zero live decoders afterward. This is not full provider or visual parity.
+Hosted native Home captures contain actual anonymous catalog rows on both OSs;
+content varies by region/session and is not a matched Kotlin visual fixture.
+
+Linux's hosted 31.25-second WAV probe also reached EOF at exactly 1500000 frames.
+Windows still has no WASAPI endpoint (error 105, zero frames), so its long-song
+speaker/EOF test is **BLOCKED**, while argument and missing-file outcomes passed.
+Local additional **32.5-second FLAC**, `--timeout 45`, reached EOF with exactly
+1433250 submitted/presented frames and position 32500000 us. Redacted local
+records are `local-probe.json` and `local-flac-probe.json`.
+
+Actual Linux JioSaavn search returned 25 entries, resolved an audio location and
+validated a 524288-byte range with a validator. A fresh live resolution then
+played through the native engine/Pulse **software sink**: phase PLAYING, error 0,
+39093 presented frames before the intentional one-second timeout. See
+`local-jiosaavn-live.json` and opt-in `tool/phase4_jiosaavn_live.dart`.
+No Windows live JioSaavn or physical-output pass is claimed.
+
+The separate YouTube resolver spike used official yt-dlp **2026.10.26**
+(`yt-dlp_linux` SHA-256
+`767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795`)
+and official Node **22.23.5** (Linux archive SHA-256
+`cdeb8670a0c81f51b4dc4ac61919f9b1ad917b304bf8221eb939570663d240f8`).
+Both were downloaded into temporary storage, publisher hashes verified, and
+config/plugin/remote-component loading disabled. The original public test video
+was unavailable; a current real catalog track then resolved an **Opus/audio-only
+URL**, but its actual media range returned **HTTP 403 / zero bytes**. This is a
+failed streaming proof despite resolver exit 0. `youtube-resolver-spike.json`
+contains only status/format metadata. No binary, signed URL or catalog payload is
+committed. These tools are **not shipped as a working YouTube resolver**.
+Client/PoToken/header compatibility and authenticated testing remain unresolved.
+
+A follow-up strengthens credential-origin redirect checks (including custom
+headers), rejects weak ETags as byte-range resume validators, exercises eight-span
+LRU eviction and explicitly labels the current 800-item UI paging limit. The
+follow-up's final matrix must be checked independently from the first run above.
+
+A further opt-in live JioSaavn trial downloaded **12487540 bytes** into a
+test-owned temporary directory, reopened the journal offline, verified every
+chunk hash and played the verified local file through the same native engine
+(**41759 presented frames** before deliberate timeout). Streaming in that trial
+presented 40508 frames. The test removed all temporary media afterward; only
+redacted numeric/status evidence is retained. Reproduce with
+`dart run tool/phase4_jiosaavn_live.dart <native-library> <probe> <test-endpoint> --download`.
+This is a Linux software-sink integration result, not Windows/physical parity.
+
+Additional application safeguards fence a delayed offline selection before
+native adoption, cancel connect/play scopes at shutdown, and report missing
+bootstrap services as failures. No missing provider port can report a successful
+operation. Controller regressions cover late results, disposal, stale offline
+selection, explicit limits and unsupported operations.

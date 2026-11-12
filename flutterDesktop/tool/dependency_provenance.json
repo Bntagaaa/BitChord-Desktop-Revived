@@ -53,5 +53,12 @@
     "archive_url": "https://pub.dev/api/archives/window_manager-0.5.1.tar.gz",
     "archive_sha256": "7eb6d6c4164ec08e1bf978d6e733f3cebe792e2a23fb07cbca25c2872bfdbdcd",
     "source_archive_verified": true
+  },
+  "crypto": {
+    "version": "3.0.8",
+    "repository": "https://github.com/dart-lang/core/tree/main/pkgs/crypto",
+    "archive_url": "https://pub.dev/api/archives/crypto-3.0.8.tar.gz",
+    "archive_sha256": "e3626ae6270383c9e3a549f34c9e4cd26c09ae6a9adaab2bf4737a00340efdc4",
+    "note": "Existing resolved transitive pin promoted to direct dependency for download SHA-256. Checksum retained from committed lockfile; no new version resolution."
   }
 }

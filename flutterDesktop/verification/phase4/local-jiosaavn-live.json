@@ -1,0 +1,40 @@
+{
+  "provider": "jiosaavn",
+  "authenticated": false,
+  "catalog_entries": 25,
+  "first_range_bytes": 524288,
+  "media_bytes": 12487540,
+  "validator": true,
+  "native_probe_exit": 4,
+  "native": {
+    "outcome": "TIMED_OUT",
+    "shutdown_ok": true,
+    "phase": 2,
+    "error": 0,
+    "backend": 1,
+    "timing_quality": 2,
+    "position_us": 918548,
+    "submitted_frames": 43101,
+    "played_frames": 40508,
+    "pcm_high_water": 705600,
+    "physical_audio": "unverified"
+  },
+  "stream_trial": "NATIVE_SOFTWARE_SINK_OUTPUT",
+  "download_bytes": 12487540,
+  "offline_reopen_verified": true,
+  "offline_native": {
+    "outcome": "TIMED_OUT",
+    "shutdown_ok": true,
+    "phase": 2,
+    "error": 0,
+    "backend": 1,
+    "timing_quality": 2,
+    "position_us": 946916,
+    "submitted_frames": 44042,
+    "played_frames": 41759,
+    "pcm_high_water": 705600,
+    "physical_audio": "unverified"
+  },
+  "offline_trial": "NATIVE_SOFTWARE_SINK_OUTPUT",
+  "evidence_class": "local Linux network and Pulse software-sink trial; physical audibility unverified"
+}

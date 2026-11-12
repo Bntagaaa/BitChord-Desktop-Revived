@@ -40,6 +40,6 @@ abstract interface class OnlinePort {
     void Function(int, int) progress,
   );
   Future<List<DownloadedEntry>> downloads();
-  Future<void> playOffline(CatalogEntry entry);
+  Future<void> playOffline(CatalogEntry entry, RequestScope scope);
   Future<void> removeDownload(CatalogEntry entry);
 }

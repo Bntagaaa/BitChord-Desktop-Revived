@@ -62,8 +62,13 @@ final class ProviderHttp {
                 next.userInfo.isNotEmpty ||
                 (target.scheme == 'https' && next.scheme != 'https') ||
                 (headers.keys.any(
-                      (k) =>
-                          ['authorization', 'cookie'].contains(k.toLowerCase()),
+                      (k) => ![
+                        'accept',
+                        'accept-language',
+                        'user-agent',
+                        'range',
+                        'if-range',
+                      ].contains(k.toLowerCase()),
                     ) &&
                     next.origin != uri.origin)) {
               throw const ProviderFailure(ProviderProblem.unsupported);

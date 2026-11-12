@@ -1,0 +1,45 @@
+{
+  "invalid_arguments": "PASS: 7 exact exit-64 cases",
+  "missing_file": {
+    "outcome": "PLAYBACK_FAILURE",
+    "shutdown_ok": true,
+    "phase": 5,
+    "error": 100,
+    "backend": 0,
+    "timing_quality": 0,
+    "position_us": 0,
+    "submitted_frames": 0,
+    "played_frames": 0,
+    "pcm_high_water": 0,
+    "physical_audio": "unverified"
+  },
+  "timeout": {
+    "outcome": "TIMED_OUT",
+    "shutdown_ok": true,
+    "phase": 2,
+    "error": 0,
+    "backend": 1,
+    "timing_quality": 2,
+    "position_us": 84604,
+    "submitted_frames": 5952,
+    "played_frames": 4061,
+    "pcm_high_water": 768000,
+    "physical_audio": "unverified"
+  },
+  "long_track": {
+    "outcome": "EOF",
+    "shutdown_ok": true,
+    "phase": 4,
+    "error": 0,
+    "backend": 1,
+    "timing_quality": 2,
+    "position_us": 31250000,
+    "submitted_frames": 1500000,
+    "played_frames": 1500000,
+    "pcm_high_water": 768000,
+    "physical_audio": "unverified",
+    "fixture_frames": 1500000,
+    "fixture_seconds": 31.25
+  },
+  "evidence_class": "local Linux software/network trial; physical audibility unverified"
+}

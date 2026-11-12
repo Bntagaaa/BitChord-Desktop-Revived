@@ -81,7 +81,10 @@ final class RangeSource {
         response.status,
       );
     }
-    final tag = response.headers['etag'] ?? response.headers['last-modified'];
+    final etag = response.headers['etag'];
+    final tag = etag != null && !etag.startsWith('W/')
+        ? etag
+        : response.headers['last-modified'];
     if (size <= 0 ||
         size > maxBytes ||
         (total != null && total != size) ||
