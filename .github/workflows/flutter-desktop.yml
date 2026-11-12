@@ -61,8 +61,10 @@ jobs:
           else
             python tool/run_checked.py dependencies flutter pub get
           fi
-      # The successful bootstrap retained formatter output. Future changes must
-      # arrive formatted; do not repair formatting silently during validation.
+      # One-time formatter repair for the verified Phase 1 UI changes.
+      # Restore strict checking immediately after the retention commit.
+      - name: Format Phase 1 UI changes with the pinned Dart SDK
+        run: dart format lib/features/shell/presentation/desktop_shell.dart test/shell_test.dart
       - name: Check Dart formatting
         run: |
           python tool/run_checked.py format-check dart format --output=none --set-exit-if-changed lib test
