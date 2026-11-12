@@ -1,0 +1,68 @@
+name: Phase 1 tested Windows reference capture
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [2.0.0-flutter]
+    paths: ['.github/workflows/flutter-phase1-windows-capture.yml', 'flutterDesktop/tool/launch_smoke_windows.ps1', 'flutterDesktop/tool/SeedReferenceProfile.java']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  capture:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: migration-tools
+          persist-credentials: false
+      - name: Require tested immutable reference artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repository = 'Bntagaaa/BitChord-Desktop-Revived'
+          $run = gh api "repos/$repository/actions/runs/43134106568" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($run.head_sha -ne '3b2a8747327fe611bcb92a75ced96373bc90c60e' -or $run.path -ne '.github/workflows/flutter-phase1-reference.yml') { throw 'Unexpected artifact producer' }
+          $jobs = gh api "repos/$repository/actions/runs/43134106568/jobs" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $windows = $jobs.jobs | Where-Object name -eq 'reference (windows-2022)'
+          foreach ($name in @('Test pinned reference without source changes or credentials','Build pinned reference for visual comparison','Verify reference preservation','Verify packaged Windows reference JNI and original models')) {
+            $step = $windows.steps | Where-Object name -eq $name
+            if ($step.conclusion -ne 'success') { throw "Reference prerequisite did not pass: $name" }
+          }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: phase1-kotlin-reference-windows-2022
+          path: reference
+          github-token: ${{ github.token }}
+          run-id: 43134106568
+          repository: Bntagaaa/BitChord-Desktop-Revived
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Configure disposable hosted display
+        shell: powershell
+        run: Set-DisplayResolution -Width 1600 -Height 1200 -Force
+      - name: Capture tested reference with bounded startup diagnostics
+        working-directory: reference
+        run: |
+          $sha = (Get-Content verification/reference-sha.txt -Raw).Trim()
+          if ($sha -ne '348b613a0c3db1a54de56483ea6f8748d6465211') { throw 'Reference source differs' }
+          $executable = (Resolve-Path desktopApp/build/compose/binaries/main/app/BitChord/BitChord.exe).Path
+          java ../migration-tools/flutterDesktop/tool/SeedReferenceProfile.java $executable
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ../migration-tools/flutterDesktop/tool/launch_smoke_windows.ps1 -Executable $executable -EvidenceDirectory "$pwd/verification" -OutputPrefix reference-windows -CaptureOnly -SourceCommit $sha
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: phase1-tested-windows-reference-captures
+          path: reference/verification/reference-windows*
+          if-no-files-found: error

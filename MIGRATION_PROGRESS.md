@@ -471,7 +471,8 @@ it does not accept full visual parity or authorize Phase 2.
 | Native shell and lifecycle | PASS in hosted environments: actual 1220×780 and 900×600 painted clients, account/drawer/settings captures, rendered Light/Dark/Pitch-black selection, F11/Escape size restoration and native close/exit 0 on both OSs |
 | Retained evidence | PASS: six additional appearance/overlay PNGs per OS, native JSON, two base client PNGs and test summary; Ahem widget images remain layout diagnostics |
 | Pinned Windows native targets | PASS: focused [43134106555](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106555) builds analysis + SMTC + window DLLs with supported MSVC/C++/WinRT and SDK prerequisites; hashes in `phase1-shell-correction/windows-native.json` |
-| Pinned full reference tests/package/Windows captures | Await actual run `43134106568`; focused DLL compilation alone is not this gate |
+| Pinned full reference tests/package | PASS on Linux and Windows in [43134106568](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106568): 857 tests per OS, zero failed/errors/skipped; Windows original JNI/model packaging audit passed |
+| Pinned Windows reference visual capture | INCOMPLETE: tested Windows bundle exists, but the capture helper found no visible main window after 30 seconds; bounded process-tree/window diagnosis and a capture-only retry are pending |
 | Corrected local Linux shell comparison | PARTIAL: repeated both apps sequentially in the same KDE/XWayland session, Light and empty test-owned profiles, both client sizes; four new PNGs/source/run/hash provenance in `phase1-shell-correction/capture.json` |
 | Kotlin/reference preservation | PASS: byte SHA-256 comparison of all 700 tracked files under desktopApp/shared/sharedUi/native with pinned reference, zero differences; reference branch untouched |
 | Visual/platform acceptance | INCOMPLETE: font rights/ink metrics/wrapping, exact Haze/noise/feed material/motion, native caption/Mica/icons, matched Windows pairing and full DPI/focus/accessibility matrix remain open |
@@ -484,3 +485,25 @@ blur equivalence is inferred. Numeric local DPI is unmeasured and SIGTERM
 capture cleanup is not lifecycle proof. Hosted native smokes establish lifecycle
 separately. No actual RAM/CPU benchmark, audio/auth implementation or Phase 2
 work is included. Phase 1 remains **INCOMPLETE for visual acceptance**.
+
+## Windows reference capture retry — 2026-11-12
+
+The full pinned reference run [43134106568](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106568)
+finished. Linux passed the same 857 tests (78 shared, 85 sharedUi, 694 desktop,
+zero failed/errors/skipped) and distributable build. Windows also passed all 857
+tests with zero failed/errors/skipped, built the distributable, passed protected
+source preservation and the packaged native JNI/model audit. Its capture failed
+after 30 seconds because .NET `MainWindowHandle` found no visible window for the
+launcher. This is a GUI capture failure; test/package/native compile passes are
+independent and retained in that run's artifact.
+
+A focused capture workflow reuses only that successful immutable Windows build
+artifact. It verifies the producing run, exact pinned reference SHA, passing
+Windows test/package/preservation/JNI steps, then checks windows belonging to
+the packaged launcher's process tree with a bounded two-minute startup window.
+On a repeated startup failure it stores only process/window ownership, Java
+exception class names and stack frames. Provider log messages, URLs and profile
+data are not retained. The Linux smoke now waits for overlay dismissal and
+asserts both the dark drawer scrim and the light Settings page before accepting
+those labeled captures. Results are pending; no Windows reference image or new
+state-capture pass is inferred.

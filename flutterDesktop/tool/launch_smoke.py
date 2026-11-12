@@ -38,7 +38,7 @@ def capture_state(evidence, window, name, theme='any'):
         if not match:
             raise RuntimeError('Unexpected native pixel format: ' + value)
         rgb = list(map(int, match.groups()))
-        if (theme == 'any' or (theme == 'light' and min(rgb) >= 230) or
+        if (theme == 'any' or (theme == 'drawer' and rgb == [183, 184, 186]) or (theme == 'light' and min(rgb) >= 230) or
                 (theme == 'dark' and rgb == [32, 32, 32]) or (theme == 'black' and max(rgb) <= 2)):
             return {'state': name, 'expected_theme': theme, 'background_rgb': rgb}
         if time.monotonic() > deadline:
@@ -47,10 +47,13 @@ def capture_state(evidence, window, name, theme='any'):
 
 
 def click_client(window, x, y):
-    subprocess.run(['xdotool', 'mousemove', '--window', window, str(x), str(y), 'click', '1'], check=True, timeout=5)
+    subprocess.run(['xdotool', 'mousemove', '--sync', '--window', window, str(x), str(y)], check=True, timeout=5)
+    time.sleep(.2)
+    subprocess.run(['xdotool', 'click', '1'], check=True, timeout=5)
+    time.sleep(.8)
     # Keep hover tooltips out of comparison images after opening an overlay.
     subprocess.run(['xdotool', 'mousemove', '--window', window, '500', '400'], check=True, timeout=5)
-    time.sleep(.8)
+    time.sleep(.25)
 
 
 def main():
@@ -114,11 +117,13 @@ def main():
             click_client(window, 36, 516)
             states = [capture_state(evidence, window, 'accounts')]
             subprocess.run(['xdotool', 'key', 'Escape'], check=True, timeout=5)
+            time.sleep(.5)
             click_client(window, 36, 34)
-            states.append(capture_state(evidence, window, 'drawer'))
+            states.append(capture_state(evidence, window, 'drawer', 'drawer'))
             subprocess.run(['xdotool', 'key', 'Escape'], check=True, timeout=5)
+            time.sleep(.5)
             click_client(window, 36, 563)
-            states.append(capture_state(evidence, window, 'settings'))
+            states.append(capture_state(evidence, window, 'settings', 'light'))
             click_client(window, 120, 127)
             click_client(window, 300, 127)
             states.append(capture_state(evidence, window, 'dark', 'dark'))

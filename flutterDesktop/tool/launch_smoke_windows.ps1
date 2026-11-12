@@ -12,6 +12,23 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public class SmokeWindow {
+  public delegate bool EnumWindowsProc(IntPtr h, IntPtr l);
+  public class WindowInfo { public long handle; public int process_id; public string title; public bool visible; }
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr l);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out int pid);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, System.Text.StringBuilder text, int max);
+  public static WindowInfo[] OwnedWindows(int[] owners) {
+    var result = new System.Collections.Generic.List<WindowInfo>();
+    EnumWindows((h,l) => {
+      int pid; GetWindowThreadProcessId(h,out pid);
+      if (Array.IndexOf(owners,pid)>=0) {
+        var title=new System.Text.StringBuilder(512); GetWindowText(h,title,512);
+        result.Add(new WindowInfo {handle=h.ToInt64(),process_id=pid,title=title.ToString(),visible=IsWindowVisible(h)});
+      }
+      return true;
+    },IntPtr.Zero);
+    return result.ToArray();
+  }
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
   [StructLayout(LayoutKind.Sequential)] public struct Point { public int X, Y; }
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
@@ -34,16 +51,57 @@ $evidence = [System.IO.Path]::GetFullPath($EvidenceDirectory)
 $privateLogs = if ($CaptureOnly) { Join-Path $env:TEMP ([Guid]::NewGuid().ToString()) } else { $evidence }
 [void](New-Item -ItemType Directory -Force $privateLogs)
 $app = Start-Process -FilePath (Resolve-Path $Executable) -PassThru -RedirectStandardOutput "$privateLogs/$OutputPrefix.stdout.log" -RedirectStandardError "$privateLogs/$OutputPrefix.stderr.log"
+$owners = [System.Collections.Generic.HashSet[int]]::new()
+[void]$owners.Add($app.Id)
 try {
-  $deadline = [DateTime]::UtcNow.AddSeconds(30)
+  $deadline = [DateTime]::UtcNow.AddSeconds($(if ($CaptureOnly) { 120 } else { 30 }))
+  $handle = [IntPtr]::Zero
+  $nextProcessScan = [DateTime]::MinValue
   do {
     $app.Refresh()
-    if ($app.HasExited) { throw "Application exited before showing: $($app.ExitCode)" }
-    $handle = $app.MainWindowHandle
-    if ($handle -ne [IntPtr]::Zero -and [SmokeWindow]::IsWindowVisible($handle) -and $app.MainWindowTitle -eq 'BitChord') { break }
+    if ($CaptureOnly) {
+      # A packaged JVM launcher can own a child/owner window that .NET's
+      # MainWindowHandle heuristic excludes. Restrict enumeration to our tree.
+      if ([DateTime]::UtcNow -ge $nextProcessScan) {
+        $processes = @(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId)
+        do {
+          $added = $false
+          foreach ($process in $processes) {
+            if ($owners.Contains([int]$process.ParentProcessId) -and $owners.Add([int]$process.ProcessId)) { $added = $true }
+          }
+        } while ($added)
+        $nextProcessScan = [DateTime]::UtcNow.AddSeconds(1)
+      }
+      $ownerIds = [int[]]::new($owners.Count)
+      $owners.CopyTo($ownerIds)
+      $windows = @([SmokeWindow]::OwnedWindows($ownerIds))
+      $candidate = $windows | Where-Object { $_.visible -and $_.title -eq 'BitChord' } | Select-Object -First 1
+      if ($candidate) { $handle = [IntPtr]$candidate.handle; break }
+    } else {
+      if ($app.HasExited) { throw "Application exited before showing: $($app.ExitCode)" }
+      $handle = $app.MainWindowHandle
+      if ($handle -ne [IntPtr]::Zero -and [SmokeWindow]::IsWindowVisible($handle) -and $app.MainWindowTitle -eq 'BitChord') { break }
+    }
     Start-Sleep -Milliseconds 200
   } while ([DateTime]::UtcNow -lt $deadline)
-  if ($handle -eq [IntPtr]::Zero) { throw 'No visible native BitChord window' }
+  if ($handle -eq [IntPtr]::Zero) {
+    $diagnosticOwners = [int[]]::new($owners.Count)
+    $owners.CopyTo($diagnosticOwners)
+    $diagnostics = @{process_ids=$diagnosticOwners; windows=$windows; exception_types=@(); stacks=@()}
+    if ($CaptureOnly) {
+      # Retain only Java exception class names and stack frames. Never provider
+      # log messages, request URLs or account/profile data.
+      foreach ($file in Get-ChildItem $privateLogs -Filter '*.log') {
+        $diagnostics.exception_types += @([regex]::Matches([string](Get-Content $file -Raw), '(?:[A-Za-z_$][\w$]*\.)+[A-Za-z_$][\w$]*(?:Exception|Error)') | ForEach-Object Value | Sort-Object -Unique)
+      }
+      foreach ($owner in $owners) {
+        $trace = & "$env:JAVA_HOME/bin/jcmd.exe" $owner Thread.print 2>$null
+        $diagnostics.stacks += @($trace | Where-Object { $_ -match '^\s+at (?:java|javax|kotlin|kotlinx|androidx|org\.jetbrains|com\.music)\.' } | Select-Object -First 100)
+      }
+      $diagnostics | ConvertTo-Json -Depth 5 | Set-Content "$evidence/$OutputPrefix-launch-failure.json"
+    }
+    throw 'No visible native BitChord window'
+  }
   [void][SmokeWindow]::SetForegroundWindow($handle)
   $dpi = [SmokeWindow]::GetDpiForWindow($handle)
   if ($dpi -ne 96) { throw "Expected CI DPI 96 for matching client captures, observed $dpi" }
@@ -62,7 +120,7 @@ try {
     do {
       Start-Sleep -Milliseconds 250
       $app.Refresh()
-      if ($app.HasExited) { throw 'Application exited during capture' }
+      if (-not $CaptureOnly -and $app.HasExited) { throw 'Application exited during capture' }
       [void][SmokeWindow]::GetClientRect($handle, [ref]$client)
       if ($client.Right -ne $size[0] -or $client.Bottom -ne $size[1]) {
         Write-Output "Resize requested=$($size[0])x$($size[1]) observed=$($client.Right)x$($client.Bottom)"
@@ -112,8 +170,9 @@ try {
     [void][SmokeWindow]::SetCursorPos($origin.X+$x, $origin.Y+$y)
     [SmokeWindow]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
     [SmokeWindow]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
-    [void][SmokeWindow]::SetCursorPos($origin.X+500, $origin.Y+400)
     Start-Sleep -Milliseconds 800
+    [void][SmokeWindow]::SetCursorPos($origin.X+500, $origin.Y+400)
+    Start-Sleep -Milliseconds 250
   }
   function Send-Key([byte]$key) {
     [SmokeWindow]::keybd_event($key,0,0,[UIntPtr]::Zero)
@@ -131,7 +190,7 @@ try {
         $graphics.CopyFromScreen($origin.X,$origin.Y,0,0,$bitmap.Size)
         $pixel = $bitmap.GetPixel(500,300)
         $rgb = @([int]$pixel.R,[int]$pixel.G,[int]$pixel.B)
-        $valid = $theme -eq 'any' -or ($theme -eq 'light' -and ($rgb | Measure-Object -Minimum).Minimum -ge 230) -or ($theme -eq 'dark' -and $pixel.R -eq 32 -and $pixel.G -eq 32 -and $pixel.B -eq 32) -or ($theme -eq 'black' -and ($rgb | Measure-Object -Maximum).Maximum -le 2)
+        $valid = $theme -eq 'any' -or ($theme -eq 'drawer' -and $pixel.R -eq 183 -and $pixel.G -eq 184 -and $pixel.B -eq 186) -or ($theme -eq 'light' -and ($rgb | Measure-Object -Minimum).Minimum -ge 230) -or ($theme -eq 'dark' -and $pixel.R -eq 32 -and $pixel.G -eq 32 -and $pixel.B -eq 32) -or ($theme -eq 'black' -and ($rgb | Measure-Object -Maximum).Maximum -le 2)
         $bitmap.Save("$evidence/$OutputPrefix-$name-900x600.png",[System.Drawing.Imaging.ImageFormat]::Png)
       } finally { $graphics.Dispose(); $bitmap.Dispose() }
       if ($valid) { return @{state=$name; expected_theme=$theme; background_rgb=$rgb} }
@@ -144,10 +203,10 @@ try {
   $states = @((Save-State 'accounts'))
   Send-Key 0x1B
   Click-Client 36 34
-  $states += Save-State 'drawer'
+  $states += Save-State 'drawer' 'drawer'
   Send-Key 0x1B
   Click-Client 36 563
-  $states += Save-State 'settings'
+  $states += Save-State 'settings' 'light'
   Click-Client 120 127
   Click-Client 300 127
   $states += Save-State 'dark' 'dark'
@@ -192,6 +251,9 @@ try {
   @{source_commit=$SourceCommit; dpi=$dpi; captures=$captures; appearance_captures=$states; exit_code=$app.ExitCode; fullscreen='F11 entered; Escape restored 900x600'; display='GitHub Windows hosted desktop'} | ConvertTo-Json -Depth 5 | Set-Content "$evidence/$OutputPrefix.json"
   Write-Output 'PASS: painted Windows client, two resizes, fullscreen/restore, native close, exit 0.'
 } finally {
+  if ($CaptureOnly) {
+    foreach ($owner in $owners) { Stop-Process -Id $owner -Force -ErrorAction SilentlyContinue }
+  }
   $app.Refresh()
   if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force }
   if ($CaptureOnly) { Remove-Item -LiteralPath $privateLogs -Recurse -Force }

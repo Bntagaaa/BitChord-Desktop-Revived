@@ -1151,6 +1151,13 @@ additional account/drawer/settings/Light/Dark/Pitch-black native captures per OS
 were reviewed. Rendered page colors, F11/Escape size restoration and exit 0 pass
 on both platforms. This adds environment-specific evidence, not full P-ID parity.
 
+Pinned reference run [43134106568](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106568)
+passed 857 tests on both Windows and Linux, zero failures/errors/skips. Windows
+also built the full distributable and passed packaged JNI/model verification.
+Only its visible window capture failed: no main window was detected within
+30 seconds, so the cross-platform visual comparison remains incomplete. A
+focused retry uses the verified build and inspects the launcher process tree.
+
 Current remaining acceptance gaps: matched Windows reference capture, full
 DPI/theme/focus/accessibility/motion checks, native caption/Mica/app/taskbar icons,
 font rights/metrics and exact material behavior. Account/data/content/player
