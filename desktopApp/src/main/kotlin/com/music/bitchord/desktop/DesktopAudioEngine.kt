@@ -1469,10 +1469,23 @@ class DesktopPlaybackEngine internal constructor(
             else state
         }
 
+        // If an upgraded lossless source later goes silent, do not reopen the same
+        // rendition twice while the player is stuck. Try other configured sources,
+        // including YouTube, and remember the broken source for the next selection.
+        val brokenLosslessSource = track.stream.sourceId?.takeIf { id ->
+            id != "youtube" &&
+                (track.stream.format.isLossless || track.decoder.measuredFormat?.isLossless == true)
+        }
+        if (brokenLosslessSource != null) {
+            refusedSources[track.song.videoId] = brokenLosslessSource
+            DesktopTrackLog.log("lossless decoder stalled; recovering from another source")
+        }
         recoveryJob?.cancel()
         recoveryJob = scope.launch {
             try {
-                DesktopMusicSources.resolveLive(track.song, audioQuality).fold(
+                DesktopMusicSources.resolveLive(
+                    track.song, audioQuality, excludedSourceId = brokenLosslessSource,
+                ).fold(
                     onSuccess = { live ->
                         openTrack(
                             song = track.song,
