@@ -49,6 +49,7 @@ private:
  bc_command identity{}, nomination{};
  std::unique_ptr<Sink> sink;
  std::string endpoint;
+ uint32_t device_recoveries=0; uint64_t healthy_frames=0;
  bool play=false; double speed=1, volume=1, fraction=0, source_frame=0;
  std::array<float,512*8> scratch{};
  std::array<double,64> matrix{};
@@ -150,6 +151,12 @@ private:
   }
   state.awaiting_audio=(state.submitted_frames==state.played_frames && state.phase!=BC_ENDED)?1:0;
  }
+ void recover_device() {
+  if(++device_recoveries>3) { fail(BC_ERROR_DEVICE); return; }
+  const auto at=state.position_us; sink.reset(); current.reset(); upcoming.reset();
+  current=std::make_unique<Decoder>(identity.path,at); reset_timeline(at);
+  state.phase=BC_BUFFERING; healthy_frames=0;
+ }
  void configure_matrix() {
   matrix.fill(0);
   if(current->channels==sink->channels) { for(uint32_t c=0;c<current->channels;c++) matrix[c*8+c]=1; return; }
@@ -168,6 +175,7 @@ private:
  void render() {
   if(!current) return;
   if(identity.selection!=admitted_selection || identity.revision!=admitted_revision) return;
+  if(sink && sink->changed()) { recover_device(); return; }
   if(current->error) { fail(uint32_t(current->error.load())); return; }
   if(!current->ready) { state.phase=BC_BUFFERING; return; }
   if(!sink) {
@@ -220,6 +228,7 @@ private:
   }
   const auto first=sink->submitted; const auto written=sink->write(scratch.data(),frames);
   if(!written) return;
+  healthy_frames+=written; if(healthy_frames>=sink->rate/2) device_recoveries=0;
   auto& segment=segments[(seg_begin+seg_size++)%segments.size()];
   segment.first=first; segment.last=first+written; segment.source=double(current->origin)+(source_frame+fraction)*1000000/current->rate;
   segment.step=step*1000000/current->rate; segment.identity=identity;
@@ -237,7 +246,7 @@ private:
       if(lock) while(n<batch.size() && !commands.empty()) { batch[n++]=commands.front(); commands.pop_front(); }
     }
     for(size_t i=0;i<n;i++) process(batch[i]);
-    try { render(); } catch(const DeviceUnavailable&) { fail(BC_ERROR_NO_DEVICE); } catch(...) { fail(BC_ERROR_DEVICE); }
+    try { render(); } catch(const DeviceChanged&) { try { recover_device(); } catch(...) { fail(BC_ERROR_DEVICE); } } catch(const DeviceUnavailable&) { fail(BC_ERROR_NO_DEVICE); } catch(...) { fail(BC_ERROR_DEVICE); }
     publish(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
    }
    current.reset(); upcoming.reset(); sink.reset(); state.phase=BC_CLOSING;

@@ -5,6 +5,7 @@
 #include <stdexcept>
 namespace bc {
 class PauseUnsupported : public std::runtime_error { public: using std::runtime_error::runtime_error; };
+class DeviceChanged : public std::runtime_error { public: using std::runtime_error::runtime_error; };
 class DeviceUnavailable : public std::runtime_error { public: using std::runtime_error::runtime_error; };
 // Dedicated push owner, never an OS callback. Writes return whole accepted frames.
 class Sink {
@@ -14,6 +15,7 @@ public:
  virtual ~Sink()=default;
  virtual uint32_t write(const float*, uint32_t)=0;
  virtual uint64_t played()=0;
+ virtual bool changed() { return false; }
  virtual bool drained() { return played()>=submitted; }
  virtual void pause(bool)=0;
  virtual void flush()=0;

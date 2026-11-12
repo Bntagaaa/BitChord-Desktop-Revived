@@ -9,12 +9,36 @@
 #include <cstring>
 #include <stdexcept>
 #include <cmath>
+#include <atomic>
 namespace bc {
 using Microsoft::WRL::ComPtr;
-static void check(HRESULT hr) { if(FAILED(hr)) throw std::runtime_error("WASAPI failure"); }
+static void check(HRESULT hr) { if(hr==AUDCLNT_E_DEVICE_INVALIDATED || hr==AUDCLNT_E_RESOURCES_INVALIDATED) throw DeviceChanged("WASAPI endpoint changed"); if(FAILED(hr)) throw std::runtime_error("WASAPI failure"); }
+// Notification callbacks only publish flags. COM teardown belongs to the sink owner.
+class EndpointWatch final : public IMMNotificationClient {
+ std::atomic<ULONG> refs{1};
+public:
+ std::atomic<bool> dirty{false}; const bool follow; const std::wstring endpoint;
+ EndpointWatch(bool automatic,std::wstring id):follow(automatic),endpoint(std::move(id)) {}
+ ULONG STDMETHODCALLTYPE AddRef() override { return ++refs; }
+ ULONG STDMETHODCALLTYPE Release() override { auto n=--refs; if(!n) delete this; return n; }
+ HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void** out) override {
+  if(!out) return E_POINTER; *out=nullptr;
+  if(iid==__uuidof(IUnknown) || iid==__uuidof(IMMNotificationClient)) { *out=static_cast<IMMNotificationClient*>(this); AddRef(); return S_OK; }
+  return E_NOINTERFACE;
+ }
+ HRESULT STDMETHODCALLTYPE OnDefaultDeviceChanged(EDataFlow flow,ERole role,LPCWSTR) override {
+  if(follow && flow==eRender && role==eMultimedia) dirty=true; return S_OK;
+ }
+ HRESULT STDMETHODCALLTYPE OnDeviceStateChanged(LPCWSTR id,DWORD state) override { if(id && endpoint==id && state!=DEVICE_STATE_ACTIVE) dirty=true; return S_OK; }
+ HRESULT STDMETHODCALLTYPE OnDeviceAdded(LPCWSTR) override { return S_OK; }
+ HRESULT STDMETHODCALLTYPE OnDeviceRemoved(LPCWSTR id) override { if(id && endpoint==id) dirty=true; return S_OK; }
+ HRESULT STDMETHODCALLTYPE OnPropertyValueChanged(LPCWSTR,const PROPERTYKEY) override { return S_OK; }
+};
 class Wasapi final : public Sink {
  bool com=false, paused=true; UINT32 capacity=0; uint64_t last=0;
  ComPtr<IMMDeviceEnumerator> enumerator; ComPtr<IMMDevice> device;
+ ComPtr<EndpointWatch> watch;
+ void unwatch() { if(enumerator && watch) enumerator->UnregisterEndpointNotificationCallback(watch.Get()); watch.Reset(); }
  ComPtr<IAudioClient> client; ComPtr<IAudioRenderClient> render;
 public:
  Wasapi(uint32_t r,uint32_t c,const std::string& endpoint,bool integer=false) {
@@ -30,6 +54,9 @@ public:
     std::wstring id(size_t(count),L'\0'); MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,endpoint.c_str(),-1,id.data(),count);
     if(FAILED(enumerator->GetDevice(id.c_str(),&device))) throw DeviceUnavailable("WASAPI endpoint unavailable");
    }
+   LPWSTR device_id=nullptr; check(device->GetId(&device_id));
+   try { watch.Attach(new EndpointWatch(endpoint.empty(),device_id)); } catch(...) { CoTaskMemFree(device_id); throw; }
+   CoTaskMemFree(device_id); check(enumerator->RegisterEndpointNotificationCallback(watch.Get()));
    check(device->Activate(__uuidof(IAudioClient),CLSCTX_ALL,nullptr,reinterpret_cast<void**>(client.GetAddressOf())));
    WAVEFORMATEXTENSIBLE format{};
    format.Format.wFormatTag=WAVE_FORMAT_EXTENSIBLE; format.Format.nChannels=WORD(c);
@@ -41,11 +68,12 @@ public:
    check(client->Initialize(AUDCLNT_SHAREMODE_SHARED,AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM|AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
      1000000,0,&format.Format,nullptr));
    check(client->GetBufferSize(&capacity)); check(client->GetService(IID_PPV_ARGS(&render)));
-  } catch(...) { render.Reset(); client.Reset(); device.Reset(); enumerator.Reset(); CoUninitialize(); com=false; throw; }
+  } catch(...) { unwatch(); render.Reset(); client.Reset(); device.Reset(); enumerator.Reset(); CoUninitialize(); com=false; throw; }
  }
  ~Wasapi() override {
-  if(client) client->Stop(); render.Reset(); client.Reset(); device.Reset(); enumerator.Reset(); if(com) CoUninitialize();
+  unwatch(); if(client) client->Stop(); render.Reset(); client.Reset(); device.Reset(); enumerator.Reset(); if(com) CoUninitialize();
  }
+ bool changed() override { return watch && watch->dirty.exchange(false); }
  uint32_t write(const float* samples,uint32_t frames) override {
   UINT32 padding=0; check(client->GetCurrentPadding(&padding));
   frames=std::min(frames,capacity-padding); if(!frames) return 0;

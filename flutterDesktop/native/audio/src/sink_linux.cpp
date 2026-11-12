@@ -12,7 +12,8 @@ namespace bc {
 class Pulse final : public Sink {
  std::array<int16_t,4096> integer_pcm{};
  pa_mainloop* loop=nullptr; pa_context* context=nullptr; pa_stream* stream=nullptr;
- uint64_t last=0; bool paused=false;
+ uint64_t last=0; bool paused=false, follow=false, route_dirty=false;
+ std::string route;
  pa_operation* drain=nullptr; bool drain_finished=false, drain_success=false;
  std::chrono::steady_clock::time_point drain_deadline;
  void cancel_drain() { if(drain) { pa_operation_cancel(drain); pa_operation_unref(drain); drain=nullptr; } drain_finished=drain_success=false; }
@@ -32,6 +33,8 @@ class Pulse final : public Sink {
   if(!done) throw std::runtime_error("pulse cancelled");
  }
  void close() {
+  if(context) pa_context_set_subscribe_callback(context,nullptr,nullptr);
+  if(stream) pa_stream_set_moved_callback(stream,nullptr,nullptr);
   cancel_drain();
   if(stream) { pa_stream_disconnect(stream); pa_stream_unref(stream); stream=nullptr; }
   if(context) { pa_context_disconnect(context); pa_context_unref(context); context=nullptr; }
@@ -57,10 +60,31 @@ public:
     const auto* actual=pa_stream_get_device_name(stream);
     if(!actual || endpoint!=actual) throw DeviceUnavailable("Pulse explicit endpoint was not honored");
    }
+   route=pa_stream_get_device_name(stream)?pa_stream_get_device_name(stream):"";
+   follow=endpoint.empty();
+   pa_stream_set_moved_callback(stream,[](pa_stream*,void* p) { static_cast<Pulse*>(p)->route_dirty=true; },this);
+   pa_context_set_subscribe_callback(context,[](pa_context* context,pa_subscription_event_type_t event,uint32_t index,void* p) {
+    auto* self=static_cast<Pulse*>(p); const auto facility=event & PA_SUBSCRIPTION_EVENT_FACILITY_MASK;
+    if(facility==PA_SUBSCRIPTION_EVENT_SINK && (event & PA_SUBSCRIPTION_EVENT_TYPE_MASK)==PA_SUBSCRIPTION_EVENT_REMOVE && index==pa_stream_get_device_index(self->stream)) self->route_dirty=true;
+    if(facility==PA_SUBSCRIPTION_EVENT_SERVER && self->follow) {
+     auto* op=pa_context_get_server_info(context,[](pa_context*,const pa_server_info* info,void* opaque) {
+      auto* owner=static_cast<Pulse*>(opaque);
+      if(!info || !info->default_sink_name || owner->route!=info->default_sink_name) owner->route_dirty=true;
+     },self);
+     if(op) pa_operation_unref(op);
+    }
+   },this);
+   auto* subscription=pa_context_subscribe(context,pa_subscription_mask_t(PA_SUBSCRIPTION_MASK_SERVER|PA_SUBSCRIPTION_MASK_SINK),nullptr,nullptr);
+   if(!subscription) throw std::runtime_error("Pulse endpoint subscription"); pa_operation_unref(subscription);
    paused=true;
   } catch(...) { const bool unavailable=!context || pa_context_get_state(context)!=PA_CONTEXT_READY; close(); if(unavailable) throw DeviceUnavailable("Pulse server unavailable"); throw; }
  }
  ~Pulse() override { close(); }
+ bool changed() override {
+  pump();
+  const bool dirty=route_dirty || pa_stream_get_state(stream)==PA_STREAM_FAILED || pa_context_get_state(context)==PA_CONTEXT_FAILED;
+  route_dirty=false; return dirty;
+ }
  uint32_t write(const float* samples,uint32_t frames) override {
   cancel_drain(); pump(); if(pa_stream_get_state(stream)!=PA_STREAM_READY || pa_stream_is_suspended(stream)>0) throw std::runtime_error("pulse device lost");
   const size_t writable=pa_stream_writable_size(stream); if(writable==size_t(-1)) throw std::runtime_error("pulse write size");

@@ -785,3 +785,8 @@ frame durations; expected fixtures/tolerances remain unchanged. All seven codecs
 now pass locally against both installed FFmpeg 4.4 and 9 libraries, and the old
 API shared library passes real Dart FFI/SQLite/import tests. Windows dependencies
 were cached before testing, so subsequent source validation can reuse them.
+
+Native WASAPI/Pulse endpoint notifications and bounded reconfiguration from the
+last presented source position have been implemented. They do not establish
+physical hotplug acceptance. A normal push of `9f91955e` hit a transient GitHub
+DNS failure and is being retried; no successful delivery is inferred from it.

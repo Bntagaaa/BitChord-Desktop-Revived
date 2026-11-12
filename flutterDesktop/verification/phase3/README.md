@@ -106,3 +106,12 @@ The 4.4 shared library also passes the Dart FFI/import/queue suite. Source Linux
 this supersedes the earlier assumption that only the current system API could
 be tested locally. Long file paths use short opaque rendition IDs, retaining
 full path/catalog metadata and avoiding accidental ABI string truncation.
+
+Native device notifications now flag WASAPI default/removal/invalidation and
+Pulse server-default/stream-move/sink-removal changes. Recovery retires owned
+resources, reopens from the last presented source position, changes the device
+clock/discontinuity and preserves pause intent. Repeated recovery is bounded
+and resets only after healthy PCM. Explicit missing devices remain errors and
+can be reselected; no simulated output. Physical endpoint/default/hotplug and
+suspend/resume acceptance remains BLOCKED. ALSA fallback reports unavailable
+hardware through its normal error path; automatic hardware rediscovery is open.
