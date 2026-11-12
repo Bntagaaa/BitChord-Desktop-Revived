@@ -109,6 +109,9 @@ jobs:
         run: |
           python tool/run_checked.py kotlin-import python tool/test_kotlin_export.py
           python tool/run_checked.py phase3-ffi dart run tool/phase3_check.dart
+      - name: Check real provider HTTP, offline integrity and native source broker
+        timeout-minutes: 3
+        run: python tool/run_checked.py phase4-http python tool/phase4_platform.py
       - name: Analyze
         run: python tool/run_checked.py analyze flutter analyze --fatal-infos
       - name: Run tests and capture rendered shell

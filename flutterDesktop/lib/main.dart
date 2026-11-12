@@ -14,6 +14,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
+import 'features/online/application/catalog_controller.dart';
+import 'features/online/data/online_runtime.dart';
 import 'core/platform/desktop_host.dart';
 import 'core/platform/diagnostics.dart';
 import 'features/shell/application/shell_controller.dart';
@@ -80,8 +82,13 @@ Future<void> main(List<String> arguments) async {
     await audio.close();
     rethrow;
   }
+  final online = OnlineRuntime(
+    playback,
+    Directory('${root.path}/downloads-v1'),
+  );
   final container = ProviderContainer(
     overrides: [
+      onlinePortProvider.overrideWithValue(online),
       settingsStoreProvider.overrideWithValue(store),
       initialSettingsProvider.overrideWithValue(settings),
       desktopWindowProvider.overrideWithValue(host),
@@ -90,7 +97,8 @@ Future<void> main(List<String> arguments) async {
   );
   host.beforeClose = () async {
     await container.read(shellProvider.notifier).flush();
-    await playback.close();
+    container.read(catalogProvider.notifier).cancel();
+    await online.close();
     container.dispose();
   };
   runApp(

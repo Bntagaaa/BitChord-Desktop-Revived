@@ -8,6 +8,7 @@ import struct
 import subprocess
 import tempfile
 import wave
+from phase4_probe import verify as verify_probe
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -60,6 +61,7 @@ def main():
                 report['wasapi_output'] = 'BLOCKED: Windows hosted audio endpoint unavailable'
             else:
                 report['wasapi_output'] = 'Endpoint accepted/presented PCM; audibility unverified'
+            report['probe_regressions'] = verify_probe(probe, endpoint, tmp, result.returncode == 0)
             if result.returncode == 0:
                 longer = Path(tmp) / 'long.wav'
                 with wave.open(str(longer), 'wb') as out:

@@ -110,6 +110,8 @@ BC_API uint64_t bc_live_allocations(void);
  * read bytes belong to caller; close database before returning. No secrets. */
 BC_API int32_t bc_store_read(const char* path, uint8_t** bytes, uint64_t* length, uint64_t* revision);
 BC_API int32_t bc_store_write(const char* path, const uint8_t* bytes, uint64_t length, uint64_t expected_revision);
+/* JioSaavn public URL obfuscation; returns unpadded byte count or -1. */
+BC_API int32_t bc_saavn_decode(const uint8_t* input, uint32_t length, uint8_t* output, uint32_t capacity);
 BC_API int32_t bc_sha256(const uint8_t* bytes, uint64_t length, uint8_t* digest);
 #ifdef __cplusplus
 }

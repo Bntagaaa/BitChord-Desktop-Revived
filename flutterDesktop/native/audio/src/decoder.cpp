@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <filesystem>
 #include <memory>
+#include <regex>
+#include <mutex>
 #include <stdexcept>
 extern "C" {
 #include <libavformat/avformat.h>
@@ -49,25 +51,35 @@ Decoder::Decoder(std::string path, int64_t seek) : worker([this,path=std::move(p
 Decoder::~Decoder() { cancel=true; if(worker.joinable()) worker.join(); }
 void Decoder::run(const std::string& path, int64_t seek) {
  Resources r;
- const auto local=std::filesystem::u8path(path);
- if(!std::filesystem::is_regular_file(local)) throw std::runtime_error("not a local regular file");
-#ifdef _WIN32
- r.file=_wfopen(local.c_str(), L"rb");
-#else
- r.file=fopen(path.c_str(),"rb");
-#endif
- if(!r.file || !r.frame || !r.packet) throw std::bad_alloc();
- Input input{r.file,&cancel};
- r.io=avio_alloc_context(static_cast<unsigned char*>(av_malloc(32768)),32768,0,&input,read_file,nullptr,seek_file);
- if(!r.io) throw std::bad_alloc();
+ // Only app-owned, tokenized loopback grants enter the network demuxer.
+ // Upstream signed URLs/headers are owned by the asynchronous Dart IO broker.
+ const bool broker=std::regex_match(path,std::regex(R"(^http://127\.0\.0\.1:[0-9]{1,5}/[a-f0-9]{64}$)"));
+ Input input{nullptr,&cancel};
  r.format=avformat_alloc_context(); if(!r.format) throw std::bad_alloc();
- r.format->pb=r.io; r.format->flags|=AVFMT_FLAG_CUSTOM_IO;
  r.format->interrupt_callback={[](void* p) { return int(*static_cast<std::atomic<bool>*>(p)); }, &cancel};
  r.format->probesize=1024*1024; r.format->max_analyze_duration=3000000;
+ if(!broker) {
+  const auto local=std::filesystem::u8path(path);
+  if(!std::filesystem::is_regular_file(local)) throw std::runtime_error("not a local regular file");
+#ifdef _WIN32
+  r.file=_wfopen(local.c_str(), L"rb");
+#else
+  r.file=fopen(path.c_str(),"rb");
+#endif
+  if(!r.file || !r.frame || !r.packet) throw std::bad_alloc();
+  input.file=r.file;
+  r.io=avio_alloc_context(static_cast<unsigned char*>(av_malloc(32768)),32768,0,&input,read_file,nullptr,seek_file);
+  if(!r.io) throw std::bad_alloc();
+  r.format->pb=r.io; r.format->flags|=AVFMT_FLAG_CUSTOM_IO;
+ } else {
+  static std::once_flag network;
+  std::call_once(network,[] { avformat_network_init(); });
+ }
  AVDictionary* options=nullptr;
- av_dict_set(&options,"protocol_whitelist","file",0);
+ av_dict_set(&options,"protocol_whitelist",broker?"http,tcp":"file",0);
+ av_dict_set(&options,"rw_timeout","15000000",0);
  av_dict_set(&options,"format_whitelist","wav,mp3,flac,ogg,mov,matroska,webm,aac,aiff,asf",0);
- int result=avformat_open_input(&r.format,nullptr,nullptr,&options); av_dict_free(&options);
+ int result=avformat_open_input(&r.format,broker?path.c_str():nullptr,nullptr,&options); av_dict_free(&options);
  if(result<0 || avformat_find_stream_info(r.format,nullptr)<0) throw std::runtime_error("probe");
  const int stream=av_find_best_stream(r.format,AVMEDIA_TYPE_AUDIO,-1,-1,nullptr,0);
  if(stream<0) throw std::runtime_error("no audio");

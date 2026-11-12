@@ -1355,3 +1355,22 @@ commands, evidence locations, exact limits and the next physical test action.
 User reports audible, error-free Linux testing of all seven Phase 3 audio formats (WAV, FLAC, MP3, M4A, AAC, Ogg, WebM). A separate real full-length FLAC was heard normally until the `bitchord_audio_probe` 30-second test limit. Snapshot `phase=2`, `error=0`, `position_us=29891814`; shell `exit code 2` reflects the probe returning before `BC_ENDED` and is **not a demonstrated crash**. Manual codec/audibility evidence is **USER_REPORTED_PASS (Linux only)** and is separate from CI codec fixture verification.
 
 The user chooses to defer a duration-aware/full-song probe and clear timeout/error exit semantics into the Phase 4 backlog. **Phase 3 Linux operational handoff USER_ACCEPTED; full physical cross-OS parity still OPEN.** No Windows speaker/WASAPI pass, calibrated loopback, device hotplug or soak has been reported, and no whole P-ID is promoted to `PARITY_ACCEPTED` by this statement. Phase 4 online provider work is explicitly authorized; Phase 5 is not.
+
+## Phase 4 first implementation evidence — 2026-11-12
+
+Pinned reference remains `348b613a0c3db1a54de56483ea6f8748d6465211`. Source anchors,
+implementation paths, scenarios and gaps are detailed in
+`flutterDesktop/verification/phase4/README.md`. Implementation commit is the
+commit adding this entry; platform results are pending exact-SHA CI inspection.
+
+| IDs | Scoped status | Evidence / limits |
+|---|---|---|
+| P03/P04/P05 | IMPLEMENTED; guest calls locally live-checked | WEB_REMIX shell/version, search/Home and continuation adapter, basic list/detail UI. Linux live search/Home 20/30 entries. No complete shelf/filter/artist/mutation/visual parity |
+| P17/P18 | IMPLEMENTED; add-on subset FIXTURE_TESTED | Typed HTTP manifest/search/stream, encoded queries/track identity, explicit unsupported responses. JioSaavn adapter added. No module host, source matching/race/upgrade acceptance |
+| P19/P11/P12 | FIXTURE_TESTED for HTTP/native broker only | Capped 512 KiB ranges, 4 MiB source cache, validators/cancellation/deadline/expiry, IO isolate and opaque loopback grant; real FFmpeg 384000 exact PCM frames. YouTube cipher/PoToken/audio remains unimplemented |
+| P08/P35/P36 | FIXTURE_TESTED for progressive download subset | Chunk hashes, interrupted resume, no partial publication, offline reopen, corruption rejection, owned removal. No manifest/queue/settings/full platform recovery parity |
+| P06/P20/P21 | PLANNED / integration unverified | Auth/browser import/protected account persistence/refresh/Spotify library remain unimplemented; no fake sign-in or plaintext fallback |
+| P11/P13 deferred probe | locally FIXTURE_TESTED | Default EOF, explicit timeout/status/exit codes, transient read retries and safe shutdown. 31.25-second Pulse software-sink EOF: 1500000 exact frames. Physical Windows/latency/hotplug gates unchanged |
+
+**Phase 4 INCOMPLETE.** No whole feature row is PARITY_ACCEPTED. Phase 5 has not
+started and no memory improvement is claimed.

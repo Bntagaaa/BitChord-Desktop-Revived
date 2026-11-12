@@ -6,6 +6,18 @@ final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     initialLocation: '/listen-now',
     routes: [
+      GoRoute(
+        path: '/catalog/:id',
+        pageBuilder: (context, state) => NoTransitionPage<void>(
+          key: state.pageKey,
+          child: DesktopShell(
+            destination: Destination.home,
+            browseId: state.pathParameters['id'],
+            detailTitle: state.uri.queryParameters['title'] ?? 'Collection',
+            browseParams: state.uri.queryParameters['params'],
+          ),
+        ),
+      ),
       for (final destination in Destination.values)
         GoRoute(
           path: '/${destination.id}',

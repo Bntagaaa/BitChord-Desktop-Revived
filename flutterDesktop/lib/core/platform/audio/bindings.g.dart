@@ -218,6 +218,32 @@ class BitchordBindings {
         int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Uint8>, int, int)
       >();
 
+  /// JioSaavn public URL obfuscation; returns unpadded byte count or -1.
+  int bc_saavn_decode(
+    ffi.Pointer<ffi.Uint8> input,
+    int length,
+    ffi.Pointer<ffi.Uint8> output,
+    int capacity,
+  ) {
+    return _bc_saavn_decode(input, length, output, capacity);
+  }
+
+  late final _bc_saavn_decodePtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            ffi.Pointer<ffi.Uint8>,
+            ffi.Uint32,
+            ffi.Pointer<ffi.Uint8>,
+            ffi.Uint32,
+          )
+        >
+      >('bc_saavn_decode');
+  late final _bc_saavn_decode = _bc_saavn_decodePtr
+      .asFunction<
+        int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<ffi.Uint8>, int)
+      >();
+
   int bc_sha256(
     ffi.Pointer<ffi.Uint8> bytes,
     int length,

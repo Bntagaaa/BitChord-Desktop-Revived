@@ -211,3 +211,18 @@ platform/physical acceptance gates. Do not start Phase 4.
 The user manually tested all seven supplied codec test files on Linux and reported **no errors**. A real full-length FLAC sounded normal until the existing 30-second probe limit; `phase=2, error=0, exit=2` is the probe's pre-EOF timeout result, not a proven playback crash. The user approves moving on and requests the longer-track probe/timeout polish be retained as an explicit Phase 4 task.
 
 Phase 3 native foundation remains CI-verified by [43197210264](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43197210264) and **user-accepted for the scoped Linux audible codec path**. Windows physical speakers, calibrated latency, hotplug and soak tests remain OPEN; do not claim full audio parity or independent confirmation of the user's physical observations. **Phase 4 is explicitly authorized** and covers online providers, accounts, streaming and downloads. Phase 5 is not authorized.
+
+## Phase 4 implementation in progress
+
+Guest YouTube Music catalogs, add-on/JioSaavn adapters and bounded progressive
+HTTP streaming/download infrastructure are implemented. YouTube audio resolution,
+accounts, Spotify and custom modules remain unimplemented/unverified; the UI
+reports those limits. See [Phase 4 evidence](verification/phase4/README.md).
+Phase 4 is **INCOMPLETE**, and Phase 5 has not started.
+
+The native probe now plays until EOF by default:
+`bitchord_audio_probe <file> [device]`. To bound a run, use
+`bitchord_audio_probe --timeout 120 <file> [device]`. JSON outcomes and exits:
+EOF 0, playback failure 2, process/shutdown failure 3, timeout 4, usage 64.
+EOF completion beyond 30 seconds is regression-tested through a real software
+sink; this does not replace physical platform acceptance.

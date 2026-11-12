@@ -7,6 +7,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
+import '../../online/application/catalog_controller.dart';
+import '../../online/presentation/catalog_surface.dart';
 import '../../../l10n/shell_strings.dart';
 import '../../../design_system/palette.dart';
 import '../../../design_system/theme.dart';
@@ -58,7 +60,14 @@ class BitChordGlyph extends StatelessWidget {
 }
 
 class DesktopShell extends ConsumerStatefulWidget {
-  const DesktopShell({super.key, required this.destination});
+  const DesktopShell({
+    super.key,
+    required this.destination,
+    this.browseId,
+    this.detailTitle,
+    this.browseParams,
+  });
+  final String? browseId, detailTitle, browseParams;
   final Destination destination;
   @override
   ConsumerState<DesktopShell> createState() => _DesktopShellState();
@@ -255,6 +264,23 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                               ? _AppearancePanel(
                                                   palette: palette,
                                                 )
+                                              : ref.watch(onlinePortProvider) !=
+                                                    null
+                                              ? CatalogSurface(
+                                                  key: ValueKey(
+                                                    '${widget.destination.id}:${widget.browseId}',
+                                                  ),
+                                                  destination:
+                                                      widget.destination.id,
+                                                  title:
+                                                      widget.detailTitle ??
+                                                      widget.destination
+                                                          .localizedLabel(
+                                                            context,
+                                                          ),
+                                                  browseId: widget.browseId,
+                                                  params: widget.browseParams,
+                                                )
                                               : _UnconnectedPage(
                                                   destination:
                                                       widget.destination,
@@ -270,9 +296,13 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                   right: 10,
                                   bottom: 20,
                                   child: Center(
-                                    child: _EmptyDock(
+                                    child: OnlineTransport(
                                       palette: palette,
                                       reduceBlur: settings.reduceBlur,
+                                      empty: _EmptyDock(
+                                        palette: palette,
+                                        reduceBlur: settings.reduceBlur,
+                                      ),
                                     ),
                                   ),
                                 ),

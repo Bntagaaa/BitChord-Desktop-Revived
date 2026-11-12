@@ -865,3 +865,39 @@ endpoints and record the gate evidence. This handoff does not authorize Phase 4.
 **Decision:** The user accepted the observed Linux Phase 3 playback/codec result as sufficient to **proceed to Phase 4 now**. Phase 3 operational foundation is **USER_ACCEPTED for Linux codec/audibility handoff**, while complete Phase 3 technical acceptance remains **PARTIAL / OPEN**: Windows physical WASAPI, endpoint unplug/replug/default changes, clock/latency measurements, full track EOF/soak, format/device matrix and other listed gates have not been demonstrated. Do not mark them PASS. This is an explicit informed scope decision to carry open work forward, not evidence that the missing tests ran.
 
 **Phase 4 explicitly AUTHORIZED.** Use `.codex/phases/phase-4.md` for online catalogs, YouTube Music/provider resolution, accounts, streaming and downloads. Preserve the real Phase 3 C++17/FFI playback engine; do not invent successful online login/playback or leak credentials. Track the deferred probe work separately and address it during Phase 4 without treating its timeout as a native crash. Do not begin Phase 5 automatically. Latest verified Phase 3 CI is [43197210264](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43197210264), Windows/Linux SUCCESS with scoped software/hardware limitations documented above.
+
+## Phase 4 execution — provider/catalog and transport increment, 2026-11-12
+
+**Phase 4 INCOMPLETE. Phase 5 NOT STARTED.** Phase 1/2 user acceptance and the
+user-reported Linux seven-codec Phase 3 handoff remain accepted. This increment
+preserves the C++ PCM/sink/clock engine and adds a strict loopback source opening
+path; it does not replace audio with a second engine.
+
+Implemented: live WEB_REMIX guest catalog adapter and catalog/search/detail
+surfaces, typed add-on HTTP and JioSaavn adapters, cancellable bounded HTTP ranges,
+source expiry renewal, dedicated IO-isolate broker with opaque native grants,
+progressive download/resume/hash-integrity/offline reopen/removal and native
+transport controls. Details, exact reference paths, commands and remaining
+contracts: `flutterDesktop/verification/phase4/README.md`.
+
+Local controlled HTTP/native checks passed (384000 exact PCM frames via broker),
+as did focused standalone Dart analysis, formatting and boundary checks. Actual
+anonymous YouTube Music search/Home returned 20/30 entries with continuations.
+This is limited live Linux catalog evidence, not account or playback parity.
+Full local Flutter SDK remains absent; Windows/Linux release/analyzer/widget/
+native GUI validation is **PENDING the triggered exact-SHA CI run**.
+
+Deferred Phase 3 probe is corrected: default EOF, positive `--timeout seconds`,
+separate EOF/playback/process/timeout/usage outcomes, bounded shutdown and proper
+transient snapshot retry handling. Local Pulse **software** sink: a 31.25-second
+WAV reached native EOF with 1500000 exact submitted/presented frames; timeout,
+missing-file and seven invalid-argument cases passed. No new physical sound or
+Windows speaker claim.
+
+Remaining implementation/integration gaps include YouTube cipher/client/PoToken,
+Google/Spotify sign-in and protected session persistence/import/refresh, Spotify
+library, custom module JS host, source matching/racing/live upgrades, full
+catalog/shelf/artist/mutation/quick-search parity, manifest downloads and complete
+recovery/platform scenarios. Required account scenarios cannot be verified
+without authorized test sessions. These are explicit unfinished Phase 4 gates;
+compiled code or fixture success does not resolve them.

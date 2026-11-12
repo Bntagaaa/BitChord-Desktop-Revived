@@ -67,6 +67,28 @@ final class NativeApi {
     return utf8.decode(bytes);
   }
 
+  String saavnUrl(String encrypted) {
+    final data = base64Decode(encrypted);
+    if (data.isEmpty || data.length > 4096)
+      throw const FormatException('Provider URL bound');
+    final input = allocate<Uint8>(data.length),
+        output = allocate<Uint8>(data.length);
+    try {
+      input.asTypedList(data.length).setAll(0, data);
+      final count = bindings.bc_saavn_decode(
+        input,
+        data.length,
+        output,
+        data.length,
+      );
+      if (count < 0) throw const FormatException('Provider URL encoding');
+      return utf8.decode(output.asTypedList(count)).trim();
+    } finally {
+      free(input);
+      free(output);
+    }
+  }
+
   String digest(List<int> data) {
     final bytes = allocate<Uint8>(data.isEmpty ? 1 : data.length);
     final hash = allocate<Uint8>(32);

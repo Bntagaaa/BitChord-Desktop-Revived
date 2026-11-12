@@ -18,6 +18,7 @@ final class LocalPlayback {
     AudioOperation operation, {
     int value = 0,
     QueueEntry? entry,
+    String? transportPath,
   }) async {
     final admission = await audio.submit(
       AudioRequest(
@@ -26,7 +27,7 @@ final class LocalPlayback {
         queueRevision: _nativeRevision,
         operation: operation,
         value: value,
-        path: entry?.localPath ?? '',
+        path: transportPath ?? entry?.localPath ?? '',
         entryId: entry?.entryId ?? '',
         renditionId: entry?.renditionId ?? '',
       ),
@@ -38,6 +39,12 @@ final class LocalPlayback {
   Future<void> playLocal(QueueEntry entry) async {
     if (_closed || entry.localPath == null)
       throw StateError('Local file required');
+    await playSource(entry, entry.localPath!);
+  }
+
+  // Transient broker grants are never persisted in queue/metadata.
+  Future<void> playSource(QueueEntry entry, String transportPath) async {
+    if (_closed) throw StateError('Playback closed');
     final updated = LocalState(
       queue: LocalQueue([entry]),
       revision: state.revision + 1,
@@ -49,7 +56,12 @@ final class LocalPlayback {
     state = updated;
     ++_selection;
     _nativeRevision = state.revision;
-    await _send(AudioOperation.select, value: 1, entry: entry);
+    await _send(
+      AudioOperation.select,
+      value: 1,
+      entry: entry,
+      transportPath: transportPath,
+    );
     await _send(
       AudioOperation.volume,
       value: (state.settings.volume * 1000000).round(),

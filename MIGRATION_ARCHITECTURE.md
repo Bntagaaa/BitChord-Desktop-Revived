@@ -242,3 +242,23 @@ position when no route exists. Hosted Windows confirms error 105 and zero output
 not audible playback. WASAPI/Pulse notifications trigger bounded native-owner
 reconfiguration from the last presented position; physical acceptance remains
 open. Final code/platform evidence is in MIGRATION_PROGRESS's Phase 3 handoff.
+
+## Phase 4 progressive HTTP broker decision — interim, 2026-11-12
+
+The current ABI-1 increment gives FFmpeg an opaque loopback HTTP grant. A
+separate Dart **IO isolate** owns provider HTTP requests, capped 512 KiB spans,
+validators, 4 MiB in-memory span cache and one expiry re-resolution. Native owns
+FFmpeg's interruptible AVIO/socket, decoder/PCM backpressure, DSP, sink and clock;
+no Dart/FFI callback occurs on its decode/render threads. Cancellation revokes
+the grant and interrupts native IO; shutdown closes native audio before broker
+teardown. There is one audio engine. Signed upstream URLs/headers stay outside
+ABI structs and durable queue state. Dart's standard HttpClient is used here
+instead of adding dio; per-request clients supply concrete cancellation owners,
+body bounds, scoped redirects and total deadlines.
+
+This is a **progressive-file transport increment**, not completion of the planned
+native libcurl/disk-span-cache or full source-purpose protocol. Manifest demux,
+source-purpose/request IDs, native-owned durable span-cache equivalence and
+UI/service-stall/recovery acceptance remain Phase 4 work. The two-second native
+PCM bounds and all output/clock ownership remain unchanged. Do not treat this
+interim broker as evidence that the complete Phase 0.5 protocol was delivered.
