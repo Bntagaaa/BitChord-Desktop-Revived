@@ -1237,3 +1237,9 @@ This section updates the interpretation of earlier screenshots without deleting 
 | Windows/Linux foundation | Hosted matrix [43163359448](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43163359448) PASS for both platforms, release bundles, tests, native shell checks and retention | Latest font-specific CI [43169153250](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43169153250) was still running when recorded; manual visual approval outstanding |
 
 The user has **not accepted Phase 1 visual parity**, and this table does not claim completed Phase 2 implementation. Kotlin reference files remain the specification. Do not record source-font binaries as licensed, embedded, or verified merely because the font family name is configured.
+
+## Phase 1 user acceptance — 2026-11-12
+
+The user explicitly reported that the latest Phase 1 UI looks OK after testing. Mark the **foundation/shell visual acceptance gate USER_ACCEPTED for Phase 1 scope**: basic navigation (including instant tab transitions), sidebar at matched 100% scale, appearance, account overlay, and empty player dock. Hosted Windows/Linux foundation CI previously passed in run `43163359448`.
+
+This acceptance is scoped to the Phase 1 shell and is **not** evidence that every Kotlin screen, media service, advanced native effect, accessibility scenario, font licensing condition or high-DPI setup has reached full parity. Keep exact Haze/Mica, DPI/accessibility, complete font glyph/weight comparison and future content-related checks open under Phase 2/Phase 8. The user's supplied `bitchord-sans` remains system-installed only; no redistributed font binaries are claimed. The later font change CI `43169153250` was still pending its terminal outcome at the time of this entry. Phase 2 work has not begun.

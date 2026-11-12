@@ -167,3 +167,9 @@ Follow-up changes:
 - The latest `bitchord-sans` code change is commit `c9cfdb1e`. Its [GitHub Actions workflow 43169153250](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43169153250) had not yet completed when this note was written. Recheck actual terminal CI status before stating a final build result.
 
 Manual visual review is still required for typography, tab transitions, scaling, glass/Haze, OS chrome, DPI/focus/accessibility and matching reference screenshots. Phase 2 has not been implemented by this documentation change. Consult `MIGRATION_PROGRESS.md`, `MIGRATION_PARITY.md` and `.codex/phases/phase-2.md` before beginning authorized Phase 2 work.
+
+## Phase 1 acceptance update — 2026-11-12
+
+The user has **manually accepted the Phase 1 foundation and shell** and confirmed the current UI is satisfactory for moving forward. This supersedes earlier README statements that Phase 1 is awaiting manual review. The successful hosted Windows/Linux validation baseline is [run 43163359448](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43163359448); the later font-specific [run 43169153250](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43169153250) was still in progress when acceptance was recorded.
+
+Phase 1 complete **within its shell/foundation scope**. Full Kotlin feature parity, native audio, exact visual effects, DPI/accessibility matrix and font redistribution verification are still open work in later phases. The sidebar spacing comparison must use matched UI scale: Kotlin 110% versus Flutter 100% was not a valid defect. `bitchord-sans` cuts are used by name when installed but are not packaged without license review. **Phase 2 is ready to start on explicit instruction; it has not started as part of this documentation update.**

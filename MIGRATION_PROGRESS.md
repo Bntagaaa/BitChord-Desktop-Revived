@@ -657,3 +657,13 @@ This entry supersedes earlier *current-status* statements for Phase 1 while pres
 **Phase 1 foundation: VERIFIED by hosted Windows/Linux CI. Phase 1 visual parity/manual acceptance: OPEN, awaiting user review.** Do not mark the entire phase 100% complete. Outstanding checks include font availability and real glyph/wrapping parity, material/Haze/motion, native chrome/Mica/icons and wider DPI/focus/accessibility tests. Full catalog/music/audio behavior remains out of this phase.
 
 **Phase 2 implementation: NOT STARTED in this handoff.** The requested next action is to use the existing `.codex/phases/phase-2.md` playbook only after the user chooses to start it. Carry unresolved visual evidence into Phase 2 with explicit owners/status rather than treating it as already accepted. Do not automatically move to Phase 3.
+
+## Phase 1 manual acceptance and Phase 2 handoff — 2026-11-12
+
+**User decision:** The user manually reviewed the current Flutter Phase 1 application and explicitly confirmed that everything looked OK. This approval supersedes the earlier *awaiting user manual visual review* gate for the Phase 1 foundation/shell. **Phase 1 is ACCEPTED for its authorized foundation and shell scope.** It is not a claim of pixel-perfect parity across every platform, complete application functionality, or proven RAM improvements.
+
+- Last fully confirmed foundation CI at acceptance time: [43163359448](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43163359448), success on Windows/Linux with tests, release builds, native smoke and retention. The later font-specific run [43169153250](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43169153250) was still in progress when this acceptance was recorded. Check the latest run outcome before relying on it.
+- User-confirmed navigation and visual shell are acceptable to proceed. The earlier sidebar spacing concern arose from unmatched Kotlin 110% versus Flutter 100% UI scale; no further 100% padding changes are requested.
+- The supplied `bitchord-sans` font family is selected when installed; binaries remain **unbundled** pending provenance and redistribution permission. The user's visual approval does not establish third-party font licensing.
+- Carry over platform-specific OS window chrome/Mica/Haze fidelity, broader DPI/accessibility/motion checks, and optional exact typography measurements as tracked **Phase 2/Phase 8 enhancement/verification items**, not Phase 1 completion blockers. New product functionality and audio are still future phases.
+- This documentation change does not implement or start Phase 2. **Phase 2 is READY for explicit user-authorized execution** using `.codex/phases/phase-2.md`. Do not initiate Phase 3 automatically.
