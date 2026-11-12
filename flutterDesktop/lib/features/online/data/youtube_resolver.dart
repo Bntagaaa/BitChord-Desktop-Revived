@@ -15,6 +15,7 @@ final class YouTubeResolver {
     this.node,
     this.poTokenPluginDirectory,
     this.poTokenServerHome,
+    this.bundled = false,
     this.timeout = const Duration(seconds: 45),
   });
   final String executable;
@@ -22,7 +23,26 @@ final class YouTubeResolver {
   // Explicitly trusted local yt-dlp plugin code. Default discovery stays off.
   final String? poTokenPluginDirectory;
   final String? poTokenServerHome;
+  final bool bundled;
   final Duration timeout;
+
+  // GitHub's artifact ZIP can discard POSIX executable bits. Repair only
+  // BitChord-owned bundled executables, never arbitrary user-configured paths.
+  Future<void> prepareBundledRuntime() async {
+    if (!bundled || Platform.isWindows) return;
+    for (final path in [executable, if (node != null) node!]) {
+      final binary = File(path);
+      final stat = await binary.stat();
+      if (stat.type != FileSystemEntityType.file) {
+        throw const ProviderFailure(ProviderProblem.unsupported);
+      }
+      if ((stat.mode & 0x49) != 0) continue;
+      final chmod = await Process.run('/usr/bin/chmod', ['u+x', '--', path]);
+      if (chmod.exitCode != 0) {
+        throw const ProviderFailure(ProviderProblem.unsupported);
+      }
+    }
+  }
 
   // Portable releases ship a pinned, self-contained resolver next to the
   // executable. This does not use the caller's PATH or silently install tools.
@@ -56,6 +76,7 @@ final class YouTubeResolver {
       node: node.absolute.path,
       poTokenPluginDirectory: plugins.absolute.path,
       poTokenServerHome: server.absolute.path,
+      bundled: true,
       timeout: const Duration(seconds: 120),
     );
   }
@@ -151,6 +172,7 @@ final class YouTubeResolver {
     var oversized = false;
     void Function() detach = () {};
     try {
+      await prepareBundledRuntime();
       process = await Process.start(
         executable,
         processArguments,

@@ -347,6 +347,16 @@ Future<void> youtubeContracts() async {
           detected.poTokenPluginDirectory != null,
       'Portable resolver should auto-configure without environment',
     );
+    if (!Platform.isWindows) {
+      await detected.prepareBundledRuntime();
+      final first = File('${portable.path}/$binary');
+      final second = File('${portable.path}/$nodeName');
+      require(
+        (first.statSync().mode & 0x40) != 0 &&
+            (second.statSync().mode & 0x40) != 0,
+        'Linux GitHub artifact executable permissions must self-repair',
+      );
+    }
     final builtArgs = detected.arguments(selected, AudioQuality.high);
     require(
       builtArgs.any(

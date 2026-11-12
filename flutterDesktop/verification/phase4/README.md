@@ -312,3 +312,43 @@ Upstream references:
 - https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide
 - https://github.com/yt-dlp/yt-dlp/wiki/Extractors
 - https://github.com/yt-dlp/yt-dlp#installing-plugins
+
+## Self-contained YouTube media runtime — 2026-11-12
+
+The default Windows/Linux **CI release artifacts now contain the resolver**:
+`youtube_runtime/yt-dlp[.exe]`, `node[.exe]`, a vetted pinned
+`plugins/bgutil-ytdlp-pot-provider.zip` and
+`server/{build,node_modules,package.json,package-lock.json}`. On app launch
+`YouTubeResolver.fromEnvironment()` detects these adjacent to the Flutter
+executable without any terminal setup, PATH discovery, cookie import, network
+installation or background provider server. A user-specified
+`BITCHORD_YTDLP` still takes explicit precedence for development.
+
+Packaging is done by `.github/workflows/flutter-desktop.yml` with the official
+pinned Node v22.23.5, yt-dlp 2026.10.26, and GPL-3.0 BgUtils provider 2.0.2
+at source SHA `26475e9d3665b972c4aeb83b4dbaafcf64b88438`. Pinned upstream
+release hashes are enforced in
+`flutterDesktop/tool/package_youtube_runtime.py`. The provider is compiled
+with `npm ci` from its pinned lockfile, then pruned to runtime dependencies.
+The runtime ZIP includes a manifest, available licensing notices and NPM
+package license files. Bundling notably increases the artifact's download size.
+
+The native audio engine is unchanged. A single yt-dlp subprocess calls the
+packaged script-mode per-video GVS token generator on demand (no listening port),
+with config/default plugins disabled, no cookie forwarding, limited input,
+timeouts and content-addressed/HTTP-range validation. The server_home points
+to the packaged provider, not to the user's home directory. If upstream still
+refuses the media URL, the application fails truthfully before adopting source.
+On Linux, the bundled tools repair missing owner executable bits at first use
+because GitHub artifact ZIP downloads may not retain them. This operation
+never alters user-configured external paths.
+
+**Verification:** [workflow 43249456690](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43249456690)
+success on Linux/Windows, with test, analyzer, native GUI launch and automatic
+bundled tool compilation/startup checks. The additional automatic POSIX
+permission-recovery regression is in a subsequent commit and requires its own
+exact-SHA CI verification. No browser sign-in or actual physical YouTube audio
+has been proven by these runs. Full cross-OS playback and real HTTP 206 ranges
+still require user/device verification; an HTTP 403, geography restriction or
+unsupported video must not be presented as playback success. Phase 4 remains
+INCOMPLETE and Phase 5 is not authorized.
