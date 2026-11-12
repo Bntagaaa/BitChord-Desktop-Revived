@@ -188,6 +188,24 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('Desktop destination change does not animate a Material page', (
+    tester,
+  ) async {
+    await mount(tester, const Size(1220, 780));
+    await tester.tap(find.byKey(const Key('nav-new')));
+    await tester.pump();
+    expect(find.byKey(const Key('page-heading')), findsOneWidget);
+    expect(find.text('New'), findsNWidgets(2));
+    expect(find.text('Home'), findsOneWidget); // Sidebar only.
+    expect(tester.takeException(), isNull);
+  });
+  test('Desktop typography uses explicit, rights-safe font fallbacks', () {
+    final typography =
+        bitChordTheme(BitChordPalette.light, Brightness.light).textTheme;
+    expect(typography.bodyMedium!.fontFamily, 'SF Pro Display');
+    expect(typography.bodyMedium!.fontFamilyFallback, contains('Inter'));
+    expect(typography.bodyMedium!.fontFamilyFallback, contains('Segoe UI'));
+  });
   testWidgets(
     'Navigation, appearance changes, back and window shortcuts are real actions',
     (tester) async {

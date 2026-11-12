@@ -19,12 +19,25 @@ abstract final class ShellMetrics {
   static const sidebarDuration = Duration(milliseconds: 180);
 }
 
+// Prefer the user's legally installed SF Pro Display. Never package copies
+// of the reference font without distribution rights. Inter/OS UI fonts are
+// explicitly ordered fallbacks instead of an implicit Material Roboto face.
+const bitChordDesktopFontFamily = 'SF Pro Display';
+const bitChordDesktopFontFallbacks = <String>[
+  'Inter',
+  'Segoe UI',
+  'Noto Sans',
+  'Roboto',
+];
+
 ThemeData bitChordTheme(BitChordPalette palette, Brightness brightness) {
   // SF Pro is not redistributed until its license is established. Default
   // logical weights below use the reference DEFAULT physical-cut remapping.
   TextStyle role(double size, FontWeight weight, double tracking) => TextStyle(
     fontSize: size,
     fontWeight: weight,
+    fontFamily: bitChordDesktopFontFamily,
+    fontFamilyFallback: bitChordDesktopFontFallbacks,
     letterSpacing: tracking,
     color: palette['foreground'],
     // Kotlin's customized roles use fresh TextStyles, without inherited
@@ -34,6 +47,8 @@ ThemeData bitChordTheme(BitChordPalette palette, Brightness brightness) {
   return ThemeData(
     brightness: brightness,
     useMaterial3: true,
+    fontFamily: bitChordDesktopFontFamily,
+    fontFamilyFallback: bitChordDesktopFontFallbacks,
     scaffoldBackgroundColor: palette['background'],
     colorScheme:
         ColorScheme.fromSeed(

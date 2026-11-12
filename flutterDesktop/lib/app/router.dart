@@ -9,7 +9,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       for (final destination in Destination.values)
         GoRoute(
           path: '/${destination.id}',
-          builder: (context, state) => DesktopShell(destination: destination),
+          // A desktop tab change is immediate, not an Android Material page push.
+          pageBuilder: (context, state) => NoTransitionPage<void>(
+            key: state.pageKey,
+            child: DesktopShell(destination: destination),
+          ),
         ),
     ],
   );

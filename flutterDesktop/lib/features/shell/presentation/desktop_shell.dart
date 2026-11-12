@@ -711,6 +711,9 @@ class _NavigationItem extends StatelessWidget {
                                         palette[selected
                                             ? 'foreground'
                                             : 'secondary'],
+                                    // Kotlin uses logical SemiBold / Medium,
+                                    // remapped to medium / regular SF Pro cuts
+                                    // in its default desktop font profile.
                                     fontWeight: selected
                                         ? FontWeight.w500
                                         : FontWeight.w400,
