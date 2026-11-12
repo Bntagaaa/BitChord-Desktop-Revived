@@ -36,11 +36,25 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Diagnose Windows native configuration with the reference toolchain
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $compiler = (Get-Command g++.exe).Source
+          $ninja = (Get-Command ninja.exe).Source
+          cmake --version
+          & $compiler --version
+          & $ninja --version
+          cmake -S desktopApp/native -B desktopApp/build/native/windows -G Ninja "-DCMAKE_MAKE_PROGRAM=$ninja" "-DCMAKE_CXX_COMPILER=$compiler" -DCMAKE_BUILD_TYPE=Release 2>&1 | Tee-Object verification/native-configure.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test pinned reference without source changes or credentials
+        if: success() || failure()
         run: |
           set -euo pipefail
           java -version 2>&1 | tee verification/java.log
-          bash gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test --no-daemon --max-workers=2 --console=plain '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' 2>&1 | tee verification/tests.log
+          display=()
+          if [ "$RUNNER_OS" = Linux ]; then display=(xvfb-run -a); fi
+          "${display[@]}" bash gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test --no-daemon --max-workers=2 --console=plain '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' 2>&1 | tee verification/tests.log
       - name: Build pinned reference for visual comparison
         if: success() || failure()
         run: |
@@ -60,5 +74,9 @@ jobs:
             reference/shared/build/test-results/
             reference/sharedUi/build/test-results/
             reference/desktopApp/build/test-results/
+            reference/desktopApp/build/native/**/CMakeCache.txt
+            reference/desktopApp/build/native/**/CMakeFiles/CMakeConfigureLog.yaml
+            reference/desktopApp/build/native-window/**/CMakeCache.txt
+            reference/desktopApp/build/native-window/**/CMakeFiles/CMakeConfigureLog.yaml
             reference/desktopApp/build/compose/binaries/main/app/
           if-no-files-found: error
