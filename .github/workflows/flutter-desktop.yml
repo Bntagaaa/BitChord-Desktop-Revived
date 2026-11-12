@@ -177,13 +177,18 @@ jobs:
           evidence = Path(os.environ['VALIDATED_EVIDENCE'])
           target = root / 'verification'
           target.mkdir(exist_ok=True)
-          for name in ['shell-dark-1220x780.png', 'shell-dark-900x600.png', 'native-linux-1220x780.png', 'native-linux-900x600.png', 'test-summary.json', 'native-linux.json']:
+          states = ['accounts', 'drawer', 'settings', 'dark', 'pitch-black', 'light']
+          linux_names = ['shell-dark-1220x780.png', 'shell-dark-900x600.png', 'native-linux-1220x780.png', 'native-linux-900x600.png', 'test-summary.json', 'native-linux.json']
+          linux_names += [f'native-linux-{state}-900x600.png' for state in states]
+          for name in linux_names:
               data = (evidence / name).read_bytes()
               if name.endswith('.png') and not data.startswith(b'\x89PNG\r\n\x1a\n'):
                   raise SystemExit('Invalid render evidence: ' + name)
               (target / name).write_bytes(data)
           windows_evidence = Path(os.environ['WINDOWS_EVIDENCE'])
-          for name in ['native-windows-1220x780.png', 'native-windows-900x600.png', 'native-windows.json']:
+          windows_names = ['native-windows-1220x780.png', 'native-windows-900x600.png', 'native-windows.json']
+          windows_names += [f'native-windows-{state}-900x600.png' for state in states]
+          for name in windows_names:
               data = (windows_evidence / name).read_bytes()
               if name.endswith('.png') and not data.startswith(b'\x89PNG\r\n\x1a\n'):
                   raise SystemExit('Invalid Windows render evidence: ' + name)

@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -25,6 +26,29 @@ def shell_painted(capture, width, height):
         '-format', '%[fx:maxima-minima]', 'info:'
     ], text=True, timeout=10))
     return boundary[0] != boundary[1] and logo_contrast >= .25
+
+
+def capture_state(evidence, window, name, theme='any'):
+    capture = evidence / f'native-linux-{name}-900x600.png'
+    deadline = time.monotonic() + 8
+    while True:
+        subprocess.run(['import', '-screen', '-window', window, '-depth', '8', str(capture)], check=True, timeout=10)
+        value = subprocess.check_output(['convert', str(capture), '-format', '%[pixel:p{500,300}]', 'info:'], text=True, timeout=10)
+        match = re.search(r'\((\d+),(\d+),(\d+)', value)
+        if not match:
+            raise RuntimeError('Unexpected native pixel format: ' + value)
+        rgb = list(map(int, match.groups()))
+        if (theme == 'any' or (theme == 'light' and min(rgb) >= 230) or
+                (theme == 'dark' and rgb == [32, 32, 32]) or (theme == 'black' and max(rgb) <= 2)):
+            return {'state': name, 'expected_theme': theme, 'background_rgb': rgb}
+        if time.monotonic() > deadline:
+            raise RuntimeError(f'Real appearance selection did not render {theme}: {rgb}')
+        time.sleep(.25)
+
+
+def click_client(window, x, y):
+    subprocess.run(['xdotool', 'mousemove', '--window', window, str(x), str(y), 'click', '1'], check=True, timeout=5)
+    time.sleep(.8)
 
 
 def main():
@@ -84,6 +108,24 @@ def main():
                 geometry = subprocess.check_output(['xdotool', 'getwindowgeometry', '--shell', window], text=True, timeout=10)
                 observations.append({'width': actual_width, 'height': actual_height,
                                      'colors': colors, 'geometry': geometry})
+            subprocess.run(['xdotool', 'windowactivate', '--sync', window], check=True, timeout=10)
+            click_client(window, 36, 516)
+            states = [capture_state(evidence, window, 'accounts')]
+            subprocess.run(['xdotool', 'key', 'Escape'], check=True, timeout=5)
+            click_client(window, 36, 34)
+            states.append(capture_state(evidence, window, 'drawer'))
+            subprocess.run(['xdotool', 'key', 'Escape'], check=True, timeout=5)
+            click_client(window, 36, 563)
+            states.append(capture_state(evidence, window, 'settings'))
+            click_client(window, 120, 127)
+            click_client(window, 300, 127)
+            states.append(capture_state(evidence, window, 'dark', 'dark'))
+            click_client(window, 170, 170)
+            states.append(capture_state(evidence, window, 'pitch-black', 'black'))
+            click_client(window, 120, 127)
+            click_client(window, 230, 127)
+            states.append(capture_state(evidence, window, 'light', 'light'))
+            subprocess.run(['xdotool', 'key', 'alt+Left', 'mousemove', '--window', window, '500', '400'], check=True, timeout=5)
             subprocess.run(['xdotool', 'windowactivate', '--sync', window, 'key', 'F11'], check=True, timeout=10)
             for expected_fullscreen, key in [(True, None), (False, 'Escape')]:
                 if key:
@@ -112,6 +154,7 @@ def main():
             (evidence / 'native-linux.json').write_text(json.dumps({
                 'display': 'Xvfb 1600x1000x24, 96 DPI / Openbox / software GL',
                 'captures': observations, 'exit_code': app.returncode,
+                'appearance_captures': states,
                 'fullscreen': 'F11 entered; Escape restored 900x600',
             }, indent=2) + '\n')
         finally:

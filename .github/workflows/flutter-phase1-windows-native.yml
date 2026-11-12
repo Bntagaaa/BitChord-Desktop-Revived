@@ -43,7 +43,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compile reference window bridge with the SDK header prerequisite
         run: |
-          cmake -S desktopApp/native/window -B desktopApp/build/native-window/windows --fresh -G 'Visual Studio 17 2022' -A x64 -DCMAKE_BUILD_TYPE=Release '-DCMAKE_CXX_FLAGS=/FIpropkeydef.h' 2>&1 | Tee-Object verification/window-configure.log
+          cmake -S desktopApp/native/window -B desktopApp/build/native-window/windows --fresh -G 'Visual Studio 17 2022' -A x64 -DCMAKE_BUILD_TYPE=Release '-DCMAKE_CXX_FLAGS=/DNOMINMAX /DWIN32_LEAN_AND_MEAN /D_WIN32_WINNT=0x0A00 /FIwindows.h /FIpropkeydef.h' 2>&1 | Tee-Object verification/window-configure.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build desktopApp/build/native-window/windows --config Release --parallel 2 --verbose 2>&1 | Tee-Object verification/window-build.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

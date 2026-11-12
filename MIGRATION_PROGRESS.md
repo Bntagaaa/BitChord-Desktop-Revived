@@ -437,3 +437,21 @@ for that bridge, preserving the reference files and all target/test checks.
 This header prerequisite corrects include order, not application/audio logic;
 its compile/test results are pending.
 
+The corrected shell in run `43132763894` passed analyzer, all 12 tests per OS,
+Windows/Linux release builds, both native client sizes, F11/Escape size restore
+and native close/exit 0. Its retention job refused to overwrite newer branch work,
+so the overall run is red despite both desktop jobs passing. This is the intended
+SHA guard, not a source/build failure. The native captures were downloaded and
+reviewed: the extra row is gone, corrected sidebar/footer and gray dock are visible.
+
+Windows reference runs `43132763855`/`43132960359` exposed that forced-including
+`propkeydef.h` alone is insufficient: its PROPERTYKEY declarations also require
+Windows types. The external compiler prelude now includes `windows.h` first with
+the reference's existing Windows/NOMINMAX definitions. No protected source changes
+or weakened tests are involved. The complete native/reference result is pending.
+
+Native smoke checks now additionally exercise actual account/drawer/settings
+input and Light/Dark/Pitch-black selection, retaining six state captures per OS.
+Theme checks assert the real rendered page color, followed by fullscreen/restore
+and clean native close. These are shell checks, not acceptance of reference
+settings inventory, authentication, accessibility or full visual parity.
