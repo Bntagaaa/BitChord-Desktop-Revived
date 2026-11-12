@@ -345,7 +345,7 @@ Future<void> youtubeContracts() async {
           detected.poTokenPluginDirectory != null,
       'Portable resolver should auto-configure without environment',
     );
-    final builtArgs = detected.arguments(selected, AudioQuality.high);
+    final builtArgs = detected!.arguments(selected, AudioQuality.high);
     require(
       builtArgs.any(
         (arg) => arg.contains('youtubepot-bgutilscript:server_home=') &&
