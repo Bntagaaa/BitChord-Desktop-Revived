@@ -10,14 +10,14 @@ final class MatchedRecording {
 }
 
 final class RecordingFallback {
-  static final _brackets = RegExp(r'\\(([^()]*)\\)|\\[([^\\[\\]]*)\\]');
-  static final _separator = RegExp(r'\\s+[-–—|]\\s+');
+  static final _brackets = RegExp(r'\(([^()]*)\)|\[([^\[\]]*)\]');
+  static final _separator = RegExp(r'\s+[-–—|]\s+');
   static final _versions = RegExp(
-    r'\\b(remix|rmx|live|acoustic|instrumental|karaoke|'
-    r'cover|sped|slowed|nightcore|unplugged|mashup|bootleg)\\b',
+    r'\b(remix|rmx|live|acoustic|instrumental|karaoke|'
+    r'cover|sped|slowed|nightcore|unplugged|mashup|bootleg)\b',
   );
   static final _neutral = RegExp(
-    r'^(?:official\\s+)?(?:(?:music|visual|lyric)\\s+)?'
+    r'^(?:official\s+)?(?:(?:music|visual|lyric)\s+)?'
     r'(?:video|audio|lyrics?|visualizer|hd|hq|4k)$',
   );
 
@@ -27,7 +27,7 @@ final class RecordingFallback {
       .replaceAll('&', ' and ')
       .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
       .trim()
-      .replaceAll(RegExp(r'\\s+'), ' ');
+      .replaceAll(RegExp(r'\s+'), ' ');
 
   static String _artist(String subtitle) {
     final segments = subtitle
@@ -42,8 +42,8 @@ final class RecordingFallback {
         ? segments[1]
         : segments.first;
     return _normalize(chosen
-        .replaceAll(RegExp(r'\\s+-\\s+topic$', caseSensitive: false), '')
-        .split(RegExp(r',|\\bfeat\\.?\\b|\\bft\\.?\\b', caseSensitive: false))
+        .replaceAll(RegExp(r'\s+-\s+topic$', caseSensitive: false), '')
+        .split(RegExp(r',|\bfeat\.?\b|\bft\.?\b', caseSensitive: false))
         .first);
   }
 
@@ -75,7 +75,7 @@ final class RecordingFallback {
       }
     }
     text = text.replaceFirst(
-      RegExp(r'\\s+\\b(?:feat\\.?|ft\\.?|featuring)\\b.*$'),
+      RegExp(r'\s+\b(?:feat\.?|ft\.?|featuring)\b.*$'),
       '',
     );
     final core = _normalize(text);

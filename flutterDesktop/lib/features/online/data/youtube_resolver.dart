@@ -167,9 +167,9 @@ final class YouTubeResolver {
       return const ProviderFailure(ProviderProblem.loginRequired);
     }
     if (RegExp(
-      r'failed to generate[^\\n]*po token|'
-      r'po token[^\\n]*(?:generation|generator)[^\\n]*(?:error|fail)|'
-      r'(?:error|failed)[^\\n]*bgutil',
+      r'failed to generate[^\n]*po token|'
+      r'po token[^\n]*(?:generation|generator)[^\n]*(?:error|fail)|'
+      r'(?:error|failed)[^\n]*bgutil',
     ).hasMatch(value)) {
       return const ProviderFailure(ProviderProblem.tokenUnavailable);
     }
