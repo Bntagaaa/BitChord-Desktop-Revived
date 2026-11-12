@@ -19,10 +19,11 @@ abstract final class ShellMetrics {
   static const sidebarDuration = Duration(milliseconds: 180);
 }
 
-// Prefer the user's legally installed SF Pro Display. Never package copies
-// of the reference font without distribution rights. Inter/OS UI fonts are
-// explicitly ordered fallbacks instead of an implicit Material Roboto face.
-const bitChordDesktopFontFamily = 'SF Pro Display';
+// The supplied five static font cuts identify themselves as "bitchord-sans"
+// (regular/medium/semibold/bold/heavy, 400..800). Resolve the installed system
+// family without redistributing font binaries of unverified licensing status.
+// Desktop fallbacks are retained for machines without the custom family.
+const bitChordDesktopFontFamily = 'bitchord-sans';
 const bitChordDesktopFontFallbacks = <String>[
   'Inter',
   'Segoe UI',
@@ -31,8 +32,8 @@ const bitChordDesktopFontFallbacks = <String>[
 ];
 
 ThemeData bitChordTheme(BitChordPalette palette, Brightness brightness) {
-  // SF Pro is not redistributed until its license is established. Default
-  // logical weights below use the reference DEFAULT physical-cut remapping.
+  // Use the reference visual metrics; real glyph width depends on the
+  // installed bitchord-sans family and its registered physical font cuts.
   TextStyle role(double size, FontWeight weight, double tracking) => TextStyle(
     fontSize: size,
     fontWeight: weight,

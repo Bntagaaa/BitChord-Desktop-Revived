@@ -204,7 +204,7 @@ void main() {
       BitChordPalette.light,
       Brightness.light,
     ).textTheme;
-    expect(typography.bodyMedium!.fontFamily, 'SF Pro Display');
+    expect(typography.bodyMedium!.fontFamily, 'bitchord-sans');
     expect(typography.bodyMedium!.fontFamilyFallback, contains('Inter'));
     expect(typography.bodyMedium!.fontFamilyFallback, contains('Segoe UI'));
   });
