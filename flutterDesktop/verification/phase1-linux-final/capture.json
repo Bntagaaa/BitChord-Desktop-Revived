@@ -1,0 +1,98 @@
+{
+  "reference_commit": "348b613a0c3db1a54de56483ea6f8748d6465211",
+  "reference_run_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43156276992",
+  "flutter_commit": "8d607663c469111b994204f80b0f9afcb050dc5e",
+  "flutter_run_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43156992243",
+  "kernel": "6.18.60-2-cachyos-lts",
+  "host": "CachyOS Linux x64",
+  "display": "Same isolated Xvfb session, 1600x1000x24, -dpi 96, no window manager; separate dbus-run-session per app",
+  "xvfb_package": {
+    "source": "https://geo.mirror.pkgbuild.com/extra/os/x86_64/xorg-server-xvfb-21.1.26-1-x86_64.pkg.tar.zst",
+    "sha256": "67fb3d52b7658bf610449cb83b97a224ea683d7486b612995b4d10ec26a1a9af",
+    "verification": "Detached signature checked with installed Arch Linux keyring: ADC8A1FCC15E01D45310419E94657AB20F2A092B"
+  },
+  "profile": "Separate temporary XDG config/data/cache and Java Preferences/user.home; Light, 100% UI scale, no accounts or queue; reference onboarding marker seeded only in test-owned Preferences",
+  "rendering": {
+    "kotlin": "Explicit -Dskiko.renderApi=SOFTWARE after default OpenGL failed to create a context in this Xvfb setup; -Dsun.java2d.uiScale=1",
+    "flutter": "GDK_BACKEND=x11, GDK_SCALE=1, GDK_DPI_SCALE=1, LIBGL_ALWAYS_SOFTWARE=1 (Mesa llvmpipe)"
+  },
+  "capture_method": "Process-owned viewable X11 window; XResizeWindow and ImageMagick import -window; dimensions checked after paint; sequential app launch",
+  "records": [
+    {
+      "app": "kotlin",
+      "file": "kotlin-1220x780.png",
+      "client": [
+        1220,
+        780
+      ],
+      "captured_at_utc": "2026-11-12T05:09:40.191824+00:00",
+      "sha256": "d73b860ab13a454f692a8647c197c306de01be1e66e245075c6915ea51989505",
+      "home_dark_ink_bbox_inclusive": [
+        238,
+        16,
+        314,
+        36
+      ]
+    },
+    {
+      "app": "kotlin",
+      "file": "kotlin-900x600.png",
+      "client": [
+        900,
+        600
+      ],
+      "captured_at_utc": "2026-11-12T05:09:46.096199+00:00",
+      "sha256": "3cae320954554d5956df5a52d876579d23b4983b33e3292f9b45c9e742d5c81a",
+      "home_dark_ink_bbox_inclusive": [
+        90,
+        16,
+        166,
+        36
+      ]
+    },
+    {
+      "app": "flutter",
+      "file": "flutter-1220x780.png",
+      "client": [
+        1220,
+        780
+      ],
+      "captured_at_utc": "2026-11-12T05:09:59.782028+00:00",
+      "sha256": "f245765102a13177b2216e24c3c6f6665051aeaa0e5727b45132fb1b1b1f2cce",
+      "home_dark_ink_bbox_inclusive": [
+        238,
+        16,
+        318,
+        37
+      ]
+    },
+    {
+      "app": "flutter",
+      "file": "flutter-900x600.png",
+      "client": [
+        900,
+        600
+      ],
+      "captured_at_utc": "2026-11-12T05:10:05.346350+00:00",
+      "sha256": "c7f5076bdda5f541a8c26245f5433614a701f08dcfd090148d83e20eff06102e",
+      "home_dark_ink_bbox_inclusive": [
+        90,
+        16,
+        170,
+        37
+      ]
+    }
+  ],
+  "review": [
+    "Home title top ink y=16 in both apps at both sizes; fallback Flutter ink is 4 px wider and 1 px taller",
+    "Expanded 220 px sidebar and 72 px rail, row/divider spacing, account footer and empty dock bounds align closely",
+    "Kotlin live anonymous feed and Flutter disconnected placeholder are different content states; no full-frame comparison accepted",
+    "Dock blur over feed versus empty body and disabled versus available controls are not equivalent material/behavior states"
+  ],
+  "limits": [
+    "Software-rendered client comparison only; excludes native caption/compositor/Mica and physical GPU behavior",
+    "Capture cleanup used SIGTERM; lifecycle evidence is from separate hosted native-close/fullscreen checks",
+    "Font glyphs/wrapping, exact Haze/noise and motion, broad DPI/focus/accessibility matrix remain unaccepted",
+    "Rejected visible-desktop trial with changed playback state was not retained"
+  ]
+}

@@ -135,8 +135,13 @@ appearance captures and native lifecycle checks in
 The retained final Windows Flutter captures can be compared with the pinned
 Kotlin Windows captures under
 [`verification/phase1-shell-correction/`](verification/phase1-shell-correction/);
-the latest Linux Flutter capture is hosted, but a same-session Linux Kotlin
-pair after the final heading adjustment has not been recorded.
+the final Linux pair is in
+[`verification/phase1-linux-final/`](verification/phase1-linux-final/), recorded
+sequentially in one isolated 96-DPI Xvfb display with temporary profiles and
+separate D-Bus sessions. The Kotlin capture uses explicit Skiko SOFTWARE
+rendering and Flutter uses Mesa llvmpipe; these are client-geometry comparisons.
+Both Home headings begin at y=16, but fallback Flutter glyphs remain 4 pixels
+wider and 1 pixel taller. Native compositor behavior remains unaccepted.
 Repeated local Linux pairs are in
 [`verification/phase1-shell-correction/`](verification/phase1-shell-correction/),
 alongside focused Windows native provenance. This does not establish full

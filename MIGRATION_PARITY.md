@@ -221,8 +221,14 @@ removed and sidebar, account footer, and dock geometry align closely with the
 Kotlin shell. The Home title ink starts at y=16 in both Windows captures, though
 fallback glyph shape and width still differ. Live Kotlin home-feed content and
 the disconnected Flutter placeholder are different states and are excluded
-from common-shell parity judgments. The current hosted Linux Flutter heading
-starts at y=15; its prior local Kotlin pairing predates this final offset change.
+from common-shell parity judgments. A repeat Linux pair at both client sizes
+is retained in `flutterDesktop/verification/phase1-linux-final/`: same isolated
+Xvfb display at 96 DPI, Light/100%, separate temporary profiles and D-Bus
+sessions. Both headings start at y=16, while Flutter fallback ink is 4 pixels
+wider and 1 pixel taller. Sidebar/rail/account-footer/dock bounds align closely;
+the playlist caption still wraps differently. Kotlin required explicit Skiko
+SOFTWARE rendering in this setup; Flutter used Mesa llvmpipe. This verifies
+client geometry under software rendering, not native compositor behavior.
 SF Pro redistribution permission, exact Haze/noise/feed material and motion,
 native caption/Mica/icons, and broad DPI/focus/accessibility verification remain
 open. This evidence does not establish full visual parity or authorize Phase 2.

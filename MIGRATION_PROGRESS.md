@@ -1,6 +1,6 @@
 # Migration progress and delivery backlog
 
-Latest Phase 1 status: see the **Phase 1 targeted acceptance audit** at the end.
+Latest Phase 1 status: see the **latest verification and Linux comparison** at the end.
 Earlier dated records are historical evidence, not the current gate status.
 
 ## Phase 0 record
@@ -577,9 +577,9 @@ captures. The title still differs in x/width and glyph shape (fallback font);
 matching its top coordinate does not establish typography parity. The 900×600
 Kotlin home has live catalog content while Flutter deliberately shows its
 disconnected placeholder, so body pixels are not comparable. The earlier local
-Linux Kotlin/Flutter pair is not a post-adjustment pair; the final hosted Linux
-Flutter capture shows the heading at y=15, but no refreshed same-session Linux
-Kotlin pairing has been recorded.
+Linux Kotlin/Flutter pair predates the heading adjustment. A refreshed isolated
+Linux pair is now recorded in the following verification entry; the hosted
+Linux Flutter capture at y=15 remains a different font/rendering environment.
 
 Remaining visual acceptance gaps are explicit: SF Pro redistribution rights
 are not established and fallback glyph widths/wrapping differ; exact Haze/noise,
@@ -587,5 +587,48 @@ feed material and motion are not reproduced; native Windows caption/Mica/icon
 behavior is not part of the Flutter client capture; and a broader physical DPI,
 focus, accessibility and native-theme matrix remains unverified. No full-frame
 visual parity is claimed. Foundation and hosted lifecycle gates pass, while
-Phase 1 visual acceptance remains **INCOMPLETE** pending these gaps and a final
-matched Linux capture review. Phase 2 remains unstarted.
+Phase 1 visual acceptance remains **INCOMPLETE** pending these gaps.
+Phase 2 remains unstarted.
+
+## Phase 1 final Linux comparison and CI repeat — 2026-11-12
+
+The documentation push also passed the complete Flutter Windows/Linux matrix
+in [43158220349](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43158220349),
+source `ad0bc173`: 13 tests per OS, analyzer/format, release builds, real native
+appearance/overlay captures, F11/Escape restore and native close/exit 0. Its
+retention commit `37c51152` was fetched and fast-forwarded into this branch.
+Local boundary/20-asset/reference-token checks passed again, and the diff of
+desktopApp/shared/sharedUi/native against the pinned reference is empty.
+
+The tested Linux bundles from reference run `43156276992` and Flutter run
+`43156992243` were downloaded and launched sequentially in the same isolated
+Xvfb display at 96 DPI, with separate temporary XDG directories, Java
+Preferences/user.home, and D-Bus sessions. Both used Light/100% scale and empty
+queues/accounts. Four actual client images (1220×780 and 900×600 per app),
+source/run provenance, hashes, capture method and renderer limits are retained
+in `flutterDesktop/verification/phase1-linux-final/capture.json` and its PNGs.
+An earlier visible-desktop trial whose playback state changed was rejected.
+
+The repeat confirms the extra header/navigation row is removed; expanded
+sidebar/rail, dividers, account footer and dock bounds align closely at both
+sizes. The Home title ink begins at y=16 in both applications; Flutter's fallback
+glyphs remain 4 pixels wider and 1 pixel taller. The expanded playlist caption
+also wraps differently. The Kotlin live anonymous feed differs from Flutter's
+disconnected body, so content pixels and dock blur over that content cannot
+establish matching materials. Disabled Flutter transport/volume styling is
+intentional while its backend is unavailable.
+
+The default Kotlin OpenGL renderer could not create a context in this local
+Xvfb setup; this accepted capture explicitly used Skiko SOFTWARE rendering.
+Flutter used Mesa llvmpipe software GL. Xvfb was extracted to `/tmp` from the
+official Arch Linux package after checking its detached signature with the
+installed Arch keyring. No system packages or protected reference sources were
+changed. Capture cleanup used SIGTERM and is not lifecycle acceptance; the
+separate hosted native-close checks supply that evidence.
+
+The missing final Linux pair is now supplied. Remaining visual acceptance
+blockers are the unresolved SF Pro redistribution rights and glyph/wrapping
+differences, exact material/motion work, and unavailable physical Windows/Linux
+compositor/DPI/focus/accessibility coverage. The current shell is buildable and
+its hosted lifecycle passes, but full visual acceptance remains **INCOMPLETE**.
+No Phase 2 work has begun.
