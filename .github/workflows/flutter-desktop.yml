@@ -38,6 +38,15 @@ jobs:
       PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Brainicism/bgutil-ytdlp-pot-provider
+          ref: 26475e9d3665b972c4aeb83b4dbaafcf64b88438 # tag 2.0.2
+          path: .youtube-po-provider
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.23.5'
+          architecture: x64
       - name: Install Linux desktop dependencies from official repositories
         if: runner.os == 'Linux'
         timeout-minutes: 15
@@ -123,6 +132,15 @@ jobs:
           python tool/run_checked.py tests flutter test --machine | tee verification/tests.json
       - name: Build release desktop bundle
         run: python tool/run_checked.py build flutter build ${{ matrix.target }} --release
+      - name: Build self-contained YouTube PO Token runtime (no user setup)
+        timeout-minutes: 15
+        run: |
+          cd "$GITHUB_WORKSPACE/.youtube-po-provider/server"
+          npm ci --no-audit --no-fund
+          npx tsc
+          npm prune --omit=dev --ignore-scripts --no-audit --no-fund
+          cd "$GITHUB_WORKSPACE/flutterDesktop"
+          python tool/run_checked.py youtube-bundle python tool/package_youtube_runtime.py ${{ matrix.target }} "$GITHUB_WORKSPACE/.youtube-po-provider"
       - name: Linux release launch smoke
         if: runner.os == 'Linux'
         timeout-minutes: 3

@@ -14,17 +14,58 @@ final class YouTubeResolver {
     this.executable, {
     this.node,
     this.poTokenPluginDirectory,
+    this.poTokenServerHome,
     this.timeout = const Duration(seconds: 45),
   });
   final String executable;
   final String? node;
   // Explicitly trusted local yt-dlp plugin code. Default discovery stays off.
   final String? poTokenPluginDirectory;
+  final String? poTokenServerHome;
   final Duration timeout;
+
+  // Portable releases ship a pinned, self-contained resolver next to the
+  // executable. This does not use the caller's PATH or silently install tools.
+  static YouTubeResolver? fromBundleDirectory(Directory executableDirectory) {
+    final separator = Platform.pathSeparator;
+    final root = '${executableDirectory.path}${separator}youtube_runtime';
+    final extractor = File(
+      '$root${separator}${Platform.isWindows ? 'yt-dlp.exe' : 'yt-dlp'}',
+    );
+    final node = File(
+      '$root${separator}${Platform.isWindows ? 'node.exe' : 'node'}',
+    );
+    final plugins = Directory('$root${separator}plugins');
+    final server = Directory('$root${separator}server');
+    final script = File(
+      '${server.path}${separator}build${separator}generate_once.js',
+    );
+    final package = File(
+      '${server.path}${separator}node_modules${separator}bgutils-js'
+      '${separator}package.json',
+    );
+    if (!extractor.existsSync() ||
+        !node.existsSync() ||
+        !plugins.existsSync() ||
+        !script.existsSync() ||
+        !package.existsSync()) {
+      return null;
+    }
+    return YouTubeResolver(
+      extractor.absolute.path,
+      node: node.absolute.path,
+      poTokenPluginDirectory: plugins.absolute.path,
+      poTokenServerHome: server.absolute.path,
+      timeout: const Duration(seconds: 120),
+    );
+  }
 
   static YouTubeResolver? fromEnvironment() {
     final path = Platform.environment['BITCHORD_YTDLP'];
-    if (path == null || !File(path).isAbsolute) return null;
+    if (path == null) {
+      return fromBundleDirectory(File(Platform.resolvedExecutable).parent);
+    }
+    if (!File(path).isAbsolute) return null;
     final node = Platform.environment['BITCHORD_YTDLP_NODE'];
     final plugin = Platform.environment['BITCHORD_YTDLP_POT_PLUGIN_DIR'];
     return YouTubeResolver(
@@ -48,6 +89,15 @@ final class YouTubeResolver {
         (!Directory(plugin).isAbsolute || !Directory(plugin).existsSync())) {
       throw const ProviderFailure(ProviderProblem.unsupported);
     }
+    final serverHome = poTokenServerHome;
+    if (serverHome != null &&
+        (!Directory(serverHome).isAbsolute ||
+            !File(
+              '$serverHome${Platform.pathSeparator}build'
+              '${Platform.pathSeparator}generate_once.js',
+            ).existsSync())) {
+      throw const ProviderFailure(ProviderProblem.unsupported);
+    }
     final ceiling = switch (quality) {
       AudioQuality.low => 64,
       AudioQuality.medium => 128,
@@ -60,7 +110,8 @@ final class YouTubeResolver {
         '--plugin-dirs',
         plugin,
         '--extractor-args',
-        'youtube:player_client=mweb',
+        'youtube:player_client=mweb'
+            '${serverHome == null ? '' : ';youtubepot-bgutilscript:server_home=$serverHome'}',
       ],
       '--no-remote-components',
       '--no-cache-dir',
@@ -123,6 +174,7 @@ final class YouTubeResolver {
               'XDG_RUNTIME_DIR',
               'XAUTHORITY',
               'DBUS_SESSION_BUS_ADDRESS',
+              'XDG_CACHE_HOME',
             ],
           ])
             if (Platform.environment[key] != null)

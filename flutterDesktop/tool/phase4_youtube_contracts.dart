@@ -314,6 +314,54 @@ Future<void> youtubeContracts() async {
     'Actionable redacted media 403 guidance',
   );
 
+  final bundle = await Directory.systemTemp.createTemp('bitchord-bundle-');
+  try {
+    final binary = '${Platform.isWindows ? 'yt-dlp.exe' : 'yt-dlp'}';
+    final nodeName = '${Platform.isWindows ? 'node.exe' : 'node'}';
+    final portable = Directory('${bundle.path}/youtube_runtime');
+    await Directory('${portable.path}/plugins').create(recursive: true);
+    await Directory('${portable.path}/server/build').create(recursive: true);
+    await Directory(
+      '${portable.path}/server/node_modules/bgutils-js',
+    ).create(recursive: true);
+    require(
+      YouTubeResolver.fromBundleDirectory(bundle) == null,
+      'Partial resolver bundle must never be adopted',
+    );
+    await File('${portable.path}/$binary').writeAsString('fixture');
+    await File('${portable.path}/$nodeName').writeAsString('fixture');
+    await File(
+      '${portable.path}/server/build/generate_once.js',
+    ).writeAsString('fixture');
+    await File(
+      '${portable.path}/server/node_modules/bgutils-js/package.json',
+    ).writeAsString('{}');
+    final detected = YouTubeResolver.fromBundleDirectory(bundle);
+    require(
+      detected != null &&
+          detected!.executable.endsWith(binary) &&
+          detected.node!.endsWith(nodeName) &&
+          detected.poTokenServerHome != null &&
+          detected.poTokenPluginDirectory != null,
+      'Portable resolver should auto-configure without environment',
+    );
+    final builtArgs = detected.arguments(selected, AudioQuality.high);
+    require(
+      builtArgs.any(
+        (arg) => arg.contains('youtubepot-bgutilscript:server_home=') &&
+            arg.contains('player_client=mweb'),
+      ),
+      'PO Token generation script must be selected automatically',
+    );
+    await File('${portable.path}/server/build/generate_once.js').delete();
+    require(
+      YouTubeResolver.fromBundleDirectory(bundle) == null,
+      'Broken bundled generator must fail closed',
+    );
+  } finally {
+    await bundle.delete(recursive: true);
+  }
+
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final bodies = <Map<String, dynamic>>[];
   server.listen((r) async {
