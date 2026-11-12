@@ -67,7 +67,10 @@ final class YouTubeSession {
 
   static YouTubeSession fromVerifiedShell(String cookie, String html) {
     final secret = signingSecret(cookie);
-    if (!RegExp(r'"LOGGED_IN"\s*:\s*true\b').hasMatch(html)) {
+    if (RegExp(
+          r'"LOGGED_IN"\s*:\s*(true|false)\b',
+        ).firstMatch(html)?.group(1) !=
+        'true') {
       throw const ProviderFailure(ProviderProblem.unauthorized);
     }
     final version = value(html, 'INNERTUBE_CLIENT_VERSION');

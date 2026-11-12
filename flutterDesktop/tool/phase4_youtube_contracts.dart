@@ -197,6 +197,7 @@ Future<void> youtubeContracts() async {
   );
   for (final shell in [
     signedShell.replaceFirst('true', 'false'),
+    '"LOGGED_IN":false, $signedShell',
     '"LOGGED_IN":false',
   ]) {
     try {
