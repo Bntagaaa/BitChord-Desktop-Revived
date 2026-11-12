@@ -115,3 +115,9 @@ and resets only after healthy PCM. Explicit missing devices remain errors and
 can be reselected; no simulated output. Physical endpoint/default/hotplug and
 suspend/resume acceptance remains BLOCKED. ALSA fallback reports unavailable
 hardware through its normal error path; automatic hardware rediscovery is open.
+
+## User device audio audit and deferred probe improvement — 2026-11-12
+
+On a physical Linux desktop, the user reports that all seven test codecs/formats (WAV, FLAC, MP3, M4A, AAC, Ogg and WebM) played successfully with no errors. The user confirmed a real music FLAC sounded normal for the whole 30-second `bitchord_audio_probe` sample. Their probe emitted `{"phase":2,"error":0,"backend":1,"timing_quality":2,"position_us":29891814,"submitted_frames":1321648,"played_frames":1318229,"pcm_high_water":705600,"physical_audio":"unverified"}` and the shell reported `Exit code: 2`. Code inspection confirms the probe's hard-coded 30-second limit and `return !error && s.error==0 && ended ? 0 : 2`; phase 2 is playing, not failed. This specific run therefore provides **user-confirmed audible Linux output**, but not an EOF pass for the full-length song.
+
+The user has authorized advancing to Phase 4 and explicitly deferred improvement of the CLI probe to that phase. Backlog: default track-completion behavior with optional configurable timeout, distinguish timeout/EOF/error in output and exit codes, safe shutdown, and a >30-second regression fixture. Treat the open probe test as an acceptance gap and do not misclassify the bounded test as an engine crash. Other remaining physical audio/device/clock validation gates in this ledger still apply to Windows and Linux.

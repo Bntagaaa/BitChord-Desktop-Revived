@@ -205,3 +205,9 @@ No playback is simulated. See [the Phase 3 ledger](verification/phase3/README.md
 for reproducible commands, native dependency licenses, imported-state subset
 and physical/device/precision blockers. **Phase 3 is INCOMPLETE** pending its
 platform/physical acceptance gates. Do not start Phase 4.
+
+## Phase 3 physical Linux audio handoff; Phase 4 go-ahead — 2026-11-12
+
+The user manually tested all seven supplied codec test files on Linux and reported **no errors**. A real full-length FLAC sounded normal until the existing 30-second probe limit; `phase=2, error=0, exit=2` is the probe's pre-EOF timeout result, not a proven playback crash. The user approves moving on and requests the longer-track probe/timeout polish be retained as an explicit Phase 4 task.
+
+Phase 3 native foundation remains CI-verified by [43197210264](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43197210264) and **user-accepted for the scoped Linux audible codec path**. Windows physical speakers, calibrated latency, hotplug and soak tests remain OPEN; do not claim full audio parity or independent confirmation of the user's physical observations. **Phase 4 is explicitly authorized** and covers online providers, accounts, streaming and downloads. Phase 5 is not authorized.
