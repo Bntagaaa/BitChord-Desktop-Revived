@@ -18,11 +18,13 @@ def shell_painted(capture, width, height):
         f'%[pixel:p{{{sidebar - 1},500}}]|%[pixel:p{{{sidebar},500}}]', 'info:'
     ], text=True, timeout=10).split('|')
     center = (width + sidebar) // 2
-    logo_colors = int(subprocess.check_output([
-        'convert', str(capture), '-crop', f'48x48+{center - 24}+{height - 73}',
-        '-format', '%k', 'info:'
+    logo_contrast = float(subprocess.check_output([
+        # import records the window's screen origin as PNG page metadata;
+        # reset it BEFORE cropping in client-local coordinates.
+        'convert', str(capture), '+repage', '-crop', f'48x48+{center - 24}+{height - 73}',
+        '-format', '%[fx:maxima-minima]', 'info:'
     ], text=True, timeout=10))
-    return boundary[0] != boundary[1] and logo_colors >= 10
+    return boundary[0] != boundary[1] and logo_contrast >= .25
 
 
 def main():

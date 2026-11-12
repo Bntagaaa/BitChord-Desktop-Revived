@@ -282,3 +282,28 @@ checks out only the immutable Kotlin reference on hosted Linux/Windows with
 JDK 21, runs its tests and attempts a distributable for comparison. It neither
 changes the Kotlin branch nor imports prior Flutter work; results remain pending.
 
+Run [43125383087](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43125383087)
+at `dc3fba4b`: builds/analysis/six tests passed on both OSs. Delaying after resize
+produced a correctly painted Linux 1220×780 client (reviewed). The landmark check
+itself failed because ImageMagick interpreted crop coordinates relative to PNG
+screen-origin metadata; resetting the virtual canvas before cropping fixes this.
+Contrast in the dock-mark region now distinguishes actual painted glyphs from
+the blank stale dock without depending on antialiasing color counts. Local
+fixtures reject both stale native images and accept the correct native image and
+both widget renders.
+
+Windows diagnostics show a 1024×768 hosted display clamping the client to
+1028×749. CI now requests a 1600×1200 hosted display before launching, with
+the original 1220×780/900×600 assertions intact. Windows also checks sidebar/dock
+landmarks. The trusted retention job keeps its original branch/SHA/matrix guards
+and additionally retains Windows capture/geometry evidence. No renderer, blur or
+other visual effect was disabled.
+
+Manual dispatch of the newly added reference workflow returned HTTP 404 because
+it is absent on the default branch. A path-filtered push trigger on the migration
+branch started [43125482870](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43125482870)
+at `56b3a228`. It is still running. Local offline reference tests were attempted
+with Gradle 8.11.1 and a separate `/tmp` cache: the sandbox first blocked its
+daemon socket; the permitted retry then failed before tests with Java version
+`27.0.1.0.3`. No local test pass is claimed.
+

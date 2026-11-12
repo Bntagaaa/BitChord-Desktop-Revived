@@ -46,6 +46,7 @@ try {
     $width = $size[0] + ($outer.Right - $outer.Left) - $client.Right
     $height = $size[1] + ($outer.Bottom - $outer.Top) - $client.Bottom
     if (-not [SmokeWindow]::SetWindowPos($handle, [IntPtr]::Zero, 20, 20, $width, $height, 0x0040)) { throw 'Resize failed' }
+    Start-Sleep -Seconds 2
     $deadline = [DateTime]::UtcNow.AddSeconds(20)
     do {
       Start-Sleep -Milliseconds 250
@@ -70,12 +71,24 @@ try {
         for ($y=0; $y -lt $bitmap.Height; $y+=4) {
           for ($x=0; $x -lt $bitmap.Width; $x+=4) { [void]$colors.Add($bitmap.GetPixel($x,$y).ToArgb()) }
         }
+        $sidebar = if ($client.Right -lt 980) { 72 } else { 220 }
+        $edgePainted = $bitmap.GetPixel($sidebar-1,500).ToArgb() -ne $bitmap.GetPixel($sidebar,500).ToArgb()
+        $center = [int](($client.Right + $sidebar) / 2)
+        $minimum = 1.0; $maximum = 0.0
+        for ($y=$client.Bottom-73; $y -lt $client.Bottom-25; $y++) {
+          for ($x=$center-24; $x -lt $center+24; $x++) {
+            $color = $bitmap.GetPixel($x,$y)
+            $level = ($color.R + $color.G + $color.B) / 765.0
+            $minimum = [Math]::Min($minimum,$level); $maximum = [Math]::Max($maximum,$level)
+          }
+        }
+        $logoContrast = $maximum - $minimum
         $bitmap.Save("$evidence/native-windows-$($size[0])x$($size[1]).png", [System.Drawing.Imaging.ImageFormat]::Png)
       } finally { $graphics.Dispose(); $bitmap.Dispose() }
-      if ($colors.Count -ge 50) { break }
+      if ($colors.Count -ge 50 -and $edgePainted -and $logoContrast -ge 0.25) { break }
     } while ([DateTime]::UtcNow -lt $deadline)
-    if ($client.Right -ne $size[0] -or $client.Bottom -ne $size[1] -or $colors.Count -lt 50) { throw 'Client did not resize and paint' }
-    $captures += @{width=$client.Right; height=$client.Bottom; sampled_colors=$colors.Count}
+    if ($client.Right -ne $size[0] -or $client.Bottom -ne $size[1] -or $colors.Count -lt 50 -or -not $edgePainted -or $logoContrast -lt 0.25) { throw 'Client did not resize and paint shell landmarks' }
+    $captures += @{width=$client.Right; height=$client.Bottom; sampled_colors=$colors.Count; logo_contrast=$logoContrast}
   }
   # WM_CLOSE exercises the real window listener and preference flush, rather
   # than killing a compiled process and calling that lifecycle verification.

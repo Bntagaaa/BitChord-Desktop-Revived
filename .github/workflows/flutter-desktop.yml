@@ -83,6 +83,10 @@ jobs:
         timeout-minutes: 3
         run: |
           python tool/run_checked.py launch python tool/launch_smoke.py build/linux/x64/release/bundle/bitchord_desktop
+      - name: Configure hosted Windows display for full-size client captures
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: Set-DisplayResolution -Width 1600 -Height 1200 -Force
       - name: Windows release launch smoke
         if: runner.os == 'Windows'
         timeout-minutes: 3
@@ -134,10 +138,15 @@ jobs:
         with:
           name: flutter-foundation-linux
           path: ${{ runner.temp }}/flutter-validated
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: flutter-foundation-windows
+          path: ${{ runner.temp }}/flutter-validated-windows
       - name: Retain officially generated hosts, resolved lockfile and formatter output
         env:
           VALIDATED_ARTIFACT: ${{ runner.temp }}/flutter-validated/flutter-source-linux.zip
           VALIDATED_EVIDENCE: ${{ runner.temp }}/flutter-validated/flutterDesktop/verification
+          WINDOWS_EVIDENCE: ${{ runner.temp }}/flutter-validated-windows/flutterDesktop/verification
           VALIDATED_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           VALIDATED_SHA: ${{ github.sha }}
         run: |
@@ -169,10 +178,16 @@ jobs:
           evidence = Path(os.environ['VALIDATED_EVIDENCE'])
           target = root / 'verification'
           target.mkdir(exist_ok=True)
-          for name in ['shell-dark-1220x780.png', 'shell-dark-900x600.png', 'native-linux-1220x780.png', 'native-linux-900x600.png', 'test-summary.json']:
+          for name in ['shell-dark-1220x780.png', 'shell-dark-900x600.png', 'native-linux-1220x780.png', 'native-linux-900x600.png', 'test-summary.json', 'native-linux.json']:
               data = (evidence / name).read_bytes()
               if name.endswith('.png') and not data.startswith(b'\x89PNG\r\n\x1a\n'):
                   raise SystemExit('Invalid render evidence: ' + name)
+              (target / name).write_bytes(data)
+          windows_evidence = Path(os.environ['WINDOWS_EVIDENCE'])
+          for name in ['native-windows-1220x780.png', 'native-windows-900x600.png', 'native-windows.json']:
+              data = (windows_evidence / name).read_bytes()
+              if name.endswith('.png') and not data.startswith(b'\x89PNG\r\n\x1a\n'):
+                  raise SystemExit('Invalid Windows render evidence: ' + name)
               (target / name).write_bytes(data)
           (target / 'hosted-run.json').write_text(json.dumps({
               'source_commit': os.environ['VALIDATED_SHA'], 'run_url': os.environ['VALIDATED_RUN_URL'],
@@ -181,7 +196,7 @@ jobs:
           PY
           git add flutterDesktop/lib flutterDesktop/test flutterDesktop/tool/platform_generation.json flutterDesktop/pubspec.lock
           git add -f flutterDesktop/windows flutterDesktop/linux flutterDesktop/.metadata
-          git add -f flutterDesktop/verification/*.png flutterDesktop/verification/test-summary.json flutterDesktop/verification/hosted-run.json
+          git add -f flutterDesktop/verification/*.png flutterDesktop/verification/test-summary.json flutterDesktop/verification/hosted-run.json flutterDesktop/verification/native-linux.json flutterDesktop/verification/native-windows.json
           if ! git diff --cached --quiet; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
