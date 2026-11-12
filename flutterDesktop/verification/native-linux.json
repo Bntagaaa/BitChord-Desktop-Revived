@@ -1,18 +1,75 @@
 {
-  "display": "Xvfb 1600x1000x24 / Openbox / software GL",
+  "display": "Xvfb 1600x1000x24, 96 DPI / Openbox / software GL",
   "captures": [
     {
       "width": 1220,
       "height": 780,
-      "colors": 709,
+      "colors": 830,
       "geometry": "WINDOW=4194307\nX=42\nY=100\nWIDTH=1220\nHEIGHT=780\nSCREEN=0\n"
     },
     {
       "width": 900,
       "height": 600,
-      "colors": 591,
+      "colors": 586,
       "geometry": "WINDOW=4194307\nX=42\nY=100\nWIDTH=900\nHEIGHT=600\nSCREEN=0\n"
     }
   ],
-  "exit_code": 0
+  "exit_code": 0,
+  "appearance_captures": [
+    {
+      "state": "accounts",
+      "expected_theme": "any",
+      "background_rgb": [
+        247,
+        248,
+        251
+      ]
+    },
+    {
+      "state": "drawer",
+      "expected_theme": "any",
+      "background_rgb": [
+        183,
+        184,
+        186
+      ]
+    },
+    {
+      "state": "settings",
+      "expected_theme": "any",
+      "background_rgb": [
+        247,
+        248,
+        251
+      ]
+    },
+    {
+      "state": "dark",
+      "expected_theme": "dark",
+      "background_rgb": [
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "state": "pitch-black",
+      "expected_theme": "black",
+      "background_rgb": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "state": "light",
+      "expected_theme": "light",
+      "background_rgb": [
+        247,
+        248,
+        251
+      ]
+    }
+  ],
+  "fullscreen": "F11 entered; Escape restored 900x600"
 }
