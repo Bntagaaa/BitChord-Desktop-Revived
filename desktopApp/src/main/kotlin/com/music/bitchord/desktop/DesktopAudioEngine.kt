@@ -320,12 +320,23 @@ class DesktopPlaybackEngine internal constructor(
             return false
         }
         val millis = latest.positionMs.coerceAtLeast(0L)
-        if (kotlin.math.abs(millis - prepared.startUs / 1_000L) > 250L) {
+        if (kotlin.math.abs(millis - prepared.startUs / 1_000L) > UPGRADE_RESEEK_THRESHOLD_MS) {
             if (!prepared.decoder.seek(millis * 1_000L)) {
                 prepared.decoder.close()
                 return false
             }
             prepared.startUs = millis * 1_000L
+        }
+        // Opening a decoder proves only that its headers were accepted, not that the source
+        // can deliver audio. Keep the existing deck audible until real PCM has arrived.
+        if (!prepared.decoder.awaitBuffered(UPGRADE_PRIME_SAMPLES, UPGRADE_PRIME_TIMEOUT_MS)) {
+            DesktopTrackLog.log("version switch rejected: replacement produced no PCM")
+            prepared.decoder.close()
+            return false
+        }
+        if (!running.get() || _state.value.song?.videoId != expectedId) {
+            prepared.decoder.close()
+            return false
         }
         val ack = CompletableDeferred<Boolean>()
         commands += Command.SwitchVersion(expectedId, prepared, ack)
@@ -598,19 +609,39 @@ class DesktopPlaybackEngine internal constructor(
                     // over at the live playhead rather than jumping back to the position at which
                     // the upgrade was first offered.
                     if (kotlin.math.abs(latest.positionMs - positionMs) >= UPGRADE_RESEEK_THRESHOLD_MS) {
-                        track.decoder.seek(latest.positionMs * 1_000)
+                        if (!track.decoder.seek(latest.positionMs * 1_000)) {
+                            DesktopTrackLog.log("quality upgrade rejected: replacement seek failed")
+                            track.decoder.close()
+                            return@fold
+                        }
                         track.startUs = latest.positionMs * 1_000
                     }
-                    commands += Command.ReplaceCurrent(track, playWhenReady = latest.isPlaying, generation = generation)
+                    // Never flush the audible stream until the upgrade has actually decoded PCM.
+                    // A successful FLAC HTTP/open probe can still stall at its first media read.
+                    if (!track.decoder.awaitBuffered(UPGRADE_PRIME_SAMPLES, UPGRADE_PRIME_TIMEOUT_MS)) {
+                        DesktopTrackLog.log(
+                            "quality upgrade rejected: ${DesktopMusicSources.sourceNameFor(stream)} " +
+                                "did not supply PCM; continuing the current rendition",
+                        )
+                        track.decoder.close()
+                        return@fold
+                    }
+                    val ready = _state.value
+                    if (!running.get() || loadGeneration.get() != generation ||
+                        ready.song?.videoId != song.videoId
+                    ) {
+                        track.decoder.close()
+                        return@fold
+                    }
+                    commands += Command.ReplaceCurrent(track, playWhenReady = ready.isPlaying, generation = generation)
+                    java.util.concurrent.locks.LockSupport.unpark(thread)
                 },
                 onFailure = { failure ->
                     DesktopTrackLog.log(
                         "could not open the copy of '${song.title}' from " +
-                            "${DesktopMusicSources.sourceNameFor(stream)}: ${failure.message}",
+                            "${DesktopMusicSources.sourceNameFor(stream)}: ${failure.message}; " +
+                            "continuing the current rendition",
                     )
-                    _state.update { it.copy(
-                        error = "Could not switch version: ${failure.message ?: "that copy would not open"}",
-                    ) }
                 },
             )
         }
@@ -2652,6 +2683,10 @@ class DesktopPlaybackEngine internal constructor(
 
         /** Avoid a decoder seek for sub-tick drift while an upgraded rendition is opening. */
         private const val UPGRADE_RESEEK_THRESHOLD_MS = 250L
+
+        /** A few actual frames, not merely an opened URL, before an audible stream replacement. */
+        private const val UPGRADE_PRIME_SAMPLES = 2_048
+        private const val UPGRADE_PRIME_TIMEOUT_MS = 8_000L
 
         /** Enough of a measurement on the incoming track to cue into it. */
         val MEASURED_ENOUGH_TO_ENTER_ON = setOf(
