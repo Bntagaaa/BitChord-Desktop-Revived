@@ -262,3 +262,24 @@ source-purpose/request IDs, native-owned durable span-cache equivalence and
 UI/service-stall/recovery acceptance remain Phase 4 work. The two-second native
 PCM bounds and all output/clock ownership remain unchanged. Do not treat this
 interim broker as evidence that the complete Phase 0.5 protocol was delivered.
+
+## Phase 4 optional extractor and ephemeral catalog session
+
+A configured absolute yt-dlp executable (optional absolute Node JS runtime) may
+perform progressive YouTube URL extraction as a cancellable data adapter. It is
+not an audio player; only a media-byte-verified result reaches the existing
+bounded broker/C++ engine. The app does not ship/download executables, load user
+extractor config/plugins/remote components, pass account cookies to extraction,
+or persist signed results. Process environment/output/deadline and candidate
+scheme/CDN/format/headers are restricted. This opt-in path is not a completed
+PoToken/browser architecture or verified working media integration; actual live
+media HTTP 403 remains open.
+
+Existing YouTube Music cookie verification follows the pinned reference's
+signed-in-shell and SAPISIDHASH/session/channel/dataSync scope. This initial
+catalog session lives only in memory. Protected persistent accounts, browser
+import/sign-in and authenticated media are separate unfinished capabilities;
+there is no plaintext storage fallback. Artwork fetches use a credential-free
+port with four active transfers, 2 MiB body cap and scoped cancellation; Flutter
+uses size-aware decodes and a 64 MiB ImageCache budget, without any measurement
+claim about total process/GPU/retained-image memory.

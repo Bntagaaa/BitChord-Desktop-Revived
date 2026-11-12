@@ -1,5 +1,30 @@
 enum CatalogKind { track, album, playlist, artist }
 
+enum SearchFilter { all, songs, albums, artists, playlists }
+
+enum ShelfLayout { cards, tracks }
+
+final class CatalogShelf {
+  CatalogShelf({
+    required this.title,
+    required Iterable<CatalogEntry> entries,
+    this.subtitle = '',
+    this.layout = ShelfLayout.cards,
+    this.moreId,
+    this.params,
+  }) : entries = List.unmodifiable(entries);
+  final String title, subtitle;
+  final List<CatalogEntry> entries;
+  final ShelfLayout layout;
+  final String? moreId, params;
+}
+
+final class CatalogHeader {
+  const CatalogHeader({required this.title, this.subtitle = '', this.artwork});
+  final String title, subtitle;
+  final Uri? artwork;
+}
+
 enum AudioQuality { low, medium, high, lossless }
 
 enum ProviderProblem {
@@ -62,19 +87,28 @@ final class CatalogEntry {
     this.durationSeconds,
     this.artwork,
     this.params,
+    this.isVideo = false,
   });
   final String provider, id, title, subtitle;
   final CatalogKind kind;
   final int? durationSeconds;
   final Uri? artwork;
   final String? params;
+  final bool isVideo;
   String get key => '$provider:$id';
 }
 
 final class CatalogPage {
-  CatalogPage(Iterable<CatalogEntry> entries, {this.continuation})
-    : entries = List.unmodifiable(entries);
+  CatalogPage(
+    Iterable<CatalogEntry> entries, {
+    this.continuation,
+    Iterable<CatalogShelf> shelves = const [],
+    this.header,
+  }) : entries = List.unmodifiable(entries),
+       shelves = List.unmodifiable(shelves);
   final List<CatalogEntry> entries;
+  final List<CatalogShelf> shelves;
+  final CatalogHeader? header;
   final String? continuation;
 }
 
@@ -118,6 +152,7 @@ abstract interface class CatalogProvider {
     String query,
     RequestScope scope, {
     String? continuation,
+    SearchFilter filter = SearchFilter.all,
   });
   Future<CatalogPage> browse(
     String browseId,

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/router.dart';
 import '../../online/application/catalog_controller.dart';
 import '../../online/presentation/catalog_surface.dart';
+import '../../online/presentation/account_session.dart';
 import '../../../l10n/shell_strings.dart';
 import '../../../design_system/palette.dart';
 import '../../../design_system/theme.dart';
@@ -622,12 +623,12 @@ class _AccountAvatar extends StatelessWidget {
   );
 }
 
-class _AccountPanel extends StatelessWidget {
+class _AccountPanel extends ConsumerWidget {
   const _AccountPanel({required this.palette, required this.reduceBlur});
   final BitChordPalette palette;
   final bool reduceBlur;
   @override
-  Widget build(BuildContext context) => Semantics(
+  Widget build(BuildContext context, WidgetRef ref) => Semantics(
     key: const Key('account-panel'),
     scopesRoute: true,
     explicitChildNodes: true,
@@ -653,48 +654,57 @@ class _AccountPanel extends StatelessWidget {
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                'Nobody is signed in. Your library, playlists and history need a YouTube Music account.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: palette['secondary']),
+            if (ref.watch(onlinePortProvider) != null)
+              const AccountSession()
+            else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Text(
+                  'Nobody is signed in. Your library, playlists and history need a YouTube Music account.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: palette['secondary']),
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Divider(
-                height: .5,
-                thickness: .5,
-                color: palette['cardEdge'],
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                child: Divider(
+                  height: .5,
+                  thickness: .5,
+                  color: palette['cardEdge'],
+                ),
               ),
-            ),
-            Tooltip(
-              message: 'Sign-in is unavailable.',
-              child: Semantics(
-                enabled: false,
-                button: true,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.add, size: 18, color: palette['secondary']),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Add account',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: palette['secondary'],
+              Tooltip(
+                message: 'Sign-in is unavailable.',
+                child: Semantics(
+                  enabled: false,
+                  button: true,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.add, size: 18, color: palette['secondary']),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Add account',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: palette['secondary']),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

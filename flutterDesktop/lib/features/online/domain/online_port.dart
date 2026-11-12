@@ -1,5 +1,20 @@
 import '../../../core/domain/audio_contract.dart';
 import 'catalog.dart';
+import 'dart:typed_data';
+
+abstract interface class OnlineAccounts {
+  bool get signedIn;
+  Future<void> signIn(String cookie, RequestScope scope);
+  Future<void> signOut();
+}
+
+abstract interface class OnlineArtwork {
+  Future<Uint8List> artwork(Uri url, RequestScope scope);
+}
+
+abstract interface class OnlineCapabilities {
+  bool get youtubeAudioConfigured;
+}
 
 final class DownloadedEntry {
   const DownloadedEntry(this.entry, this.bytes);
@@ -17,6 +32,7 @@ abstract interface class OnlinePort {
     String query,
     RequestScope scope, {
     String? continuation,
+    SearchFilter filter = SearchFilter.all,
   });
   Future<CatalogPage> browse(
     String id,

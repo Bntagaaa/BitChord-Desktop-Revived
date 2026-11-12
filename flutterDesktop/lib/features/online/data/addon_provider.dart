@@ -59,7 +59,10 @@ final class AddonProvider implements CatalogProvider {
     String query,
     RequestScope scope, {
     String? continuation,
+    SearchFilter filter = SearchFilter.all,
   }) async {
+    if (filter != SearchFilter.all && filter != SearchFilter.songs)
+      throw const ProviderFailure(ProviderProblem.unsupported);
     if (continuation != null)
       throw const ProviderFailure(ProviderProblem.unsupported);
     final m = await manifest(scope);

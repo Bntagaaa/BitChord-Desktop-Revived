@@ -41,7 +41,7 @@ final class RangeSource {
         maxBytes: span,
       );
       if ([401, 403, 410].contains(response.status))
-        throw const ProviderFailure(ProviderProblem.expired);
+        throw ProviderFailure(ProviderProblem.expired, response.status);
     } on ProviderFailure catch (e) {
       if (e.problem != ProviderProblem.expired || refresh == null || _renewed)
         rethrow;

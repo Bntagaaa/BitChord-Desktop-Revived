@@ -24,6 +24,7 @@ import 'features/shell/domain/shell_settings.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 64 * 1024 * 1024;
   foundation.LicenseRegistry.addLicense(() async* {
     yield foundation.LicenseEntryWithLineBreaks([
       'BitChord reference assets',

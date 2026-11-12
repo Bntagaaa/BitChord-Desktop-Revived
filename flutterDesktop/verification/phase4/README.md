@@ -180,3 +180,73 @@ native adoption, cancel connect/play scopes at shutdown, and report missing
 bootstrap services as failures. No missing provider port can report a successful
 operation. Controller regressions cover late results, disposal, stale offline
 selection, explicit limits and unsupported operations.
+
+## Current continuation: shelves, existing sessions and refused-media preflight
+
+The historical "NOT implemented" entries above describe the prior handoff.
+This increment adds a bounded optional extractor adapter, typed shelf/header
+models, artwork service, horizontal Home cards/track columns, shelf navigation,
+heterogeneous/type-filtered search and improved collection parsing. It also adds
+**session-only existing-cookie verification** to Accounts; browser sign-in,
+protected account persistence/import/refresh and Spotify remain unimplemented.
+No successful real-account verification or YouTube playback has been observed.
+
+Reference anchors are the pinned `HomeScreen.kt`, `components/Common.kt` and
+`ShelfRow.kt`, `InnertubeParser.kt`, common `Models.kt` SearchCategory,
+`DesktopYouTubeAuth.kt`, `DesktopYouTubeSession.kt`, `StreamResolver.kt` (real
+media probe past 1 MiB), and `PlayerClient.kt` (client media identity).
+
+To enable extraction attempts, explicitly supply an installed trusted executable:
+
+```sh
+BITCHORD_YTDLP=/absolute/path/to/yt-dlp BITCHORD_YTDLP_NODE=/absolute/path/to/node ./bitchord_desktop
+# PowerShell: set $env:BITCHORD_YTDLP and optional $env:BITCHORD_YTDLP_NODE
+# to full executable paths before launching bitchord_desktop.exe.
+```
+
+No dependency binary is shipped or automatically downloaded. The locally tested
+publisher-hash-verified versions are yt-dlp 2026.10.26 / Node 22.23.5; Windows
+extractor execution and deployment remain unverified. yt-dlp performs extraction
+only; the existing native C++/FFmpeg backend owns all audio. Config/plugin/remote
+component/cache/download loading is disabled; only selected host environment
+variables are inherited. No account cookie is passed to this process. Output is
+capped, errors redacted and requests cancelled/killed on deadline or scope end.
+Only progressive HTTPS audio-only googlevideo candidates are admitted. All
+manifest/live/DRM/authenticated-media paths remain unsupported. Low/medium
+quality selection honors a bitrate ceiling rather than silently exceeding it.
+
+A candidate must serve real production-sized ranges, including past the first
+MiB when available, before playback opens. **The actual new production resolver
+still returned HTTP 403.** This integration must not be called working YouTube
+audio. Android VR skipped formats without a GVS PoToken, TV asked to reload,
+embedded web reported missing URLs/possible SABR. These observations narrow the
+investigation but do not establish the sole cause. Supporting browser-bound
+PoToken/cipher/media sessions is unfinished work. Upstream sources checked:
+[client/token guide](https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide),
+[extractor guidance](https://github.com/yt-dlp/yt-dlp/wiki/Extractors),
+[current client definitions](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/youtube/_base.py).
+
+Accounts accepts an existing YouTube Music cookie, sends it only to the fixed
+HTTPS music origin, requires the actual shell's `LOGGED_IN:true`, then adopts
+its session/channel/dataSync/visitor scope. It does not infer success from the
+cookie containing a signing key. The text field clears on submit/disposal;
+credentials remain process memory only and are excluded from SQLite/preferences,
+extractor arguments, media headers, logs and evidence. This is a scoped session
+integration with a truthful verification error, not a browser sign-in flow.
+Protected persistent storage and live authorized account trials are still gates.
+
+Additional reproducible commands:
+
+```sh
+dart run tool/phase4_youtube_contracts.dart # also called by phase4_check.dart on both OSs
+dart run tool/phase4_youtube_live.dart /absolute/yt-dlp /absolute/node
+# Optional native probe and endpoint arguments run only if media preflight succeeds.
+```
+
+Local contracts and complete controlled HTTP/native suite passed (384000 exact
+PCM frames). Anonymous Linux live Home/search/album/artist/playlist counts and
+media refusal are in `youtube-continuation-live.json`. No signed catalog or URL
+is saved. Full new Flutter/Windows/Linux checks await the exact-SHA CI result.
+Matched reference desktop visual evidence, browser auth/PoToken, owned playlist
+mutations, multi-track collection playback and complete Phase 4 acceptance remain
+open. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**

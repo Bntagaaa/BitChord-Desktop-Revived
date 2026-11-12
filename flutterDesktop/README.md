@@ -226,3 +226,14 @@ The native probe now plays until EOF by default:
 EOF 0, playback failure 2, process/shutdown failure 3, timeout 4, usage 64.
 EOF completion beyond 30 seconds is regression-tested through a real software
 sink; this does not replace physical platform acceptance.
+
+## Phase 4 continuation
+
+Home now preserves real provider shelves/artwork and reference card dimensions;
+search supports All/Songs/Albums/Artists/Playlists with collection navigation.
+Accounts can verify an existing cookie for a process-only YouTube Music catalog
+session. Browser sign-in and protected persistent accounts remain unavailable.
+The optional explicitly configured yt-dlp resolver validates actual media ranges
+before native playback; its live trial still failed with **HTTP 403**. Setup,
+checks and limits are in [the Phase 4 ledger](verification/phase4/README.md).
+No working YouTube playback or complete Phase 4 parity is claimed.

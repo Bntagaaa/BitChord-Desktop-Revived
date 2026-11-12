@@ -2,19 +2,42 @@ import 'dart:convert';
 
 import '../domain/catalog.dart';
 import 'provider_http.dart';
+import 'youtube_session.dart';
+import 'youtube_resolver.dart';
 
 // Independent WEB_REMIX catalog adapter; the player/cipher/PoToken contract is
 // separate. A catalog response is never treated as a playable URL.
 final class YouTubeMusic implements CatalogProvider {
-  YouTubeMusic(this.http, {Uri? origin})
+  YouTubeMusic(this.http, {Uri? origin, this.resolver})
     : origin = origin ?? Uri.parse('https://music.youtube.com');
   final ProviderHttp http;
   final Uri origin;
   String? _version;
+  final YouTubeResolver? resolver;
+  YouTubeSession? _session;
+  int _accountGeneration = 0;
+  bool get signedIn => _session != null;
+  Future<void> signIn(String cookie, RequestScope scope) async {
+    final generation = ++_accountGeneration;
+    final session = await YouTubeSession.verify(cookie, http, scope);
+    scope.check();
+    if (generation != _accountGeneration)
+      throw const ProviderFailure(ProviderProblem.cancelled);
+    _session = session;
+    _version = session.version;
+  }
+
+  void signOut() {
+    ++_accountGeneration;
+    _session = null;
+    _version = null;
+  }
+
   @override
   String get id => 'youtube';
   Future<void> _initialize(RequestScope scope) async {
     if (_version != null) return;
+    final generation = _accountGeneration;
     final response = await http.request(
       origin,
       scope,
@@ -28,6 +51,8 @@ final class YouTubeMusic implements CatalogProvider {
     ).firstMatch(html)?.group(1);
     if (version == null) throw const ProviderFailure(ProviderProblem.malformed);
     scope.check();
+    if (generation != _accountGeneration)
+      throw const ProviderFailure(ProviderProblem.cancelled);
     _version = version;
   }
 
@@ -36,12 +61,18 @@ final class YouTubeMusic implements CatalogProvider {
     Map<String, Object?> body,
     RequestScope scope,
   ) async {
+    final generation = _accountGeneration;
     await _initialize(scope);
+    if (generation != _accountGeneration)
+      throw const ProviderFailure(ProviderProblem.cancelled);
+    final session = _session;
     final data = await http.json(
       origin.resolve('/youtubei/v1/$endpoint?prettyPrint=false'),
       scope,
       headers: {
         'Origin': origin.origin,
+        if (session != null && origin.origin == YouTubeSession.origin)
+          ...session.headers(),
         'X-YouTube-Client-Name': '67',
         'X-YouTube-Client-Version': _version!,
       },
@@ -52,13 +83,19 @@ final class YouTubeMusic implements CatalogProvider {
             'clientVersion': _version,
             'hl': 'en',
             'gl': 'US',
+            if (session?.visitorData != null)
+              'visitorData': session!.visitorData,
           },
+          if (session?.dataSyncId != null)
+            'user': {'onBehalfOfUser': session!.dataSyncId},
         },
         ...body,
       },
     );
     scope.check();
-    return parsePage(data);
+    if (generation != _accountGeneration)
+      throw const ProviderFailure(ProviderProblem.cancelled);
+    return parsePage(data, browseId: body['browseId'] as String?);
   }
 
   @override
@@ -66,9 +103,17 @@ final class YouTubeMusic implements CatalogProvider {
     String query,
     RequestScope scope, {
     String? continuation,
+    SearchFilter filter = SearchFilter.all,
   }) => _call('search', {
     if (continuation == null) 'query': query.trim(),
-    if (continuation == null) 'params': 'EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D',
+    if (continuation == null && filter != SearchFilter.all)
+      'params': switch (filter) {
+        SearchFilter.songs => 'EgWKAQIIAWoKEAkQChAFEAMQBA==',
+        SearchFilter.albums => 'EgWKAQIYAWoKEAkQChAFEAMQBA==',
+        SearchFilter.artists => 'EgWKAQIgAWoKEAkQChAFEAMQBA==',
+        SearchFilter.playlists => 'EgWKAQIoAWoKEAkQChAFEAMQBA==',
+        SearchFilter.all => '',
+      },
     if (continuation != null) 'continuation': continuation,
   }, scope);
   @override
@@ -89,7 +134,10 @@ final class YouTubeMusic implements CatalogProvider {
     RequestScope scope,
   ) async {
     scope.check();
-    throw const ProviderFailure(ProviderProblem.unsupported);
+    final selected = resolver;
+    if (selected == null)
+      throw const ProviderFailure(ProviderProblem.unsupported);
+    return selected.resolve(track, quality, scope);
   }
 
   static Iterable<Map<String, dynamic>> nodes(Object? value, String key) sync* {
@@ -114,9 +162,62 @@ final class YouTubeMusic implements CatalogProvider {
         .join();
   }
 
-  static CatalogPage parsePage(Map<String, dynamic> data) {
+  static CatalogEntry? _entry(Map<String, dynamic> row) {
+    final flex = row['flexColumns'] as List? ?? [];
+    Object? column(int index) {
+      if (flex.length <= index || flex[index] is! Map) return null;
+      final cell =
+          (flex[index] as Map)['musicResponsiveListItemFlexColumnRenderer'];
+      return cell is Map ? cell['text'] : null;
+    }
+
+    final title = text(row['title'] ?? column(0));
+    final subtitle = text(row['subtitle'] ?? column(1));
+    final navigation = row['navigationEndpoint'] ?? row['onTap'];
+    final browse = nodes(navigation, 'browseEndpoint').firstOrNull;
+    final browseId = browse?['browseId'] as String?;
+    final video =
+        (row['playlistItemData'] as Map?)?['videoId'] ??
+        nodes(navigation, 'watchEndpoint').firstOrNull?['videoId'] ??
+        nodes(row['overlay'], 'watchEndpoint').firstOrNull?['videoId'];
+    // Collection play overlays must not turn albums/artists into track cards.
+    final id = browseId ?? video as String?;
+    if (id == null || id.isEmpty || title.isEmpty) return null;
+    final thumbnails =
+        nodes(
+              row,
+              'musicThumbnailRenderer',
+            ).firstOrNull?['thumbnail']?['thumbnails']
+            as List? ??
+        [];
+    final thumb = thumbnails.lastOrNull is Map
+        ? thumbnails.last as Map
+        : const {};
+    final image = thumb['url'] is String
+        ? Uri.tryParse(thumb['url'] as String)
+        : null;
+    final width = thumb['width'] as num? ?? 1,
+        height = thumb['height'] as num? ?? 1;
+    return CatalogEntry(
+      provider: 'youtube',
+      id: id,
+      title: title,
+      subtitle: subtitle,
+      kind: browseId == null
+          ? CatalogKind.track
+          : browseId.startsWith('MPRE')
+          ? CatalogKind.album
+          : browseId.startsWith('UC')
+          ? CatalogKind.artist
+          : CatalogKind.playlist,
+      artwork: image?.scheme == 'https' ? image : null,
+      params: browse?['params'] as String?,
+      isVideo: browseId == null && width / height > 1.3,
+    );
+  }
+
+  static List<CatalogEntry> _entries(Object? value) {
     final entries = <CatalogEntry>[];
-    // Only rows/cards in content containers: exclude menus, queues and suggestions.
     void walk(Object? value) {
       if (entries.length >= 400) return;
       if (value is List) {
@@ -137,75 +238,134 @@ final class YouTubeMusic implements CatalogProvider {
         if ([
               'musicResponsiveListItemRenderer',
               'musicTwoRowItemRenderer',
+              'musicCardShelfRenderer',
             ].contains(pair.key) &&
             pair.value is Map<String, dynamic>) {
           final row = pair.value as Map<String, dynamic>;
-          final flex = row['flexColumns'] as List? ?? [];
-          final title = text(
-            row['title'] ??
-                (flex.isEmpty
-                    ? null
-                    : (flex.first
-                          as Map)['musicResponsiveListItemFlexColumnRenderer']?['text']),
-          );
-          final subtitle = text(
-            row['subtitle'] ??
-                (flex.length < 2
-                    ? null
-                    : (flex[1]
-                          as Map)['musicResponsiveListItemFlexColumnRenderer']?['text']),
-          );
-          final video =
-              (row['playlistItemData'] as Map?)?['videoId'] ??
-              nodes(
-                row['navigationEndpoint'],
-                'watchEndpoint',
-              ).firstOrNull?['videoId'] ??
-              nodes(row['overlay'], 'watchEndpoint').firstOrNull?['videoId'];
-          final browse = nodes(
-            row['navigationEndpoint'],
-            'browseEndpoint',
-          ).firstOrNull;
-          final browseId = browse?['browseId'] as String?;
-          final id = video as String? ?? browseId;
-          if (id == null || id.isEmpty || title.isEmpty) continue;
-          final thumbs =
-              nodes(
-                    row,
-                    'musicThumbnailRenderer',
-                  ).firstOrNull?['thumbnail']?['thumbnails']
-                  as List?;
-          final image = thumbs?.lastOrNull is Map
-              ? (thumbs!.last as Map)['url'] as String?
-              : null;
-          entries.add(
-            CatalogEntry(
-              provider: 'youtube',
-              id: id,
-              title: title,
-              subtitle: subtitle,
-              kind: video != null
-                  ? CatalogKind.track
-                  : browseId!.startsWith('MPRE')
-                  ? CatalogKind.album
-                  : browseId.startsWith('UC')
-                  ? CatalogKind.artist
-                  : CatalogKind.playlist,
-              artwork: image == null ? null : Uri.tryParse(image),
-              params: browse?['params'] as String?,
-            ),
-          );
+          final entry = _entry(row);
+          if (entry != null) entries.add(entry);
+          if (pair.key == 'musicCardShelfRenderer') walk(row['contents']);
         } else {
           walk(pair.value);
         }
       }
     }
 
-    walk(data['contents'] ?? data['continuationContents'] ?? data);
+    walk(value);
+    return entries;
+  }
+
+  static CatalogPage parsePage(Map<String, dynamic> data, {String? browseId}) {
+    final root = data['contents'] ?? data['continuationContents'] ?? data;
+    final shelves = <CatalogShelf>[];
+    void collect(Object? value) {
+      if (shelves.length >= 40) return;
+      if (value is List) {
+        for (final child in value) {
+          collect(child);
+        }
+      }
+      if (value is! Map) return;
+      for (final pair in value.entries) {
+        if (['menu', 'header', 'suggestions', 'background'].contains(pair.key))
+          continue;
+        if ([
+              'musicCarouselShelfRenderer',
+              'musicShelfRenderer',
+              'gridRenderer',
+            ].contains(pair.key) &&
+            pair.value is Map<String, dynamic>) {
+          final shelf = pair.value as Map<String, dynamic>;
+          final header =
+              nodes(
+                shelf['header'],
+                'musicCarouselShelfBasicHeaderRenderer',
+              ).firstOrNull ??
+              nodes(shelf['header'], 'gridHeaderRenderer').firstOrNull ??
+              shelf;
+          final content = shelf['contents'] ?? shelf['items'];
+          final entries = _entries(content);
+          if (entries.isEmpty) continue;
+          final endpoint =
+              nodes(header, 'browseEndpoint').firstOrNull ??
+              nodes(shelf['bottomEndpoint'], 'browseEndpoint').firstOrNull ??
+              nodes(shelf['bottomButton'], 'browseEndpoint').firstOrNull;
+          final title = text(header['title']);
+          final fromList =
+              content is List &&
+              content.firstOrNull is Map &&
+              (content.first as Map).containsKey(
+                'musicResponsiveListItemRenderer',
+              );
+          shelves.add(
+            CatalogShelf(
+              title: title.isEmpty ? 'For you' : title,
+              subtitle: text(header['strapline']),
+              entries: entries,
+              moreId: endpoint?['browseId'] as String?,
+              params: endpoint?['params'] as String?,
+              layout: fromList ? ShelfLayout.tracks : ShelfLayout.cards,
+            ),
+          );
+        } else {
+          collect(pair.value);
+        }
+      }
+    }
+
+    collect(root);
+    final playlist =
+        nodes(root, 'musicPlaylistShelfRenderer').firstOrNull ??
+        nodes(root, 'musicPlaylistShelfContinuation').firstOrNull ??
+        ((browseId?.startsWith('MPRE') ?? false)
+            ? nodes(root, 'musicShelfRenderer').firstOrNull
+            : null);
+    final entries = _entries(playlist ?? root);
+    final header =
+        nodes(data, 'musicResponsiveHeaderRenderer').firstOrNull ??
+        nodes(data['header'], 'musicDetailHeaderRenderer').firstOrNull ??
+        nodes(data['header'], 'musicImmersiveHeaderRenderer').firstOrNull ??
+        nodes(data['header'], 'musicVisualHeaderRenderer').firstOrNull;
+    final headerTitle = text(header?['title']);
+    final thumb =
+        nodes(
+              header,
+              'musicThumbnailRenderer',
+            ).firstOrNull?['thumbnail']?['thumbnails']
+            as List?;
+    final art = thumb?.lastOrNull is Map
+        ? (thumb!.last as Map)['url'] as String?
+        : null;
+    final continuationRoot =
+        playlist ??
+        nodes(root, 'sectionListContinuation').firstOrNull ??
+        nodes(root, 'sectionListRenderer').firstOrNull ??
+        nodes(root, 'musicShelfContinuation').firstOrNull ??
+        root;
+    // Only the feed/collection continuation, never an individual carousel's token.
+    Object? continuations = continuationRoot;
+    if (continuationRoot is Map && continuationRoot['continuations'] != null) {
+      continuations = continuationRoot['continuations'];
+    }
     final token =
-        nodes(data, 'continuationCommand').firstOrNull?['token'] as String? ??
-        nodes(data, 'nextContinuationData').firstOrNull?['continuation']
+        nodes(continuations, 'continuationCommand').firstOrNull?['token']
+            as String? ??
+        nodes(
+              continuations,
+              'nextContinuationData',
+            ).firstOrNull?['continuation']
             as String?;
-    return CatalogPage(entries, continuation: token);
+    return CatalogPage(
+      entries,
+      shelves: playlist == null ? shelves : const [],
+      continuation: token,
+      header: headerTitle.isEmpty
+          ? null
+          : CatalogHeader(
+              title: headerTitle,
+              subtitle: text(header?['subtitle']),
+              artwork: art == null ? null : Uri.tryParse(art),
+            ),
+    );
   }
 }

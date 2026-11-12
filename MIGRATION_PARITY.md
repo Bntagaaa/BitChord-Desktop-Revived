@@ -1421,3 +1421,20 @@ matched process-memory result or whole-P-ID PARITY_ACCEPTED claim. **Phase 4 is
 INCOMPLETE** for the explicitly listed implementation and acceptance gaps;
 **Phase 5 has not started**. MIGRATION_PROGRESS's final Phase 4 handoff provides
 the complete platform table and concrete next work.
+
+### Phase 4 continuation: catalog structure and real media refusal — 2026-11-12
+
+Reference remains `348b613a0c3db1a54de56483ea6f8748d6465211`. Source audit and
+commands are recorded in the new MIGRATION_PROGRESS section and Phase 4 README.
+Implementation commit is the commit containing this entry; new CI pending.
+
+| IDs | Increment status | Evidence / remaining gap |
+|---|---|---|
+| P03/P04/P05 | IMPLEMENTED; parser/protocol FIXTURE_TESTED, Linux catalog LIVE_CHECKED | Home shelves/artwork/hero/cards/four-track columns; shelf/collection targets; all/type-filtered search; duplicate and playlist-suggestion isolation. Live Home/filter/detail counts retained. Full matched native visual acceptance, suggestions/restoration, owned mutations and collection queue playback open |
+| P06/P20 | IMPLEMENTED session-only subset; FIXTURE_TESTED | Reference signing-cookie preference, SAPISIDHASH, actual signed-in-shell prerequisite, account/channel/dataSync scope, redaction/header injection checks and late-result generation fences. No authorized live account trial, browser sign-in, protected persistence/import/refresh or Spotify acceptance |
+| P19/P11/P12 | IMPLEMENTED optional extractor adapter; live media BLOCKED | Explicit installed yt-dlp/Node path, bounded/cancellable process and output, no account export, strict format/CDN/header checks; real first/past-1MiB range preflight before native adoption. Production live trial returned **HTTP 403**. No working YouTube audio/PoToken parity claim |
+| P36 | IMPLEMENTED artwork bounds | Four credential-free transfers; 2 MiB per body; size-aware decode; 64 MiB ImageCache budget. No matched RAM measurement or full retained-image lifetime acceptance |
+
+**Phase 4 remains INCOMPLETE.** New Windows/Linux platform promotion awaits
+inspection of the exact-SHA matrix. Whole P-IDs are not PARITY_ACCEPTED.
+Phase 5 is not authorized or started.

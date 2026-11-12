@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import '../../../core/domain/audio_contract.dart';
 import '../../playback/application/local_playback.dart';
 import '../../playback/domain/local_queue.dart';
@@ -12,12 +13,18 @@ import 'range_source.dart';
 import 'source_broker.dart';
 import 'youtube_music.dart';
 import 'jiosaavn.dart';
+import 'youtube_resolver.dart';
+import 'artwork_loader.dart';
 import '../../../core/platform/audio/native_api.dart';
 
-final class OnlineRuntime implements OnlinePort {
+final class OnlineRuntime
+    implements OnlinePort, OnlineAccounts, OnlineArtwork, OnlineCapabilities {
   OnlineRuntime(this.playback, Directory downloads)
     : store = DownloadStore(downloads) {
-    _providers['youtube'] = YouTubeMusic(const ProviderHttp());
+    _providers['youtube'] = YouTubeMusic(
+      const ProviderHttp(),
+      resolver: YouTubeResolver.fromEnvironment(),
+    );
     _providers['jiosaavn'] = JioSaavn(
       const ProviderHttp(),
       NativeApi.bundledLibrary,
@@ -25,6 +32,23 @@ final class OnlineRuntime implements OnlinePort {
   }
   final LocalPlayback playback;
   final DownloadStore store;
+  final _artwork = ArtworkLoader();
+  YouTubeMusic get _youtube => _providers['youtube']! as YouTubeMusic;
+  @override
+  bool get youtubeAudioConfigured => _youtube.resolver != null;
+  @override
+  bool get signedIn => _youtube.signedIn;
+  @override
+  Future<void> signIn(String cookie, RequestScope scope) =>
+      _youtube.signIn(cookie, scope);
+  @override
+  Future<void> signOut() async {
+    _youtube.signOut();
+  }
+
+  @override
+  Future<Uint8List> artwork(Uri url, RequestScope scope) =>
+      _artwork.load(url, scope);
   final _providers = <String, CatalogProvider>{};
   SourceBroker? _broker;
   Future<void> _tail = Future.value();
@@ -67,7 +91,10 @@ final class OnlineRuntime implements OnlinePort {
     String query,
     RequestScope scope, {
     String? continuation,
-  }) => _provider(provider).search(query, scope, continuation: continuation);
+    SearchFilter filter = SearchFilter.all,
+  }) => _provider(
+    provider,
+  ).search(query, scope, continuation: continuation, filter: filter);
   @override
   Future<CatalogPage> browse(
     String id,
@@ -181,6 +208,7 @@ final class OnlineRuntime implements OnlinePort {
   Future<void> close() async {
     await _tail;
     _closed = true;
+    _youtube.signOut();
     try {
       await playback.close();
     } finally {

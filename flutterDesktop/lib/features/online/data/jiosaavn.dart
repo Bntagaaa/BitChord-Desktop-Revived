@@ -30,7 +30,10 @@ final class JioSaavn implements CatalogProvider {
     String query,
     RequestScope scope, {
     String? continuation,
+    SearchFilter filter = SearchFilter.all,
   }) async {
+    if (filter != SearchFilter.all && filter != SearchFilter.songs)
+      throw const ProviderFailure(ProviderProblem.unsupported);
     final page = continuation == null ? 1 : int.tryParse(continuation);
     if (page == null || page < 1 || page > 100)
       throw const ProviderFailure(ProviderProblem.malformed);

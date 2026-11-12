@@ -8,6 +8,7 @@ import '../../../design_system/theme.dart';
 import '../application/catalog_controller.dart';
 import '../domain/catalog.dart';
 import '../domain/online_port.dart';
+import 'catalog_components.dart';
 
 class CatalogSurface extends ConsumerStatefulWidget {
   const CatalogSurface({
@@ -26,6 +27,13 @@ class CatalogSurface extends ConsumerStatefulWidget {
 class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
   final _query = TextEditingController(), _addon = TextEditingController();
   String _source = 'youtube';
+  SearchFilter _filter = SearchFilter.all;
+  bool get _youtubeAudio {
+    final port = ref.read(onlinePortProvider);
+    return port is OnlineCapabilities &&
+        (port as OnlineCapabilities).youtubeAudioConfigured;
+  }
+
   String? _notice;
   bool _connecting = false;
   String? _progress;
@@ -96,6 +104,30 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
       });
   }
 
+  void _select(CatalogEntry entry) {
+    if (entry.kind == CatalogKind.track) {
+      if (entry.provider == 'youtube' && !_youtubeAudio) {
+        _message(
+          'YouTube audio resolver is not configured. See Phase 4 setup.',
+        );
+      } else {
+        _play(entry);
+      }
+    } else {
+      _open(entry);
+    }
+  }
+
+  void _openShelf(String id, String title, String? params) => _open(
+    CatalogEntry(
+      provider: 'youtube',
+      id: id,
+      title: title,
+      params: params,
+      kind: CatalogKind.playlist,
+    ),
+  );
+
   void _open(CatalogEntry entry) {
     final path = Uri(
       path: '/catalog/${entry.id}',
@@ -109,11 +141,18 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
   }
 
   Widget _row(CatalogEntry entry, {bool offline = false}) {
-    final playable = offline || entry.provider != 'youtube';
+    final playable = offline || entry.provider != 'youtube' || _youtubeAudio;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
+          CatalogArtwork(
+            url: entry.artwork,
+            size: 48,
+            radius: 7,
+            round: entry.kind == CatalogKind.artist,
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(7),
@@ -210,7 +249,9 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               _source == 'youtube'
-                  ? 'YouTube Music · Guest catalog. Audio resolution and sign-in are unavailable.'
+                  ? (_youtubeAudio
+                        ? 'YouTube Music · Media access is checked before playback.'
+                        : 'YouTube Music · Audio resolver is not configured.')
                   : _source == 'jiosaavn'
                   ? 'JioSaavn'
                   : 'Add-on · This session',
@@ -223,10 +264,16 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
               Expanded(
                 child: TextField(
                   controller: _query,
-                  decoration: const InputDecoration(hintText: 'Search songs'),
+                  decoration: const InputDecoration(
+                    hintText: 'Search songs, albums, artists and playlists',
+                  ),
                   onSubmitted: (query) {
                     if (query.trim().isNotEmpty)
-                      controller.load(provider: _source, query: query);
+                      controller.load(
+                        provider: _source,
+                        query: query,
+                        filter: _filter,
+                      );
                   },
                 ),
               ),
@@ -253,19 +300,52 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                     ),
                 ],
                 onChanged: (value) {
-                  if (value != null) setState(() => _source = value);
+                  if (value != null)
+                    setState(() {
+                      _source = value;
+                      _filter = SearchFilter.all;
+                    });
                 },
               ),
               IconButton(
                 tooltip: 'Search',
                 onPressed: () {
                   if (_query.text.trim().isNotEmpty)
-                    controller.load(provider: _source, query: _query.text);
+                    controller.load(
+                      provider: _source,
+                      query: _query.text,
+                      filter: _filter,
+                    );
                 },
                 icon: const Icon(Icons.search),
               ),
             ],
           ),
+          if (_source == 'youtube')
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final filter in SearchFilter.values)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(filter.name),
+                        selected: _filter == filter,
+                        onSelected: (_) {
+                          setState(() => _filter = filter);
+                          if (_query.text.trim().isNotEmpty)
+                            controller.load(
+                              provider: _source,
+                              query: _query.text,
+                              filter: filter,
+                            );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
           Row(
             children: [
               Expanded(
@@ -325,6 +405,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                   query: state.query,
                   browseId: state.browseId,
                   params: state.params,
+                  filter: state.filter,
                 ),
                 child: const Text('Retry'),
               ),
@@ -332,16 +413,70 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
           ),
         if (catalog)
           Expanded(
-            child: ListView.builder(
-              itemCount:
-                  state.entries.length + (state.continuation == null ? 0 : 1),
-              itemBuilder: (context, index) => index == state.entries.length
-                  ? TextButton(
-                      onPressed: state.loading ? null : controller.more,
-                      child: const Text('Load more'),
-                    )
-                  : _row(state.entries[index]),
-            ),
+            child:
+                state.entries.isEmpty && !state.loading && state.error == null
+                ? Center(
+                    child: Text(
+                      search
+                          ? 'Search for music'
+                          : 'No catalog items available.',
+                    ),
+                  )
+                : ListView(
+                    children: [
+                      if (state.header != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Row(
+                            children: [
+                              CatalogArtwork(
+                                url: state.header!.artwork,
+                                size: 140,
+                                round:
+                                    widget.browseId?.startsWith('UC') ?? false,
+                              ),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: Text(
+                                  state.header!.subtitle,
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (state.shelves.isNotEmpty && !search)
+                        for (
+                          var index = 0;
+                          index < state.shelves.length;
+                          index++
+                        )
+                          CatalogShelfView(
+                            key: ValueKey(
+                              'shelf-$index-${state.shelves[index].title}',
+                            ),
+                            shelf: state.shelves[index],
+                            onSelect: _select,
+                            onOpen: _openShelf,
+                            hero:
+                                widget.destination == 'listen-now' &&
+                                widget.browseId == null &&
+                                index == 0 &&
+                                state.shelves[index].layout ==
+                                    ShelfLayout.cards &&
+                                !state.shelves[index].entries.any(
+                                  (e) => e.isVideo,
+                                ),
+                          )
+                      else
+                        for (final entry in state.entries) _row(entry),
+                      if (state.continuation != null)
+                        TextButton(
+                          onPressed: state.loading ? null : controller.more,
+                          child: const Text('Load more'),
+                        ),
+                    ],
+                  ),
           ),
         if (widget.destination == 'downloads')
           Expanded(
@@ -367,7 +502,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
           const Padding(
             padding: EdgeInsets.only(top: 24),
             child: Text(
-              'Account sign-in is unavailable. Library and account operations have not been verified.',
+              'Library management and account operations are not yet implemented. Existing YouTube Music sessions can be verified from Accounts for catalog requests.',
             ),
           ),
       ],

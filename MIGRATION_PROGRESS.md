@@ -985,3 +985,67 @@ account/browser/PoToken path with dedicated authorized sessions, verify actual
 YouTube media access, then complete source-policy/manifest/catalog gaps and their
 cross-platform recovery scenarios. The missing functionality above is not
 presented as a working integration or as solely an external testing blocker.
+
+## Phase 4 continuation — shelves, session validation and refused-media checks — 2026-11-12
+
+**Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** Starting tree was clean on
+`2.0.0-flutter`, head `3c9c3b11`; latest verified application matrix remains
+[a20f6f4b / 43212024128](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43212024128).
+This increment's Windows/Linux result is pending its own exact-SHA run.
+
+Reference audit: pinned `348b613a` `HomeScreen.kt`, `components/{Common,ShelfRow}.kt`,
+`InnertubeParser.kt`, `Models.kt` SearchCategory, `DesktopSearchClient.kt`,
+`DesktopYouTube{Auth,Session}.kt`, `StreamResolver.kt` and `PlayerClient.kt`.
+Affected IDs: P03/P04/P05, P06/P19/P20, P11/P12 and P36.
+
+Implemented scope:
+
+- Typed provider shelves/header/targets, heterogeneous search and the reference's
+  Songs/Albums/Artists/Playlists filter parameters. Preserve collection identity
+  over play overlays; preserve playlist duplicates and exclude recommendations
+  from its tracks. Album primary-track isolation avoids playing related releases.
+- Home hero/square/video/artist cards, horizontal shelves with pointer dragging,
+  arrows, four-track columns, shelf navigation and detail artwork. Reference
+  dimensions: 150dp square cards; 14dp gaps; min(.70 width,320dp)/.92 hero;
+  four 56dp rows per min(.88 width,400dp) column. Search/detail item navigation,
+  pagination and failure messages remain real adapter operations. Full reference
+  visuals, restoration, suggestions, owned mutations and full collection queue
+  playback remain unfinished.
+- Credential-free artwork service: four transfers, 2 MiB body cap, scoped
+  cancellation, size-aware Flutter decodes and 64 MiB shared image-cache budget.
+  These are resource limits, not measured RAM savings.
+- Existing-session cookie verification in Accounts, following Kotlin's signed-in
+  shell check and SAPISIDHASH/account/channel/dataSync scoping. The secret field
+  clears on submit/dispose; session lives in memory and is never persisted or sent
+  to the media extractor/CDN. Account generations reject late catalog/validation
+  results. No browser sign-in, protected persistent storage/import, Spotify or
+  live authenticated account pass is claimed.
+- Optional explicit `BITCHORD_YTDLP` absolute executable and
+  `BITCHORD_YTDLP_NODE` absolute Node executable: bounded/cancellable extraction,
+  no shell/config/plugins/remote components/cache/download, filtered environment,
+  capped output and discarded diagnostics. Strict HTTPS/audio-only/googlevideo
+  validation and media-header allowlist. The existing C++ engine remains the only
+  audio engine. Resolution reads actual 512 KiB media ranges, including past
+  1 MiB where present, before adopting a source. Refusals retain HTTP status.
+  No extractor binaries are bundled or downloaded by the app. This is an opt-in
+  integration path, **not verified working YouTube playback**.
+
+Local executed checks: standalone Dart 3.13.7 (language 3.11 formatting), focused
+Dart analysis (data/domain/new tools), boundary/asset verifier and `git diff
+--check` passed. New controlled catalog/filter/session/resolver contracts passed;
+full production HTTP/add-on/JioSaavn/download/broker suite and real sanitized
+FFmpeg decode passed with **384000 exact PCM frames**, zero live decoders.
+Full local Flutter SDK is absent; widget/analyzer/release/native launch checks
+must be obtained from CI, not inferred from standalone analysis.
+
+Anonymous Linux production probe retrieved 30 Home entries in two shelves, all
+with artwork; 20 entries for each Songs/Albums/Artists/Playlists filter; real
+artist/album/playlist detail responses (playlist: 100 entries plus continuation).
+Redacted evidence: `flutterDesktop/verification/phase4/youtube-continuation-live.json`.
+The production resolver still received **HTTP 403** from actual media. No native
+YouTube playback was attempted after that refusal. Additional clients failed:
+Android VR requires a GVS PoToken; TV requested reload; embedded web had no
+selectable HTTPS URL/SABR warning. These observations do not prove a single
+root cause. Current upstream describes client/token enforcement; no header-only
+fix or stale-client fallback is claimed. PoToken/browser runtime, authenticated
+media, real Windows/Linux provider playback and failure recovery remain gates.
