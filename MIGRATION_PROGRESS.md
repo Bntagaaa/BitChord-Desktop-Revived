@@ -667,3 +667,30 @@ This entry supersedes earlier *current-status* statements for Phase 1 while pres
 - The supplied `bitchord-sans` font family is selected when installed; binaries remain **unbundled** pending provenance and redistribution permission. The user's visual approval does not establish third-party font licensing.
 - Carry over platform-specific OS window chrome/Mica/Haze fidelity, broader DPI/accessibility/motion checks, and optional exact typography measurements as tracked **Phase 2/Phase 8 enhancement/verification items**, not Phase 1 completion blockers. New product functionality and audio are still future phases.
 - This documentation change does not implement or start Phase 2. **Phase 2 is READY for explicit user-authorized execution** using `.codex/phases/phase-2.md`. Do not initiate Phase 3 automatically.
+
+## Phase 2 execution — 2026-11-12
+
+User explicitly authorized Phase 2 and confirmed Phase 1 accepted. Rechecked
+baseline run [43169704236](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43169704236): Windows/Linux and guarded retention succeeded;
+font-only run 43169153250 was cancelled, not failed or verified independently.
+Fast-forwarded verified retention `c71b8e19` while preserving task edits.
+
+Implemented source-pinned route/settings/default/visibility/semantics extraction,
+15 source shell translation catalogues with fallback, reference UI zoom and
+backward-compatible shell preference extension, independent display-DPI widget
+coverage, drawer Back ordering, and modal background focus/semantics exclusion.
+Existing accepted 100% geometry, honest disconnected pages and disabled dock
+remain. Full inventory, reproducibility commands, per-surface states and explicit
+visual gaps are in `flutterDesktop/verification/phase2/README.md`.
+
+Local: publisher-SHA-256 verified standalone Dart 3.13.7; format at language 3.11,
+Python compilation, reference extraction reproducibility, layer/20-asset check,
+palette/transport/vector verification and protected Kotlin tree diff passed.
+Full Flutter analyze/test/release/native checks use CI (local SDK unavailable,
+workspace free disk <1 GiB); results will be appended after the pushed run.
+
+**Phase 2 INCOMPLETE** pending the platform run and remaining matched native
+DPI/motion/focus/material/font evidence listed in the ledger. Existing real
+Windows/Linux fixtures are retained with original provenance, not renamed as
+new captures. No full visual parity, performance result or Phase 3 implementation
+is claimed. Phase 3 remains unauthorized.

@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../domain/shell_settings.dart';
 
 // Separate Flutter preference namespace; never writes Kotlin's Java Preferences.
@@ -10,7 +11,8 @@ final class PreferencesStore implements ShellSettingsStore {
   @override
   Future<ShellSettings> read() async {
     final values = await preferences.getStringList(_key);
-    if (values == null || values.length != 5) return const ShellSettings();
+    if (values == null || (values.length != 5 && values.length != 6))
+      return const ShellSettings();
     var appearance = Appearance.system;
     for (final option in Appearance.values) {
       if (option.name == values[0]) appearance = option;
@@ -21,6 +23,9 @@ final class PreferencesStore implements ShellSettingsStore {
       sidebarCollapsed: values[2] == 'true',
       reduceMotion: values[3] == 'true',
       reduceBlur: values[4] == 'true',
+      uiScalePercent: normalizeUiScale(
+        values.length == 6 ? int.tryParse(values[5]) ?? 100 : 100,
+      ),
     );
   }
 
@@ -31,5 +36,6 @@ final class PreferencesStore implements ShellSettingsStore {
     '${value.sidebarCollapsed}',
     '${value.reduceMotion}',
     '${value.reduceBlur}',
+    '${normalizeUiScale(value.uiScalePercent)}',
   ]);
 }

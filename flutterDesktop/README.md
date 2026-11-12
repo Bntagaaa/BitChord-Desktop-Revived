@@ -173,3 +173,14 @@ Manual visual review is still required for typography, tab transitions, scaling,
 The user has **manually accepted the Phase 1 foundation and shell** and confirmed the current UI is satisfactory for moving forward. This supersedes earlier README statements that Phase 1 is awaiting manual review. The successful hosted Windows/Linux validation baseline is [run 43163359448](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43163359448); the later font-specific [run 43169153250](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43169153250) was still in progress when acceptance was recorded.
 
 Phase 1 complete **within its shell/foundation scope**. Full Kotlin feature parity, native audio, exact visual effects, DPI/accessibility matrix and font redistribution verification are still open work in later phases. The sidebar spacing comparison must use matched UI scale: Kotlin 110% versus Flutter 100% was not a valid defect. `bitchord-sans` cuts are used by name when installed but are not packaged without license review. **Phase 2 is ready to start on explicit instruction; it has not started as part of this documentation update.**
+
+## Phase 2 presentation work
+
+Phase 2 is authorized; current evidence and unresolved gates are recorded in
+[`verification/phase2/README.md`](verification/phase2/README.md). Reproduce the
+source inventory and shell translation pipeline with
+`python3 tool/phase2_reference.py --check` (the pinned reference Git object must
+exist). UI zoom matches the source 80/90/100/110/125% choices and remains separate
+from display DPI. No fonts are redistributed, and no live music service or native
+audio implementation is added. Full phase acceptance remains incomplete pending
+the evidence ledger; Phase 3 does not start automatically.

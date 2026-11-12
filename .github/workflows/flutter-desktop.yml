@@ -54,6 +54,8 @@ jobs:
           python tool/run_checked.py initialize python tool/initialize_platforms.py
           python tool/run_checked.py boundaries python tool/check_boundaries.py
           python tool/run_checked.py reference python tool/verify_reference_tokens.py
+          git fetch --no-tags --depth=1 origin 348b613a0c3db1a54de56483ea6f8748d6465211
+          python tool/run_checked.py phase2-reference python tool/phase2_reference.py --check
       - name: Resolve dependencies
         run: |
           if [ -f pubspec.lock ]; then

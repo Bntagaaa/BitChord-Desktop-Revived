@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:bitchord_desktop/l10n/shell_strings.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -367,5 +368,75 @@ void main() {
       }
       await tester.pumpWidget(const SizedBox());
     }
+  });
+  test('UI zoom normalizes like Kotlin, including ties and bounds', () {
+    expect(normalizeUiScale(-1), 80);
+    expect(normalizeUiScale(95), 90);
+    expect(normalizeUiScale(110), 110);
+    expect(normalizeUiScale(999), 125);
+  });
+  test('Localized shell copy falls back to English then caller copy', () {
+    expect(lookupShellString('id', 'settings', 'wrong'), 'Pengaturan');
+    expect(lookupShellString('unknown', 'settings', 'wrong'), 'Settings');
+    expect(lookupShellString('he', 'new-feature', 'Fallback'), 'Fallback');
+  });
+  for (final dpi in [1.0, 1.25, 1.5, 2.0]) {
+    testWidgets('Shell navigation and disabled dock at display scale $dpi', (
+      tester,
+    ) async {
+      await mount(tester, const Size(1220, 780));
+      tester.view.devicePixelRatio = dpi;
+      tester.view.physicalSize = Size(1220 * dpi, 780 * dpi);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byKey(const Key('inline-sidebar'))).width,
+        220,
+      );
+      await tester.tap(find.byKey(const Key('nav-settings')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ui-scale-110')));
+      await tester.pumpAndSettle();
+      final sidebar = tester.getRect(find.byKey(const Key('inline-sidebar')));
+      expect(sidebar.width, closeTo(242, .01));
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(const Key('transport-play')))
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+  testWidgets('Back dismisses drawer before visiting history', (tester) async {
+    final container = await mount(tester, const Size(900, 600));
+    await tester.tap(find.byKey(const Key('nav-new')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('sidebar-brand-toggle')));
+    await tester.pumpAndSettle();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('drawer-scrim')), findsNothing);
+    expect(container.read(historyProvider).last, '/new');
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('Modal account menu excludes background focus and semantics', (
+    tester,
+  ) async {
+    await mount(tester, const Size(1220, 780));
+    await tester.tap(find.byKey(const Key('sidebar-account')));
+    await tester.pumpAndSettle();
+    final exclusion = tester.widgetList<ExcludeFocus>(
+      find.byType(ExcludeFocus),
+    );
+    expect(exclusion.any((widget) => widget.excluding), isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('account-panel')), findsNothing);
+    await tester.tap(find.byKey(const Key('nav-settings')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ui-scale-100')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

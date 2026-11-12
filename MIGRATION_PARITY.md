@@ -1243,3 +1243,24 @@ The user has **not accepted Phase 1 visual parity**, and this table does not cla
 The user explicitly reported that the latest Phase 1 UI looks OK after testing. Mark the **foundation/shell visual acceptance gate USER_ACCEPTED for Phase 1 scope**: basic navigation (including instant tab transitions), sidebar at matched 100% scale, appearance, account overlay, and empty player dock. Hosted Windows/Linux foundation CI previously passed in run `43163359448`.
 
 This acceptance is scoped to the Phase 1 shell and is **not** evidence that every Kotlin screen, media service, advanced native effect, accessibility scenario, font licensing condition or high-DPI setup has reached full parity. Keep exact Haze/Mica, DPI/accessibility, complete font glyph/weight comparison and future content-related checks open under Phase 2/Phase 8. The user's supplied `bitchord-sans` remains system-installed only; no redistributed font binaries are claimed. The later font change CI `43169153250` was still pending its terminal outcome at the time of this entry. Phase 2 work has not begun.
+
+## Phase 2 presentation evidence — 2026-11-12
+
+Reference for all rows: `348b613a0c3db1a54de56483ea6f8748d6465211`.
+Implementation commit is the commit adding this entry (CI SHA recorded later);
+full paths/scenarios/gaps are in `flutterDesktop/verification/phase2/README.md`.
+
+| P-ID | Evidence status in this change | Scope and limits |
+|---|---|---|
+| P01 | STATICALLY_CHECKED | Welcome/default/semantics catalog only; no onboarding implementation |
+| P02 | IMPLEMENTED | All ten IDs catalogued, existing immediate routes; drawer Back dismisses before history; nested data routes remain later work |
+| P03–P05 | STATICALLY_CHECKED | Source loading/empty/error/overlay inventory; disconnected shell remains honest |
+| P24 | IMPLEMENTED | Existing disabled empty dock retained across independent display-DPI/zoom widget scenarios; functional player remains unimplemented |
+| P28 | IMPLEMENTED | Nonrepeating shell shortcuts, drawer Back and modal background focus exclusion; full shortcut/focus/accessibility oracle open |
+| P29 | IMPLEMENTED | Exact source zoom choices and nearest-option normalization, geometry+type scaling; source palettes/icons verified; native multi-DPI and font licensing/glyph evidence open |
+| P30 | IMPLEMENTED | Existing clipped blur/reduction and motion tokens retained; modal background semantics excluded; Haze/Mica/motion equivalence open |
+| P31 | IMPLEMENTED | Complete source Settings render block and declaration inventory, generated 15-language shell copy/fallback; 5-field persisted settings remain readable and zoom extends snapshot; broader Settings/localization/RTL still open |
+
+No P-ID is promoted to PARITY_ACCEPTED. Widget/platform results must be read
+with the specific subsequent CI evidence; static extracted expressions are not
+proof that runtime defaults and visibility have been exercised.

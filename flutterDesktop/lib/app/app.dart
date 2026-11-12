@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../design_system/palette.dart';
 import '../design_system/theme.dart';
+import '../design_system/desktop_scale.dart';
 import '../features/shell/application/shell_controller.dart';
 import 'router.dart';
 
@@ -30,6 +32,11 @@ class _BitChordAppState extends ConsumerState<BitChordApp>
   }
 
   @override
+  void didChangeLocales(List<Locale>? locales) {
+    setState(() {});
+  }
+
+  @override
   void didChangePlatformBrightness() {
     setState(() {});
   }
@@ -53,6 +60,8 @@ class _BitChordAppState extends ConsumerState<BitChordApp>
       title: 'BitChord',
       debugShowCheckedModeBanner: false,
       theme: bitChordTheme(palette, brightness),
+      builder: (context, child) =>
+          DesktopScale(percent: settings.uiScalePercent, child: child!),
       routerConfig: ref.watch(routerProvider),
     );
   }

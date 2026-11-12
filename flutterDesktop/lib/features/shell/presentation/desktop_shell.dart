@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
+import '../../../l10n/shell_strings.dart';
 import '../../../design_system/palette.dart';
 import '../../../design_system/theme.dart';
 import '../application/shell_controller.dart';
@@ -28,6 +29,9 @@ enum Destination {
   final String id;
   final String label;
   final String glyph;
+
+  String localizedLabel(BuildContext context) =>
+      shellString(context, this == Destination.home ? 'home' : id, label);
 }
 
 class BitChordGlyph extends StatelessWidget {
@@ -89,6 +93,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
   }
 
   void _goBack() {
+    if (_drawerRequested) {
+      setState(() => _drawerRequested = false);
+      return;
+    }
     if (_accountsOpen) {
       setState(() => _accountsOpen = false);
       return;
@@ -178,77 +186,88 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                   : ShellMetrics.sidebarDuration;
               return Stack(
                 children: [
-                  Row(
-                    children: [
-                      AnimatedContainer(
-                        key: const Key('inline-sidebar'),
-                        width: collapsed
-                            ? ShellMetrics.railWidth
-                            : ShellMetrics.sidebarWidth,
-                        duration: duration,
-                        curve: Curves.fastOutSlowIn,
-                        child: LayoutBuilder(
-                          builder: (context, sidebarConstraints) => _Sidebar(
-                            collapsed:
-                                collapsed || sidebarConstraints.maxWidth < 200,
-                            palette: palette,
-                            selected: widget.destination,
-                            onToggle: toggle,
-                            onNavigate: _navigate,
-                            onOpenAccounts: _openAccounts,
+                  ExcludeFocus(
+                    excluding: _accountsOpen || (narrow && _drawerRequested),
+                    child: ExcludeSemantics(
+                      excluding: _accountsOpen || (narrow && _drawerRequested),
+                      child: Row(
+                        children: [
+                          AnimatedContainer(
+                            key: const Key('inline-sidebar'),
+                            width: collapsed
+                                ? ShellMetrics.railWidth
+                                : ShellMetrics.sidebarWidth,
+                            duration: duration,
+                            curve: Curves.fastOutSlowIn,
+                            child: LayoutBuilder(
+                              builder: (context, sidebarConstraints) =>
+                                  _Sidebar(
+                                    collapsed:
+                                        collapsed ||
+                                        sidebarConstraints.maxWidth < 200,
+                                    palette: palette,
+                                    selected: widget.destination,
+                                    onToggle: toggle,
+                                    onNavigate: _navigate,
+                                    onOpenAccounts: _openAccounts,
+                                  ),
+                            ),
                           ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            Column(
+                          Expanded(
+                            child: Stack(
                               children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.fromLTRB(
-                                      16,
-                                      widget.destination == Destination.home
-                                          // Fallback font ink metrics differ by
-                                          // desktop OS; these settle HomeTitle's
-                                          // first visible baseline to Kotlin.
-                                          ? desktopHomeHeadingTopPadding(
-                                              Theme.of(context).platform,
-                                            )
-                                          : 16,
-                                      16,
-                                      ShellMetrics.contentBottomReserve,
+                                Column(
+                                  children: [
+                                    Expanded(
+                                      child: Padding(
+                                        padding: EdgeInsets.fromLTRB(
+                                          16,
+                                          widget.destination == Destination.home
+                                              // Fallback font ink metrics differ by
+                                              // desktop OS; these settle HomeTitle's
+                                              // first visible baseline to Kotlin.
+                                              ? desktopHomeHeadingTopPadding(
+                                                  Theme.of(context).platform,
+                                                )
+                                              : 16,
+                                          16,
+                                          ShellMetrics.contentBottomReserve,
+                                        ),
+                                        child: Align(
+                                          alignment: Alignment.topLeft,
+                                          child:
+                                              widget.destination ==
+                                                  Destination.settings
+                                              ? _AppearancePanel(
+                                                  palette: palette,
+                                                )
+                                              : _UnconnectedPage(
+                                                  destination:
+                                                      widget.destination,
+                                                  palette: palette,
+                                                ),
+                                        ),
+                                      ),
                                     ),
-                                    child: Align(
-                                      alignment: Alignment.topLeft,
-                                      child:
-                                          widget.destination ==
-                                              Destination.settings
-                                          ? _AppearancePanel(palette: palette)
-                                          : _UnconnectedPage(
-                                              destination: widget.destination,
-                                              palette: palette,
-                                            ),
+                                  ],
+                                ),
+                                Positioned(
+                                  left: 10,
+                                  right: 10,
+                                  bottom: 20,
+                                  child: Center(
+                                    child: _EmptyDock(
+                                      palette: palette,
+                                      reduceBlur: settings.reduceBlur,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                            Positioned(
-                              left: 10,
-                              right: 10,
-                              bottom: 20,
-                              child: Center(
-                                child: _EmptyDock(
-                                  palette: palette,
-                                  reduceBlur: settings.reduceBlur,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                   if (narrow && _drawerRequested) ...[
                     Positioned.fill(
@@ -661,9 +680,9 @@ class _NavigationItem extends StatelessWidget {
       key: Key('nav-${destination.id}'),
       selected: selected,
       button: true,
-      label: destination.label,
+      label: destination.localizedLabel(context),
       child: Tooltip(
-        message: collapsed ? destination.label : '',
+        message: collapsed ? destination.localizedLabel(context) : '',
         child: Material(
           color: selected ? palette['navSelectedSurface'] : Colors.transparent,
           borderRadius: BorderRadius.circular(7),
@@ -702,7 +721,7 @@ class _NavigationItem extends StatelessWidget {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              destination.label,
+                              destination.localizedLabel(context),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodyMedium
@@ -751,7 +770,7 @@ class _UnconnectedPage extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        destination.label,
+        destination.localizedLabel(context),
         key: const Key('page-heading'),
         style: Theme.of(context).textTheme.headlineLarge,
       ),
@@ -992,12 +1011,15 @@ class _AppearancePanel extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Settings',
+            shellString(context, 'settings', 'Settings'),
             key: const Key('page-heading'),
             style: Theme.of(context).textTheme.headlineLarge,
           ),
           const SizedBox(height: 24),
-          Text('Appearance', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            shellString(context, 'appearance', 'Appearance'),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -1019,16 +1041,40 @@ class _AppearancePanel extends ConsumerWidget {
                   update(settings.copyWith(pitchBlack: value)),
             ),
           SwitchListTile(
-            title: const Text('Reduce dynamic blur'),
+            title: Text(
+              shellString(
+                context,
+                'reduce_dynamic_blur',
+                'Reduce dynamic blur',
+              ),
+            ),
             value: settings.reduceBlur,
             onChanged: (value) => update(settings.copyWith(reduceBlur: value)),
           ),
           SwitchListTile(
-            title: const Text('Reduce animation'),
+            title: Text(
+              shellString(context, 'reduce_animation', 'Reduce animation'),
+            ),
             value: settings.reduceMotion,
             onChanged: (value) =>
                 update(settings.copyWith(reduceMotion: value)),
           ),
+          Wrap(
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text('UI Scale'),
+              for (final percent in uiScaleOptions)
+                ChoiceChip(
+                  key: Key('ui-scale-$percent'),
+                  label: Text('$percent%'),
+                  selected: settings.uiScalePercent == percent,
+                  onSelected: (_) =>
+                      update(settings.copyWith(uiScalePercent: percent)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
         ],
       ),
     );
