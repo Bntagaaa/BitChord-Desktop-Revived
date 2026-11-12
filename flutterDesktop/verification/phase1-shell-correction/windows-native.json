@@ -1,0 +1,13 @@
+{
+  "run_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106555",
+  "migration_helper_commit": "3b2a8747327fe611bcb92a75ced96373bc90c60e",
+  "reference_sha": "348b613a0c3db1a54de56483ea6f8748d6465211",
+  "result": "success: all three original DLLs, source diff empty; tests/package not part of focused workflow",
+  "compiler": "MSVC 19.44.35229 / Visual Studio 17 2022 / Windows SDK 10.0.26100.0",
+  "adapter": "External compiler include prelude: windows.h, wtypes.h, propkeydef.h, initguid.h; source unchanged",
+  "dll_sha256": {
+    "bitchord_analysis.dll": "20b31b77096fc698e794ce8e5e8a62a0df9d1e14b66f0bfdaaa8e466069b3f5a",
+    "bitchord_smtc.dll": "a73b8f8f8e617a0333cb7e19a1c808482ed642afc39e8d13bc49e2ced6e25316",
+    "bitchord_window.dll": "0c4f859cfb4c1307bde53bdb4e536f3c25bbc217a56815508f2ce38fc8dac428"
+  }
+}

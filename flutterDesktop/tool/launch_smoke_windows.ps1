@@ -112,6 +112,7 @@ try {
     [void][SmokeWindow]::SetCursorPos($origin.X+$x, $origin.Y+$y)
     [SmokeWindow]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
     [SmokeWindow]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
+    [void][SmokeWindow]::SetCursorPos($origin.X+500, $origin.Y+400)
     Start-Sleep -Milliseconds 800
   }
   function Send-Key([byte]$key) {

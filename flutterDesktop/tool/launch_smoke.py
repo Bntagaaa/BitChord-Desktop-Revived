@@ -48,6 +48,8 @@ def capture_state(evidence, window, name, theme='any'):
 
 def click_client(window, x, y):
     subprocess.run(['xdotool', 'mousemove', '--window', window, str(x), str(y), 'click', '1'], check=True, timeout=5)
+    # Keep hover tooltips out of comparison images after opening an overlay.
+    subprocess.run(['xdotool', 'mousemove', '--window', window, '500', '400'], check=True, timeout=5)
     time.sleep(.8)
 
 

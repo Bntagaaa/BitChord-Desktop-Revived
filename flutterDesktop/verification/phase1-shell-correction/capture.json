@@ -1,0 +1,63 @@
+{
+  "reference_sha": "348b613a0c3db1a54de56483ea6f8748d6465211",
+  "flutter_sha": "95859ac9053c65143ca6799726c38de06706df1e",
+  "session": "KDE Wayland / XWayland; client drawable capture (root-screen capture unavailable)",
+  "theme": "light",
+  "profiles": "isolated temporary, no accounts, onboarding completed in test-owned Java Preferences",
+  "records": [
+    {
+      "app": "kotlin",
+      "requested_client": [
+        1220,
+        780
+      ],
+      "captured": "1220 780",
+      "file": "kotlin-light-1220x780.png",
+      "sha256": "b3ef1f1d96b3f1ac2fda3b86b2715d043949cb4f61b1873f2aee7ae59a744927",
+      "captured_at_utc": "2026-11-12T01:23:43.305387+00:00"
+    },
+    {
+      "app": "kotlin",
+      "requested_client": [
+        900,
+        600
+      ],
+      "captured": "900 600",
+      "file": "kotlin-light-900x600.png",
+      "sha256": "ec1548b542245a5e0f4dff04e615557c0aa776ba2d815a8d48d4558a18a7cbbb",
+      "captured_at_utc": "2026-11-12T01:23:47.659586+00:00"
+    },
+    {
+      "app": "flutter",
+      "requested_client": [
+        1220,
+        780
+      ],
+      "captured": "1220 780",
+      "file": "flutter-light-1220x780.png",
+      "sha256": "40c59c13a3e535fcdbc11418503f5b1482a4c607c9a0f4657dfe0dadab84bb20",
+      "captured_at_utc": "2026-11-12T01:24:09.329571+00:00"
+    },
+    {
+      "app": "flutter",
+      "requested_client": [
+        900,
+        600
+      ],
+      "captured": "900 600",
+      "file": "flutter-light-900x600.png",
+      "sha256": "32faeff4738d41d034d20c90bd3b75ea2d08377af5710457e1bc3738637a3655",
+      "captured_at_utc": "2026-11-12T01:24:13.587764+00:00"
+    }
+  ],
+  "shutdown": "capture cleanup via SIGTERM, not lifecycle acceptance",
+  "reference_run_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43125482870",
+  "flutter_run_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43132763894",
+  "numeric_dpi": "not independently measured locally; same session and requested client sizes",
+  "scope": "Common shell regions only; real anonymous Kotlin feed differs from disconnected Flutter body",
+  "limits": [
+    "Not a full-frame golden",
+    "No native close proof: capture processes terminated after screenshots",
+    "Font rights/ink metrics/wrapping, exact Haze/noise, native decorations/icons, motion/focus/accessibility and DPI matrix remain open"
+  ]
+}

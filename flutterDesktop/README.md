@@ -6,6 +6,10 @@ no previous Flutter rewrite is used. The shell has real navigation, appearance
 preferences and native lifecycle, with disconnected music pages and disabled
 transport controls. There is no audio backend or simulated playback.
 
+Phase 1 remains incomplete for visual acceptance. The latest authoritative
+gate results and remaining prerequisites are in the targeted acceptance audit
+at the end of [`MIGRATION_PROGRESS.md`](../MIGRATION_PROGRESS.md).
+
 ## Toolchain and commands
 
 Pin: Flutter **3.47.9**, framework `c197ca5199e9ee5661e865596c9c07294dfab51c`,
@@ -36,7 +40,7 @@ CI checks formatting without rewriting source and enforces the committed lockfil
 
 Linux needs Clang, CMake, Ninja, pkg-config, GTK3/liblzma development packages
 and a C++ runtime. The hosted smoke also needs D-Bus, Xvfb, Xauth, Openbox,
-xdotool and ImageMagick; `tool/install_linux_ci.py` is scoped to Ubuntu 22.04
+xdotool, x11-utils and ImageMagick; `tool/install_linux_ci.py` is scoped to Ubuntu 22.04
 runners and uses signed official HTTPS repositories. Windows needs Visual
 Studio's Desktop C++ workload and Windows SDK; CI uses Server 2022/VS 2022.
 The smoke requires a visible display large enough for both client sizes at
@@ -46,10 +50,13 @@ The smoke requires a visible display large enough for both client sizes at
 
 The workflow `.github/workflows/flutter-desktop.yml` generates official hosts,
 records `flutter doctor -v`/SDK provenance, resolves packages, checks formatting,
-analyzes, runs eight tests and builds release bundles on Linux and Windows. Native
+analyzes, runs twelve tests and builds release bundles on Linux and Windows. Native
 smokes launch the release executable, capture painted 1220×780 and 900×600
 **client** surfaces, check responsive sidebar/dock landmarks and close through
-the native window path with exit code zero. These are hosted lifecycle checks,
+the native window path with exit code zero. Actual F11/Escape input verifies
+fullscreen and restoration to the prior client size. Account/drawer/settings
+captures and real Light/Dark/Pitch-black selections extend the smoke; their
+results must be checked in the specific run's native JSON and logs. These are hosted lifecycle checks,
 not physical GPU/compositor or reference-parity acceptance. Kotlin's initial
 1220×780 is an outer-window size; a matched comparison must record native insets.
 
@@ -71,17 +78,25 @@ force-quit failures are recorded with their fixes in `../MIGRATION_PROGRESS.md`.
 This verifies the foundation and lifecycle, not full visual parity.
 
 Local checks on 2026-11-12 passed Python compilation, layer/asset verification
-and all 779 recorded reference hashes. Flutter/Dart are absent locally; the older
+and all 779 recorded reference hashes. The full Flutter SDK is absent locally; the older
 cloud SDK HTTP 403 is historical. This workstation has under 1 GiB workspace
 free disk and only full JDK 27. Local offline reference tests failed before
 execution on that JDK. JitPack currently responds HTTP 200 locally. Hosted pinned
 Kotlin Linux validation passed **857 tests** and built a distributable in
 [43125482870](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43125482870).
-The Windows reference Gradle native build failed in that run and the diagnostic
-retry [43126572145](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43126572145);
-standalone GNU 14.2 native configuration succeeded, but the Gradle native build
-still exited 1. This blocks the Windows reference comparison; Kotlin is unchanged.
-No local Flutter format/analyze/test/build or native GUI pass is claimed.
+Those early Windows reference runs failed inside the native Gradle task. Focused
+diagnosis proved GNU 14.2 builds analysis but fails SMTC's incomplete MinGW WinRT
+types. The reference's supported MSVC path plus an external SDK header prelude
+now builds **all three original DLLs** in
+[43134106555](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106555).
+`tool/reference_msvc.init.gradle` changes CI toolchain actions only; protected
+reference files and tests remain intact. Full tests/package/capture results are
+recorded separately in the current acceptance audit; focused compilation alone
+does not prove them.
+Official standalone Dart 3.13.7 was downloaded with its publisher SHA-256
+checked, and local formatting at language version 3.11 passed. Flutter analyze,
+tests and builds use CI; local native capture cleanup is separate from CI's
+verified native-close path.
 
 ## Ownership and source provenance
 
@@ -104,18 +119,26 @@ future audio architecture; no native audio library is loaded here.
 
 ## Open visual and platform gates
 
-Local Linux light-theme pairs at both client sizes are in
+The initial local Linux light-theme pairs at both client sizes are in
 [`verification/phase1-local-comparison/`](verification/phase1-local-comparison/),
 with provenance/limits in `capture.json`. They compare common shell regions:
 Kotlin's anonymous live catalog differs from Flutter's disconnected body. Local
-numeric DPI is unmeasured; Windows reference pairing remains blocked. The extra
-Flutter 48-dp header, sidebar spacing/account row, larger/darker dock mark and
-missing dock actions/volume differ visibly. SF Pro redistribution rights and
-fallback metrics remain unresolved. Native
+numeric DPI is unmeasured. The targeted continuation removes the extra 48-dp
+header, matches sidebar/header/row/footer dimensions, restores the account
+avatar/empty menu and rail action, uses the original gray dock asset and adds
+the original action slots and unavailable volume track. Typography roles now
+match the source's sizes, physical weights and line-height policy. Twelve tests
+and the full release/native/retention matrix passed in run
+[43134106705](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106705).
+Repeated local Linux pairs are in
+[`verification/phase1-shell-correction/`](verification/phase1-shell-correction/),
+alongside focused Windows native provenance. This does not establish full
+reference parity. SF Pro redistribution rights,
+fallback ink metrics/wrapping and Haze noise/blur equivalence remain unresolved. Native
 Mica/caption material, template app/taskbar icons, OS theme changes, focus and
-fullscreen restoration, 100/125/150/200% DPI, glass/motion and accessibility still
+100/125/150/200% DPI, glass/motion and accessibility still
 need matched platform checks. Widget font rectangles must not be called text
-parity. The standard status header, Material appearance controls and disconnected
+parity. Material appearance controls and the disconnected
 page body are Phase 1 infrastructure; legacy top player, full player/side panels,
 account/data screens and PiP remain later work. No RAM improvement is measured.
 Phase 1 is incomplete until its remaining gates have evidence; Phase 2 has not

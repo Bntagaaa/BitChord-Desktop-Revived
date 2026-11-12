@@ -1094,3 +1094,65 @@ disconnected page; this is a common-shell review, not a full-frame golden.
 **Phase 1 foundation checks pass; visual acceptance remains INCOMPLETE/BLOCKED.**
 No P-ID's full parity, memory reduction or Phase 2 completion is inferred.
 
+
+### Phase 1 shell correction and Windows native diagnosis — 2026-11-12
+
+This continuation supersedes the specific missing-shell observations above, not
+full P-ID acceptance. Protected Kotlin/shared/native source remains unchanged;
+Phase 2 has not begun.
+
+- P01/P28: run [43132763894](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43132763894)
+  at `95859ac9` passed **12 tests per OS**, analysis, release builds, two native
+  client sizes, F11/Escape fullscreen/restore and clean native close (exit 0) on
+  Windows and Linux. Only retention failed: it correctly rejected a newer branch
+  head. No newer source is inferred validated from that run.
+- P02/P29: removed the invented 48-dp navigation row; Alt+Left retains back.
+  Header/row/divider/footer dimensions follow `DesktopApp.kt` Sidebar/SidebarItem.
+  Empty account row/avatar/menu and narrow-rail playlist action now exist. Add
+  account is explicitly unavailable until the authorized account implementation.
+- P24: original padded gray `bitchord_no_music.svg` replaces the oversized white
+  mark. Dock 760×58, reference action/button slots and 72×4 unavailable volume
+  track are present. No playback or volume engine is simulated.
+- P29: compact Home heading is 30 sp; custom role line heights no longer inherit
+  unrelated Material defaults; default-role physical weights/metrics are mapped.
+  SF Pro is not bundled. Its rights and actual ink/line metrics remain unresolved.
+  The local expanded playlist caption still wraps where SF Pro fits one line.
+- P30: original chrome tint/blur parameters are used for dock/menu. Haze noise,
+  renderer-specific blur, feed-under-dock fade and animation equivalence are open.
+
+Repeated local Linux light captures of both apps at both client sizes are in
+[`flutterDesktop/verification/phase1-shell-correction/`](flutterDesktop/verification/phase1-shell-correction/).
+They use the real pinned Kotlin distributable and corrected Flutter `95859ac9`,
+sequentially in the same KDE/XWayland session, isolated empty profiles and actual
+Light selection. `capture.json` records run/source/image hashes and timestamps.
+Review confirms the corrected sidebar/footer/dock geometry and absence of the
+extra row. Home ink positioning/width and playlist wrapping still differ by
+font. Different real feed/disconnected content prevents full-frame or matching
+blur acceptance. Local numerical DPI is unmeasured; SIGTERM cleanup is not
+native-close evidence.
+
+Focused Windows diagnostic [43129985058](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43129985058)
+proved GNU 14.2 builds the analyzer, then fails the SMTC target's incomplete
+MinGW WinRT types. The native task name obscured the actual failing target.
+The reference already supports MSVC/C++/WinRT; an external Gradle init script
+selects it without editing protected source. The window bridge additionally
+needs SDK property-key prerequisites included before its original headers.
+[PROPERTYKEY belongs to wtypes.h](https://learn.microsoft.com/en-us/windows/win32/api/wtypes/ns-wtypes-propertykey);
+[DEFINE_PROPERTYKEY/Initguid behavior](https://learn.microsoft.com/en-us/windows/win32/api/propkeydef/nf-propkeydef-define_propertykey)
+is supplied through compiler `/FI` options. All original targets/tests remain
+required. Focused run [43134106555](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106555)
+passed all three DLLs with MSVC 19.44 / SDK 10.0.26100.0 and empty protected diff;
+`windows-native.json` records hashes. Full reference tests/package/capture are
+separate gates; the focused compile does not prove them.
+
+Full foundation run [43134106705](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106705)
+at `3b2a8747` subsequently passed both OSs and retention (`32f8150b`). Six
+additional account/drawer/settings/Light/Dark/Pitch-black native captures per OS
+were reviewed. Rendered page colors, F11/Escape size restoration and exit 0 pass
+on both platforms. This adds environment-specific evidence, not full P-ID parity.
+
+Current remaining acceptance gaps: matched Windows reference capture, full
+DPI/theme/focus/accessibility/motion checks, native caption/Mica/app/taskbar icons,
+font rights/metrics and exact material behavior. Account/data/content/player
+functionality is outside this foundation. No full parity or memory reduction
+is claimed. Phase 1 visual acceptance remains **INCOMPLETE**.

@@ -1,5 +1,8 @@
 # Migration progress and delivery backlog
 
+Latest Phase 1 status: see the **Phase 1 targeted acceptance audit** at the end.
+Earlier dated records are historical evidence, not the current gate status.
+
 ## Phase 0 record
 
 Reference branch: `1.9.2`; exact commit: `348b613a0c3db1a54de56483ea6f8748d6465211`.
@@ -455,3 +458,29 @@ input and Light/Dark/Pitch-black selection, retaining six state captures per OS.
 Theme checks assert the real rendered page color, followed by fullscreen/restore
 and clean native close. These are shell checks, not acceptance of reference
 settings inventory, authentication, accessibility or full visual parity.
+## Phase 1 targeted acceptance audit — 2026-11-12
+
+This audit supersedes the earlier missing-shell and native-build observations;
+it does not accept full visual parity or authorize Phase 2.
+
+| Gate | Latest verified result |
+|---|---|
+| Flutter foundation Windows + Linux | PASS: run [43134106705](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106705), source `3b2a8747`, full matrix and retention succeeded; bot commit `32f8150b` fetched/reviewed |
+| Formatting / analyzer / asset boundaries | PASS on both OSs; local official Dart 3.13.7 format check at language version 3.11, Python compilation and 20-asset/palette/reference checks also pass |
+| Tests / release builds | PASS: 12 tests per OS, zero failures/skips; official Flutter 3.47.9, Windows VS 2022 and Ubuntu 22.04 release bundles |
+| Native shell and lifecycle | PASS in hosted environments: actual 1220×780 and 900×600 painted clients, account/drawer/settings captures, rendered Light/Dark/Pitch-black selection, F11/Escape size restoration and native close/exit 0 on both OSs |
+| Retained evidence | PASS: six additional appearance/overlay PNGs per OS, native JSON, two base client PNGs and test summary; Ahem widget images remain layout diagnostics |
+| Pinned Windows native targets | PASS: focused [43134106555](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43134106555) builds analysis + SMTC + window DLLs with supported MSVC/C++/WinRT and SDK prerequisites; hashes in `phase1-shell-correction/windows-native.json` |
+| Pinned full reference tests/package/Windows captures | Await actual run `43134106568`; focused DLL compilation alone is not this gate |
+| Corrected local Linux shell comparison | PARTIAL: repeated both apps sequentially in the same KDE/XWayland session, Light and empty test-owned profiles, both client sizes; four new PNGs/source/run/hash provenance in `phase1-shell-correction/capture.json` |
+| Kotlin/reference preservation | PASS: byte SHA-256 comparison of all 700 tracked files under desktopApp/shared/sharedUi/native with pinned reference, zero differences; reference branch untouched |
+| Visual/platform acceptance | INCOMPLETE: font rights/ink metrics/wrapping, exact Haze/noise/feed material/motion, native caption/Mica/icons, matched Windows pairing and full DPI/focus/accessibility matrix remain open |
+
+The local comparison confirms the extra navigation row is removed and common
+sidebar/footer/dock geometry now follows Kotlin. Home ink top/width and expanded
+playlist-caption wrapping still differ with fallback fonts. The real Kotlin
+catalog and disconnected Flutter body are different states; no full-frame or
+blur equivalence is inferred. Numeric local DPI is unmeasured and SIGTERM
+capture cleanup is not lifecycle proof. Hosted native smokes establish lifecycle
+separately. No actual RAM/CPU benchmark, audio/auth implementation or Phase 2
+work is included. Phase 1 remains **INCOMPLETE for visual acceptance**.
