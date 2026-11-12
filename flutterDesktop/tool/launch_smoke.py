@@ -118,6 +118,10 @@ def main():
             states = [capture_state(evidence, window, 'accounts')]
             subprocess.run(['xdotool', 'key', 'Escape'], check=True, timeout=5)
             time.sleep(.5)
+            # Account flyouts can retain a transient desktop tooltip/focus.
+            # Dismiss via the real outside-click scrim before requesting the
+            # drawer, rather than letting the brand click only close Accounts.
+            click_client(window, 500, 300)
             click_client(window, 36, 34)
             states.append(capture_state(evidence, window, 'drawer', 'drawer'))
             subprocess.run(['xdotool', 'key', 'Escape'], check=True, timeout=5)
