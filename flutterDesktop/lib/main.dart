@@ -53,7 +53,14 @@ Future<void> main(List<String> arguments) async {
     rethrow;
   }
   final audio = await AudioService.start();
-  final root = Directory(SqliteLocalRepository.storageRoot());
+  final dataRoots = arguments.where(
+    (value) => value.startsWith('--data-root='),
+  );
+  final root = Directory(
+    SqliteLocalRepository.storageRoot(
+      portableRoot: dataRoots.isEmpty ? null : dataRoots.single.substring(12),
+    ),
+  );
   await root.create(recursive: true);
   final playback = LocalPlayback(
     SqliteLocalRepository(

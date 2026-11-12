@@ -21,7 +21,7 @@ static void wav(const std::filesystem::path& path,int frames) {
  f.write("data",4); word(f,frames*4,4);
  for(int i=0;i<frames;i++) { word(f,uint16_t(i%16000-8000),2); word(f,uint16_t(8000-i%16000),2); }
 }
-int main() {
+int main(int argc,char** argv) {
  const auto dir=std::filesystem::temp_directory_path()/("bitchord-decode-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
  std::filesystem::create_directory(dir);
  try {
@@ -43,6 +43,27 @@ int main() {
   { bc::Decoder d(longfile.u8string());until([&]{return d.ready.load() && d.available()==96000;});require(!d.eof,"producer backpressure"); }
   require(bc::live_decoders==0,"cancel/join at full ring");
   { bc::Decoder d((dir/"missing").u8string());until([&]{return d.eof.load();});require(d.error!=0,"missing file distinct failure"); }
+  if(argc>1) for(const auto* extension : {"wav","flac","mp3","m4a","aac","ogg","webm"}) {
+   const auto fixture=std::filesystem::path(argv[1])/(std::string("tone.")+extension);
+   std::ifstream reference(fixture.string()+".f32",std::ios::binary);
+   require(bool(reference),"PCM oracle missing");
+   bc::Decoder d(fixture.u8string()); until([&]{return d.ready.load() || d.error.load();});
+   require(d.ready && !d.error,"codec decode open");
+   uint64_t frames=0;
+   until([&]{
+    const auto n=d.available();
+    for(uint64_t i=0;i<n;i++) for(uint32_t c=0;c<d.channels;c++) {
+     float expected=0; reference.read(reinterpret_cast<char*>(&expected),4);
+     require(bool(reference),"codec produced excess tail");
+     const float tolerance=(std::strcmp(extension,"wav")==0 || std::strcmp(extension,"flac")==0)?0.0000001f:0.001f;
+     require(std::isfinite(d.sample(i,c)) && std::abs(d.sample(i,c)-expected)<=tolerance,"codec PCM tolerance");
+    }
+    frames+=n; d.consume(n); return d.eof && d.available()==0;
+   });
+   require(reference.peek()==std::char_traits<char>::eof(),"codec truncated tail");
+   require(frames>0 && !d.error,"codec frames/error");
+   std::cout<<extension<<" "<<frames<<" frames"<<std::endl;
+  }
   std::filesystem::remove_all(dir);std::cout<<"exact WAV PCM, seek, tail and bounded cancellation passed"<<std::endl;return 0;
  } catch(const std::exception& e) {std::cerr<<e.what()<<std::endl;return 1;}
 }

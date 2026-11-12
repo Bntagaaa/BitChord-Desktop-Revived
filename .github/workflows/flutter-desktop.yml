@@ -53,15 +53,30 @@ jobs:
           repository: microsoft/vcpkg
           ref: ef7dbf94b9198bc58f45951adcf1f041fcbc5ea0
           path: .native-vcpkg
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: runner.os == 'Windows'
+        with:
+          path: ${{ runner.temp }}/bitchord-vcpkg-cache
+          key: native-windows-release-v2-${{ hashFiles('flutterDesktop/native/audio/vcpkg.json') }}
+      - name: Configure native binary cache
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p "$RUNNER_TEMP/bitchord-vcpkg-cache"
+          echo "VCPKG_BINARY_SOURCES=clear;files,$RUNNER_TEMP/bitchord-vcpkg-cache,readwrite" >> "$GITHUB_ENV"
       - name: Build pinned LGPL native dependencies on Windows
         if: runner.os == 'Windows'
         timeout-minutes: 50
         run: |
           "$GITHUB_WORKSPACE/.native-vcpkg/bootstrap-vcpkg.bat" -disableMetrics
-          "$GITHUB_WORKSPACE/.native-vcpkg/vcpkg.exe" install --triplet x64-windows --x-manifest-root="$GITHUB_WORKSPACE/flutterDesktop/native/audio" --x-install-root="$RUNNER_TEMP/bitchord-deps"
-          echo "BC_DEPENDENCY_ROOT=$RUNNER_TEMP/bitchord-deps/x64-windows" >> "$GITHUB_ENV"
-          echo "CMAKE_PREFIX_PATH=$RUNNER_TEMP/bitchord-deps/x64-windows" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/bitchord-deps/x64-windows/bin" >> "$GITHUB_PATH"
+          "$GITHUB_WORKSPACE/.native-vcpkg/vcpkg.exe" install --triplet x64-windows-release --overlay-triplets="$GITHUB_WORKSPACE/flutterDesktop/native/audio/triplets" --x-manifest-root="$GITHUB_WORKSPACE/flutterDesktop/native/audio" --x-install-root="$RUNNER_TEMP/bitchord-deps"
+          echo "BC_DEPENDENCY_ROOT=$RUNNER_TEMP/bitchord-deps/x64-windows-release" >> "$GITHUB_ENV"
+          echo "CMAKE_PREFIX_PATH=$RUNNER_TEMP/bitchord-deps/x64-windows-release" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/bitchord-deps/x64-windows-release/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: runner.os == 'Windows'
+        with:
+          path: ${{ runner.temp }}/bitchord-vcpkg-cache
+          key: native-windows-release-v2-${{ hashFiles('flutterDesktop/native/audio/vcpkg.json') }}
       - name: Configure, build and test real native PCM foundation
         run: |
           python tool/run_checked.py native-configure cmake -S native/audio -B build/native -DCMAKE_BUILD_TYPE=Release
@@ -138,6 +153,10 @@ jobs:
           name: flutter-foundation-${{ matrix.target }}
           path: |
             flutterDesktop/verification/
+            flutterDesktop/build/native/bitchord_*
+            flutterDesktop/build/native/*.so
+            flutterDesktop/build/native/Release/*.exe
+            flutterDesktop/build/native/Release/*.dll
             flutter-source-${{ matrix.target }}.zip
             flutterDesktop/build/linux/x64/release/bundle/
             flutterDesktop/build/windows/x64/runner/Release/

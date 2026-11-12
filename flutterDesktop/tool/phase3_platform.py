@@ -3,7 +3,6 @@ import json
 import math
 import os
 from pathlib import Path
-import shutil
 import struct
 import subprocess
 import tempfile
@@ -50,15 +49,26 @@ def main():
             result = subprocess.run([str(probe), str(audio), *endpoint], capture_output=True, text=True, timeout=35)
             report['probe'] = json.loads(result.stdout.strip().splitlines()[-1])
             report['probe_exit'] = result.returncode
+            report['probe_stderr'] = result.stderr[-1000:]
             if os.name != 'nt':
                 if result.returncode != 0 or report['probe']['submitted_frames'] != 24000 or report['probe']['played_frames'] != 24000:
                     raise RuntimeError(f'Pulse real PCM output failed: {report}')
             elif result.returncode != 0:
-                if report['probe']['error'] != 101:
+                if report['probe']['error'] != 105:
                     raise RuntimeError('Windows decode/lifecycle failure, not missing device')
                 report['wasapi_output'] = 'BLOCKED: Windows hosted audio endpoint unavailable'
             else:
                 report['wasapi_output'] = 'Endpoint accepted/presented PCM; audibility unverified'
+            if result.returncode == 0:
+                longer = Path(tmp) / 'long.wav'
+                with wave.open(str(longer), 'wb') as out:
+                    out.setparams((2, 2, 48000, 0, 'NONE', 'not compressed'))
+                    out.writeframes(b''.join(struct.pack('<hh', i % 8000 - 4000, 4000 - i % 8000) for i in range(144000)))
+                library = native / ('Release/bitchord_audio.dll' if os.name == 'nt' else 'libbitchord_audio.so')
+                trial = subprocess.run(['dart', 'tool/phase3_sink.dart', str(library), str(longer), str(audio), *endpoint],
+                                       capture_output=True, text=True, timeout=40, check=True)
+                report['sink_contract'] = json.loads(trial.stdout.strip().splitlines()[-1])
+
         finally:
             if server:
                 server.terminate()

@@ -229,7 +229,8 @@ Fixed x64 layouts are verified by native static assertions and generated Dart
 `sizeOf` negotiation. Commands are copied UTF-8 bounded records; native owns all
 PCM, decoder and sink resources. A single audio-service isolate owns one engine;
 no callback enters Dart. Dedicated push output uses prepared PCM, not an OS
-real-time callback. Current float-at-source-format adapters explicitly fail
-unsupported formats/devices; the complete negotiated precision/channel ladder
-remains a Phase 3 acceptance gap. Native resampling rate is distinguished from
+real-time callback. Adapters negotiate source float/S16, alternate 48k/44.1k rates and stereo
+fallback with an FFmpeg-derived channel matrix; snapshots report actual output
+rate/channels/precision. Unsupported devices fail explicitly. Physical precision
+and device-matrix acceptance remains a Phase 3 gap. Native resampling rate is distinguished from
 Kotlin's pitch-preserving speed (Phase 5).

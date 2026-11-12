@@ -36,7 +36,8 @@ final class AudioService implements LocalAudioPort {
     final reply = ReceivePort();
     try {
       _port.send([operation, data, reply.sendPort]);
-      final response = await reply.first as List;
+      final response =
+          await reply.first.timeout(const Duration(seconds: 15)) as List;
       if (response[0] != true)
         throw StateError('Native service operation failed: ${response[1]}');
       return response[1];
@@ -64,6 +65,11 @@ final class AudioService implements LocalAudioPort {
     final s = await _call('snapshot') as Map;
     return PlaybackSnapshot(
       phase: AudioPhase.values[s['phase'] as int],
+      selection: s['selection'] as int,
+      queueRevision: s['revision'] as int,
+      sequence: s['sequence'] as int,
+      eventWatermark: s['watermark'] as int,
+      renditionId: s['rendition'] as String,
       positionUs: s['position'] as int,
       durationUs: s['duration'] as int,
       sampledAtNativeNs: s['ns'] as int,
@@ -79,6 +85,9 @@ final class AudioService implements LocalAudioPort {
       quiescent: s['quiescent'] as bool,
       timingQuality: s['timing'] as int,
       backend: s['backend'] as int,
+      outputRate: s['rate'] as int,
+      outputChannels: s['channels'] as int,
+      precisionBits: s['bits'] as int,
     );
   }
 
@@ -169,6 +178,11 @@ Future<void> _worker(List<Object> arguments) async {
             NativeApi.check(status);
             result = {
               'phase': s.ref.phase,
+              'selection': s.ref.selection,
+              'revision': s.ref.revision,
+              'sequence': s.ref.sequence,
+              'watermark': s.ref.watermark,
+              'rendition': NativeApi.text(s.ref.rendition, 128),
               'position': s.ref.position_us,
               'duration': s.ref.duration_us,
               'ns': s.ref.sampled_ns,
@@ -184,6 +198,9 @@ Future<void> _worker(List<Object> arguments) async {
               'quiescent': s.ref.quiescent != 0,
               'timing': s.ref.timing_quality,
               'backend': s.ref.backend,
+              'rate': s.ref.rate,
+              'channels': s.ref.channels,
+              'bits': s.ref.precision_bits,
             };
           } finally {
             api.free(s);

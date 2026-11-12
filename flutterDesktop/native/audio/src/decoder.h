@@ -14,6 +14,7 @@ public:
  std::atomic<int> error{0};
  std::atomic<uint64_t> write_at{0}, read_at{0}, high_water{0};
  uint32_t rate=0, channels=0;
+ uint64_t channel_mask=0;
  int64_t duration=0, origin=0;
  std::vector<float> pcm;
  explicit Decoder(std::string path, int64_t seek=0);

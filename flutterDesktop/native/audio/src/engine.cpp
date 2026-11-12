@@ -16,6 +16,8 @@
 #include <stdexcept>
 extern "C" {
 #include <libavcodec/version.h>
+#include <libswresample/swresample.h>
+#include <libavutil/channel_layout.h>
 }
 static_assert(sizeof(bc_command)==4400 && offsetof(bc_command,path)==48,"command ABI");
 static_assert(sizeof(bc_snapshot)==424 && offsetof(bc_snapshot,entry)==168,"snapshot ABI");
@@ -49,6 +51,7 @@ private:
  std::string endpoint;
  bool play=false; double speed=1, volume=1, fraction=0, source_frame=0;
  std::array<float,512*8> scratch{};
+ std::array<double,64> matrix{};
  std::array<Segment,4096> segments{}; size_t seg_begin=0,seg_size=0;
  std::array<bc_event,256> staging{}; size_t staged=0;
  void event(const bc_command& c,uint32_t outcome,uint32_t error=0,uint32_t kind=BC_EVENT_COMMAND) {
@@ -91,14 +94,30 @@ private:
     case BC_NOMINATE:
      upcoming.reset(); nomination=c; upcoming=std::make_unique<Decoder>(c.path); break;
     case BC_CLEAR_NEXT: upcoming.reset(); break;
-    case BC_PLAY: play=true; if(sink) sink->pause(false); break;
-    case BC_PAUSE: play=false; if(sink) sink->pause(true); state.phase=BC_PAUSED; break;
+    case BC_PLAY:
+     if(state.phase==BC_ENDED && current) {
+      if(sink) sink->flush(); current.reset(); current=std::make_unique<Decoder>(identity.path);
+      state.phase=BC_BUFFERING; reset_timeline(0);
+     }
+     play=true; if(sink) sink->pause(false); break;
+    case BC_PAUSE:
+     play=false;
+     if(sink) {
+      clock();
+      try { sink->pause(true); }
+      catch(const PauseUnsupported&) {
+       const auto at=state.position_us; sink->flush(); current.reset(); upcoming.reset();
+       current=std::make_unique<Decoder>(identity.path,at); reset_timeline(at);
+      }
+     }
+     state.phase=BC_PAUSED; break;
     case BC_STOP:
      play=false; sink.reset(); current.reset(); upcoming.reset(); reset_timeline(0); state.phase=BC_IDLE; break;
     case BC_SEEK:
      if(!current) { event(c,BC_COMMAND_FAILED,BC_ERROR_SEEK); return; }
      if(sink) sink->flush(); current.reset(); upcoming.reset();
-     current=std::make_unique<Decoder>(identity.path,c.value); state.phase=BC_BUFFERING; reset_timeline(c.value); break;
+     current=std::make_unique<Decoder>(identity.path,c.value); state.phase=BC_BUFFERING; reset_timeline(c.value);
+     if(sink && play) sink->pause(false); break;
     case BC_RATE: speed=double(c.value)/1000000; break;
     case BC_VOLUME: volume=double(c.value)/1000000; break;
     case BC_DEVICE:
@@ -131,17 +150,33 @@ private:
   }
   state.awaiting_audio=(state.submitted_frames==state.played_frames && state.phase!=BC_ENDED)?1:0;
  }
+ void configure_matrix() {
+  matrix.fill(0);
+  if(current->channels==sink->channels) { for(uint32_t c=0;c<current->channels;c++) matrix[c*8+c]=1; return; }
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+  AVChannelLayout input{},output{};
+  if(current->channel_mask) av_channel_layout_from_mask(&input,current->channel_mask); else av_channel_layout_default(&input,int(current->channels));
+  av_channel_layout_default(&output,int(sink->channels));
+  const int result=swr_build_matrix2(&input,&output,0.7071067811865476,0.7071067811865476,0,1,1,matrix.data(),8,AV_MATRIX_ENCODING_NONE,nullptr);
+  av_channel_layout_uninit(&input); av_channel_layout_uninit(&output);
+#else
+  const int64_t input=current->channel_mask?int64_t(current->channel_mask):av_get_default_channel_layout(int(current->channels));
+  const int result=swr_build_matrix(input,av_get_default_channel_layout(int(sink->channels)),0.7071067811865476,0.7071067811865476,0,1,1,matrix.data(),8,AV_MATRIX_ENCODING_NONE,nullptr);
+#endif
+  if(result<0) throw std::runtime_error("channel matrix");
+ }
  void render() {
   if(!current) return;
+  if(identity.selection!=admitted_selection || identity.revision!=admitted_revision) return;
   if(current->error) { fail(uint32_t(current->error.load())); return; }
   if(!current->ready) { state.phase=BC_BUFFERING; return; }
   if(!sink) {
    sink=open_sink(current->rate,current->channels,endpoint); ++state.device_epoch;
    state.rate=sink->rate; state.channels=sink->channels; state.backend=sink->backend; state.timing_quality=sink->timing;
-   state.duration_us=current->duration; sink->pause(!play);
+   state.duration_us=current->duration; state.precision_bits=sink->bits; configure_matrix(); sink->pause(!play);
   }
   clock();
-  if(!play) { state.phase=BC_PAUSED; return; }
+  if(!play) { if(state.phase!=BC_ENDED) state.phase=BC_PAUSED; return; }
   state.phase=BC_PLAYING;
   const auto available=current->available();
   if(!available) {
@@ -151,7 +186,8 @@ private:
     current=std::move(upcoming); identity=nomination; fraction=source_frame=0; state.duration_us=current->duration;
     return;
    }
-   if(state.played_frames>=sink->submitted) {
+   if(sink->drained()) {
+    clock();
     if(upcoming) {
      if(upcoming->error) { fail(uint32_t(upcoming->error.load())); return; }
      if(!upcoming->ready) { state.phase=BC_BUFFERING; return; }
@@ -159,30 +195,35 @@ private:
      memcpy(state.entry,identity.entry,128); memcpy(state.rendition,identity.rendition,128);
      event(identity,BC_APPLIED,0,BC_EVENT_ADOPTED); return;
     }
-    sink->pause(true); play=false; state.phase=BC_ENDED; state.awaiting_audio=0;
+    try { sink->pause(true); } catch(const PauseUnsupported&) { /* All accepted PCM was consumed. */ }
+    play=false; state.phase=BC_ENDED; state.awaiting_audio=0;
    }
    return;
   }
   // Bound mapping memory even when a server stops consuming accepted PCM.
   if(seg_size>=segments.size()-1) return;
-  uint32_t frames=uint32_t(std::min<double>(512,std::floor((double(available)-fraction)/speed)));
+  const double step=speed*current->rate/sink->rate;
+  uint32_t frames=uint32_t(std::min<double>(512,std::floor((double(available)-fraction)/step)));
   if(!frames) {
    if(current->eof) frames=1;
    else return;
   }
   const auto channels=current->channels;
   for(uint32_t f=0;f<frames;f++) {
-   const double pos=fraction+double(f)*speed;
+   const double pos=fraction+double(f)*step;
    const auto a=std::min<uint64_t>(uint64_t(pos),available-1), b=std::min<uint64_t>(a+1,available-1);
    const double blend=pos-std::floor(pos);
-   for(uint32_t c=0;c<channels;c++) scratch[size_t(f)*channels+c]=float((current->sample(a,c)*(1-blend)+current->sample(b,c)*blend)*volume);
+   for(uint32_t out=0;out<sink->channels;out++) {
+    double mixed=0; for(uint32_t c=0;c<channels;c++) mixed+=(current->sample(a,c)*(1-blend)+current->sample(b,c)*blend)*matrix[out*8+c];
+    scratch[size_t(f)*sink->channels+out]=float(mixed*volume);
+   }
   }
   const auto first=sink->submitted; const auto written=sink->write(scratch.data(),frames);
   if(!written) return;
   auto& segment=segments[(seg_begin+seg_size++)%segments.size()];
   segment.first=first; segment.last=first+written; segment.source=double(current->origin)+(source_frame+fraction)*1000000/current->rate;
-  segment.step=speed*1000000/current->rate; segment.identity=identity;
-  const double old_fraction=fraction; const double consumed=fraction+written*speed; const auto whole=std::min<uint64_t>(uint64_t(consumed),available);
+  segment.step=step*1000000/current->rate; segment.identity=identity;
+  const double old_fraction=fraction; const double consumed=fraction+written*step; const auto whole=std::min<uint64_t>(uint64_t(consumed),available);
   fraction=consumed-double(whole); if(current->eof && whole==available) { segment.step=(double(whole)-old_fraction)*1000000/current->rate/written; fraction=0; }
   source_frame+=double(whole); current->consume(whole);
   clock();
@@ -196,7 +237,7 @@ private:
       if(lock) while(n<batch.size() && !commands.empty()) { batch[n++]=commands.front(); commands.pop_front(); }
     }
     for(size_t i=0;i<n;i++) process(batch[i]);
-    try { render(); } catch(...) { fail(BC_ERROR_DEVICE); }
+    try { render(); } catch(const DeviceUnavailable&) { fail(BC_ERROR_NO_DEVICE); } catch(...) { fail(BC_ERROR_DEVICE); }
     publish(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
    }
    current.reset(); upcoming.reset(); sink.reset(); state.phase=BC_CLOSING;

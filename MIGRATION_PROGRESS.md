@@ -766,3 +766,13 @@ inspected; audible output/loopback timing/physical hotplug are explicitly blocke
 until physical test evidence exists. Full precision/device negotiation and codec
 corpus/soak remain open. The native rate primitive is resampling, not acceptance
 of Kotlin's pitch-preserving speed. No Automix, online audio or RAM-saving claim.
+
+Phase 3 first CI `43188018937` (tested merge `e94a863a`) failed honestly:
+Linux compiled the native library and passed both CTests, then the real Pulse
+probe exposed EOS state/drain behavior. Windows built FFmpeg/SQLite and the
+native DLL, but its test executable failed compilation due to a missing explicit
+`<string>` include. Both fixes are in the next increment. Added local software
+sink pause/active-seek/rate/handoff checks, seven real codec fixtures, negotiated
+float/S16/rate/channel output reporting and stronger shutdown/CAS tests. This is
+not a CI success statement. Physical audibility, calibrated loopback and physical
+hotplug remain BLOCKED; Phase 4 remains untouched.

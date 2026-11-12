@@ -1,0 +1,43 @@
+{
+  "generator": "ffmpeg version n9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+  "origin": "Synthetic stereo sine, 440/997Hz; 48000Hz; 24000 source frames",
+  "lossless_tolerance": 1e-07,
+  "lossy_tolerance": 0.001,
+  "files": {
+    "tone.wav": {
+      "sha256": "40899f594073614e4ab7448cada2e6b6deddf49f538a552f2539e30c4b3db68a",
+      "frames": 24000,
+      "pcm_sha256": "6817a6217fdd006675f37182b87a02d1490c37a3d0070d12a21962f1305b5fd3"
+    },
+    "tone.flac": {
+      "sha256": "70010beaf9925532ed69f655f5ad1089fbedc90c8155adb2249de09649d1abc3",
+      "frames": 24000,
+      "pcm_sha256": "6817a6217fdd006675f37182b87a02d1490c37a3d0070d12a21962f1305b5fd3"
+    },
+    "tone.mp3": {
+      "sha256": "ffe150ad111eca02e7af27551e44cd0798c8f243d8af8cf856d82348da3b9741",
+      "frames": 24000,
+      "pcm_sha256": "5b5cfcc3729dd24a3ce50a63875d10a337d964791cb872228e795e0d33e9a383"
+    },
+    "tone.m4a": {
+      "sha256": "5ac755c187ca69022b59c168fde59786bee67b69f38d5dae324194c4a9528c29",
+      "frames": 24000,
+      "pcm_sha256": "ab894061abe2a9327110b284a847ceccf6844bbf1801667de67c29ad46cff48d"
+    },
+    "tone.aac": {
+      "sha256": "b9dff800ddcc2674ce679a6ce244f4b7f5a5c9afb3ca19c352f5db517e61a603",
+      "frames": 25600,
+      "pcm_sha256": "fb2245394659411b342e00b914e2a97b0553b04f1360796d2cd7b41b2721f4a3"
+    },
+    "tone.ogg": {
+      "sha256": "eef7e2a63461f7e03e83db59745c8cf4775802cb85e5aaf98f936f6de4146d62",
+      "frames": 23872,
+      "pcm_sha256": "a14bb9b1f5fa039e104d01ec565d4ddd46c72c1ae891cb97a3bb2562f06c5da7"
+    },
+    "tone.webm": {
+      "sha256": "fa8d42b2965f9579697a9c82c1eddc87bda0b1f02e950e44244e7a89dc80c158",
+      "frames": 24000,
+      "pcm_sha256": "c058c4388be0a07afafb8d5d26003d74e58303d57a1ad4a72c7bcf0edde80513"
+    }
+  }
+}

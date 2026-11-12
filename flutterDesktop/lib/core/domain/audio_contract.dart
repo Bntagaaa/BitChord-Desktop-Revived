@@ -33,6 +33,11 @@ final class AudioRequest {
 final class PlaybackSnapshot {
   const PlaybackSnapshot({
     required this.phase,
+    required this.selection,
+    required this.queueRevision,
+    required this.sequence,
+    required this.eventWatermark,
+    required this.renditionId,
     required this.positionUs,
     required this.durationUs,
     required this.sampledAtNativeNs,
@@ -48,12 +53,16 @@ final class PlaybackSnapshot {
     required this.quiescent,
     required this.timingQuality,
     required this.backend,
+    required this.outputRate,
+    required this.outputChannels,
+    required this.precisionBits,
   });
   final AudioPhase phase;
   final int positionUs, durationUs, sampledAtNativeNs, discontinuity, error;
   final int submittedFrames, playedFrames, deviceEpoch, pcmBytes, pcmHighWater;
-  final int timingQuality, backend;
-  final String entryId;
+  final int timingQuality, backend, outputRate, outputChannels, precisionBits;
+  final String entryId, renditionId;
+  final int selection, queueRevision, sequence, eventWatermark;
   final bool awaitingAudio, quiescent;
 }
 

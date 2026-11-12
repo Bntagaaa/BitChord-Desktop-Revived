@@ -52,6 +52,7 @@ extern "C" {
 #define BC_ERROR_SEEK 102
 #define BC_ERROR_RESOURCE 103
 #define BC_ERROR_FORMAT 104
+#define BC_ERROR_NO_DEVICE 105
 
 typedef struct bc_caps {
  uint32_t struct_size, abi, command_capacity, event_capacity;
@@ -75,7 +76,7 @@ typedef struct bc_snapshot {
  uint64_t pcm_bytes, pcm_high_water, underruns, device_epoch;
  uint32_t phase, error, rate, channels;
  uint32_t pending_commands, unacked_events, decoders, timing_quality;
- uint32_t quiescent, awaiting_audio, backend, reserved;
+ uint32_t quiescent, awaiting_audio, backend, precision_bits;
  char entry[128];
  char rendition[128];
 } bc_snapshot;

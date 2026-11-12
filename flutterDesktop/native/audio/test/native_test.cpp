@@ -1,5 +1,6 @@
 #include "bitchord_audio.h"
 #include <chrono>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -7,6 +8,7 @@
 #include <iostream>
 #include <set>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 static void require(bool v,const char* m) { if(!v) throw std::runtime_error(m); }
@@ -14,9 +16,11 @@ template<class F> static void until(F fn) {
  const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(6);
  while(!fn()) { require(std::chrono::steady_clock::now()<deadline,"deadline"); std::this_thread::sleep_for(std::chrono::milliseconds(2)); }
 }
-static void close(uint64_t h) {
+static void close(uint64_t h,uint64_t terminal=0) {
  require(bc_shutdown(h)==BC_OK,"shutdown"); require(bc_shutdown(h)==BC_OK,"idempotent shutdown");
  bc_snapshot s{}; until([&]{s.struct_size=sizeof(s);return bc_read(h,&s)==BC_OK && s.quiescent;});
+ require(s.decoders==0 && s.pcm_bytes==0 && s.pending_commands==0,"quiescent resource ownership");
+ if(terminal) { bc_event events[256];uint32_t count=0; require(bc_poll(h,events,256,&count)==BC_OK && count==1 && events[0].command_id==terminal,"shutdown retains terminal outcome"); }
  require(bc_destroy(h)==BC_OK,"destroy"); require(bc_destroy(h)==BC_HANDLE,"stale destroy");
  require(bc_read(h,&s)==BC_HANDLE,"stale read");
 }
@@ -36,6 +40,11 @@ int main() {
   uint8_t* data=nullptr;uint64_t len=0,revision=0;
   require(bc_store_read(db.c_str(),&data,&len,&revision)==BC_OK && len==3 && revision==1 && std::memcmp(a,data,3)==0,"restart/CAS rollback");bc_free(data);
   require(bc_store_write(db.c_str(),b,2,1)==BC_OK,"second transaction");
+  const auto concurrent=(dir/"concurrent.sqlite3").u8string();
+  require(bc_store_read(concurrent.c_str(),&data,&len,&revision)==BC_OK,"initialize concurrent store");bc_free(data);
+  std::atomic<int> wins{0}, stale{0}; std::vector<std::thread> writers;
+  for(int i=0;i<8;i++) writers.emplace_back([&] { const auto result=bc_store_write(concurrent.c_str(),a,3,0); if(result==BC_OK) ++wins; if(result==BC_STALE) ++stale; });
+  for(auto& writer:writers) writer.join(); require(wins==1 && stale==7,"concurrent CAS serialization");
   for(int cycle=0;cycle<20;cycle++) {
    uint64_t h=0,other=0; require(bc_create(&h)==BC_OK,"create"); require(bc_create(&other)==BC_BUSY,"single engine");
    if(cycle==0) {
@@ -57,10 +66,10 @@ int main() {
     c.id=200;c.selection=2;c.type=BC_SELECT;std::strcpy(c.entry,"duplicate:2"); require(bc_submit(h,&c)==BC_OK,"new selection");
     c.id=201;c.selection=1;c.type=BC_PLAY;require(bc_submit(h,&c)==BC_STALE,"stale selection rejected");
    }
-   close(h);
+   close(h,cycle==0?200:0);
   }
   require(bc_live_allocations()==baseline,"FFI/store allocation balance");
-  std::cout<<"{\"native_contract\":\"passed\",\"cycles\":20,\"pcm\":\"WAV exact frames and samples\",\"seek_us\":125000,\"physical_audio\":\"blocked: no listener or loopback instrument\"}"<<std::endl;
+  std::cout<<"{\"native_contract\":\"passed\",\"cycles\":20,\"physical_audio\":\"blocked: no listener or loopback instrument\"}"<<std::endl;
   std::filesystem::remove_all(dir);return 0;
  } catch(const std::exception& e) { std::cerr<<e.what()<<std::endl; return 1; }
 }

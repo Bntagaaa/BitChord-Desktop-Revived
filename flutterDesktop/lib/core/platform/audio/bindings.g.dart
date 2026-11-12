@@ -398,7 +398,7 @@ final class bc_snapshot extends ffi.Struct {
   external int backend;
 
   @ffi.Uint32()
-  external int reserved;
+  external int precision_bits;
 
   @ffi.Array.multi([128])
   external ffi.Array<ffi.Char> entry;
@@ -507,3 +507,5 @@ const int BC_ERROR_SEEK = 102;
 const int BC_ERROR_RESOURCE = 103;
 
 const int BC_ERROR_FORMAT = 104;
+
+const int BC_ERROR_NO_DEVICE = 105;

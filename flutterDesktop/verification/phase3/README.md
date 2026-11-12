@@ -13,7 +13,7 @@ must identify their tested SHA separately.
 | P35 | `DesktopPersistence.kt`, `DesktopPreferenceChunks.kt`, `DesktopPlaybackWrites.kt` | `local_data/`: SQLite WAL/FULL CAS queue/cursor/settings/checkpoint document. Read-only, explicit-key Linux XML / Windows Registry exporter; versioned JSON importer, private verified backup before fresh-destination transaction. Exact pinned Kotlin song encoder executed for Unicode fixture. Real FFI/SQLite duplicate import/restart/idempotence/conflict rollback passed locally. FIXTURE_TESTED |
 | P07 | `DesktopLocalMusic.kt`, `DesktopAudioDecoder.kt` | Local regular-file adapter/scanner, original extension/depth/name rules; FFmpeg decoding through native local AVIO only. Missing media retained on import and returned as errors on playback. Metadata/art/lyrics/watchers and full Local Music UI remain open. IMPLEMENTED / native WAV FIXTURE_TESTED |
 | P11/P12 | `DesktopAudioEngine.kt`, `DesktopDecodeAhead.kt`, `DesktopPcmWrite.kt`, `DesktopPlayhead.kt`, `DesktopPlayback.kt` | `native/audio/`: C++17, x64 ABI 1, single engine/generation handle, copied bounded commands, reserved terminal journal, explicit ack, native decode worker cancellation/backpressure, two-second per-deck PCM, played-frame source mapping, seek/flush, pause, volume/rate, same-format nomination/handoff. Dart ffigen bindings plus isolate service. WAV exact samples/frame count/125ms seek/tail/cancellation, command saturation, stale handle, 20 shutdown cycles and FFI alloc balance passed locally. FIXTURE_TESTED; device/codec corpus gates below |
-| P13 | `DesktopAudioSink.kt`, `DesktopWindowsAudio.kt`, `DesktopLinuxPulseAudio.kt`; `desktopApp/native/window/window_jni.cpp` | New WASAPI shared float output; direct libpulse/PipeWire Pulse-compatible push output; ALSA float fallback only when default Pulse connection fails or explicitly selected. Explicit endpoints never silently fall back. Missing device fails without simulated time. PLATFORM VERIFICATION PENDING |
+| P13 | `DesktopAudioSink.kt`, `DesktopWindowsAudio.kt`, `DesktopLinuxPulseAudio.kt`; `desktopApp/native/window/window_jni.cpp` | New WASAPI shared float/S16 output; direct libpulse/PipeWire Pulse-compatible push output; ALSA float fallback only when default Pulse connection fails or explicitly selected. Explicit endpoints never silently fall back. Missing device fails without simulated time. PLATFORM VERIFICATION PENDING |
 | P14 | `DesktopAudioSpeed.kt`, `DesktopRateConverter.kt`, `DesktopAudioProcessors.kt` | Native volume and resampling rate only. Rate changes source frame mapping at submitted boundaries. Pitch-preserving Kotlin speed/EQ/silence/widening/advanced DSP remains Phase 5, not claimed here |
 | P36 | `DesktopDecodeAhead.kt`, `DesktopMemoryOptimizer.kt` | Ring capacity/high-water, active decoder, pending command/journal and submitted/presented counters. Bounded full-ring cancellation locally tested. No RSS saving or full memory parity claim |
 
@@ -43,13 +43,55 @@ Physical acceptance blockers (remain blocked even if CI passes):
 - Audible output/listening comparison on Windows and Linux.
 - Calibrated loopback and authoritative clock/latency/drift tolerance matrix.
 - Physical unplug/replug, default switch, suspend/resume and device routing.
-- Full float/integer precision and source-rate/channel negotiation ladder;
-  current adapters request float at source rate/shape and fail unsupported routes.
-- ALSA endpoint pause support is required; unsupported pause returns a device
-  error rather than silently dropping queued audio. No Java Sound fallback.
-- Long-duration RSS/FD/COM/thread resource soak and codec priming/tail corpus.
+- Physical verification of the implemented float/S16, source/48k/44.1k/stereo
+  negotiation ladder and FFmpeg-derived channel mixing matrix.
+- ALSA endpoints without hardware pause use native flush/reseek from the
+  presented source position; exact physical pause/resume timing remains unverified.
+  No Java Sound fallback.
+- Long-duration RSS/FD/COM/thread resource soak and physical codec/timing corpus.
 
 Local fixture tests, hosted Pulse software sink and hosted WASAPI availability
 must never be labeled physical speaker acceptance. Credentials/account protected
 state is not imported; reauthentication is required. Import supports the named
 local-state subset, not arbitrary Preferences or a promise of all account data.
+
+### Additional local validation and first CI finding
+
+The real local PipeWire Pulse-compatible software sink passed pause clock hold,
+seek while playing/paused, 2x source-time rate (~1.998 observed), same-format
+handoff (72000 submitted/presented frames, one adoption, no reopen), and bounded
+PCM (768000-byte observed high-water in this fixture). This is **software sink**
+evidence only. AddressSanitizer/UndefinedBehaviorSanitizer engine and exact WAV
+checks passed outside the sandbox (LeakSanitizer cannot inspect traced sandbox
+threads); no diagnostics were suppressed. These are correctness checks, not
+matched whole-application performance measurements.
+
+The seven-format synthetic corpus in `native/audio/test/fixtures/` now verifies
+WAV/FLAC/MP3/M4A/AAC/Ogg/WebM frames and PCM against FFmpeg CLI-produced float
+fixtures. Lossless tolerance is 1e-7; lossy cross-build absolute tolerance 0.001.
+Generator version, frame counts and hashes are in its manifest. Local corpus
+passes. Explicit seek at 125000us is exact for WAV; compressed-seek differential
+and physical signal quality still require expanded acceptance evidence.
+
+First CI run `43188018937` at `e94a863a` passed Linux CMake compilation and both
+native CTests, then failed the real Pulse output probe. Investigation found a
+transient ENDED→PAUSED state and a latency-estimated tail that needed the Pulse
+server's drain acknowledgment. Both are fixed and covered by the sink lifecycle
+trial; the next exact-SHA CI result must be recorded separately. Windows was
+still compiling pinned dependencies at the time of this entry.
+
+Windows in the first CI run built the pinned dependencies and native DLL, then
+failed the test executable's missing `<string>` include. This is fixed; it was
+not a WASAPI acceptance result. Windows dependencies now use the reviewed
+release-only x64 dynamic triplet and a pinned official Actions binary cache;
+there is no second unnecessary Debug codec build or static-codec substitution.
+
+Endpoint failure/recovery trial additionally verifies an explicit missing Pulse
+sink cannot silently route to another device, failed playback holds its source
+clock, and a new generation can reselect a working endpoint. PipeWire's Pulse
+compatibility layer initially accepted a nonexistent name using another route;
+the adapter now verifies the actual stream endpoint after connection. This is
+software endpoint validation, not physical hotplug proof. Concurrent SQLite CAS
+with eight writers admits exactly one initial revision and rejects seven stale
+writes. Shutdown retains the pending accepted command's terminal outcome and
+reports zero decoder/PCM ownership before handle destruction.

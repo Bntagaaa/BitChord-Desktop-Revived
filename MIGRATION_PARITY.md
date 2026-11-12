@@ -1311,3 +1311,11 @@ implementation paths, commands, platform limits and required follow-up evidence.
 Phase 3 **INCOMPLETE**; no whole feature is marked PARITY_ACCEPTED. Hosted software
 sink output and decoder sample tests are not speaker/loopback proof. Phase 4 has
 not started.
+
+Phase 3 additional local evidence: real Pulse-compatible **software sink** clock
+hold, active/paused seek, ~1.998x measured source-time progression for 2x rate,
+72000 exact same-format handoff frames/no reopen, seven synthetic real codec
+fixtures with FFmpeg-produced PCM oracles, and ASan/UBSan lifecycle/decoder passes.
+These strengthen FIXTURE_TESTED P11/P12/P36, not physical P13 acceptance. The
+first CI run `43188018937` failed on Pulse EOS behavior and a Windows test include;
+follow-up validation is required before any PLATFORM_VERIFIED promotion.

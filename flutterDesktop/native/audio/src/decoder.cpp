@@ -80,10 +80,12 @@ void Decoder::run(const std::string& path, int64_t seek) {
  rate=uint32_t(r.codec->sample_rate);
 #if LIBAVUTIL_VERSION_MAJOR >= 57
  channels=uint32_t(r.codec->ch_layout.nb_channels);
+ channel_mask=r.codec->ch_layout.order==AV_CHANNEL_ORDER_NATIVE?r.codec->ch_layout.u.mask:0;
  if(swr_alloc_set_opts2(&r.swr,&r.codec->ch_layout,AV_SAMPLE_FMT_FLT,int(rate),
     &r.codec->ch_layout,r.codec->sample_fmt,int(rate),0,nullptr)<0) throw std::runtime_error("resample");
 #else
  channels=uint32_t(r.codec->channels);
+ channel_mask=r.codec->channel_layout;
  int64_t layout=r.codec->channel_layout ? int64_t(r.codec->channel_layout) : av_get_default_channel_layout(int(channels));
  r.swr=swr_alloc_set_opts(nullptr,layout,AV_SAMPLE_FMT_FLT,int(rate),layout,r.codec->sample_fmt,int(rate),0,nullptr);
 #endif
@@ -134,7 +136,10 @@ void Decoder::run(const std::string& path, int64_t seek) {
   uint8_t* output=reinterpret_cast<uint8_t*>(block.data());
   const int count=swr_convert(r.swr,&output,65536,const_cast<const uint8_t**>(r.frame->extended_data),r.frame->nb_samples);
   if(count<0) throw std::runtime_error("convert");
-  const int skip=int(std::min<int64_t>(count,std::max<int64_t>(0,av_rescale_rnd(seek-position,rate,1000000,AV_ROUND_UP))));
+  // libavcodec already applies encoder skip/discard side data at open.
+  // Only an explicit seek needs timestamp trimming; trimming open at t=0
+  // would discard MP3/Opus priming a second time.
+  const int skip=seek>0 ? int(std::min<int64_t>(count,std::max<int64_t>(0,av_rescale_rnd(seek-position,rate,1000000,AV_ROUND_UP)))) : 0;
   if(count>skip) push(block.data()+size_t(skip)*channels,count-skip);
   position+=int64_t(count)*1000000/rate;
   av_frame_unref(r.frame);
