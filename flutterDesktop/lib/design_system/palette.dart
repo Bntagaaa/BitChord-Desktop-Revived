@@ -69,11 +69,21 @@ final class BitChordPalette {
     'onAccent': Color(0xFFFFFFFF),
   });
   static BitChordPalette resolve(ShellSettings settings, Brightness system) {
-    final darkMode = settings.appearance == Appearance.dark ||
-      (settings.appearance == Appearance.system && system == Brightness.dark);
+    final darkMode =
+        settings.appearance == Appearance.dark ||
+        (settings.appearance == Appearance.system && system == Brightness.dark);
     if (!darkMode) return light;
     if (settings.appearance == Appearance.dark && settings.pitchBlack) {
-      return BitChordPalette({...dark.tokens, for (final key in ['background', 'surface', 'sidebarSurface', 'chromeSurface']) key: Colors.black});
+      return BitChordPalette({
+        ...dark.tokens,
+        for (final key in [
+          'background',
+          'surface',
+          'sidebarSurface',
+          'chromeSurface',
+        ])
+          key: Colors.black,
+      });
     }
     return dark;
   }

@@ -15,14 +15,21 @@ final class PreferencesStore implements ShellSettingsStore {
     for (final option in Appearance.values) {
       if (option.name == values[0]) appearance = option;
     }
-    return ShellSettings(appearance: appearance,
-      pitchBlack: values[1] == 'true', sidebarCollapsed: values[2] == 'true',
-      reduceMotion: values[3] == 'true', reduceBlur: values[4] == 'true');
+    return ShellSettings(
+      appearance: appearance,
+      pitchBlack: values[1] == 'true',
+      sidebarCollapsed: values[2] == 'true',
+      reduceMotion: values[3] == 'true',
+      reduceBlur: values[4] == 'true',
+    );
   }
 
   @override
   Future<void> write(ShellSettings value) => preferences.setStringList(_key, [
-    value.appearance.name, '${value.pitchBlack}', '${value.sidebarCollapsed}',
-    '${value.reduceMotion}', '${value.reduceBlur}',
+    value.appearance.name,
+    '${value.pitchBlack}',
+    '${value.sidebarCollapsed}',
+    '${value.reduceMotion}',
+    '${value.reduceBlur}',
   ]);
 }

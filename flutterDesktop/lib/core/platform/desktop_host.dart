@@ -16,15 +16,25 @@ final class DesktopHost with WindowListener implements DesktopWindow {
     await windowManager.ensureInitialized();
     await windowManager.setPreventClose(true);
     windowManager.addListener(this);
-    await windowManager.waitUntilReadyToShow(const WindowOptions(
-      size: Size(ShellMetrics.initialWidth, ShellMetrics.initialHeight),
-      minimumSize: Size(ShellMetrics.minimumWidth, ShellMetrics.minimumHeight),
-      center: true, title: 'BitChord', titleBarStyle: TitleBarStyle.normal));
+    await windowManager.waitUntilReadyToShow(
+      const WindowOptions(
+        size: Size(ShellMetrics.initialWidth, ShellMetrics.initialHeight),
+        minimumSize: Size(
+          ShellMetrics.minimumWidth,
+          ShellMetrics.minimumHeight,
+        ),
+        center: true,
+        title: 'BitChord',
+        titleBarStyle: TitleBarStyle.normal,
+      ),
+    );
   }
+
   Future<void> show() async {
     await windowManager.show();
     await windowManager.focus();
   }
+
   @override
   Future<void> toggleFullscreen() async {
     if (await windowManager.isFullScreen()) {
@@ -34,12 +44,14 @@ final class DesktopHost with WindowListener implements DesktopWindow {
       await windowManager.setFullScreen(true);
     }
   }
+
   @override
   Future<void> exitFullscreen() async {
     if (!await windowManager.isFullScreen()) return;
     await windowManager.setFullScreen(false);
     if (_maximizedBeforeFullscreen) await windowManager.maximize();
   }
+
   @override
   Future<void> close() async {
     if (_closing) return;
@@ -56,6 +68,13 @@ final class DesktopHost with WindowListener implements DesktopWindow {
       await windowManager.close();
     }
   }
+
   @override
-  void onWindowClose() { unawaited(close().catchError((Object error) { diagnostics.failure('close window', error); })); }
+  void onWindowClose() {
+    unawaited(
+      close().catchError((Object error) {
+        diagnostics.failure('close window', error);
+      }),
+    );
+  }
 }

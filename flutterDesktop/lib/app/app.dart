@@ -11,34 +11,49 @@ class BitChordApp extends ConsumerStatefulWidget {
   ConsumerState<BitChordApp> createState() => _BitChordAppState();
 }
 
-class _BitChordAppState extends ConsumerState<BitChordApp> with WidgetsBindingObserver {
+class _BitChordAppState extends ConsumerState<BitChordApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     PaintingBinding.instance.imageCache.maximumSizeBytes = 64 * 1024 * 1024;
   }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.hidden || state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
     }
   }
+
   @override
-  void didChangePlatformBrightness() { setState(() {}); }
+  void didChangePlatformBrightness() {
+    setState(() {});
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(shellProvider);
-    final system = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    final system =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
     final palette = BitChordPalette.resolve(settings, system);
-    final brightness = palette['foreground'].computeLuminance() > .5 ? Brightness.dark : Brightness.light;
-    return MaterialApp.router(title: 'BitChord', debugShowCheckedModeBanner: false,
-      theme: bitChordTheme(palette, brightness), routerConfig: ref.watch(routerProvider));
+    final brightness = palette['foreground'].computeLuminance() > .5
+        ? Brightness.dark
+        : Brightness.light;
+    return MaterialApp.router(
+      title: 'BitChord',
+      debugShowCheckedModeBanner: false,
+      theme: bitChordTheme(palette, brightness),
+      routerConfig: ref.watch(routerProvider),
+    );
   }
 }

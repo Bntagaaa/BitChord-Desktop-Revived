@@ -1,10 +1,25 @@
 // Future native boundary contracts. There is deliberately no backend implementation.
-enum AudioPhase { idle, resolving, buffering, playing, paused, ended, failed, closing }
+enum AudioPhase {
+  idle,
+  resolving,
+  buffering,
+  playing,
+  paused,
+  ended,
+  failed,
+  closing,
+}
+
 enum CommandOutcome { applied, superseded, cancelled, failed }
 
 final class AudioIdentity {
-  const AudioIdentity({required this.sessionEpoch, required this.selectionGeneration,
-    required this.queueRevision, required this.entryId, required this.renditionId});
+  const AudioIdentity({
+    required this.sessionEpoch,
+    required this.selectionGeneration,
+    required this.queueRevision,
+    required this.entryId,
+    required this.renditionId,
+  });
   final int sessionEpoch;
   final int selectionGeneration;
   final int queueRevision;
@@ -13,10 +28,17 @@ final class AudioIdentity {
 }
 
 final class PlaybackSnapshot {
-  const PlaybackSnapshot({required this.sequence, required this.eventWatermark,
-    required this.identity, required this.phase, required this.positionUs,
-    required this.sampledAtNativeNs, required this.clockEpoch,
-    required this.discontinuity, required this.awaitingAudio});
+  const PlaybackSnapshot({
+    required this.sequence,
+    required this.eventWatermark,
+    required this.identity,
+    required this.phase,
+    required this.positionUs,
+    required this.sampledAtNativeNs,
+    required this.clockEpoch,
+    required this.discontinuity,
+    required this.awaitingAudio,
+  });
   final int sequence;
   final int eventWatermark;
   final AudioIdentity? identity;
@@ -40,9 +62,14 @@ abstract interface class NativeAudioBridge {
 }
 
 enum ShutdownStatus { pending, quiescent }
+
 final class AudioEvent {
-  const AudioEvent({required this.sequence, required this.commandId,
-    required this.identity, required this.outcome});
+  const AudioEvent({
+    required this.sequence,
+    required this.commandId,
+    required this.identity,
+    required this.outcome,
+  });
   final int sequence;
   final int commandId;
   final AudioIdentity identity;
@@ -50,15 +77,18 @@ final class AudioEvent {
 }
 
 enum Admission { accepted, busy, stale, closed, invalid }
+
 sealed class AudioCommand {
   const AudioCommand(this.commandId, this.identity);
   final int commandId;
   final AudioIdentity identity;
 }
+
 final class SeekAudio extends AudioCommand {
   const SeekAudio(super.commandId, super.identity, this.positionUs);
   final int positionUs;
 }
+
 final class SetPlayIntent extends AudioCommand {
   const SetPlayIntent(super.commandId, super.identity, {required this.play});
   final bool play;

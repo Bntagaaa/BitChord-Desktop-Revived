@@ -20,12 +20,24 @@ ThemeData bitChordTheme(BitChordPalette palette, Brightness brightness) {
   // SF Pro is not redistributed until its license is established. Default
   // logical weights below use the reference DEFAULT physical-cut remapping.
   TextStyle role(double size, FontWeight weight, double tracking) => TextStyle(
-    fontSize: size, fontWeight: weight, letterSpacing: tracking,
-    color: palette['foreground']);
-  return ThemeData(brightness: brightness, useMaterial3: true,
+    fontSize: size,
+    fontWeight: weight,
+    letterSpacing: tracking,
+    color: palette['foreground'],
+  );
+  return ThemeData(
+    brightness: brightness,
+    useMaterial3: true,
     scaffoldBackgroundColor: palette['background'],
-    colorScheme: ColorScheme.fromSeed(seedColor: palette['navAccent'], brightness: brightness)
-      .copyWith(primary: palette['navAccent'], surface: palette['surface'], onSurface: palette['foreground']),
+    colorScheme:
+        ColorScheme.fromSeed(
+          seedColor: palette['navAccent'],
+          brightness: brightness,
+        ).copyWith(
+          primary: palette['navAccent'],
+          surface: palette['surface'],
+          onSurface: palette['foreground'],
+        ),
     textTheme: TextTheme(
       displayLarge: role(34, FontWeight.w700, -.5),
       headlineLarge: role(30, FontWeight.w700, -.4),
@@ -35,19 +47,40 @@ ThemeData bitChordTheme(BitChordPalette palette, Brightness brightness) {
       bodyLarge: role(16, FontWeight.w400, .2),
       bodyMedium: role(14, FontWeight.w400, .3),
       labelMedium: role(12, FontWeight.w500, .25),
-      labelSmall: role(11, FontWeight.w500, .3)),
-    tooltipTheme: const TooltipThemeData(waitDuration: Duration(milliseconds: 400)));
+      labelSmall: role(11, FontWeight.w500, .3),
+    ),
+    tooltipTheme: const TooltipThemeData(
+      waitDuration: Duration(milliseconds: 400),
+    ),
+  );
 }
 
 class GlassSurface extends StatelessWidget {
-  const GlassSurface({super.key, required this.palette, required this.reduceBlur, required this.child});
+  const GlassSurface({
+    super.key,
+    required this.palette,
+    required this.reduceBlur,
+    required this.child,
+  });
   final BitChordPalette palette;
   final bool reduceBlur;
   final Widget child;
   @override
-  Widget build(BuildContext context) => ClipRRect(borderRadius: BorderRadius.circular(16),
-    child: BackdropFilter(filter: ui.ImageFilter.blur(sigmaX: reduceBlur ? 0 : 20, sigmaY: reduceBlur ? 0 : 20),
-      child: DecoratedBox(decoration: BoxDecoration(
-        color: palette[reduceBlur ? 'floatingPlayerSurface' : 'barGlass'],
-        border: Border.all(color: palette['barEdge'], width: .5), borderRadius: BorderRadius.circular(16)), child: child)));
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(16),
+    child: BackdropFilter(
+      filter: ui.ImageFilter.blur(
+        sigmaX: reduceBlur ? 0 : 20,
+        sigmaY: reduceBlur ? 0 : 20,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: palette[reduceBlur ? 'floatingPlayerSurface' : 'barGlass'],
+          border: Border.all(color: palette['barEdge'], width: .5),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: child,
+      ),
+    ),
+  );
 }
