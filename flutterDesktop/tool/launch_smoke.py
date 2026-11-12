@@ -10,6 +10,21 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def shell_painted(capture, width, height):
+    """Check responsive shell landmarks, not just a nonblank stale framebuffer."""
+    sidebar = 72 if width < 980 else 220
+    boundary = subprocess.check_output([
+        'convert', str(capture), '-format',
+        f'%[pixel:p{{{sidebar - 1},500}}]|%[pixel:p{{{sidebar},500}}]', 'info:'
+    ], text=True, timeout=10).split('|')
+    center = (width + sidebar) // 2
+    logo_colors = int(subprocess.check_output([
+        'convert', str(capture), '-crop', f'48x48+{center - 24}+{height - 73}',
+        '-format', '%k', 'info:'
+    ], text=True, timeout=10))
+    return boundary[0] != boundary[1] and logo_colors >= 10
+
+
 def main():
     if sys.platform != 'linux':
         raise SystemExit('This smoke check requires an X11 Linux runner.')
@@ -46,6 +61,8 @@ def main():
             observations = []
             for width, height in [(1220, 780), (900, 600)]:
                 subprocess.run(['xdotool', 'windowsize', '--sync', window, str(width), str(height)], check=True, timeout=10)
+                # X11 geometry changes precede Flutter's metrics/frame update.
+                time.sleep(2)
                 capture = evidence / f'native-linux-{width}x{height}.png'
                 deadline = time.monotonic() + 20
                 while True:
@@ -56,7 +73,8 @@ def main():
                     subprocess.run(['import', '-screen', '-window', window, str(capture)], check=True, timeout=10)
                     details = subprocess.check_output(['identify', '-format', '%w %h %k', str(capture)], text=True, timeout=10)
                     actual_width, actual_height, colors = map(int, details.split())
-                    if (actual_width, actual_height) == (width, height) and colors >= 50:
+                    if ((actual_width, actual_height) == (width, height) and colors >= 50
+                            and shell_painted(capture, width, height)):
                         break
                     if time.monotonic() >= deadline:
                         raise RuntimeError(f'Client did not paint at {width}x{height}: {details}')

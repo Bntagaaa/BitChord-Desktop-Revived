@@ -265,3 +265,20 @@ native lifecycle evidence, retained/reviewed official hosts and lockfile,
 matched Kotlin/Flutter captures, DPI/native-theme/focus verification and explicit
 font/material/icon/motion gaps. Phase 1 remains **INCOMPLETE** pending evidence.
 
+Follow-up run [43123831091](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43123831091)
+at `b227b10f`: Linux setup, analysis, six tests, release build and basic lifecycle
+smoke passed; Windows analysis, six tests and release build passed, but native
+client-size verification failed. Artifact review found stale/corrupt Linux
+capture content despite the basic nonblank check. This is **not visual acceptance**.
+The stronger check now waits after native resize and verifies the responsive
+sidebar edge and centered dock logo, rejecting both flawed captures locally while
+accepting both widget-layout fixtures. Windows records actual geometry and adjusts
+the observed frame insets during resize. No assertions were removed.
+
+This workstation now reaches JitPack with HTTP 200; the historical cloud 403 is
+not a current local result. Local Flutter is absent, Java is 27 (no full JDK 21),
+and workspace free disk is under 1 GiB. A separate manual, read-only workflow
+checks out only the immutable Kotlin reference on hosted Linux/Windows with
+JDK 21, runs its tests and attempts a distributable for comparison. It neither
+changes the Kotlin branch nor imports prior Flutter work; results remain pending.
+

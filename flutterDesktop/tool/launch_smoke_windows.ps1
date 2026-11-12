@@ -37,6 +37,7 @@ try {
   $dpi = [SmokeWindow]::GetDpiForWindow($handle)
   if ($dpi -ne 96) { throw "Expected CI DPI 96 for matching client captures, observed $dpi" }
   $captures = @()
+  Write-Output "Visible window=$handle DPI=$dpi screen=$([System.Windows.Forms.Screen]::PrimaryScreen.Bounds)"
   foreach ($size in @(@(1220,780), @(900,600))) {
     $client = New-Object SmokeWindow+Rect
     $outer = New-Object SmokeWindow+Rect
@@ -51,7 +52,14 @@ try {
       $app.Refresh()
       if ($app.HasExited) { throw 'Application exited during capture' }
       [void][SmokeWindow]::GetClientRect($handle, [ref]$client)
-      if ($client.Right -ne $size[0] -or $client.Bottom -ne $size[1]) { continue }
+      if ($client.Right -ne $size[0] -or $client.Bottom -ne $size[1]) {
+        Write-Output "Resize requested=$($size[0])x$($size[1]) observed=$($client.Right)x$($client.Bottom)"
+        [void][SmokeWindow]::GetWindowRect($handle, [ref]$outer)
+        $width = $size[0] + ($outer.Right - $outer.Left) - $client.Right
+        $height = $size[1] + ($outer.Bottom - $outer.Top) - $client.Bottom
+        [void][SmokeWindow]::SetWindowPos($handle, [IntPtr]::Zero, 20, 20, $width, $height, 0x0040)
+        continue
+      }
       $origin = New-Object SmokeWindow+Point
       [void][SmokeWindow]::ClientToScreen($handle, [ref]$origin)
       $bitmap = New-Object System.Drawing.Bitmap($client.Right, $client.Bottom)

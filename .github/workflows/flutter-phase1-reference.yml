@@ -1,0 +1,61 @@
+name: Phase 1 pinned Kotlin reference validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+        working-directory: reference
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 348b613a0c3db1a54de56483ea6f8748d6465211
+          path: reference
+          persist-credentials: false
+      - name: Record immutable reference and environment
+        run: |
+          test "$(git rev-parse HEAD)" = 348b613a0c3db1a54de56483ea6f8748d6465211
+          mkdir -p verification
+          git rev-parse HEAD > verification/reference-sha.txt
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Test pinned reference without source changes or credentials
+        run: |
+          set -euo pipefail
+          java -version 2>&1 | tee verification/java.log
+          bash gradlew :shared:jvmTest :sharedUi:jvmTest :desktopApp:test --no-daemon --max-workers=2 --console=plain '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' 2>&1 | tee verification/tests.log
+      - name: Build pinned reference for visual comparison
+        if: success() || failure()
+        run: |
+          set -euo pipefail
+          bash gradlew :desktopApp:createDistributable --no-daemon --max-workers=2 --console=plain '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' -Pbitchord.version=1.9.2 2>&1 | tee verification/build.log
+      - name: Verify reference preservation
+        if: always()
+        run: |
+          git diff --exit-code
+          git status --short > verification/worktree.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: phase1-kotlin-reference-${{ matrix.os }}
+          path: |
+            reference/verification/
+            reference/shared/build/test-results/
+            reference/sharedUi/build/test-results/
+            reference/desktopApp/build/test-results/
+            reference/desktopApp/build/compose/binaries/main/app/
+          if-no-files-found: error
