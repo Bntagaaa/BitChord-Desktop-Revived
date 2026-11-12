@@ -798,3 +798,60 @@ Dart integration; its SDK hook runner failed trying to execute `dart.EXE.exe`.
 The Python command resolver's Windows PATHEXT spelling is normalized to the real
 `dart.exe` filename; no SDK files, hooks or tests are disabled. Final Windows
 validation is pending the corrective workflow run.
+
+## Phase 3 final automated handoff — 2026-11-12
+
+**Phase 3 status: INCOMPLETE (physical acceptance gates BLOCKED). Phase 4 was not
+started.** Implementation, tests and release packaging are committed and pushed
+on `2.0.0-flutter`. The user-accepted Phase 1/2 scope remains accepted.
+
+Authoritative final code validation: [run 43197210264](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43197210264)
+at **`cea0cc4cb25ade31b42ebe08fcd76a4139eabd40`**, terminal **success** for Windows,
+Linux and trusted retention. Evidence commit `5ef4809b` was fast-forwarded without
+overwriting work. Both complete downloaded artifacts were inspected under local
+`/tmp/phase3-final-linux` and `/tmp/phase3-final-windows` (not committed binaries).
+The subsequent root-document handoff does not change validated application code.
+
+| Executed check | Linux x64 / Ubuntu 22.04 | Windows x64 / Server 2022 |
+|---|---|---|
+| C++17/CMake native library, probe and test builds | PASS | PASS |
+| Native CTests | 2/2 PASS; seven codecs, exact frames/tails, bounded cancellation, ABI/commands, SQLite concurrent CAS, 20 create/shutdown cycles | 2/2 PASS, same corpus/contracts |
+| Read-only export fixture checks | 3/3 PASS | 3/3 PASS |
+| Real Dart FFI/SQLite/import and 450 Kotlin queue transitions | PASS | PASS |
+| Dart format, fatal analyzer, enforced package lock | PASS | PASS |
+| Flutter tests | 28 passed, 0 failed/skipped | 28 passed, 0 failed/skipped |
+| Release bundle and real GUI/native library bootstrap/close | PASS; native exit 0 | PASS; native exit 0 |
+| Actual OS sink output trial | Pulse software sink: 24000/24000 submitted/presented frames, EOF; pause/seek/rate/handoff/recovery PASS | **BLOCKED**: no WASAPI endpoint; explicit error 105, position/submitted/played all zero |
+| Physical speaker/loopback/hotplug tests | **BLOCKED / unavailable** | **BLOCKED / unavailable** |
+
+Linux sink contract artifact: pause clock held; active/paused seek passed;
+2x-rate source-time ratio observed `2.0190070290425695` in this short hosted trial;
+same-format handoff **72000 exact submitted/presented frames**, one adoption,
+zero sink reopen at handoff; PCM high-water `768000` bytes; explicit missing
+endpoint failed without clock simulation and recovered on a new selection.
+This is software/latency-estimated evidence, not a physical timing tolerance or
+an application RAM benchmark. Both release artifacts contain the real audio
+library/probe; Windows additionally contains FFmpeg and SQLite DLLs/licenses.
+
+Local final native ASan/UBSan checks also passed after device-notification work,
+with leak inspection outside the tracing sandbox. Local seven-codec checks passed
+against **both FFmpeg 4.4 and 9** without weakening fixtures. Original Kotlin
+application/shared/native source has no task diff. No old Flutter rewrite was
+used. No release, online provider, advanced DSP/Automix or memory-saving claim.
+
+Implementation paths and reference trace are in
+`flutterDesktop/verification/phase3/README.md`; this final section supersedes its
+historical pending-CI statements. Actual artifact evidence files are
+`phase3-platform.json`, `native-tests.log`, `phase3-ffi.log`, `kotlin-import.log`,
+`test-summary.json`, `native-linux.json` / `native-windows.json`, plus build,
+analyze and launch logs in each run artifact.
+
+Remaining acceptance work: audible local playback and calibrated loopback on
+Windows/Linux; physical default switch/unplug/replug/suspend/resume; float/S16,
+source-rate/alternate-rate/channel negotiation matrix; compressed-seek expansion
+and long-duration RSS/FD/COM/thread soak. ALSA physical fallback/rediscovery and
+full local metadata/artwork/watchers/UI remain unaccepted feature-row portions.
+Pitch-preserving speed/EQ/silence/Automix stay in the documented Phase 5 scope.
+Next concrete action is to exercise the packaged `bitchord_audio_probe <file>`
+(or `bitchord_desktop --local-file=<absolute-file>`) on physical Windows/Linux
+endpoints and record the gate evidence. This handoff does not authorize Phase 4.

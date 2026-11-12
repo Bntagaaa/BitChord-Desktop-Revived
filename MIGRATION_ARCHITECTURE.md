@@ -234,3 +234,11 @@ fallback with an FFmpeg-derived channel matrix; snapshots report actual output
 rate/channels/precision. Unsupported devices fail explicitly. Physical precision
 and device-matrix acceptance remains a Phase 3 gap. Native resampling rate is distinguished from
 Kotlin's pitch-preserving speed (Phase 5).
+
+Phase 3's explicit user instruction prohibits simulated audio. It supersedes
+the earlier planning note about preserving the Kotlin no-endpoint virtual clock:
+this engine returns `BC_ERROR_NO_DEVICE` and holds time/frames at the last valid
+position when no route exists. Hosted Windows confirms error 105 and zero output,
+not audible playback. WASAPI/Pulse notifications trigger bounded native-owner
+reconfiguration from the last presented position; physical acceptance remains
+open. Final code/platform evidence is in MIGRATION_PROGRESS's Phase 3 handoff.

@@ -1324,3 +1324,28 @@ The second Phase 3 run `43191387338` failed the new AAC tail assertion on both
 OSs; native protocol/storage/lifecycle tests passed. The implementation fix has
 passed the unchanged seven-codec corpus locally against FFmpeg 4.4 and 9. No
 platform state is promoted until the subsequent exact-SHA workflow is inspected.
+
+## Phase 3 final platform evidence — 2026-11-12
+
+Reference: `348b613a0c3db1a54de56483ea6f8748d6465211`.
+Final tested implementation: **`cea0cc4cb25ade31b42ebe08fcd76a4139eabd40`**;
+[Windows/Linux run 43197210264](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43197210264)
+completed successfully. Both artifacts' native/FFI/test/build/launch records were
+inspected; 28 Flutter tests, 2 native CTests and 3 export checks passed per OS.
+
+| IDs | Scoped evidence status | Scenario / remaining limits |
+|---|---|---|
+| P10 | PLATFORM_VERIFIED for local domain corpus | 450 transitions against executed pinned Kotlin queue source, duplicates/tier/cursor invariants, repeat and seeded shuffle restoration. Whole online/party/transition row remains open |
+| P35 | PLATFORM_VERIFIED for implemented local subset | Real SQLite CAS/restart/concurrent writes; versioned settings; selected-key read-only export/private backup/import/checkpoint; original Kotlin encoder fixture; source unchanged. Account/secret and broader migration remain open |
+| P07/P11 | PLATFORM_VERIFIED for decoder/ABI foundation | Seven real codec frame/PCM fixtures, priming/tails, exact WAV seek, cancellation/backpressure, generation/event/ack ownership and shutdown. Full local-media UI/metadata/watchers and expanded compressed seek remain open |
+| P12 | PLATFORM_VERIFIED for software/native clock scenarios | Pause/seek/rate and 72000-frame prepared handoff verified via real Pulse software sink. Physical clock drift/latency and WASAPI presentation remain BLOCKED |
+| P13 | IMPLEMENTED; software Pulse scenarios PLATFORM_VERIFIED | Native WASAPI/Pulse/ALSA, format ladder, notifications/bounded recovery and explicit endpoint selection implemented. Windows runner returned **NO_DEVICE 105** with zero frames/time; **not** a passed WASAPI output test. Physical sound/loopback/hotplug/precision/ALSA matrix BLOCKED |
+| P14 | IMPLEMENTED, limited primitives | Volume and resampling rate/source mapping; no pitch-preserving speed/EQ/advanced DSP acceptance (Phase 5) |
+| P36 | PLATFORM_VERIFIED for bounded-lifetime fixtures | Two-decoder/ring bounds, high-water instrumentation, 20 create/destroy cycles, journal pressure, zero owned PCM/decoders at quiescence; local ASan/UBSan pass. Soak and matched process RAM/CPU not measured |
+
+**Phase 3 INCOMPLETE** because physical acceptance and the remaining matrix/soak
+gates are unavailable/unverified. No whole P-ID is PARITY_ACCEPTED. No fake audio,
+no memory-reduction claim, and no Phase 4 work. The final automated evidence above
+supersedes historical pending/failed-run status, retaining those failures as a
+record of the fixes. See the final Phase 3 section in MIGRATION_PROGRESS for
+commands, evidence locations, exact limits and the next physical test action.
