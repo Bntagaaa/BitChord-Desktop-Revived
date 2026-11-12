@@ -395,3 +395,10 @@ and window DLLs. No native target or test is skipped. This is an explicit build
 environment adaptation, not a fix to the protected reference or an audio migration.
 Reference test/package results for the MSVC route are pending.
 
+MSVC run `43130275448` built the analysis and C++/WinRT SMTC DLLs, then exposed
+an independent MSVC-only property-key header/include-order failure in the window
+JNI bridge. The adapter is narrowed to `buildAnalysisNative`; the window task
+keeps its original GNU toolchain/action. All three native libraries remain
+required, with all reference tests enabled. This mixed supported-toolchain
+reference build is awaiting execution; no protected source was edited.
+

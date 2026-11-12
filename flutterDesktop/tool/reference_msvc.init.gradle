@@ -1,13 +1,14 @@
 // CI-only toolchain adapter for the immutable Kotlin Windows reference.
 // The reference CMake files already implement an MSVC/C++/WinRT backend.
 // Build ALL original targets and keep every reference test enabled; change only
-// the two Gradle tasks that hard-code the incompatible hosted MinGW headers.
+// the analyzer/SMTC task that hard-codes incompatible hosted MinGW headers.
+// Keep buildWindowNative's original GNU action; its SDK include order expects it.
 gradle.projectsEvaluated {
     def desktop = gradle.rootProject.project(':desktopApp')
     if (!System.getProperty('os.name').startsWith('Windows')) {
         throw new GradleException('The reference MSVC adapter is Windows-only')
     }
-    [buildAnalysisNative: 'native', buildWindowNative: 'native/window'].each { taskName, source ->
+    [buildAnalysisNative: 'native'].each { taskName, source ->
         desktop.tasks.named(taskName).configure { task ->
             task.setActions([{ ignored ->
                 def output = desktop.layout.buildDirectory.dir(
