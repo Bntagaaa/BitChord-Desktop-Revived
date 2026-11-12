@@ -141,6 +141,29 @@ jobs:
           npm prune --omit=dev --ignore-scripts --no-audit --no-fund
           cd "$GITHUB_WORKSPACE/flutterDesktop"
           python tool/run_checked.py youtube-bundle python tool/package_youtube_runtime.py ${{ matrix.target }} "$GITHUB_WORKSPACE/.youtube-po-provider"
+      - name: Observe anonymous bundled YouTube media access (non-gating)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        timeout-minutes: 4
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import subprocess
+          try:
+              result = subprocess.run(
+                  ['dart', 'run', 'tool/phase4_bundled_live.dart',
+                   'build/linux/x64/release/bundle'],
+                  capture_output=True, text=True, timeout=210)
+              lines = result.stdout.strip().splitlines()
+              report = json.loads(lines[-1]) if lines else {'media': 'NO_REPORT'}
+              report['probe_process_exit'] = result.returncode
+          except (ValueError, subprocess.TimeoutExpired, OSError):
+              report = {'media': 'PROBE_UNAVAILABLE', 'probe_process_exit': 'UNVERIFIED'}
+          Path('verification/youtube-bundle-live.json').write_text(
+              json.dumps(report, indent=2) + '\\n')
+          print(json.dumps(report))
+          PY
       - name: Linux release launch smoke
         if: runner.os == 'Linux'
         timeout-minutes: 3
