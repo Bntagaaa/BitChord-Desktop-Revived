@@ -27,24 +27,30 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Configure immutable reference with the Gradle-selected tools
+      - name: Configure immutable reference using its supported MSVC path
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force verification | Out-Null
           $sha = git rev-parse HEAD
           if ($sha -ne '348b613a0c3db1a54de56483ea6f8748d6465211') { throw 'Reference SHA differs' }
           $sha | Set-Content verification/reference-sha.txt
-          $compiler = (Get-Command g++.exe).Source
-          $ninja = (Get-Command ninja.exe).Source
           cmake --version | Tee-Object verification/cmake-version.log
-          & $compiler --version | Tee-Object verification/compiler-version.log
-          & $ninja --version | Tee-Object verification/ninja-version.log
-          cmake -S desktopApp/native -B desktopApp/build/native/windows --fresh -G Ninja "-DCMAKE_MAKE_PROGRAM=$ninja" "-DCMAKE_CXX_COMPILER=$compiler" -DCMAKE_BUILD_TYPE=Release 2>&1 | Tee-Object verification/native-configure.log
+          cmake -S desktopApp/native -B desktopApp/build/native/windows --fresh -G 'Visual Studio 17 2022' -A x64 -DCMAKE_BUILD_TYPE=Release 2>&1 | Tee-Object verification/native-configure.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compile all reference native targets with visible diagnostics
         run: |
           cmake --build desktopApp/build/native/windows --config Release --parallel 2 --verbose 2>&1 | Tee-Object verification/native-build.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile reference window bridge with the SDK header prerequisite
+        run: |
+          cmake -S desktopApp/native/window -B desktopApp/build/native-window/windows --fresh -G 'Visual Studio 17 2022' -A x64 -DCMAKE_BUILD_TYPE=Release '-DCMAKE_CXX_FLAGS=/FIpropkeydef.h' 2>&1 | Tee-Object verification/window-configure.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build desktopApp/build/native-window/windows --config Release --parallel 2 --verbose 2>&1 | Tee-Object verification/window-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($file in @('desktopApp/build/native/windows/bitchord_analysis.dll','desktopApp/build/native/windows/bitchord_smtc.dll','desktopApp/build/native-window/windows/bitchord_window.dll')) {
+            if (-not (Test-Path $file)) { throw "Missing original reference target: $file" }
+            Get-FileHash -Algorithm SHA256 $file | Format-List | Out-File -Append verification/native-hashes.txt
+          }
       - name: Verify protected source preservation
         if: always()
         run: |
@@ -58,4 +64,6 @@ jobs:
             reference/verification/
             reference/desktopApp/build/native/windows/CMakeCache.txt
             reference/desktopApp/build/native/windows/CMakeFiles/CMakeConfigureLog.yaml
+            reference/desktopApp/build/native-window/windows/CMakeCache.txt
+            reference/desktopApp/build/native-window/windows/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: error
