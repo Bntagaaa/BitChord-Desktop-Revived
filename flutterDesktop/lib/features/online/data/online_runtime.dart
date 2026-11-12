@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+
 import '../../../core/domain/audio_contract.dart';
 import '../../playback/application/local_playback.dart';
 import '../../playback/domain/local_queue.dart';
@@ -73,6 +74,7 @@ final class OnlineRuntime
     final artist = playback.state.queue.current?.artist ?? '';
     return _matchedAlternate ? '$artist · Source: JioSaavn (matched)' : artist;
   }
+
   @override
   List<String> get providers => List.unmodifiable(_providers.keys);
   CatalogProvider _provider(String id) =>
@@ -97,18 +99,18 @@ final class OnlineRuntime
     RequestScope scope, {
     String? continuation,
     SearchFilter filter = SearchFilter.all,
-  }) => _provider(
-    provider,
-  ).search(query, scope, continuation: continuation, filter: filter);
+  }) =>
+      _provider(provider)
+          .search(query, scope, continuation: continuation, filter: filter);
   @override
   Future<CatalogPage> browse(
     String id,
     RequestScope scope, {
     String? continuation,
     String? params,
-  }) => _provider(
-    'youtube',
-  ).browse(id, scope, continuation: continuation, params: params);
+  }) =>
+      _provider('youtube')
+          .browse(id, scope, continuation: continuation, params: params);
   @override
   Future<void> play(
     CatalogEntry entry,
@@ -130,7 +132,8 @@ final class OnlineRuntime
             ProviderProblem.mediaRefused,
             ProviderProblem.tokenUnavailable,
             ProviderProblem.formatUnavailable,
-          ].contains(primaryError.problem)) rethrow;
+          ].contains(primaryError.problem))
+        rethrow;
       final alternative = await RecordingFallback.resolve(
         entry,
         _provider('jiosaavn'),
@@ -233,6 +236,7 @@ final class OnlineRuntime
       );
       await _broker?.close();
       _broker = null;
+      _matchedAlternate = false;
     });
   }
 

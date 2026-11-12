@@ -37,14 +37,17 @@ final class RecordingFallback {
         .toList();
     if (segments.isEmpty) return '';
     final first = segments.first.toLowerCase();
-    final chosen = segments.length > 1 &&
+    final chosen =
+        segments.length > 1 &&
             ['song', 'video', 'music', 'single'].contains(first)
         ? segments[1]
         : segments.first;
-    return _normalize(chosen
-        .replaceAll(RegExp(r'\s+-\s+topic$', caseSensitive: false), '')
-        .split(RegExp(r',|\bfeat\.?\b|\bft\.?\b', caseSensitive: false))
-        .first);
+    return _normalize(
+      chosen
+          .replaceAll(RegExp(r'\s+-\s+topic$', caseSensitive: false), '')
+          .split(RegExp(r',|\bfeat\.?\b|\bft\.?\b', caseSensitive: false))
+          .first,
+    );
   }
 
   static ({String core, String versions}) _parts(String title, String artist) {
@@ -94,14 +97,16 @@ final class RecordingFallback {
         .where((entry) {
           if (entry.provider != 'jiosaavn' ||
               entry.kind != CatalogKind.track ||
-              _artist(entry.subtitle) != artist) return false;
+              _artist(entry.subtitle) != artist)
+            return false;
           final parts = _parts(entry.title, artist);
           if (title.core != parts.core || title.versions != parts.versions) {
             return false;
           }
           final wanted = target.durationSeconds;
           final actual = entry.durationSeconds;
-          return wanted == null || actual == null ||
+          return wanted == null ||
+              actual == null ||
               (wanted - actual).abs() <= 12;
         })
         .take(25)
@@ -115,12 +120,17 @@ final class RecordingFallback {
           .toList();
       if (durations.isNotEmpty &&
           durations.reduce((a, b) => a > b ? a : b) -
-                  durations.reduce((a, b) => a < b ? a : b) > 12) return null;
+                  durations.reduce((a, b) => a < b ? a : b) >
+              12)
+        return null;
     } else {
-      suitable.sort((a, b) =>
-          ((a.durationSeconds ?? 0) - target.durationSeconds!).abs()
-              .compareTo(((b.durationSeconds ?? 0) -
-                      target.durationSeconds!).abs()));
+      suitable.sort(
+        (a, b) => ((a.durationSeconds ?? 0) - target.durationSeconds!)
+            .abs()
+            .compareTo(
+              ((b.durationSeconds ?? 0) - target.durationSeconds!).abs(),
+            ),
+      );
     }
     return suitable.first;
   }
@@ -152,8 +162,8 @@ final class RecordingFallback {
     try {
       final media = await alternate.resolve(selected, quality, scope);
       scope.check();
-      if (media.provider != selected.provider ||
-          media.trackId != selected.id) return null;
+      if (media.provider != selected.provider || media.trackId != selected.id)
+        return null;
       return MatchedRecording(selected, media);
     } on ProviderFailure {
       scope.check();

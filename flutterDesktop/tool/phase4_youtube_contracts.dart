@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+
 import '../lib/features/online/data/youtube_music.dart';
 import '../lib/features/online/data/youtube_resolver.dart';
 import '../lib/features/online/data/youtube_session.dart';
@@ -289,8 +290,7 @@ Future<void> youtubeContracts() async {
       'Trusted mweb per-video token provider configuration',
     );
     require(
-      !args.contains('--cookies-from-browser') &&
-          !args.contains('--cookies'),
+      !args.contains('--cookies-from-browser') && !args.contains('--cookies'),
       'No account secret import into external extractor',
     );
   } finally {
@@ -309,9 +309,10 @@ Future<void> youtubeContracts() async {
     );
   }
   require(
-    const ProviderFailure(ProviderProblem.mediaRefused, 403)
-        .toString()
-        .contains('PO Token'),
+    const ProviderFailure(
+      ProviderProblem.mediaRefused,
+      403,
+    ).toString().contains('PO Token'),
     'Actionable redacted media 403 guidance',
   );
 
@@ -322,21 +323,18 @@ Future<void> youtubeContracts() async {
     final portable = Directory('${bundle.path}/youtube_runtime');
     await Directory('${portable.path}/plugins').create(recursive: true);
     await Directory('${portable.path}/server/build').create(recursive: true);
-    await Directory(
-      '${portable.path}/server/node_modules/bgutils-js',
-    ).create(recursive: true);
+    await Directory('${portable.path}/server/node_modules/bgutils-js')
+        .create(recursive: true);
     require(
       YouTubeResolver.fromBundleDirectory(bundle) == null,
       'Partial resolver bundle must never be adopted',
     );
     await File('${portable.path}/$binary').writeAsString('fixture');
     await File('${portable.path}/$nodeName').writeAsString('fixture');
-    await File(
-      '${portable.path}/server/build/generate_once.js',
-    ).writeAsString('fixture');
-    await File(
-      '${portable.path}/server/node_modules/bgutils-js/package.json',
-    ).writeAsString('{}');
+    await File('${portable.path}/server/build/generate_once.js')
+        .writeAsString('fixture');
+    await File('${portable.path}/server/node_modules/bgutils-js/package.json')
+        .writeAsString('{}');
     final detected = YouTubeResolver.fromBundleDirectory(bundle);
     if (detected == null) {
       throw StateError('Bundled resolver was not discovered');
@@ -361,7 +359,8 @@ Future<void> youtubeContracts() async {
     final builtArgs = detected.arguments(selected, AudioQuality.high);
     require(
       builtArgs.any(
-        (arg) => arg.contains('youtubepot-bgutilscript:server_home=') &&
+        (arg) =>
+            arg.contains('youtubepot-bgutilscript:server_home=') &&
             arg.contains('player_client=mweb'),
       ),
       'PO Token generation script must be selected automatically',
@@ -396,16 +395,25 @@ Future<void> youtubeContracts() async {
   );
   for (final other in <CatalogEntry>[
     const CatalogEntry(
-      provider: 'jiosaavn', id: 'wrong-artist', title: 'Shape of You',
-      subtitle: 'Other Artist', durationSeconds: 233,
+      provider: 'jiosaavn',
+      id: 'wrong-artist',
+      title: 'Shape of You',
+      subtitle: 'Other Artist',
+      durationSeconds: 233,
     ),
     const CatalogEntry(
-      provider: 'jiosaavn', id: 'wrong-version', title: 'Shape of You (Live)',
-      subtitle: 'Ed Sheeran', durationSeconds: 233,
+      provider: 'jiosaavn',
+      id: 'wrong-version',
+      title: 'Shape of You (Live)',
+      subtitle: 'Ed Sheeran',
+      durationSeconds: 233,
     ),
     const CatalogEntry(
-      provider: 'jiosaavn', id: 'wrong-length', title: 'Shape of You',
-      subtitle: 'Ed Sheeran', durationSeconds: 330,
+      provider: 'jiosaavn',
+      id: 'wrong-length',
+      title: 'Shape of You',
+      subtitle: 'Ed Sheeran',
+      durationSeconds: 330,
     ),
   ]) {
     require(
@@ -415,33 +423,53 @@ Future<void> youtubeContracts() async {
   }
   require(
     RecordingFallback.match(
-      const CatalogEntry(provider: 'youtube', id: 'ccccccccccc',
-        title: 'Shape of You', subtitle: 'Ed Sheeran', isVideo: true),
-      [sameRecording],
-    ) == null,
+          const CatalogEntry(
+            provider: 'youtube',
+            id: 'ccccccccccc',
+            title: 'Shape of You',
+            subtitle: 'Ed Sheeran',
+            isVideo: true,
+          ),
+          [sameRecording],
+        ) ==
+        null,
     'Video sources must not be substituted with album audio',
   );
   require(
     RecordingFallback.match(
-      const CatalogEntry(provider: 'youtube', id: 'ddddddddddd',
-        title: 'Shape of You', subtitle: 'Ed Sheeran'),
-      [sameRecording, const CatalogEntry(provider: 'jiosaavn',
-        id: 'ambiguous-cut', title: 'Shape of You',
-        subtitle: 'Ed Sheeran', durationSeconds: 180)],
-    ) == null,
+          const CatalogEntry(
+            provider: 'youtube',
+            id: 'ddddddddddd',
+            title: 'Shape of You',
+            subtitle: 'Ed Sheeran',
+          ),
+          [
+            sameRecording,
+            const CatalogEntry(
+              provider: 'jiosaavn',
+              id: 'ambiguous-cut',
+              title: 'Shape of You',
+              subtitle: 'Ed Sheeran',
+              durationSeconds: 180,
+            ),
+          ],
+        ) ==
+        null,
     'Reject ambiguous cuts when duration is missing',
   );
   require(
     YouTubeResolver.classifyExtractorFailure(
-      'ERROR: Sign in to confirm you are not a bot '
-      'https://secret.invalid/?token=private',
-    ).problem == ProviderProblem.loginRequired,
+          'ERROR: Sign in to confirm you are not a bot '
+          'https://secret.invalid/?token=private',
+        ).problem ==
+        ProviderProblem.loginRequired,
     'Login-required extraction must not collapse to generic unavailable',
   );
   require(
     YouTubeResolver.classifyExtractorFailure(
-      'ERROR: requested format is not available',
-    ).problem == ProviderProblem.formatUnavailable,
+          'ERROR: requested format is not available',
+        ).problem ==
+        ProviderProblem.formatUnavailable,
     'No progressive format must be reported explicitly',
   );
   require(
