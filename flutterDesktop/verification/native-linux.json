@@ -27,20 +27,20 @@
     },
     {
       "state": "drawer",
-      "expected_theme": "any",
-      "background_rgb": [
-        247,
-        248,
-        251
-      ]
-    },
-    {
-      "state": "settings",
-      "expected_theme": "any",
+      "expected_theme": "drawer",
       "background_rgb": [
         183,
         184,
         186
+      ]
+    },
+    {
+      "state": "settings",
+      "expected_theme": "light",
+      "background_rgb": [
+        247,
+        248,
+        251
       ]
     },
     {
