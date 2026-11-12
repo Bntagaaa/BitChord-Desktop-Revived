@@ -94,21 +94,34 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
 
   void _goBack() {
     if (_drawerRequested) {
-      setState(() => _drawerRequested = false);
+      _dismissOverlays();
       return;
     }
     if (_accountsOpen) {
-      setState(() => _accountsOpen = false);
+      _dismissOverlays();
       return;
     }
     final path = ref.read(historyProvider.notifier).back();
     if (path != null) context.go(path);
   }
 
-  void _openAccounts() => setState(() {
-    _drawerRequested = false;
-    _accountsOpen = true;
-  });
+  void _dismissOverlays() {
+    setState(() {
+      _drawerRequested = false;
+      _accountsOpen = false;
+    });
+    _rootFocus.requestFocus();
+  }
+
+  void _openAccounts() {
+    setState(() {
+      _drawerRequested = false;
+      _accountsOpen = true;
+    });
+    // A modal excludes its opener from focus traversal. Keep shortcuts on the
+    // shell owner, rather than leaving primary focus on the excluded opener.
+    _rootFocus.requestFocus();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,9 +147,9 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
           includeRepeats: false,
         ): () {
           if (_accountsOpen) {
-            setState(() => _accountsOpen = false);
+            _dismissOverlays();
           } else if (_drawerRequested) {
-            setState(() => _drawerRequested = false);
+            _dismissOverlays();
           } else {
             _windowAction((host) => host.exitFullscreen());
           }
@@ -170,6 +183,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
               void toggle() {
                 if (narrow) {
                   setState(() => _drawerRequested = !_drawerRequested);
+                  _rootFocus.requestFocus();
                 } else {
                   ref
                       .read(shellProvider.notifier)
@@ -273,7 +287,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                     Positioned.fill(
                       child: GestureDetector(
                         key: const Key('drawer-scrim'),
-                        onTap: () => setState(() => _drawerRequested = false),
+                        onTap: _dismissOverlays,
                         child: ColoredBox(
                           color: Colors.black.withValues(alpha: .26),
                         ),
@@ -308,7 +322,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                       child: GestureDetector(
                         key: const Key('account-scrim'),
                         behavior: HitTestBehavior.opaque,
-                        onTap: () => setState(() => _accountsOpen = false),
+                        onTap: _dismissOverlays,
                       ),
                     ),
                     Positioned(

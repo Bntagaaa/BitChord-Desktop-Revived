@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:bitchord_desktop/features/shell/data/preferences_store.dart';
 import 'package:bitchord_desktop/l10n/shell_strings.dart';
 import 'dart:ui' as ui;
 
@@ -439,4 +440,60 @@ void main() {
     expect(find.byKey(const Key('ui-scale-100')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  test(
+    'Existing appearance preferences survive adding UI zoom and restart',
+    () {
+      final legacy = PreferencesStore.decode([
+        'dark',
+        'true',
+        'true',
+        'true',
+        'true',
+      ]);
+      expect(legacy.appearance, Appearance.dark);
+      expect(legacy.pitchBlack, isTrue);
+      expect(legacy.sidebarCollapsed, isTrue);
+      expect(legacy.reduceMotion, isTrue);
+      expect(legacy.reduceBlur, isTrue);
+      expect(legacy.uiScalePercent, 100);
+      final restored = PreferencesStore.decode(
+        PreferencesStore.encode(legacy.copyWith(uiScalePercent: 110)),
+      );
+      expect(restored.uiScalePercent, 110);
+      expect(restored.appearance, Appearance.dark);
+      expect(restored.pitchBlack, isTrue);
+      expect(
+        PreferencesStore.decode([
+          'invalid',
+          'false',
+          'false',
+          'false',
+          'false',
+          'broken',
+        ]).uiScalePercent,
+        100,
+      );
+      expect(PreferencesStore.decode(null).appearance, Appearance.system);
+    },
+  );
+  testWidgets(
+    'Native smoke account Escape outside click then brand opens drawer',
+    (tester) async {
+      await mount(tester, const Size(900, 600));
+      await tester.tapAt(const Offset(36, 516));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('account-panel')), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('account-panel')), findsNothing);
+      await tester.tapAt(const Offset(500, 300));
+      await tester.tapAt(const Offset(36, 34));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('drawer-scrim')), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('drawer-scrim')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

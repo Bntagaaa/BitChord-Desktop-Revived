@@ -10,7 +10,10 @@ final class PreferencesStore implements ShellSettingsStore {
 
   @override
   Future<ShellSettings> read() async {
-    final values = await preferences.getStringList(_key);
+    return decode(await preferences.getStringList(_key));
+  }
+
+  static ShellSettings decode(List<String>? values) {
     if (values == null || (values.length != 5 && values.length != 6))
       return const ShellSettings();
     var appearance = Appearance.system;
@@ -30,12 +33,15 @@ final class PreferencesStore implements ShellSettingsStore {
   }
 
   @override
-  Future<void> write(ShellSettings value) => preferences.setStringList(_key, [
+  Future<void> write(ShellSettings value) =>
+      preferences.setStringList(_key, encode(value));
+
+  static List<String> encode(ShellSettings value) => [
     value.appearance.name,
     '${value.pitchBlack}',
     '${value.sidebarCollapsed}',
     '${value.reduceMotion}',
     '${value.reduceBlur}',
     '${normalizeUiScale(value.uiScalePercent)}',
-  ]);
+  ];
 }

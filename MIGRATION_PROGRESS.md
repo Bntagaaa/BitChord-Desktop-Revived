@@ -694,3 +694,12 @@ DPI/motion/focus/material/font evidence listed in the ledger. Existing real
 Windows/Linux fixtures are retained with original provenance, not renamed as
 new captures. No full visual parity, performance result or Phase 3 implementation
 is claimed. Phase 3 remains unauthorized.
+
+First Phase 2 run [43176555556](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43176555556)
+at `132e8209`: Linux format/analyze, **24 tests (0 failed/skipped)** and release
+build passed. Native smoke failed at Accounts -> Escape -> outside click ->
+drawer (expected drawer scrim, observed Light background). Downloaded native
+screenshots and launch.log, retained the assertion, and added explicit shell
+focus restoration plus the exact coordinate/keyboard sequence as a regression
+test. Added a legacy preference decode/save/restart regression test as well.
+Subsequent CI must verify the repair; this failed attempt is not acceptance.
