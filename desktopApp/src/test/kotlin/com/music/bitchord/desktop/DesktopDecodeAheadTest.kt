@@ -4,6 +4,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -117,6 +118,34 @@ class DesktopDecodeAheadTest {
         assertEquals(0f, reader.readSamples()!![0])
         assertEquals(0L, reader.underrunMillis)
         reader.close()
+    }
+
+    @Test
+    fun `quality upgrade waits for actual PCM without consuming it`() {
+        val source = CountingSource(blocks = 10).also { it.stall = CountDownLatch(1) }
+        val reader = ahead(source)
+        try {
+            assertFalse(reader.awaitBuffered(minSamples = 4, timeoutMillis = 60),
+                "a decoder that has opened but is blocked on media bytes must not replace playback")
+            source.stall!!.countDown()
+            source.stall = null
+            assertTrue(reader.awaitBuffered(minSamples = 4, timeoutMillis = 2_000))
+            assertEquals(0f, reader.readSamples(100)!![0],
+                "priming must not consume the audio the player will need")
+        } finally {
+            reader.close()
+        }
+    }
+
+    @Test
+    fun `quality upgrade rejects a decoder that ended without PCM`() {
+        val reader = ahead(CountingSource(blocks = 0))
+        try {
+            assertFalse(reader.awaitBuffered(minSamples = 4, timeoutMillis = 500))
+            assertEquals(DesktopDecodeState.EOF, reader.state)
+        } finally {
+            reader.close()
+        }
     }
 
     @Test
