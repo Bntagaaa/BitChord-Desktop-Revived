@@ -1,0 +1,61 @@
+name: Phase 1 Windows reference native diagnosis
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [2.0.0-flutter]
+    paths: ['.github/workflows/flutter-phase1-windows-native.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: reference
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 348b613a0c3db1a54de56483ea6f8748d6465211
+          path: reference
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Configure immutable reference with the Gradle-selected tools
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force verification | Out-Null
+          $sha = git rev-parse HEAD
+          if ($sha -ne '348b613a0c3db1a54de56483ea6f8748d6465211') { throw 'Reference SHA differs' }
+          $sha | Set-Content verification/reference-sha.txt
+          $compiler = (Get-Command g++.exe).Source
+          $ninja = (Get-Command ninja.exe).Source
+          cmake --version | Tee-Object verification/cmake-version.log
+          & $compiler --version | Tee-Object verification/compiler-version.log
+          & $ninja --version | Tee-Object verification/ninja-version.log
+          cmake -S desktopApp/native -B desktopApp/build/native/windows --fresh -G Ninja "-DCMAKE_MAKE_PROGRAM=$ninja" "-DCMAKE_CXX_COMPILER=$compiler" -DCMAKE_BUILD_TYPE=Release 2>&1 | Tee-Object verification/native-configure.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile all reference native targets with visible diagnostics
+        run: |
+          cmake --build desktopApp/build/native/windows --config Release --parallel 2 --verbose 2>&1 | Tee-Object verification/native-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify protected source preservation
+        if: always()
+        run: |
+          git diff --exit-code
+          git status --short | Set-Content verification/worktree.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: phase1-windows-reference-native-diagnostics
+          path: |
+            reference/verification/
+            reference/desktopApp/build/native/windows/CMakeCache.txt
+            reference/desktopApp/build/native/windows/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: error

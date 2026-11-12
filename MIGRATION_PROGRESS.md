@@ -370,3 +370,14 @@ a runnable pinned Windows reference without changing the protected reference,
 then execute the remaining matched visual/platform checks and resolve the
 recorded shell differences. Phase 2 has not started and is not authorized.
 
+## Phase 1 targeted continuation — 2026-11-12
+
+Resumed from clean `ac30f547`, matching the fetched migration branch. Latest
+foundation run `43128710948` passed both platforms and retention. The user
+authorized diagnosis of the pinned Windows native failure and correction of the
+documented shell differences, still within Phase 1 (P01/P02/P24/P28–P31).
+A focused Windows-only diagnostic workflow reproduces the reference's fresh
+CMake/Ninja/GNU configure and verbose compilation separately; it leaves all
+protected reference source untouched and retains the actual compiler output.
+Results are pending. No Phase 2 implementation has begun.
+
