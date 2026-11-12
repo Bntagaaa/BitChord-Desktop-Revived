@@ -783,132 +783,133 @@ class _EmptyDock extends StatelessWidget {
             key: const Key('player-dock'),
             height: ShellMetrics.dockHeight,
             child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  if (!compact) ...[
-                    _DockButton(
-                      'shuffle',
-                      label: 'Shuffle',
-                      palette: palette,
-                      width: 34,
-                      glyphSize: 18,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  _DockButton(
-                    'previous',
-                    label: 'Previous',
-                    palette: palette,
-                    width: 34,
-                    glyphSize: 20,
-                    tint: palette['secondary'].withValues(alpha: .4),
-                  ),
-                  const SizedBox(width: 4),
-                  _DockButton(
-                    'play',
-                    label: 'Play',
-                    palette: palette,
-                    width: 36,
-                    glyphSize: 23,
-                    tint: palette['foreground'],
-                  ),
-                  const SizedBox(width: 4),
-                  _DockButton(
-                    'next',
-                    label: 'Next',
-                    palette: palette,
-                    width: 34,
-                    glyphSize: 20,
-                    tint: palette['foreground'],
-                  ),
-                  const SizedBox(width: 4),
-                  if (!compact) ...[
-                    _DockButton(
-                      'repeat',
-                      label: 'Repeat',
-                      palette: palette,
-                      width: 34,
-                      glyphSize: 18,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  const Spacer(),
-                  Row(
-                    spacing: 1,
+              alignment: Alignment.center,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
                     children: [
-                      _DockButton('lyrics', label: 'Lyrics', palette: palette),
-                      if (!compact)
-                        _DockButton(
-                          'pip',
-                          label: 'Picture in picture',
-                          palette: palette,
-                          icon: Icons.picture_in_picture_alt_rounded,
-                        ),
-                      _DockButton('up_next', label: 'Queue', palette: palette),
                       if (!compact) ...[
                         _DockButton(
-                          'details',
-                          label: 'Now playing details',
+                          'shuffle',
+                          label: 'Shuffle',
                           palette: palette,
-                          icon: Icons.info_rounded,
+                          width: 34,
+                          glyphSize: 18,
                         ),
-                        _DockButton(
-                          'audio-output',
-                          label: 'Audio output',
-                          palette: palette,
-                          icon: Icons.headphones_rounded,
-                        ),
+                        const SizedBox(width: 4),
                       ],
-                      if (!compact) Tooltip(
-                        message: 'Volume — playback is unavailable',
-                        child: Semantics(
-                          key: const Key('dock-volume'),
-                          label: 'Volume',
-                          enabled: false,
-                          child: SizedBox(
-                            width: 72,
-                            height: 29,
-                            child: Center(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: palette['foreground'].withValues(
-                                    alpha: .30,
+                      _DockButton(
+                        'previous',
+                        label: 'Previous',
+                        palette: palette,
+                        width: 34,
+                        glyphSize: 20,
+                        tint: palette['secondary'].withValues(alpha: .4),
+                      ),
+                      const SizedBox(width: 4),
+                      _DockButton(
+                        'play',
+                        label: 'Play',
+                        palette: palette,
+                        width: 36,
+                        glyphSize: 23,
+                        tint: palette['foreground'],
+                      ),
+                      const SizedBox(width: 4),
+                      _DockButton(
+                        'next',
+                        label: 'Next',
+                        palette: palette,
+                        width: 34,
+                        glyphSize: 20,
+                        tint: palette['foreground'],
+                      ),
+                      const SizedBox(width: 4),
+                      if (!compact) ...[
+                        _DockButton(
+                          'repeat',
+                          label: 'Repeat',
+                          palette: palette,
+                          width: 34,
+                          glyphSize: 18,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      const Spacer(),
+                      Row(
+                        spacing: 1,
+                        children: [
+                          _DockButton('lyrics', label: 'Lyrics', palette: palette),
+                          if (!compact)
+                            _DockButton(
+                              'pip',
+                              label: 'Picture in picture',
+                              palette: palette,
+                              icon: Icons.picture_in_picture_alt_rounded,
+                            ),
+                          _DockButton('up_next', label: 'Queue', palette: palette),
+                          if (!compact) ...[
+                            _DockButton(
+                              'details',
+                              label: 'Now playing details',
+                              palette: palette,
+                              icon: Icons.info_rounded,
+                            ),
+                            _DockButton(
+                              'audio-output',
+                              label: 'Audio output',
+                              palette: palette,
+                              icon: Icons.headphones_rounded,
+                            ),
+                          ],
+                          if (!compact)
+                        Tooltip(
+                            message: 'Volume — playback is unavailable',
+                            child: Semantics(
+                              key: const Key('dock-volume'),
+                              label: 'Volume',
+                              enabled: false,
+                              child: SizedBox(
+                                width: 72,
+                                height: 29,
+                                child: Center(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: palette['foreground'].withValues(
+                                        alpha: .30,
+                                      ),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                    child: const SizedBox(width: 72, height: 4),
                                   ),
-                                  borderRadius: BorderRadius.circular(2),
                                 ),
-                                child: const SizedBox(width: 72, height: 4),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            IgnorePointer(
-              child: SvgPicture.asset(
-                'assets/icons/bitchord_no_music.svg',
-                key: const Key('empty-dock-mark'),
-                semanticsLabel: 'BitChord',
-                width: 48,
-                height: 48,
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 2,
-              child: ColoredBox(
-                color: palette['foreground'].withValues(alpha: .12),
-              ),
-            ),
+                ),
+                IgnorePointer(
+                  child: SvgPicture.asset(
+                    'assets/icons/bitchord_no_music.svg',
+                    key: const Key('empty-dock-mark'),
+                    semanticsLabel: 'BitChord',
+                    width: 48,
+                    height: 48,
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 2,
+                  child: ColoredBox(
+                    color: palette['foreground'].withValues(alpha: .12),
+                  ),
+                ),
               ],
             ),
           ),
