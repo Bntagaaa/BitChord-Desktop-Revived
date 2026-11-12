@@ -95,3 +95,14 @@ software endpoint validation, not physical hotplug proof. Concurrent SQLite CAS
 with eight writers admits exactly one initial revision and rejects seven stale
 writes. Shutdown retains the pending accepted command's terminal outcome and
 reports zero decoder/PCM ownership before handle destruction.
+
+The second run `43191387338` exposed final AAC frame padding with Ubuntu's
+FFmpeg 4.4. Decoder packet timebase is now set exactly as the Kotlin source
+requires; sample-precise packet/frame durations cap audible tails while coarse
+Matroska timestamps are not used to truncate PCM. Local **both FFmpeg 4.4 and
+9** now pass all seven codec fixtures without changing expected frames/tolerances.
+The 4.4 shared library also passes the Dart FFI/import/queue suite. Source Linux
+4.4 headers/libraries were discovered under `/usr/include/ffmpeg4.4` and `/usr/lib`;
+this supersedes the earlier assumption that only the current system API could
+be tested locally. Long file paths use short opaque rendition IDs, retaining
+full path/catalog metadata and avoiding accidental ABI string truncation.

@@ -53,6 +53,14 @@ extern "C" {
 #define BC_ERROR_RESOURCE 103
 #define BC_ERROR_FORMAT 104
 #define BC_ERROR_NO_DEVICE 105
+#define BC_CAP_LOCAL 1
+#define BC_CAP_PAUSE 2
+#define BC_CAP_SEEK 4
+#define BC_CAP_RATE 8
+#define BC_CAP_VOLUME 16
+#define BC_CAP_NOMINATION 32
+#define BC_CAP_DEVICE 64
+#define BC_CAP_STORE 128
 
 typedef struct bc_caps {
  uint32_t struct_size, abi, command_capacity, event_capacity;

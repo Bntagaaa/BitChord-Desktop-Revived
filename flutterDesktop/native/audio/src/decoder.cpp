@@ -76,6 +76,7 @@ void Decoder::run(const std::string& path, int64_t seek) {
  r.codec=avcodec_alloc_context3(codec);
  if(!r.codec || avcodec_parameters_to_context(r.codec,s->codecpar)<0) throw std::runtime_error("codec");
  r.codec->thread_count=1;
+ r.codec->pkt_timebase=s->time_base;
  if(avcodec_open2(r.codec,codec,nullptr)<0) throw std::runtime_error("codec open");
  rate=uint32_t(r.codec->sample_rate);
 #if LIBAVUTIL_VERSION_MAJOR >= 57
@@ -139,8 +140,17 @@ void Decoder::run(const std::string& path, int64_t seek) {
   // libavcodec already applies encoder skip/discard side data at open.
   // Only an explicit seek needs timestamp trimming; trimming open at t=0
   // would discard MP3/Opus priming a second time.
-  const int skip=seek>0 ? int(std::min<int64_t>(count,std::max<int64_t>(0,av_rescale_rnd(seek-position,rate,1000000,AV_ROUND_UP)))) : 0;
-  if(count>skip) push(block.data()+size_t(skip)*channels,count-skip);
+  // Older FFmpeg decoders leave the final AAC frame padded while the
+  // demuxed packet/frame duration carries its exact audible sample extent.
+#if LIBAVUTIL_VERSION_MAJOR >= 58
+  const auto frame_duration=r.frame->duration;
+#else
+  const auto frame_duration=r.frame->pkt_duration;
+#endif
+  const bool sample_precise_timebase=int64_t(s->time_base.den)>=int64_t(rate)*s->time_base.num;
+  const int extent=frame_duration>0 && sample_precise_timebase ? int(std::min<int64_t>(count,av_rescale_q(frame_duration,s->time_base,AVRational{1,int(rate)}))) : count;
+  const int skip=seek>0 ? int(std::min<int64_t>(extent,std::max<int64_t>(0,av_rescale_rnd(seek-position,rate,1000000,AV_ROUND_UP)))) : 0;
+  if(extent>skip) push(block.data()+size_t(skip)*channels,extent-skip);
   position+=int64_t(count)*1000000/rate;
   av_frame_unref(r.frame);
  }

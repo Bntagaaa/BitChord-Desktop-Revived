@@ -509,3 +509,19 @@ const int BC_ERROR_RESOURCE = 103;
 const int BC_ERROR_FORMAT = 104;
 
 const int BC_ERROR_NO_DEVICE = 105;
+
+const int BC_CAP_LOCAL = 1;
+
+const int BC_CAP_PAUSE = 2;
+
+const int BC_CAP_SEEK = 4;
+
+const int BC_CAP_RATE = 8;
+
+const int BC_CAP_VOLUME = 16;
+
+const int BC_CAP_NOMINATION = 32;
+
+const int BC_CAP_DEVICE = 64;
+
+const int BC_CAP_STORE = 128;

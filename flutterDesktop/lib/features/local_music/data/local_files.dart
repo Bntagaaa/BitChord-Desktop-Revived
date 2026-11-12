@@ -21,7 +21,7 @@ final class LocalFiles {
     return QueueEntry(
       entryId: id,
       catalogId: 'local:${file.path}',
-      renditionId: file.uri.toString(),
+      renditionId: 'file:$id',
       sourceId: 'local',
       localPath: file.path,
       title: split > 0 ? stem.substring(split + 3).trim() : stem,

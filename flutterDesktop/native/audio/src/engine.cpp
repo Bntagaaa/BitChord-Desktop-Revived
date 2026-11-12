@@ -263,7 +263,7 @@ static std::shared_ptr<Engine> acquire(uint64_t handle) {
 extern "C" {
 int32_t bc_get_caps(bc_caps* out) {
  if(!out || out->struct_size!=sizeof(bc_caps)) return BC_INVALID;
- *out={sizeof(bc_caps),BC_ABI,128,256,2,8,192000,0x1ff,sizeof(bc_command),sizeof(bc_snapshot),sizeof(bc_event),LIBAVCODEC_VERSION_INT}; return BC_OK;
+ *out={sizeof(bc_caps),BC_ABI,128,256,2,8,192000,BC_CAP_LOCAL|BC_CAP_PAUSE|BC_CAP_SEEK|BC_CAP_RATE|BC_CAP_VOLUME|BC_CAP_NOMINATION|BC_CAP_DEVICE|BC_CAP_STORE,sizeof(bc_command),sizeof(bc_snapshot),sizeof(bc_event),LIBAVCODEC_VERSION_INT}; return BC_OK;
 }
 int64_t bc_monotonic_ns() { return std::chrono::duration_cast<std::chrono::nanoseconds>(bc::Clock::now().time_since_epoch()).count(); }
 int32_t bc_create(uint64_t* handle) { try {

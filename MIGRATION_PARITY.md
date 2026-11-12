@@ -1319,3 +1319,8 @@ fixtures with FFmpeg-produced PCM oracles, and ASan/UBSan lifecycle/decoder pass
 These strengthen FIXTURE_TESTED P11/P12/P36, not physical P13 acceptance. The
 first CI run `43188018937` failed on Pulse EOS behavior and a Windows test include;
 follow-up validation is required before any PLATFORM_VERIFIED promotion.
+
+The second Phase 3 run `43191387338` failed the new AAC tail assertion on both
+OSs; native protocol/storage/lifecycle tests passed. The implementation fix has
+passed the unchanged seven-codec corpus locally against FFmpeg 4.4 and 9. No
+platform state is promoted until the subsequent exact-SHA workflow is inspected.

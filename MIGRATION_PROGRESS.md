@@ -776,3 +776,12 @@ sink pause/active-seek/rate/handoff checks, seven real codec fixtures, negotiate
 float/S16/rate/channel output reporting and stronger shutdown/CAS tests. This is
 not a CI success statement. Physical audibility, calibrated loopback and physical
 hotplug remain BLOCKED; Phase 4 remains untouched.
+
+Second run `43191387338` compiled the updated native library on both OSs and
+passed native command/storage/lifecycle CTests, but its seven-codec suite found
+AAC final-frame padding on both FFmpeg 4.4 (Linux) and 7.1 (Windows). The decoder
+now sets the reference-required packet timebase and trims only sample-precise
+frame durations; expected fixtures/tolerances remain unchanged. All seven codecs
+now pass locally against both installed FFmpeg 4.4 and 9 libraries, and the old
+API shared library passes real Dart FFI/SQLite/import tests. Windows dependencies
+were cached before testing, so subsequent source validation can reuse them.

@@ -106,7 +106,9 @@ jobs:
         run: |
           python tool/run_checked.py format-check dart format --output=none --set-exit-if-changed lib test
       - name: Check real FFI, transactional import and queue corpus
-        run: python tool/run_checked.py phase3-ffi dart run tool/phase3_check.dart
+        run: |
+          python tool/run_checked.py kotlin-import python tool/test_kotlin_export.py
+          python tool/run_checked.py phase3-ffi dart run tool/phase3_check.dart
       - name: Analyze
         run: python tool/run_checked.py analyze flutter analyze --fatal-infos
       - name: Run tests and capture rendered shell

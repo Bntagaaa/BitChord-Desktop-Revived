@@ -8,6 +8,7 @@ import '../lib/features/local_data/data/kotlin_import.dart';
 import '../lib/features/local_data/data/sqlite_repository.dart';
 import '../lib/features/local_data/domain/local_state.dart';
 import '../lib/features/playback/domain/local_queue.dart';
+import '../lib/features/local_music/data/local_files.dart';
 
 void check(bool value, String message) {
   if (!value) throw StateError(message);
@@ -143,6 +144,14 @@ Future<void> main(List<String> args) async {
       baseline = NativeApi(library).bindings.bc_live_allocations();
   final temp = await Directory.systemTemp.createTemp('bitchord-ffi-');
   try {
+    final longFile = File('${temp.path}/${List.filled(150, 'a').join()}.wav');
+    await File('native/audio/test/fixtures/tone.wav').copy(longFile.path);
+    final longEntry = await LocalFiles.entry(longFile.path);
+    check(
+      longEntry.renditionId.length < 128 &&
+          longEntry.localPath == longFile.path,
+      'Long media paths use opaque rendition IDs without truncation',
+    );
     final repository = SqliteLocalRepository(
       path: '${temp.path}/state.sqlite3',
       libraryPath: library,

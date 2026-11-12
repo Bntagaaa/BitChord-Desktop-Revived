@@ -76,7 +76,7 @@ final class KotlinImport {
     return QueueEntry(
       entryId: 'kotlin:$identity',
       catalogId: fields[0],
-      renditionId: fields[0],
+      renditionId: 'kotlin:rendition:$identity',
       sourceId: fields[9].isEmpty ? 'kotlin' : 'local',
       title: fields[1],
       artist: fields[2],
