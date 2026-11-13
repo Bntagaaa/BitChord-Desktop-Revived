@@ -1559,3 +1559,7 @@ Current status: **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** See the final
 increment record in MIGRATION_PROGRESS and the scoped completion audit for
 remaining implementation and evidence gates. No Kotlin reference modification,
 performance improvement, universal provider availability or 1:1 parity is claimed.
+
+### P20/Phase 4 — isolated interactive YouTube Music login adapter, 2026-11-13
+
+Pinned Kotlin reference: DesktopBrowserSignIn.kt, DesktopWebSignIn.kt, DesktopAccounts.kt and DesktopYouTubeSession.kt at 348b613a. Flutter implementation adds data/browser_sign_in.dart and changes presentation/account_session.dart: non-debug dedicated Chromium profile for sign-in, post-close local ephemeral headless cookie capture filtered strictly to youtube.com, existing signed-in YouTube shell verification, cancellation and temporary profile cleanup; no ordinary browser data accessed. A manual session-only fallback remains. Targeted fixture coverage: browser_sign_in_test.dart. This is **IMPLEMENTED** (verification on this new source pending CI), not authenticated USER_VERIFIED/PARITY_ACCEPTED. It does not implement encrypted session persistence, multi-account/channel switching, Spotify account/library, mutations or full Kotlin-matched account UI. The Kotlin source remains unchanged; Phase 4 INCOMPLETE, Phase 5 NOT STARTED.

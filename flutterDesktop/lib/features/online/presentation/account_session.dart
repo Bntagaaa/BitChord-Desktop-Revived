@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/catalog_controller.dart';
 import '../application/search_suggestions.dart';
 import '../application/download_queue.dart';
+import '../data/browser_sign_in.dart';
 import '../domain/catalog.dart';
 import '../domain/online_port.dart';
 
@@ -16,7 +17,8 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
   final _cookie = TextEditingController();
   RequestScope? _scope;
   String? _error;
-  bool _busy = false;
+  bool _busy = false, _browserBusy = false;
+
   @override
   void dispose() {
     _scope?.cancel();
@@ -25,42 +27,83 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
     super.dispose();
   }
 
-  Future<void> _connect(OnlineAccounts accounts) async {
+  void _invalidateAccountState() {
+    ref.read(catalogProvider.notifier).cancel();
+    ref.read(searchSuggestionsProvider.notifier).dismiss();
+    ref.read(downloadQueueProvider.notifier).cancelAll();
+  }
+
+  Future<void> _reloadCurrentCatalog() async {
+    final current = ref.read(catalogProvider);
+    if (current.browseId != null || current.query.isNotEmpty) {
+      await ref.read(catalogProvider.notifier).load(
+        provider: current.provider,
+        query: current.query,
+        browseId: current.browseId,
+        params: current.params,
+        filter: current.filter,
+      );
+    }
+  }
+
+  Future<void> _connect(OnlineAccounts accounts, {bool browser = false}) async {
+    if (_busy) return;
+    _scope?.cancel();
     final scope = _scope = RequestScope();
-    final cookie = _cookie.text.trim();
+    final manualCookie = _cookie.text.trim();
     _cookie.clear();
+    setState(() {
+      _busy = true;
+      _browserBusy = browser;
+      _error = null;
+    });
+    _invalidateAccountState();
+    try {
+      // Browser owns a fresh isolated profile; no user's ordinary Chrome data
+      // is inspected. The returned cookies are held in memory and verified by
+      // the existing authenticated YouTube shell before session adoption.
+      final cookie = browser
+          ? await BrowserSignIn.captureYouTube(scope)
+          : manualCookie;
+      scope.check();
+      await accounts.signIn(cookie, scope);
+      scope.check();
+      await _reloadCurrentCatalog();
+    } catch (error) {
+      if (mounted && !scope.cancelled) {
+        setState(() {
+          _error = error is ProviderFailure
+              ? error.toString()
+              : error is StateError
+              ? error.message.toString()
+              : 'Session verification failed.';
+        });
+      }
+    } finally {
+      scope.cancel();
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _browserBusy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _signOut(OnlineAccounts accounts) async {
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
     });
-    // Cancel personalized catalog/download operations across account generations.
-    ref.read(catalogProvider.notifier).cancel();
-    ref.read(searchSuggestionsProvider.notifier).dismiss();
-    ref.read(downloadQueueProvider.notifier).cancelAll();
+    _scope?.cancel();
+    _invalidateAccountState();
     try {
-      await accounts.signIn(cookie, scope);
-      scope.check();
-      final state = ref.read(catalogProvider);
-      if (state.browseId != null || state.query.isNotEmpty) {
-        await ref
-            .read(catalogProvider.notifier)
-            .load(
-              provider: state.provider,
-              query: state.query,
-              browseId: state.browseId,
-              params: state.params,
-              filter: state.filter,
-            );
-      }
-    } catch (e) {
-      if (mounted)
-        setState(
-          () => _error = e is ProviderFailure
-              ? e.toString()
-              : 'Session verification failed.',
-        );
+      await accounts.signOut();
+      await _reloadCurrentCatalog();
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Sign-out failed.');
     } finally {
-      scope.cancel();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -82,11 +125,34 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
                 : 'YouTube Music · Guest',
           ),
           const SizedBox(height: 8),
-          Text(
-            'Use an existing YouTube Music cookie for this app session. It is used for YouTube catalog and playback requests, passed to the bundled resolver in memory, and cleared on exit. No cookie file is saved. Browser sign-in and protected account storage are not available.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
           if (!accounts.signedIn) ...[
+            Text(
+              'Sign in using an isolated Chrome, Edge, Brave or Chromium window. '
+              'Complete Google sign-in, open YouTube Music, then close that '
+              'window. This app verifies your session without reading your '
+              'normal browser profile or saving a cookie file.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              key: const Key('browser-sign-in'),
+              onPressed: _busy ? null : () => _connect(accounts, browser: true),
+              child: Text(
+                _browserBusy ? 'Complete sign-in in browser…' : 'Sign in with browser',
+              ),
+            ),
+            if (_browserBusy)
+              TextButton(
+                key: const Key('cancel-browser-sign-in'),
+                onPressed: () => _scope?.cancel(),
+                child: const Text('Cancel browser sign-in'),
+              ),
+            const SizedBox(height: 8),
+            Text(
+              'Advanced: verify an existing YouTube Music session for this '
+              'app run only. It is cleared on exit.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             TextField(
               key: const Key('session-cookie'),
               controller: _cookie,
@@ -100,33 +166,24 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
             ),
             TextButton(
               onPressed: _busy ? null : () => _connect(accounts),
-              child: Text(_busy ? 'Verifying session…' : 'Verify session'),
+              child: Text(_busy && !_browserBusy ? 'Verifying session…' : 'Verify session'),
             ),
-          ] else
+          ] else ...[
+            Text(
+              'Your session is held in memory only and is removed on sign-out '
+              'or application exit.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             TextButton(
-              onPressed: () async {
-                ref.read(catalogProvider.notifier).cancel();
-                ref.read(searchSuggestionsProvider.notifier).dismiss();
-                ref.read(downloadQueueProvider.notifier).cancelAll();
-                await accounts.signOut();
-                final state = ref.read(catalogProvider);
-                if (state.browseId != null || state.query.isNotEmpty) {
-                  await ref
-                      .read(catalogProvider.notifier)
-                      .load(
-                        provider: state.provider,
-                        query: state.query,
-                        browseId: state.browseId,
-                        params: state.params,
-                        filter: state.filter,
-                      );
-                }
-                if (mounted) setState(() {});
-              },
+              onPressed: _busy ? null : () => _signOut(accounts),
               child: const Text('Sign out'),
             ),
+          ],
           if (_error != null)
-            Text(_error!, style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              _error!,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
         ],
       ),
     );
