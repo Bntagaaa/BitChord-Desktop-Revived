@@ -1,9 +1,27 @@
 {
+  "captures": [
+    {
+      "sampled_colors": 10151,
+      "width": 1220,
+      "logo_contrast": 0.39869281045751637,
+      "height": 780
+    },
+    {
+      "sampled_colors": 8375,
+      "width": 900,
+      "logo_contrast": 0.39869281045751637,
+      "height": 600
+    }
+  ],
   "display": "GitHub Windows hosted desktop",
+  "exit_code": 0,
+  "dpi": 96,
+  "source_commit": "97d04f5110042c48dba055e141b8444a4d21d8a2",
+  "fullscreen": "F11 entered; Escape restored 900x600",
   "appearance_captures": [
     {
-      "expected_theme": "any",
       "state": "accounts",
+      "expected_theme": "any",
       "background_rgb": [
         247,
         248,
@@ -11,8 +29,8 @@
       ]
     },
     {
-      "expected_theme": "drawer",
       "state": "drawer",
+      "expected_theme": "drawer",
       "background_rgb": [
         183,
         184,
@@ -20,8 +38,8 @@
       ]
     },
     {
-      "expected_theme": "light",
       "state": "settings",
+      "expected_theme": "light",
       "background_rgb": [
         247,
         248,
@@ -29,8 +47,8 @@
       ]
     },
     {
-      "expected_theme": "dark",
       "state": "dark",
+      "expected_theme": "dark",
       "background_rgb": [
         32,
         32,
@@ -38,8 +56,8 @@
       ]
     },
     {
-      "expected_theme": "black",
       "state": "pitch-black",
+      "expected_theme": "black",
       "background_rgb": [
         0,
         0,
@@ -47,31 +65,13 @@
       ]
     },
     {
-      "expected_theme": "light",
       "state": "light",
+      "expected_theme": "light",
       "background_rgb": [
         247,
         248,
         251
       ]
     }
-  ],
-  "exit_code": 0,
-  "source_commit": "80f1b8e07ae80a787004f4933cabebe14a3fc586",
-  "captures": [
-    {
-      "width": 1220,
-      "logo_contrast": 0.39869281045751637,
-      "sampled_colors": 15095,
-      "height": 780
-    },
-    {
-      "width": 900,
-      "logo_contrast": 0.39869281045751637,
-      "sampled_colors": 8789,
-      "height": 600
-    }
-  ],
-  "dpi": 96,
-  "fullscreen": "F11 entered; Escape restored 900x600"
+  ]
 }
