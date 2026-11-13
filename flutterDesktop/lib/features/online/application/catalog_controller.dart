@@ -121,7 +121,9 @@ final class CatalogController extends Notifier<CatalogView> {
       return;
     // Guest users have no account library. Keep the real route identity so a
     // subsequent verified sign-in can refresh it, without any fake result.
-    if (browseId == 'app:library' && api is OnlineAccounts && !api.signedIn) {
+    if (browseId == 'app:library' &&
+        api is OnlineAccounts &&
+        !(api as OnlineAccounts).signedIn) {
       _queryScope?.cancel();
       ++_generation;
       state = const CatalogView(browseId: 'app:library');
@@ -145,7 +147,7 @@ final class CatalogController extends Notifier<CatalogView> {
     try {
       final page = browseId == 'app:library'
           ? api is OnlineLibrary
-                ? await api.library(scope)
+                ? await (api as OnlineLibrary).library(scope)
                 : (throw const ProviderFailure(ProviderProblem.unsupported))
           : browseId == null
           ? await api.search(
@@ -276,7 +278,8 @@ final class CatalogController extends Notifier<CatalogView> {
     if (api is! OnlinePlaylistEditor) {
       throw const ProviderFailure(ProviderProblem.unsupported);
     }
-    if (api is! OnlineAccounts || !api.signedIn) {
+    if (api is! OnlineAccounts ||
+        !(api as OnlineAccounts).signedIn) {
       throw const ProviderFailure(ProviderProblem.unauthorized);
     }
     if (_editScope != null) {
@@ -284,7 +287,7 @@ final class CatalogController extends Notifier<CatalogView> {
     }
     final scope = _editScope = RequestScope();
     try {
-      final result = await action(api, scope);
+      final result = await action(api as OnlinePlaylistEditor, scope);
       scope.check();
       return result;
     } finally {
@@ -312,7 +315,8 @@ final class CatalogController extends Notifier<CatalogView> {
 
   Future<List<CatalogEntry>> accountPlaylists() async {
     final api = port;
-    if (api is! OnlineAccounts || !api.signedIn) {
+    if (api is! OnlineAccounts ||
+        !(api as OnlineAccounts).signedIn) {
       throw const ProviderFailure(ProviderProblem.unauthorized);
     }
     if (api == null) {
