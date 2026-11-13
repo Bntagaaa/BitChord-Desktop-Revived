@@ -16,6 +16,11 @@ abstract interface class OnlineSuggestions {
   Future<List<String>> suggestions(String query, RequestScope scope);
 }
 
+/// An authenticated account's real library, not a local placeholder.
+abstract interface class OnlineLibrary {
+  Future<CatalogPage> library(RequestScope scope);
+}
+
 abstract interface class OnlinePlaybackIdentity {
   String get currentEntryId;
 }
