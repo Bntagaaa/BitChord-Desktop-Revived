@@ -32,6 +32,15 @@ final class YouTubeMusic implements CatalogProvider {
 
   void signOut() => _accounts.signOut();
 
+  Future<List<String>> suggestions(String input, RequestScope scope) async {
+    if (input.trim().isEmpty) return const [];
+    return YouTubeCatalogParser.suggestions(
+      await _catalog.request('music/get_search_suggestions', {
+        'input': input,
+      }, scope),
+    );
+  }
+
   @override
   Future<CatalogPage> search(
     String query,

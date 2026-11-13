@@ -329,6 +329,89 @@ Future<void> formatChecks() async {
 }
 
 Future<void> catalogChecks() async {
+  final continued = YouTubeCatalogParser.parsePage({
+    'contents': {
+      'singleColumnBrowseResultsRenderer': {'tabs': []},
+    },
+    'continuationContents': {
+      'sectionListContinuation': {
+        'contents': [
+          {
+            'musicCarouselShelfRenderer': {
+              'header': {
+                'musicCarouselShelfBasicHeaderRenderer': {
+                  'title': {'simpleText': 'Next shelf'},
+                },
+              },
+              'contents': [
+                {
+                  'musicTwoRowItemRenderer': {
+                    'title': {'simpleText': 'Next album'},
+                    'navigationEndpoint': {
+                      'browseEndpoint': {'browseId': 'MPREnext'},
+                    },
+                  },
+                },
+              ],
+              'continuations': [
+                {
+                  'nextContinuationData': {'continuation': 'wrong-shelf-token'},
+                },
+              ],
+            },
+          },
+        ],
+        'continuations': [
+          {
+            'nextContinuationData': {'continuation': 'next-home'},
+          },
+        ],
+      },
+    },
+  });
+  check(
+    continued.entries.single.id == 'MPREnext' &&
+        continued.shelves.single.title == 'Next shelf',
+    'Home continuation content takes precedence over empty tab shell',
+  );
+  check(
+    continued.continuation == 'next-home',
+    'Continue outer Home feed, never a carousel',
+  );
+  final searched = YouTubeCatalogParser.parsePage({
+    'contents': {
+      'tabbedSearchResultsRenderer': {
+        'tabs': [
+          {
+            'tabRenderer': {
+              'content': {
+                'sectionListRenderer': {
+                  'contents': [
+                    {
+                      'musicShelfRenderer': {
+                        'contents': [],
+                        'continuations': [
+                          {
+                            'nextContinuationData': {
+                              'continuation': 'search-next',
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+  }, search: true);
+  check(
+    searched.continuation == 'search-next',
+    'Filtered Search continues its result shelf',
+  );
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final origin = Uri.parse('http://127.0.0.1:${server.port}');
   var shells = 0, calls = 0, mode = 'refresh';
@@ -346,7 +429,50 @@ Future<void> catalogChecks() async {
           jsonDecode(await utf8.decoder.bind(request).join())
               as Map<String, dynamic>,
         );
-        if (mode == 'refresh' && calls == 1) {
+        if (request.uri.path == '/youtubei/v1/music/get_search_suggestions') {
+          check(seen.last['input'] == 'fixture', 'Suggestion input contract');
+          request.response.write(
+            jsonEncode({
+              'contents': [
+                {
+                  'searchSuggestionRenderer': {
+                    'suggestion': {
+                      'runs': [
+                        {'text': 'display'},
+                        {'text': ' text'},
+                      ],
+                    },
+                    'navigationEndpoint': {
+                      'searchEndpoint': {'query': 'fixture completion'},
+                    },
+                  },
+                },
+                {
+                  'searchSuggestionRenderer': {
+                    'suggestion': {
+                      'runs': [
+                        {'text': 'fixture'},
+                        {'text': ' artist'},
+                      ],
+                    },
+                  },
+                },
+                {
+                  'searchSuggestionRenderer': {
+                    'navigationEndpoint': {
+                      'searchEndpoint': {'query': 'fixture completion'},
+                    },
+                  },
+                },
+                {
+                  'musicResponsiveListItemRenderer': {
+                    'title': {'simpleText': 'Not a query'},
+                  },
+                },
+              ],
+            }),
+          );
+        } else if (mode == 'refresh' && calls == 1) {
           request.response.statusCode = 400;
         } else if (mode == 'limited') {
           request.response.statusCode = 429;
@@ -370,6 +496,17 @@ Future<void> catalogChecks() async {
     check(
       (seen.last['context'] as Map)['client']['visitorData'] == 'visitor-2',
       'Keep visitor and client version together',
+    );
+    final suggestions = await youtube.suggestions('fixture', RequestScope());
+    check(
+      suggestions.join('|') == 'fixture completion|fixture artist',
+      'Suggestion order, endpoint precedence, run joining and deduplication',
+    );
+    final beforeEmpty = calls;
+    check(
+      (await youtube.suggestions('  ', RequestScope())).isEmpty &&
+          calls == beforeEmpty,
+      'Blank input makes no provider request',
     );
     mode = 'limited';
     final before = calls;

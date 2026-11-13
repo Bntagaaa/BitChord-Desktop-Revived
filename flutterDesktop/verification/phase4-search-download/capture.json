@@ -1,0 +1,19 @@
+{
+  "kind": "widget-layout-diagnostics-only",
+  "viewport": [
+    900,
+    600
+  ],
+  "device_pixel_ratio": 1,
+  "font": "Flutter test Ahem (not native font equivalence)",
+  "reference_commit": "348b613a0c3db1a54de56483ea6f8748d6465211",
+  "native_kotlin_comparison": "NOT_PERFORMED",
+  "artifacts": {
+    "dark-album-widget-900x600.png": "d23ff5c53018f18097f45a731898a7e270947e5173bd5ef03c7a669bd891e659",
+    "dark-download-manager-widget-900x600.png": "274a8af71b828d20b7f5ca84d5eccb60bc1948371b2e8d59eed48112a870fc43",
+    "dark-search-widget-900x600.png": "4f376bbce8e04acb60b5b655ff2a4903cb281ab4070de7b080e7a63900b5c0bf",
+    "light-album-widget-900x600.png": "f002e00987bdcfe8c8193df83b8f111b50aaa701a659932753299248c34499f6",
+    "light-download-manager-widget-900x600.png": "b127d81b1e00833c68b8f241405f97d89d542691a0524f316d2d16e3bf5d98c2",
+    "light-search-widget-900x600.png": "fdd8056d398f79ea244fe1593772139e73d48f0a08aae3fd7778cf683816f099"
+  }
+}

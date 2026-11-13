@@ -1217,3 +1217,53 @@ The direct-first YouTube resolver, other providers and native engine were not ch
 4. Audit all in-scope P03-P09/P17-P21 and related UI P-IDs for missing controls/visual deviations, document exact Kotlin and Flutter paths, test/capture evidence, remaining gaps, and status. Do not promote entire P-IDs based on partial flows.
 
 **Subsequent authorized phases, each also targeting real functional+visual parity:** Phase 5 advanced audio/DSP/EQ/Automix; Phase 6 synced lyrics, artwork/video and all player surfaces; Phase 7 desktop integrations/settings/packaging; Phase 8 full cross-phase feature and visual parity audit, measured performance/RAM and release readiness. These phase descriptions are a roadmap, not permission to start them. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
+
+## Phase 4 completion audit and catalog/download increment — 2026-11-13
+
+User authorized **Phase 4 only**, including its functional and visual surfaces.
+Started at clean `c086c85e` on `2.0.0-flutter`; checked latest baseline matrix
+[43364580612](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43364580612)
+as SUCCESS. The full feature/source/gap ledger, local commands and visual limits
+are in [the completion audit](flutterDesktop/verification/phase4/completion-audit-2026-11-13.md).
+
+Implemented:
+
+- Real debounced YouTube suggestions, source query parsing, fill/submit and
+  keyboard/mouse dismissal semantics; no signed-in full search on keystrokes.
+- Fixed actual live Home continuation precedence and filtered Search's shelf
+  token selection; failed pagination retains its token/rows and is retryable.
+- Bounded Back restoration of Search/parent catalogs, with account cancellation
+  erasing personalized rows and cached pages.
+- Sequential loaded album/playlist/offline context with occurrence indices,
+  Next/Previous/EOF, cancellation and exact native-entry adoption fences. Existing
+  resolver/broker/decoder/final-on-release scrub algorithms were preserved.
+- Source-measured album/playlist header and numbered rows, play/shuffle, local
+  find, batch download and real link-copy actions. Full detail/menu parity is open.
+- Four-worker download queue, duplicate suppression, progress, cancel/all,
+  failure/retry/clear and source-measured manager. Separate partial/completed
+  journals preserve previous offline media when replacement fails; tested
+  concurrent writers, identity/rendition checks, promotion-crash recovery and
+  duration persistence. Default Lossless is retained; complete quality settings,
+  manifests, destination and cache parity remain open.
+
+Observed local checks: official Flutter 3.47.9/Dart 3.13.7, enforced lockfile,
+format, fatal analyzer and **56 passing Flutter tests**; controlled provider/
+broker/download tests passed, with **384000 byte-exact native PCM frames** and
+zero retained decoders. Native source was compiled locally with Clang 23.1.4;
+CMake/Xvfb are absent, so local release/native GUI validation is not claimed.
+Source/layer/asset/inventory checks passed; Kotlin reference sources unchanged.
+
+[Redacted Linux live audit](flutterDesktop/verification/phase4/catalog-live-2026-11-13.json)
+observed Home/next Home, New, Explore, all Search filters and their next pages,
+album/artist/playlist details and suggestions. No authenticated/physical playback
+or full visual parity result is inferred. The user offered interactive login;
+the missing browser/protected-store and Spotify bridges must be implemented
+before that offer can be exercised. This is missing implementation, not lack of
+user authorization or a request for credentials in chat.
+
+Light/Dark widget PNGs are layout diagnostics with the test Ahem font, not native
+Kotlin comparisons. Full account/library/Spotify/module/source/manifest/cache,
+artist/shelf/discovery/custom-menu and matched native visual/DPI/live gates remain
+unfinished. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** New exact-SHA CI status
+will be recorded after this increment is pushed; baseline success is not reused
+as evidence for new source.

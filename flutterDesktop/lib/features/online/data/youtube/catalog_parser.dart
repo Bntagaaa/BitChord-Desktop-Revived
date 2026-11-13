@@ -2,6 +2,22 @@ import '../../domain/catalog.dart';
 
 // Reference-backed renderer semantics; bounded, type-checked traversal.
 final class YouTubeCatalogParser {
+  // InnertubeParser.parseSearchSuggestions: query endpoints take precedence
+  // over styled display runs; entity results have different tap actions.
+  static List<String> suggestions(Map<String, dynamic> data) {
+    final seen = <String>{};
+    for (final row in nodes(data, 'searchSuggestionRenderer')) {
+      final endpoint = nodes(
+        row['navigationEndpoint'],
+        'searchEndpoint',
+      ).firstOrNull;
+      final query = string(endpoint?['query']) ?? text(row['suggestion']);
+      if (query.trim().isNotEmpty) seen.add(query);
+      if (seen.length >= 20) break;
+    }
+    return List.unmodifiable(seen);
+  }
+
   static String? string(Object? value) => value is String ? value : null;
   static Map? map(Object? value) => value is Map ? value : null;
   static List list(Object? value) => value is List ? value : const [];
@@ -158,8 +174,14 @@ final class YouTubeCatalogParser {
     return entries;
   }
 
-  static CatalogPage parsePage(Map<String, dynamic> data, {String? browseId}) {
-    final root = data['contents'] ?? data['continuationContents'] ?? data;
+  static CatalogPage parsePage(
+    Map<String, dynamic> data, {
+    String? browseId,
+    bool search = false,
+  }) {
+    // Live Home continuations carry an empty tab shell in `contents` alongside
+    // the actual next shelves in `continuationContents`.
+    final root = data['continuationContents'] ?? data['contents'] ?? data;
     final shelves = <CatalogShelf>[];
     var visited = 0;
     void collect(Object? value, [int depth = 0]) {
@@ -251,6 +273,10 @@ final class YouTubeCatalogParser {
     final continuationRoot =
         playlist ??
         nodes(root, 'sectionListContinuation').firstOrNull ??
+        (search
+            ? nodes(root, 'musicShelfContinuation').firstOrNull ??
+                  nodes(root, 'musicShelfRenderer').firstOrNull
+            : null) ??
         nodes(root, 'sectionListRenderer').firstOrNull ??
         nodes(root, 'musicShelfContinuation').firstOrNull ??
         nodes(root, 'musicShelfRenderer').firstOrNull ??

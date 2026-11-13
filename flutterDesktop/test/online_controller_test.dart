@@ -11,12 +11,14 @@ import '../lib/features/online/presentation/catalog_surface.dart';
 import '../lib/features/online/presentation/catalog_components.dart';
 
 // Test-only ports. Production bootstrap always injects OnlineRuntime.
-final class ControlledCatalog implements OnlinePort, OnlineCapabilities {
+class ControlledCatalog implements OnlinePort, OnlineCapabilities {
   CatalogPage? browsePage;
   bool resolverConfigured = false;
   @override
   bool get youtubeAudioConfigured => resolverConfigured;
   SearchFilter? requestedFilter;
+  String? requestedContinuation;
+  int searchCalls = 0;
   PlaybackSnapshot? currentSnapshot;
   final seekCalls = <int>[];
 
@@ -24,6 +26,7 @@ final class ControlledCatalog implements OnlinePort, OnlineCapabilities {
   final scopes = <String, RequestScope>{};
   Completer<void>? offlineGate;
   RequestScope? offlineScope;
+  List<DownloadedEntry> downloadedEntries = const [];
   @override
   List<String> get providers => ['youtube', 'addon', 'jiosaavn'];
   @override
@@ -39,6 +42,8 @@ final class ControlledCatalog implements OnlinePort, OnlineCapabilities {
     SearchFilter filter = SearchFilter.all,
   }) {
     requestedFilter = filter;
+    requestedContinuation = continuation;
+    searchCalls++;
     scopes[query] = scope;
     return (requests[query] = Completer<CatalogPage>()).future;
   }
@@ -92,7 +97,7 @@ final class ControlledCatalog implements OnlinePort, OnlineCapabilities {
     void Function(int, int) progress,
   ) async {}
   @override
-  Future<List<DownloadedEntry>> downloads() async => [];
+  Future<List<DownloadedEntry>> downloads() async => downloadedEntries;
   @override
   Future<void> removeDownload(CatalogEntry entry) async {}
 }
@@ -100,8 +105,9 @@ final class ControlledCatalog implements OnlinePort, OnlineCapabilities {
 PlaybackSnapshot transportFixture({
   int selection = 1,
   String entryId = 'fixture:first',
+  AudioPhase phase = AudioPhase.playing,
 }) => PlaybackSnapshot(
-  phase: AudioPhase.playing,
+  phase: phase,
   selection: selection,
   queueRevision: 1,
   sequence: 1,
@@ -128,6 +134,93 @@ PlaybackSnapshot transportFixture({
 );
 
 void main() {
+  test(
+    'failed pagination preserves rows and retries the same token once',
+    () async {
+      final port = ControlledCatalog();
+      final container = ProviderContainer(
+        overrides: [onlinePortProvider.overrideWithValue(port)],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(catalogProvider.notifier);
+      final first = controller.load(query: 'page', filter: SearchFilter.songs);
+      const row = CatalogEntry(provider: 'youtube', id: 'one', title: 'First');
+      port.requests['page']!.complete(CatalogPage([row], continuation: 'next'));
+      await first;
+      final next = controller.more();
+      await controller
+          .more(); // Repeated click cannot issue concurrent page reads.
+      expect(port.searchCalls, 2);
+      expect(port.requestedContinuation, 'next');
+      port.requests['page']!.completeError(
+        const ProviderFailure(ProviderProblem.network),
+      );
+      await next;
+      expect(container.read(catalogProvider).entries.single, row);
+      expect(container.read(catalogProvider).continuation, 'next');
+      expect(container.read(catalogProvider).pageError, isTrue);
+      final retry = controller.retry();
+      expect(port.requestedContinuation, 'next');
+      expect(port.requestedFilter, SearchFilter.songs);
+      port.requests['page']!.complete(CatalogPage([row]));
+      await retry;
+      // Repeated recording IDs represent distinct playlist entries.
+      expect(container.read(catalogProvider).entries, [row, row]);
+      expect(container.read(catalogProvider).error, isNull);
+    },
+  );
+
+  test(
+    'Back restores Search and parent data; account cancellation evicts saved pages',
+    () async {
+      final port = ControlledCatalog();
+      final container = ProviderContainer(
+        overrides: [onlinePortProvider.overrideWithValue(port)],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(catalogProvider.notifier);
+      expect(controller.activate('search'), isFalse);
+      final search = controller.load(
+        query: 'album',
+        filter: SearchFilter.albums,
+      );
+      port.requests['album']!.complete(
+        CatalogPage([
+          const CatalogEntry(provider: 'youtube', id: 'MPRE1', title: 'Result'),
+        ], continuation: 'next'),
+      );
+      await search;
+      controller.activate('MPRE1');
+      await controller.load(browseId: 'MPRE1');
+      expect(controller.activate('search'), isTrue);
+      expect(container.read(catalogProvider).query, 'album');
+      expect(container.read(catalogProvider).filter, SearchFilter.albums);
+      expect(container.read(catalogProvider).continuation, 'next');
+      controller.cancel();
+      expect(container.read(catalogProvider).entries, isEmpty);
+      expect(container.read(catalogProvider).query, 'album');
+      expect(controller.activate('MPRE1'), isFalse);
+    },
+  );
+
+  test('editing Search rejects the late committed query', () async {
+    final port = ControlledCatalog();
+    final container = ProviderContainer(
+      overrides: [onlinePortProvider.overrideWithValue(port)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(catalogProvider.notifier);
+    final pending = controller.load(query: 'old');
+    controller.clearSearch();
+    port.requests['old']!.complete(
+      CatalogPage([
+        const CatalogEntry(provider: 'youtube', id: 'old', title: 'Stale'),
+      ]),
+    );
+    await pending;
+    expect(container.read(catalogProvider).entries, isEmpty);
+    expect(container.read(catalogProvider).loading, isFalse);
+  });
   test('late query result cannot overwrite a newer query/provider', () async {
     final port = ControlledCatalog();
     final container = ProviderContainer(

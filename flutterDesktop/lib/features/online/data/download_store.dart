@@ -18,19 +18,27 @@ final class OfflineTrack {
 final class DownloadStore {
   DownloadStore(this.root);
   final Directory root;
-  bool _busy = false;
+  final _busy = <String>{};
   String _key(CatalogEntry entry) =>
       sha256.convert(utf8.encode(entry.key)).toString();
   File _file(String key, String suffix) => File('${root.path}/$key.$suffix');
-  Future<void> _journal(String key, Map<String, dynamic> data) async {
-    final tmp = _file(key, 'json.tmp');
+  Future<void> _journal(
+    String key,
+    Map<String, dynamic> data, {
+    bool partial = false,
+  }) async {
+    final suffix = partial ? 'partial.json' : 'json';
+    final tmp = _file(key, '$suffix.tmp');
     await tmp.writeAsString(jsonEncode(data), flush: true);
-    await tmp.rename(_file(key, 'json').path);
+    await tmp.rename(_file(key, suffix).path);
   }
 
-  Future<Map<String, dynamic>?> _read(String key) async {
+  Future<Map<String, dynamic>?> _read(
+    String key, {
+    bool partial = false,
+  }) async {
     try {
-      final f = _file(key, 'json');
+      final f = _file(key, partial ? 'partial.json' : 'json');
       if (!await f.exists() || await f.length() > 2 * 1024 * 1024) return null;
       return jsonDecode(await f.readAsString()) as Map<String, dynamic>;
     } catch (_) {
@@ -56,6 +64,8 @@ final class DownloadStore {
     if (committed is! int ||
         committed < 0 ||
         committed > total ||
+        hashes.length != (committed / RangeSource.span).ceil() ||
+        (committed != total && committed % RangeSource.span != 0) ||
         (!partial && committed != total))
       return false;
     if (await file.length() < committed ||
@@ -84,21 +94,31 @@ final class DownloadStore {
     RangeSource source, {
     void Function(int, int)? progress,
   }) async {
-    if (_busy) throw const ProviderFailure(ProviderProblem.unavailable);
+    final identity = _key(entry);
+    if (_busy.contains(identity))
+      throw const ProviderFailure(ProviderProblem.unavailable);
     source.media.check();
+    if (entry.provider != source.media.provider ||
+        entry.id != source.media.trackId)
+      throw const ProviderFailure(ProviderProblem.integrity);
     if (!source.media.downloadsAllowed)
       throw const ProviderFailure(ProviderProblem.unsupported);
-    _busy = true;
+    _busy.add(identity);
     try {
       await root.create(recursive: true);
       final key = _key(entry), part = _file(_key(entry), 'part');
       await source.chunk(0);
-      var journal = await _read(key);
+      // A failed replacement never hides a previously verified offline file.
+      // Read the old in-progress journal too for backwards-compatible resume.
+      var journal = await _read(key, partial: true);
+      final previous = await _read(key);
+      journal ??= previous?['complete'] == false ? previous : null;
       var committed = 0;
       final hashes = <String>[];
       if (journal != null &&
           journal['key'] == entry.key &&
           journal['total'] == source.total &&
+          journal['rendition'] == source.media.rendition &&
           source.validator != null &&
           journal['validator'] == source.validator &&
           await _verify(part, journal, partial: true)) {
@@ -112,6 +132,8 @@ final class DownloadStore {
         'id': entry.id,
         'title': entry.title,
         'subtitle': entry.subtitle,
+        'duration': entry.durationSeconds,
+        'rendition': source.media.rendition,
         'total': source.total,
         'validator': source.validator,
         'hashes': hashes,
@@ -122,7 +144,7 @@ final class DownloadStore {
       try {
         await output.truncate(committed);
         await output.setPosition(committed);
-        await _journal(key, journal);
+        await _journal(key, journal, partial: true);
         while (committed < source.total!) {
           source.scope.check();
           final data = await source.chunk(hashes.length);
@@ -131,7 +153,7 @@ final class DownloadStore {
           committed += data.length;
           hashes.add(sha256.convert(data).toString());
           journal['committed'] = committed;
-          await _journal(key, journal);
+          await _journal(key, journal, partial: true);
           progress?.call(committed, source.total!);
         }
       } finally {
@@ -139,15 +161,17 @@ final class DownloadStore {
       }
       source.scope.check();
       journal['complete'] = true;
-      await _journal(key, journal);
+      await _journal(key, journal, partial: true);
       await part.rename(_file(key, 'audio').path);
+      await _journal(key, journal);
+      await _file(key, 'partial.json').delete();
       return OfflineTrack(entry, _file(key, 'audio').path, committed);
     } on ProviderFailure {
       rethrow;
     } on FileSystemException {
       throw const ProviderFailure(ProviderProblem.integrity);
     } finally {
-      _busy = false;
+      _busy.remove(identity);
     }
   }
 
@@ -156,9 +180,29 @@ final class DownloadStore {
     final result = <OfflineTrack>[];
     await for (final file in root.list(followLinks: false)) {
       if (file is! File ||
-          !RegExp(r'^[a-f0-9]{64}\.json$').hasMatch(file.uri.pathSegments.last))
+          !RegExp(
+            r'^[a-f0-9]{64}(?:\.partial)?\.json$',
+          ).hasMatch(file.uri.pathSegments.last))
         continue;
       final key = file.uri.pathSegments.last.split('.').first;
+      if (_busy.contains(key)) {
+        // Read only the completed journal while a new transfer owns this key.
+        if (file.path.endsWith('.partial.json')) continue;
+      } else {
+        final pending = await _read(key, partial: true);
+        if (pending?['complete'] == true) {
+          final part = _file(key, 'part'), audio = _file(key, 'audio');
+          if (await _verify(part, pending!)) {
+            await part.rename(audio.path);
+            await _journal(key, pending);
+            await _file(key, 'partial.json').delete();
+          } else if (await _verify(audio, pending)) {
+            await _journal(key, pending);
+            await _file(key, 'partial.json').delete();
+          }
+        }
+      }
+      if (result.any((row) => _key(row.entry) == key)) continue;
       final j = await _read(key);
       if (j == null ||
           j['complete'] != true ||
@@ -171,6 +215,7 @@ final class DownloadStore {
         id: j['id'] as String,
         title: j['title'] as String,
         subtitle: j['subtitle'] as String? ?? '',
+        durationSeconds: j['duration'] is int ? j['duration'] as int : null,
       );
       if (_key(entry) != key) continue;
       var audio = _file(key, 'audio');
@@ -184,8 +229,16 @@ final class DownloadStore {
   }
 
   Future<void> remove(CatalogEntry entry) async {
-    if (_busy) throw const ProviderFailure(ProviderProblem.unavailable);
-    for (final suffix in ['json', 'json.tmp', 'audio', 'part']) {
+    if (_busy.contains(_key(entry)))
+      throw const ProviderFailure(ProviderProblem.unavailable);
+    for (final suffix in [
+      'json',
+      'json.tmp',
+      'partial.json',
+      'partial.json.tmp',
+      'audio',
+      'part',
+    ]) {
       final f = _file(_key(entry), suffix);
       if (await f.exists()) await f.delete();
     }

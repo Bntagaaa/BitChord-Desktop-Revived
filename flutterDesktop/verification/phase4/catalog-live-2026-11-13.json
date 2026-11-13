@@ -1,0 +1,124 @@
+{
+  "recorded_at_utc": "2026-11-13T05:22:27.823235Z",
+  "platform": "linux",
+  "dart": "3.13.7",
+  "authenticated": false,
+  "physical_audio": "NOT_TESTED",
+  "visual_parity": "NOT_TESTED",
+  "home": {
+    "status": "LIVE_RESPONSE",
+    "entries": 30,
+    "shelves": 2,
+    "header": false,
+    "continuation": true
+  },
+  "home_continuation": {
+    "status": "LIVE_RESPONSE",
+    "entries": 29,
+    "shelves": 3,
+    "header": false,
+    "continuation": true
+  },
+  "new": {
+    "status": "LIVE_RESPONSE",
+    "entries": 49,
+    "shelves": 3,
+    "header": false,
+    "continuation": false
+  },
+  "explore": {
+    "status": "LIVE_RESPONSE",
+    "entries": 68,
+    "shelves": 3,
+    "header": false,
+    "continuation": false
+  },
+  "search_all": {
+    "status": "LIVE_RESPONSE",
+    "entries": 30,
+    "shelves": 0,
+    "header": false,
+    "continuation": false
+  },
+  "search_songs": {
+    "status": "LIVE_RESPONSE",
+    "entries": 20,
+    "shelves": 1,
+    "header": false,
+    "continuation": true
+  },
+  "search_songs_continuation": {
+    "status": "LIVE_RESPONSE",
+    "entries": 20,
+    "shelves": 0,
+    "header": false,
+    "continuation": true
+  },
+  "search_albums": {
+    "status": "LIVE_RESPONSE",
+    "entries": 20,
+    "shelves": 1,
+    "header": false,
+    "continuation": true
+  },
+  "search_albums_continuation": {
+    "status": "LIVE_RESPONSE",
+    "entries": 20,
+    "shelves": 0,
+    "header": false,
+    "continuation": true
+  },
+  "detail_albums": {
+    "status": "LIVE_RESPONSE",
+    "entries": 9,
+    "shelves": 0,
+    "header": true,
+    "continuation": false
+  },
+  "search_artists": {
+    "status": "LIVE_RESPONSE",
+    "entries": 20,
+    "shelves": 1,
+    "header": false,
+    "continuation": true
+  },
+  "search_artists_continuation": {
+    "status": "LIVE_RESPONSE",
+    "entries": 20,
+    "shelves": 0,
+    "header": false,
+    "continuation": true
+  },
+  "detail_artists": {
+    "status": "LIVE_RESPONSE",
+    "entries": 35,
+    "shelves": 4,
+    "header": true,
+    "continuation": false
+  },
+  "search_playlists": {
+    "status": "LIVE_RESPONSE",
+    "entries": 20,
+    "shelves": 1,
+    "header": false,
+    "continuation": true
+  },
+  "search_playlists_continuation": {
+    "status": "LIVE_RESPONSE",
+    "entries": 20,
+    "shelves": 0,
+    "header": false,
+    "continuation": true
+  },
+  "detail_playlists": {
+    "status": "LIVE_RESPONSE",
+    "entries": 100,
+    "shelves": 0,
+    "header": true,
+    "continuation": true
+  },
+  "suggestions": {
+    "status": "LIVE_RESPONSE",
+    "count": 6
+  }
+}

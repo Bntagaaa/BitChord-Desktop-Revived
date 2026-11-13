@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/catalog_controller.dart';
+import '../application/search_suggestions.dart';
+import '../application/download_queue.dart';
 import '../domain/catalog.dart';
 import '../domain/online_port.dart';
 
@@ -33,6 +35,8 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
     });
     // Cancel personalized catalog/download operations across account generations.
     ref.read(catalogProvider.notifier).cancel();
+    ref.read(searchSuggestionsProvider.notifier).dismiss();
+    ref.read(downloadQueueProvider.notifier).cancelAll();
     try {
       await accounts.signIn(cookie, scope);
       scope.check();
@@ -102,6 +106,8 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
             TextButton(
               onPressed: () async {
                 ref.read(catalogProvider.notifier).cancel();
+                ref.read(searchSuggestionsProvider.notifier).dismiss();
+                ref.read(downloadQueueProvider.notifier).cancelAll();
                 await accounts.signOut();
                 final state = ref.read(catalogProvider);
                 if (state.browseId != null || state.query.isNotEmpty) {

@@ -1501,3 +1501,28 @@ User-reported live YouTube start was fast and functional, but scrubbing immediat
 ### P11/P12/P24 — user confirmation of immediate-scrub fix, 2026-11-13
 
 **USER_VERIFIED (scoped):** after `dd0af8f2` / `972870c3` and [CI 43362441316](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43362441316) passed on Windows/Linux, the user confirmed the delivered immediate-after-Play scrubbing fix with **"perfect"**. This promotes the specific user-observed rapid-start/scrub regression from CI-only to a user-confirmed scenario; it does not promote the whole P11/P12/P24 IDs to PARITY_ACCEPTED. Long sessions, repeated rapid seeks, token expiry, authenticated streaming and both physical OS output matrices remain open. Phase 4 INCOMPLETE; Phase 5 NOT STARTED.
+
+### Phase 4 scoped catalog/download closure attempt — 2026-11-13
+
+The [complete audit](flutterDesktop/verification/phase4/completion-audit-2026-11-13.md)
+maps every Phase 4 family to inspected pinned Kotlin paths, Flutter behavior,
+UI differences, absent implementations and missing evidence. Scope remains
+Phase 4 only. The user has also confirmed restart/offline playback works and
+offered interactive account login; no secret or live account session was supplied.
+
+| IDs | New implementation/evidence | Status and limits |
+| --- | --- | --- |
+| P02/P03/P04 | `online/application/catalog_controller.dart`, `search_suggestions.dart`; `data/youtube/catalog_client.dart`, `catalog_parser.dart`, `youtube_music.dart`; `presentation/catalog_search_field.dart` | FIXTURE_TESTED locally: debounced real query suggestions, mouse/fill/arrows/Enter/Escape, stale edit rejection, bounded parent/Search restoration, account invalidation, retryable failed pagination, Home continuation root and filtered Search shelf token fixes. LIVE_RESPONSE counts in `verification/phase4/catalog-live-2026-11-13.json`; no full P-ID acceptance. |
+| P05/related P10–P12 | `application/catalog_playback.dart`, existing runtime identity getter and `presentation/catalog_surface.dart`, `catalog_components.dart` | FIXTURE_TESTED locally: occurrence-preserving loaded-context selection, sequential Next/Previous/EOF and offline mode; only the exact adopted native entry may advance. Source-sized release header, numbered rows, source artwork omission on albums, local find, shuffle, batch download and clipboard share. No native decoder/broker/resolver/seek algorithm change; physical multi-track/live EOF remains unverified. |
+| P08/P35/P36 | `application/download_queue.dart`, `presentation/download_manager.dart`, `data/download_store.dart` | FIXTURE_TESTED locally: four workers, dedup/FIFO/progress/cancel/retry/clear, same-key quiescence; separate staging journal, concurrent independent writers, failed replacement preserves offline file, crash promotion recovery, rendition/identity/duration checks and corruption exclusion. Default quality Lossless; full settings/manifest/path/cache/fault parity remains open. |
+| P03–P05 visual | Scoped Search/collection/manager source metrics; Light/Dark test PNGs at `verification/phase4-search-download/` | IMPLEMENTED with widget layout/interaction diagnostics. Ahem-font test PNGs are not real native comparisons. Artist hero, shelf grid, discovery/Search landing, custom menus, full account/library surfaces, every state/DPI/motion/font check remain open. **Not PARITY_ACCEPTED.** |
+| P06/P20/P21 | Inspected `DesktopAccounts.kt`, browser/session/secret-store sources, Spotify web-player token/client-token and library contracts | INCOMPLETE implementation: no browser/protected-store/multi-account bridge or Spotify library/refresh flow. User is willing to log in; missing UI/code is the prerequisite, not missing user permission. Existing process-only cookie validation remains a subset. |
+| P17/P18/P19 | Existing JioSaavn/add-on/direct guest/extractor/broker paths retained; provider regressions rerun | No new full source/module/upgrade/manifest acceptance. Custom-module isolation, persistent source management, full disk-span-cache protocol and Windows/Linux live account/physical proof remain open. |
+
+Local Flutter 3.47.9/Dart 3.13.7 fatal analyzer and **56 tests passed** after
+context implementation; provider/native suite passed with **384000 exact PCM
+frames**, zero retained decoders. Native library/test compiled with Clang 23.1.4;
+local CMake/Xvfb absent, Windows/Linux release/native GUI matrix pending the push.
+Baseline success [43364580612](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43364580612)
+is not promoted to new-source evidence. All reference Kotlin trees are unchanged.
+**Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**

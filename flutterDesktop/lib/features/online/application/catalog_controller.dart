@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/domain/audio_contract.dart';
 import '../domain/catalog.dart';
 import '../domain/online_port.dart';
+import 'catalog_playback.dart';
 
 final onlinePortProvider = Provider<OnlinePort?>((ref) => null);
 final artworkProvider = FutureProvider.autoDispose.family<Uint8List?, Uri>((
@@ -38,37 +39,68 @@ final class CatalogView {
     this.query = '',
     this.browseId,
     this.params,
-    this.downloadProgress,
+    this.pageError = false,
   });
   final List<CatalogEntry> entries;
   final List<CatalogShelf> shelves;
   final CatalogHeader? header;
   final SearchFilter filter;
   final bool loading;
-  final String? error, continuation, browseId, params, downloadProgress;
+  final bool pageError;
+  final String? error, continuation, browseId, params;
   final String provider, query;
 }
 
 final class CatalogController extends Notifier<CatalogView> {
-  RequestScope? _queryScope, _playScope, _downloadScope, _connectScope;
+  RequestScope? _queryScope, _connectScope;
   int _generation = 0;
   bool _disposed = false;
+  final _pages = <String, CatalogView>{};
+  String? _pageKey;
   OnlinePort? get port => ref.read(onlinePortProvider);
   @override
   CatalogView build() {
     ref.onDispose(() {
       _disposed = true;
       cancel();
-      _playScope?.cancel();
     });
     return const CatalogView();
   }
 
   void cancel() {
+    ++_generation;
+    _pages.clear();
     _queryScope?.cancel();
-    _downloadScope?.cancel();
-    _playScope?.cancel();
+    if (!_disposed) {
+      ref.read(catalogPlaybackProvider.notifier).cancel();
+      state = CatalogView(
+        provider: state.provider,
+        query: state.query,
+        filter: state.filter,
+        browseId: state.browseId,
+        params: state.params,
+      );
+    }
     _connectScope?.cancel();
+  }
+
+  // A small route working set keeps Search and a parent collection intact on
+  // Back. Account changes call cancel(), invalidating personalized snapshots.
+  bool activate(String key) {
+    if (_pageKey == key) return !state.loading;
+    if (_pageKey != null && !state.loading) {
+      _pages.remove(_pageKey);
+      _pages[_pageKey!] = state;
+      while (_pages.length > 3) {
+        _pages.remove(_pages.keys.first);
+      }
+    }
+    _queryScope?.cancel();
+    ++_generation;
+    _pageKey = key;
+    final saved = _pages.remove(key);
+    state = saved ?? const CatalogView();
+    return saved != null;
   }
 
   String _message(Object e) =>
@@ -82,7 +114,8 @@ final class CatalogController extends Notifier<CatalogView> {
     SearchFilter filter = SearchFilter.all,
   }) async {
     final api = port;
-    if (api == null || (more && state.continuation == null)) return;
+    if (api == null || (more && (state.loading || state.continuation == null)))
+      return;
     _queryScope?.cancel();
     final scope = _queryScope = RequestScope(), generation = ++_generation;
     final before = state;
@@ -90,6 +123,7 @@ final class CatalogController extends Notifier<CatalogView> {
       entries: more ? before.entries : const [],
       shelves: more ? before.shelves : const [],
       header: more ? before.header : null,
+      continuation: more ? before.continuation : null,
       filter: filter,
       loading: true,
       provider: provider,
@@ -143,6 +177,8 @@ final class CatalogController extends Notifier<CatalogView> {
           entries: more ? before.entries : const [],
           shelves: more ? before.shelves : const [],
           header: more ? before.header : null,
+          continuation: more ? before.continuation : null,
+          pageError: more,
           filter: filter,
           error: _message(e),
           provider: provider,
@@ -182,6 +218,25 @@ final class CatalogController extends Notifier<CatalogView> {
     more: true,
     filter: state.filter,
   );
+  Future<void> retry() => load(
+    provider: state.provider,
+    query: state.query,
+    browseId: state.browseId,
+    params: state.params,
+    filter: state.filter,
+    more: state.pageError,
+  );
+
+  void clearSearch({
+    String query = '',
+    String provider = 'youtube',
+    SearchFilter filter = SearchFilter.all,
+  }) {
+    _queryScope?.cancel();
+    ++_generation;
+    state = CatalogView(query: query, provider: provider, filter: filter);
+  }
+
   Future<String?> connect(String url) async {
     final api = port;
     if (api == null) return 'Music services are unavailable.';
@@ -197,43 +252,14 @@ final class CatalogController extends Notifier<CatalogView> {
     }
   }
 
-  Future<String?> play(CatalogEntry entry, {bool offline = false}) async {
-    final api = port;
-    if (api == null) return 'Music services are unavailable.';
-    _playScope?.cancel();
-    final scope = _playScope = RequestScope();
-    try {
-      if (offline) {
-        await api.playOffline(entry, scope);
-      } else {
-        await api.play(entry, AudioQuality.lossless, scope);
-      }
-      return null;
-    } catch (e) {
-      return _message(e);
-    }
-  }
-
-  Future<String?> download(
-    CatalogEntry entry,
-    void Function(int, int) progress,
-  ) async {
-    final api = port;
-    if (api == null) return 'Music services are unavailable.';
-    if (_downloadScope != null) return 'A download is already active.';
-    final scope = _downloadScope = RequestScope();
-    try {
-      await api.download(entry, AudioQuality.lossless, scope, progress);
-      return null;
-    } catch (e) {
-      return _message(e);
-    } finally {
-      scope.cancel();
-      _downloadScope = null;
-    }
-  }
-
-  void cancelDownload() => _downloadScope?.cancel();
+  Future<String?> play(
+    CatalogEntry entry, {
+    bool offline = false,
+    List<CatalogEntry>? context,
+    int? index,
+  }) => ref
+      .read(catalogPlaybackProvider.notifier)
+      .select(entry, offline: offline, context: context, index: index);
 }
 
 final class TransportController extends Notifier<PlaybackSnapshot?> {
@@ -249,7 +275,10 @@ final class TransportController extends Notifier<PlaybackSnapshot?> {
         _busy = true;
         try {
           final next = await port.snapshot();
-          if (!_disposed) state = next;
+          if (!_disposed) {
+            state = next;
+            ref.read(catalogPlaybackProvider.notifier).observe(next);
+          }
         } catch (_) {
         } finally {
           _busy = false;

@@ -12,6 +12,14 @@ abstract interface class OnlineArtwork {
   Future<Uint8List> artwork(Uri url, RequestScope scope);
 }
 
+abstract interface class OnlineSuggestions {
+  Future<List<String>> suggestions(String query, RequestScope scope);
+}
+
+abstract interface class OnlinePlaybackIdentity {
+  String get currentEntryId;
+}
+
 abstract interface class OnlineCapabilities {
   bool get youtubeAudioConfigured;
 }

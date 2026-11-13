@@ -417,6 +417,69 @@ Future<void> main(List<String> arguments) async {
     );
     final reopened = DownloadStore(Directory('${directory.path}/downloads'));
     check((await reopened.list()).length == 1, 'Offline restart');
+    check(
+      (await reopened.list()).single.entry.durationSeconds ==
+          entry.durationSeconds,
+      'Offline metadata survives restart',
+    );
+    // Starting a replacement and then losing the network must leave the
+    // previously verified offline recording available.
+    tag = '"replacement"';
+    failAt = RangeSource.span;
+    s = source();
+    await fails(() => store.save(entry, s), ProviderProblem.unavailable);
+    s.close();
+    check(
+      (await reopened.list()).length == 1,
+      'Failed replacement preserves offline file',
+    );
+    failAt = -1;
+    const other = CatalogEntry(
+      provider: 'addon',
+      id: 'second',
+      title: 'Second',
+    );
+    final secondSource = RangeSource(
+      ResolvedMedia(
+        provider: 'addon',
+        trackId: 'second',
+        rendition: 'wav',
+        url: base.resolve('media'),
+      ),
+      http,
+      RequestScope(),
+    );
+    s = source();
+    await Future.wait([store.save(entry, s), store.save(other, secondSource)]);
+    s.close();
+    secondSource.close();
+    check(
+      (await reopened.list()).length == 2,
+      'Independent queued writers can run concurrently',
+    );
+    await reopened.remove(other);
+    final wrongIdentity = source();
+    await fails(
+      () => store.save(other, wrongIdentity),
+      ProviderProblem.integrity,
+    );
+    wrongIdentity.close();
+    // Crash after final audio promotion but before committing its journal.
+    final journalFile =
+        (await reopened.root
+                .list()
+                .where((f) => f.path.endsWith('.json'))
+                .toList())
+            .single;
+    final pendingJournal = File(
+      journalFile.path.replaceFirst(RegExp(r'\.json$'), '.partial.json'),
+    );
+    await (journalFile as File).copy(pendingJournal.path);
+    await journalFile.delete();
+    check(
+      (await reopened.list()).length == 1,
+      'Recover promoted audio from completed staging journal',
+    );
     final input = await File(
       downloaded.path,
     ).open(mode: FileMode.writeOnlyAppend);
@@ -430,7 +493,7 @@ Future<void> main(List<String> arguments) async {
     await reopened.remove(entry);
     check((await reopened.list()).isEmpty, 'Removal');
     report['downloads'] =
-        'PASS: interruption/resume, unpublished partials, offline restart, corruption rejection, app-owned removal';
+        'PASS: interruption/resume, unpublished partials, concurrent writers, replacement failure isolation, identity checks, promotion-crash recovery, offline restart/metadata, corruption rejection, app-owned removal';
     final broker = await SourceBroker.open(media());
     try {
       final brokerScope = RequestScope();

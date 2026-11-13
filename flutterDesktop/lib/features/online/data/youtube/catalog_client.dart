@@ -96,8 +96,22 @@ final class YouTubeCatalogClient {
     String endpoint,
     Map<String, Object?> body,
     RequestScope parent,
+  ) async => YouTubeCatalogParser.parsePage(
+    await request(endpoint, body, parent),
+    browseId: body['browseId'] as String?,
+    search: endpoint == 'search',
+  );
+
+  Future<Map<String, dynamic>> request(
+    String endpoint,
+    Map<String, Object?> body,
+    RequestScope parent,
   ) async {
-    if (!['search', 'browse'].contains(endpoint))
+    if (![
+      'search',
+      'browse',
+      'music/get_search_suggestions',
+    ].contains(endpoint))
       throw const ProviderFailure(ProviderProblem.unsupported);
     return accounts.run(parent, (scope, session) async {
       try {
@@ -178,10 +192,7 @@ final class YouTubeCatalogClient {
           if (decoded is! Map<String, dynamic> || decoded['error'] != null) {
             throw const ProviderFailure(ProviderProblem.malformed);
           }
-          return YouTubeCatalogParser.parsePage(
-            decoded,
-            browseId: body['browseId'] as String?,
-          );
+          return decoded;
         }
         throw const ProviderFailure(ProviderProblem.youtubeUnavailable);
       } on ProviderFailure catch (failure) {

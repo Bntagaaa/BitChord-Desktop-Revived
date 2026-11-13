@@ -416,3 +416,14 @@ Targeted synthetic contracts were expanded for filtering, quality ranking, candi
 The direct-first guest playback path was previously reported by the user to start and play quickly. The remaining immediate-scrub issue was traced to `OnlineTransport` sending native `seek()` on every slider movement. Commits `dd0af8f2` and `972870c3` implement preview-only dragging, one seek on release, stale-track gesture fencing and a small EOF guard; the native engine and non-YouTube providers were not changed. Two widget regression tests were added (single seek despite many drag updates; no seek after track replacement).
 
 [Exact-source Actions run 43362441316](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43362441316) completed SUCCESS for Linux, Windows and retention: 40 Flutter tests per platform, format, analyzer, provider/native checks, release bundles and GUI smoke. The user subsequently replied **"perfect"**, which is recorded as **USER_VERIFIED** for the specific early-scrub playback failure on their device. No independently captured media-byte/physical-audio trace or exhaustive live seek/expiry/account scenario was supplied; do not interpret the confirmation as complete YouTube or Phase 4 parity. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
+
+## Completion audit and catalog/download continuation — 2026-11-13
+
+See [the current source/feature/evidence audit](completion-audit-2026-11-13.md)
+and [redacted live catalog report](catalog-live-2026-11-13.json). They supersede
+older unavailable-provider claims only for the specifically observed guest
+responses and user-confirmed scenarios. Real Home/Search continuations,
+suggestions, loaded-context sequencing, download queue and offline replacement
+recovery are now implemented and locally regression-tested. Full browser/account,
+Spotify/library/module/source/manifest/cache and matched native visual gates
+remain unfinished. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**

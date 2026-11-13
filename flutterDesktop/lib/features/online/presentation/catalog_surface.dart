@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +11,11 @@ import '../application/catalog_controller.dart';
 import '../domain/catalog.dart';
 import '../domain/online_port.dart';
 import 'catalog_components.dart';
+import 'catalog_search_field.dart';
+import '../application/search_suggestions.dart';
+import '../application/download_queue.dart';
+import '../application/catalog_playback.dart';
+import 'download_manager.dart';
 
 class CatalogSurface extends ConsumerStatefulWidget {
   const CatalogSurface({
@@ -37,13 +43,31 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
 
   String? _notice;
   bool _connecting = false;
-  String? _progress;
   Future<List<DownloadedEntry>>? _downloads;
+  bool _finding = false;
+  String _listQuery = '';
+  bool get _collection =>
+      widget.browseId != null &&
+      (widget.browseId!.startsWith('MPRE') ||
+          widget.browseId!.startsWith('VL') ||
+          widget.browseId!.startsWith('OLAK'));
   @override
   void initState() {
     super.initState();
     Future.microtask(() {
       if (!mounted) return;
+      final controller = ref.read(catalogProvider.notifier);
+      final restored = controller.activate(
+        '${widget.destination}:${widget.browseId}:${widget.params}',
+      );
+      if (restored) {
+        final saved = ref.read(catalogProvider);
+        setState(() {
+          _query.text = saved.query;
+          _source = saved.provider;
+          _filter = saved.filter;
+        });
+      }
       if (widget.destination == 'downloads') {
         _reloadDownloads();
         return;
@@ -56,7 +80,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
             'explore' => 'FEmusic_explore',
             _ => null,
           };
-      if (browse != null)
+      if (browse != null && !restored)
         ref
             .read(catalogProvider.notifier)
             .load(browseId: browse, params: widget.params);
@@ -80,32 +104,27 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     if (mounted) setState(() => _notice = message);
   }
 
-  Future<void> _play(CatalogEntry entry, {bool offline = false}) async {
+  Future<void> _play(
+    CatalogEntry entry, {
+    bool offline = false,
+    List<CatalogEntry>? context,
+    int? index,
+  }) async {
     _message('Opening audio…');
     _message(
-      await ref.read(catalogProvider.notifier).play(entry, offline: offline),
+      await ref
+          .read(catalogProvider.notifier)
+          .play(entry, offline: offline, context: context, index: index),
     );
   }
 
-  Future<void> _download(CatalogEntry entry) async {
-    setState(() => _progress = 'Starting download…');
-    final error = await ref.read(catalogProvider.notifier).download(entry, (
-      done,
-      total,
-    ) {
-      if (mounted)
-        setState(
-          () => _progress = 'Downloading ${(done * 100 / total).floor()}%',
-        );
-    });
-    if (mounted)
-      setState(() {
-        _progress = null;
-        _notice = error ?? 'Download verified and saved.';
-      });
+  void _download(CatalogEntry entry) {
+    ref.read(downloadQueueProvider.notifier).enqueue(entry);
+    showDialog<void>(context: context, builder: (_) => const DownloadManager());
   }
 
   void _select(CatalogEntry entry) {
+    ref.read(searchSuggestionsProvider.notifier).dismiss();
     if (entry.kind == CatalogKind.track) {
       if (entry.provider == 'youtube' && !_youtubeAudio) {
         _message(
@@ -141,8 +160,28 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     context.go(path);
   }
 
-  Widget _row(CatalogEntry entry, {bool offline = false}) {
+  Widget _row(
+    CatalogEntry entry, {
+    bool offline = false,
+    List<CatalogEntry>? playbackEntries,
+    int? index,
+  }) {
     final playable = offline || entry.provider != 'youtube' || _youtubeAudio;
+    if (_collection && entry.kind == CatalogKind.track) {
+      return CollectionTrackRow(
+        entry: entry,
+        index: index ?? 0,
+        album: !widget.browseId!.startsWith('VL'),
+        onPlay: playable
+            ? () => _play(
+                entry,
+                context: playbackEntries,
+                index: playbackEntries == null ? null : index,
+              )
+            : null,
+        onDownload: playable ? () => _download(entry) : null,
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -159,7 +198,12 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
               borderRadius: BorderRadius.circular(7),
               onTap: entry.kind == CatalogKind.track
                   ? playable
-                        ? () => _play(entry, offline: offline)
+                        ? () => _play(
+                            entry,
+                            offline: offline,
+                            context: playbackEntries,
+                            index: playbackEntries == null ? null : index,
+                          )
                         : null
                   : () => _open(entry),
               child: Padding(
@@ -191,13 +235,18 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
           if (entry.kind == CatalogKind.track && playable)
             IconButton(
               tooltip: offline ? 'Play offline' : 'Play',
-              onPressed: () => _play(entry, offline: offline),
+              onPressed: () => _play(
+                entry,
+                offline: offline,
+                context: playbackEntries,
+                index: playbackEntries == null ? null : index,
+              ),
               icon: const Icon(Icons.play_arrow, size: 20),
             ),
           if (entry.kind == CatalogKind.track && !offline && playable)
             IconButton(
               tooltip: 'Download',
-              onPressed: _progress == null ? () => _download(entry) : null,
+              onPressed: () => _download(entry),
               icon: const Icon(Icons.download_outlined, size: 20),
             ),
           if (offline)
@@ -221,6 +270,10 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(catalogProvider);
+    final tasks = ref.watch(downloadQueueProvider);
+    ref.listen(downloadRevisionProvider, (_, _) {
+      if (widget.destination == 'downloads') _reloadDownloads();
+    });
     final controller = ref.read(catalogProvider.notifier);
     final search = widget.destination == 'search';
     final catalog =
@@ -229,11 +282,12 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          widget.title,
-          key: const Key('page-heading'),
-          style: Theme.of(context).textTheme.headlineLarge,
-        ),
+        if (!_collection)
+          Text(
+            widget.title,
+            key: const Key('page-heading'),
+            style: Theme.of(context).textTheme.headlineLarge,
+          ),
         if (widget.browseId != null)
           Align(
             alignment: Alignment.centerLeft,
@@ -245,7 +299,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
               child: const Text('Back'),
             ),
           ),
-        if (catalog)
+        if (catalog && (_source != 'youtube' || !_youtubeAudio))
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
@@ -260,25 +314,22 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
             ),
           ),
         if (search) ...[
+          CatalogSearchField(
+            controller: _query,
+            youtube: _source == 'youtube',
+            onEdit: () => controller.clearSearch(
+              query: _query.text,
+              provider: _source,
+              filter: _filter,
+            ),
+            onSubmit: (query) => controller.load(
+              provider: _source,
+              query: query,
+              filter: _filter,
+            ),
+          ),
           Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _query,
-                  decoration: const InputDecoration(
-                    hintText: 'Search songs, albums, artists and playlists',
-                  ),
-                  onSubmitted: (query) {
-                    if (query.trim().isNotEmpty)
-                      controller.load(
-                        provider: _source,
-                        query: query,
-                        filter: _filter,
-                      );
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
               DropdownButton<String>(
                 value: _source,
                 items: [
@@ -303,22 +354,12 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                 onChanged: (value) {
                   if (value != null)
                     setState(() {
+                      ref.read(searchSuggestionsProvider.notifier).dismiss();
+                      controller.clearSearch();
                       _source = value;
                       _filter = SearchFilter.all;
                     });
                 },
-              ),
-              IconButton(
-                tooltip: 'Search',
-                onPressed: () {
-                  if (_query.text.trim().isNotEmpty)
-                    controller.load(
-                      provider: _source,
-                      query: _query.text,
-                      filter: _filter,
-                    );
-                },
-                icon: const Icon(Icons.search),
               ),
             ],
           ),
@@ -384,15 +425,16 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(_notice!),
           ),
-        if (_progress != null)
-          Row(
-            children: [
-              Expanded(child: Text(_progress!)),
-              TextButton(
-                onPressed: controller.cancelDownload,
-                child: const Text('Cancel'),
+        if (tasks.isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) => const DownloadManager(),
               ),
-            ],
+              child: Text('Downloads · ${tasks.length}'),
+            ),
           ),
         if (catalog && state.loading)
           const LinearProgressIndicator(minHeight: 2),
@@ -401,13 +443,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
             children: [
               Expanded(child: Text(state.error!)),
               TextButton(
-                onPressed: () => controller.load(
-                  provider: state.provider,
-                  query: state.query,
-                  browseId: state.browseId,
-                  params: state.params,
-                  filter: state.filter,
-                ),
+                onPressed: state.loading ? null : controller.retry,
                 child: const Text('Retry'),
               ),
             ],
@@ -425,7 +461,71 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                   )
                 : ListView(
                     children: [
-                      if (state.header != null)
+                      if (_collection && state.header != null)
+                        CollectionHeader(
+                          header: state.header!,
+                          album: !widget.browseId!.startsWith('VL'),
+                          entries: state.entries,
+                          onShuffle:
+                              state.entries.isEmpty ||
+                                  !state.entries.every(
+                                    (e) => e.kind == CatalogKind.track,
+                                  )
+                              ? null
+                              : () {
+                                  final shuffled = state.entries.toList()
+                                    ..shuffle();
+                                  _play(
+                                    shuffled.first,
+                                    context: shuffled,
+                                    index: 0,
+                                  );
+                                },
+                          onPlay:
+                              state.entries.isEmpty ||
+                                  !state.entries.every(
+                                    (e) => e.kind == CatalogKind.track,
+                                  )
+                              ? null
+                              : () => _play(
+                                  state.entries.first,
+                                  context: state.entries,
+                                  index: 0,
+                                ),
+                          onFind: () => setState(() {
+                            _finding = !_finding;
+                            _listQuery = '';
+                          }),
+                          onShare: () async {
+                            final id = widget.browseId!;
+                            final link = id.startsWith('VL')
+                                ? Uri.https('music.youtube.com', '/playlist', {
+                                    'list': id.substring(2),
+                                  })
+                                : Uri.https('music.youtube.com', '/browse/$id');
+                            try {
+                              await Clipboard.setData(
+                                ClipboardData(text: link.toString()),
+                              );
+                              _message('Link copied.');
+                            } catch (_) {
+                              _message('Unable to copy link.');
+                            }
+                          },
+                          onDownload: () {
+                            final queue = ref.read(
+                              downloadQueueProvider.notifier,
+                            );
+                            for (final entry in state.entries) {
+                              queue.enqueue(entry);
+                            }
+                            showDialog<void>(
+                              context: context,
+                              builder: (_) => const DownloadManager(),
+                            );
+                          },
+                        )
+                      else if (state.header != null)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           child: Row(
@@ -446,7 +546,16 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                             ],
                           ),
                         ),
-                      if (state.shelves.isNotEmpty && !search)
+                      if (_collection && _finding)
+                        TextField(
+                          key: const Key('collection-find'),
+                          decoration: const InputDecoration(
+                            hintText: 'Search this list',
+                          ),
+                          onChanged: (value) =>
+                              setState(() => _listQuery = value),
+                        ),
+                      if (state.shelves.isNotEmpty && !search && !_collection)
                         for (
                           var index = 0;
                           index < state.shelves.length;
@@ -470,7 +579,22 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                                 ),
                           )
                       else
-                        for (final entry in state.entries) _row(entry),
+                        for (final (index, entry) in state.entries.indexed)
+                          if (_listQuery.trim().isEmpty ||
+                              '${entry.title} ${entry.subtitle}'
+                                  .toLowerCase()
+                                  .contains(_listQuery.trim().toLowerCase()))
+                            _row(
+                              entry,
+                              playbackEntries:
+                                  _collection &&
+                                      state.entries.every(
+                                        (e) => e.kind == CatalogKind.track,
+                                      )
+                                  ? state.entries
+                                  : null,
+                              index: _collection ? index : null,
+                            ),
                       if (state.continuation != null)
                         TextButton(
                           onPressed: state.loading ? null : controller.more,
@@ -490,11 +614,22 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                   return const Center(child: CircularProgressIndicator());
                 if (snapshot.data!.isEmpty)
                   return const Text('No verified downloads.');
-                return ListView(
-                  children: [
-                    for (final row in snapshot.data!)
-                      _row(row.entry, offline: true),
-                  ],
+                final rows = snapshot.data!;
+                // Construct one bounded context, not a full copy per row.
+                // Large offline libraries retain individual playback support.
+                final context = rows.length <= 800
+                    ? List<CatalogEntry>.unmodifiable(
+                        rows.map((row) => row.entry),
+                      )
+                    : null;
+                return ListView.builder(
+                  itemCount: rows.length,
+                  itemBuilder: (_, index) => _row(
+                    rows[index].entry,
+                    offline: true,
+                    playbackEntries: context,
+                    index: context == null ? null : index,
+                  ),
                 );
               },
             ),
@@ -546,6 +681,8 @@ class _OnlineTransportState extends ConsumerState<OnlineTransport> {
       return widget.empty;
     }
     final port = ref.read(onlinePortProvider);
+    final playback = ref.watch(catalogPlaybackProvider);
+    final contextPlayback = ref.read(catalogPlaybackProvider.notifier);
     final displayUs = _isCurrentScrub(snapshot)
         ? _scrubPreview!
         : snapshot.positionUs.toDouble();
@@ -560,6 +697,14 @@ class _OnlineTransportState extends ConsumerState<OnlineTransport> {
           child: Row(
             children: [
               const SizedBox(width: 12),
+              if (playback.entries.length > 1)
+                IconButton(
+                  tooltip: 'Previous',
+                  onPressed: playback.hasPrevious
+                      ? () => contextPlayback.previous()
+                      : null,
+                  icon: const Icon(Icons.skip_previous),
+                ),
               IconButton(
                 tooltip: snapshot.phase == AudioPhase.playing
                     ? 'Pause'
@@ -576,6 +721,14 @@ class _OnlineTransportState extends ConsumerState<OnlineTransport> {
                 ),
               ),
               const SizedBox(width: 8),
+              if (playback.entries.length > 1)
+                IconButton(
+                  tooltip: 'Next',
+                  onPressed: playback.hasNext
+                      ? () => contextPlayback.next()
+                      : null,
+                  icon: const Icon(Icons.skip_next),
+                ),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -587,9 +740,10 @@ class _OnlineTransportState extends ConsumerState<OnlineTransport> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      snapshot.phase == AudioPhase.failed
-                          ? 'Playback failed (${snapshot.error})'
-                          : '${snapshot.phase.name} · ${position ~/ 60}:${(position % 60).toString().padLeft(2, '0')} · ${port?.currentSubtitle ?? ''}',
+                      playback.error ??
+                          (snapshot.phase == AudioPhase.failed
+                              ? 'Playback failed (${snapshot.error})'
+                              : '${snapshot.phase.name} · ${position ~/ 60}:${(position % 60).toString().padLeft(2, '0')} · ${port?.currentSubtitle ?? ''}'),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],

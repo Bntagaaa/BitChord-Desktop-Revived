@@ -4,6 +4,282 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/catalog_controller.dart';
 import '../domain/catalog.dart';
+import '../../../design_system/palette.dart';
+
+class CollectionHeader extends StatelessWidget {
+  const CollectionHeader({
+    super.key,
+    required this.header,
+    required this.album,
+    required this.entries,
+    required this.onPlay,
+    required this.onShuffle,
+    required this.onFind,
+    required this.onDownload,
+    required this.onShare,
+  });
+  final CatalogHeader header;
+  final bool album;
+  final List<CatalogEntry> entries;
+  final VoidCallback? onPlay, onShuffle;
+  final VoidCallback onFind, onDownload, onShare;
+  @override
+  Widget build(BuildContext context) {
+    final palette = Theme.of(context).brightness == Brightness.dark
+        ? BitChordPalette.dark
+        : BitChordPalette.light;
+    final parts = header.subtitle
+        .split(RegExp(r' • | · | \| '))
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty);
+    final credit = parts
+        .where(
+          (part) =>
+              ![
+                'album',
+                'single',
+                'ep',
+                'playlist',
+                'artist',
+              ].contains(part.toLowerCase()) &&
+              !RegExp(
+                r'^\d{4}$|^\d{1,2}:\d{2}(?::\d{2})?$|^[0-9,.]+\s*(songs?|tracks?)$',
+                caseSensitive: false,
+              ).hasMatch(part),
+        )
+        .firstOrNull;
+    final year = parts
+        .where((part) => RegExp(r'^\d{4}$').hasMatch(part))
+        .firstOrNull;
+    final seconds = entries.fold<int>(
+      0,
+      (sum, entry) => sum + (entry.durationSeconds ?? 0),
+    );
+    final minutes = seconds ~/ 60;
+    final metadata = [
+      album ? 'ALBUM' : 'PLAYLIST',
+      if (year != null) year,
+      if (entries.isNotEmpty) '${entries.length} songs',
+      if (seconds > 0)
+        minutes < 60
+            ? '$minutes min'
+            : '${minutes ~/ 60} hr ${minutes % 60} min',
+    ].join(' • ').toUpperCase();
+    Widget action(
+      String tooltip,
+      IconData icon,
+      VoidCallback? onPressed, {
+      bool primary = false,
+    }) => SizedBox(
+      width: 50,
+      height: 50,
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        iconSize: 22,
+        style: IconButton.styleFrom(
+          backgroundColor: primary ? palette['accent'] : palette['subtleFill'],
+          foregroundColor: primary
+              ? palette['onAccent']
+              : palette['foreground'],
+        ),
+        icon: Icon(icon),
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 36),
+      child: Row(
+        children: [
+          CatalogArtwork(
+            url: header.artwork ?? entries.firstOrNull?.artwork,
+            size: 286,
+            radius: 8,
+          ),
+          const SizedBox(width: 30),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  album ? 'ALBUM' : 'PLAYLIST',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: palette['secondary'],
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  header.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (credit != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    credit,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: palette['accent']),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  metadata,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: palette['secondary']),
+                ),
+                const SizedBox(height: 24),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    action('Shuffle', Icons.shuffle_rounded, onShuffle),
+                    action(
+                      'Play',
+                      Icons.play_arrow_rounded,
+                      onPlay,
+                      primary: true,
+                    ),
+                    action('Search this list', Icons.search_rounded, onFind),
+                    SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: PopupMenuButton<String>(
+                        tooltip: 'More',
+                        style: IconButton.styleFrom(
+                          backgroundColor: palette['subtleFill'],
+                          foregroundColor: palette['foreground'],
+                        ),
+                        icon: const Icon(Icons.more_horiz_rounded, size: 22),
+                        onSelected: (value) {
+                          if (value == 'download') onDownload();
+                          if (value == 'share') onShare();
+                        },
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'download',
+                            enabled: entries.isNotEmpty,
+                            child: const Text('Download all'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'share',
+                            child: Text('Share'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CollectionTrackRow extends StatelessWidget {
+  const CollectionTrackRow({
+    super.key,
+    required this.entry,
+    required this.index,
+    required this.album,
+    required this.onPlay,
+    required this.onDownload,
+  });
+  final CatalogEntry entry;
+  final int index;
+  final bool album;
+  final VoidCallback? onPlay, onDownload;
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final seconds = entry.durationSeconds;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: onPlay,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            color: index.isOdd ? colors.onSurface.withValues(alpha: .04) : null,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 28,
+                child: Text(
+                  '${index + 1}',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ),
+              const SizedBox(width: 12),
+              if (!album) ...[
+                CatalogArtwork(url: entry.artwork, size: 44, radius: 6),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: 42,
+                child: Text(
+                  entry.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                ),
+              ),
+              Expanded(
+                flex: 20,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    entry.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 58,
+                child: Text(
+                  seconds == null
+                      ? '—'
+                      : '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}',
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              SizedBox(
+                width: 34,
+                height: 34,
+                child: IconButton(
+                  tooltip: 'Download',
+                  iconSize: 18,
+                  padding: EdgeInsets.zero,
+                  onPressed: onDownload,
+                  icon: const Icon(Icons.download_outlined),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class CatalogArtwork extends ConsumerWidget {
   const CatalogArtwork({

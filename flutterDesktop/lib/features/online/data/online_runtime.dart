@@ -19,7 +19,13 @@ import 'artwork_loader.dart';
 import '../../../core/platform/audio/native_api.dart';
 
 final class OnlineRuntime
-    implements OnlinePort, OnlineAccounts, OnlineArtwork, OnlineCapabilities {
+    implements
+        OnlinePort,
+        OnlineAccounts,
+        OnlineArtwork,
+        OnlineCapabilities,
+        OnlineSuggestions,
+        OnlinePlaybackIdentity {
   OnlineRuntime(this.playback, Directory downloads)
     : store = DownloadStore(downloads) {
     _providers['youtube'] = YouTubeMusic(
@@ -49,6 +55,10 @@ final class OnlineRuntime
   }
 
   @override
+  Future<List<String>> suggestions(String query, RequestScope scope) =>
+      _youtube.suggestions(query, scope);
+
+  @override
   Future<Uint8List> artwork(Uri url, RequestScope scope) =>
       _artwork.load(url, scope);
   final _providers = <String, CatalogProvider>{};
@@ -71,6 +81,8 @@ final class OnlineRuntime
 
   @override
   String get currentTitle => playback.state.queue.current?.title ?? '';
+  @override
+  String get currentEntryId => playback.state.queue.current?.entryId ?? '';
   @override
   String get currentSubtitle => playback.state.queue.current?.artist ?? '';
 

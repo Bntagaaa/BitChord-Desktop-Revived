@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-13",
+  "platform": "Linux x64 (local workstation)",
+  "flutter": "3.47.9",
+  "framework": "c197ca5199e9ee5661e865596c9c07294dfab51c",
+  "engine": "89c39edfdfae2949f6806e4a315c0c08522238b7",
+  "dart": "3.13.7",
+  "checks": {
+    "lockfile": "enforced",
+    "format": "PASS (language 3.11)",
+    "flutter_analyze_fatal_infos": "PASS",
+    "flutter_tests": {
+      "passed": 56,
+      "failed": 0
+    },
+    "youtube_rewrite_assertions": 49,
+    "youtube_fastpath_assertions": 49,
+    "provider_download_broker": "PASS",
+    "native_stream": {
+      "exact_pcm": true,
+      "frames": 384000,
+      "live_decoders": 0
+    },
+    "layer_assets_reference_inventory": "PASS"
+  },
+  "native_compile": "Clang 23.1.4, C++17, production engine/decoder/store/provider_crypto/Linux sink; pkg-config dependencies",
+  "cmake_local": "UNAVAILABLE",
+  "local_release_and_native_gui": "NOT_RUN (CMake/Xvfb unavailable)",
+  "windows_linux_ci": "PENDING push; see later migration ledger entry",
+  "native_visual_parity": "NOT_VERIFIED",
+  "live_authenticated_accounts": "NOT_TESTED (browser/protected-account UI implementation incomplete; user willing to log in)",
+  "phase4": "INCOMPLETE",
+  "phase5": "NOT_STARTED"
+}

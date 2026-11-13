@@ -237,3 +237,22 @@ The optional explicitly configured yt-dlp resolver validates actual media ranges
 before native playback; its live trial still failed with **HTTP 403**. Setup,
 checks and limits are in [the Phase 4 ledger](verification/phase4/README.md).
 No working YouTube playback or complete Phase 4 parity is claimed.
+
+## Latest Phase 4 audit — 2026-11-13
+
+The earlier unavailable-YouTube notes above are historical. The user has since
+verified fast guest YouTube playback, immediate scrubbing and offline playback
+after restart. This does not establish complete Phase 4 parity.
+
+The latest [Phase 4 audit](verification/phase4/completion-audit-2026-11-13.md)
+records real suggestions/pagination fixes, bounded Back restoration, loaded
+album/playlist/offline context, source-measured detail/Search/download surfaces,
+four-worker download management and isolated offline replacement/recovery.
+Run the current provider checks with `dart run tool/phase4_check.dart
+<stream-test> <native-library>`; opt-in `dart run tool/phase4_catalog_live.dart`
+prints only guest counts/statuses. `BITCHORD_CAPTURE=1 flutter test` also creates
+Phase 4 widget diagnostic PNGs, which are not Kotlin/native visual goldens.
+
+Browser/protected multi-account sign-in, Spotify/library mutations, custom
+modules, full source/download quality/manifest/cache and native visual/live
+account acceptance still require work. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
