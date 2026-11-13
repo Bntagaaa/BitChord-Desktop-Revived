@@ -287,8 +287,8 @@ final class YouTubeCatalogParser {
             : null);
     final entries = _entries(playlist ?? root);
     final header =
-        nodes(data, 'musicEditablePlaylistDetailHeaderRenderer').firstOrNull ??
         nodes(data, 'musicResponsiveHeaderRenderer').firstOrNull ??
+        nodes(data, 'musicEditablePlaylistDetailHeaderRenderer').firstOrNull ??
         nodes(data['header'], 'musicDetailHeaderRenderer').firstOrNull ??
         nodes(data['header'], 'musicImmersiveHeaderRenderer').firstOrNull ??
         nodes(data['header'], 'musicVisualHeaderRenderer').firstOrNull;
@@ -348,7 +348,7 @@ final class YouTubeCatalogParser {
               title: headerTitle,
               subtitle: text(header?['subtitle']),
               artwork: art == null ? null : Uri.tryParse(art),
-              ownedByAccount: browseId?.startsWith('VL') ?? false
+              ownedByAccount: (browseId?.startsWith('VL') ?? false)
                   ? playlistOwned(data)
                   : null,
             ),
