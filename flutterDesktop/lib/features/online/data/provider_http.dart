@@ -20,10 +20,13 @@ final class _HttpPool {
   bool _closed = false;
   HttpClient acquire(Duration timeout) {
     if (_closed) throw const ProviderFailure(ProviderProblem.cancelled);
+    // Queue behind the previous bounded span while its socket returns to the
+    // idle pool, instead of opening a spare connection during that handoff.
+    // This owner belongs to one source, not all providers or all playback.
     return _client ??= HttpClient()
       ..connectionTimeout = timeout
       ..idleTimeout = const Duration(seconds: 15)
-      ..maxConnectionsPerHost = 2
+      ..maxConnectionsPerHost = 1
       ..autoUncompress = false;
   }
 
