@@ -343,7 +343,10 @@ final class CatalogController extends Notifier<CatalogView> {
           (e) =>
               e.provider == 'youtube' &&
               e.kind == CatalogKind.playlist &&
-              e.id.startsWith('VL'),
+              e.id.startsWith('VL') &&
+              !['VLLM', 'VLSE', 'VLRD', 'VLOLAK', 'VLMPRE'].any(
+                (blocked) => e.id.startsWith(blocked),
+              ),
         ),
       );
     } finally {
