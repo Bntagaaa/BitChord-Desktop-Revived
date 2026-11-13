@@ -1,77 +1,77 @@
 {
-  "source_commit": "01bf85714047d8730cd3cd3e908d0f35d4d7859c",
   "display": "GitHub Windows hosted desktop",
-  "fullscreen": "F11 entered; Escape restored 900x600",
-  "exit_code": 0,
-  "captures": [
-    {
-      "width": 1220,
-      "height": 780,
-      "logo_contrast": 0.39869281045751637,
-      "sampled_colors": 6651
-    },
-    {
-      "width": 900,
-      "height": 600,
-      "logo_contrast": 0.39869281045751637,
-      "sampled_colors": 1728
-    }
-  ],
   "dpi": 96,
   "appearance_captures": [
     {
+      "state": "accounts",
+      "expected_theme": "any",
       "background_rgb": [
         247,
         248,
         251
-      ],
-      "state": "accounts",
-      "expected_theme": "any"
+      ]
     },
     {
+      "state": "drawer",
+      "expected_theme": "drawer",
       "background_rgb": [
         183,
         184,
         186
-      ],
-      "state": "drawer",
-      "expected_theme": "drawer"
+      ]
     },
     {
+      "state": "settings",
+      "expected_theme": "light",
       "background_rgb": [
         247,
         248,
         251
-      ],
-      "state": "settings",
-      "expected_theme": "light"
+      ]
     },
     {
+      "state": "dark",
+      "expected_theme": "dark",
       "background_rgb": [
         32,
         32,
         32
-      ],
-      "state": "dark",
-      "expected_theme": "dark"
+      ]
     },
     {
+      "state": "pitch-black",
+      "expected_theme": "black",
       "background_rgb": [
         0,
         0,
         0
-      ],
-      "state": "pitch-black",
-      "expected_theme": "black"
+      ]
     },
     {
+      "state": "light",
+      "expected_theme": "light",
       "background_rgb": [
         247,
         248,
         251
-      ],
-      "state": "light",
-      "expected_theme": "light"
+      ]
     }
-  ]
+  ],
+  "fullscreen": "F11 entered; Escape restored 900x600",
+  "source_commit": "b52cd56486bb6f2af5ae59e9b0354d8ee3b797bc",
+  "captures": [
+    {
+      "sampled_colors": 13565,
+      "width": 1220,
+      "height": 780,
+      "logo_contrast": 0.39869281045751637
+    },
+    {
+      "sampled_colors": 8797,
+      "width": 900,
+      "height": 600,
+      "logo_contrast": 0.39869281045751637
+    }
+  ],
+  "exit_code": 0
 }
