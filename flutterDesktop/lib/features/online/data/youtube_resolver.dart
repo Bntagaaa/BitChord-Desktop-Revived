@@ -183,7 +183,9 @@ final class YouTubeResolver {
         value.contains('only images are available')) {
       return const ProviderFailure(ProviderProblem.formatUnavailable);
     }
-    if (RegExp(r'http error 403|403 forbidden|status code 403').hasMatch(value)) {
+    if (RegExp(
+      r'http error 403|403 forbidden|status code 403',
+    ).hasMatch(value)) {
       return const ProviderFailure(ProviderProblem.mediaRefused, 403);
     }
     // Upstream extraction is not the same as the catalog provider being down.
