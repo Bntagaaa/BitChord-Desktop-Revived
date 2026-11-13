@@ -1,0 +1,67 @@
+name: Phase 4 completion validation
+on:
+  push:
+    branches: [phase4-completion-20261113]
+    paths: ['.github/workflows/phase4-completion.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: phase4-completion-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      DART_SUPPRESS_ANALYTICS: 'true'
+      VALIDATION_GENERATION: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: python .github/phase4_integrate.py
+      - run: python flutterDesktop/tool/install_linux_ci.py
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - name: Resolve and format reviewed staging source
+        working-directory: flutterDesktop
+        run: |
+          flutter pub get --enforce-lockfile
+          dart format lib test
+          python tool/check_boundaries.py
+      - name: Retain exact integration and formatter output in staging only
+        run: |
+          test "$GITHUB_REF_NAME" = 'phase4-completion-20261113'
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add flutterDesktop
+          if ! git diff --cached --quiet; then
+            git commit -m 'build(phase4): retain integrated formatted staging source [skip ci]'
+            git push origin HEAD:phase4-completion-20261113
+          fi
+          git rev-parse HEAD
+      - name: Build OS secret helper
+        run: |
+          cmake -S flutterDesktop/native/accounts -B /tmp/bitchord-account-build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/bitchord-account-build --parallel 2
+          dbus-run-session -- python flutterDesktop/tool/test_account_vault.py /tmp/bitchord-account-build/bitchord_secrets
+      - name: Analyze and run all Flutter regression tests
+        working-directory: flutterDesktop
+        run: |
+          flutter analyze --fatal-infos
+          flutter test --reporter expanded
+  windows-secret:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Build and test user-bound DPAPI helper
+        shell: pwsh
+        run: |
+          cmake -S flutterDesktop/native/accounts -B build/accounts
+          cmake --build build/accounts --config Release --parallel 2
+          python flutterDesktop/tool/test_account_vault.py build/accounts/Release/bitchord_secrets.exe
