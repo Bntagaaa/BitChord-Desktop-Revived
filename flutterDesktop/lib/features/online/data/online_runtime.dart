@@ -26,6 +26,7 @@ final class OnlineRuntime
         OnlineCapabilities,
         OnlineSuggestions,
         OnlineLibrary,
+        OnlinePlaylistEditor,
         OnlinePlaybackIdentity {
   OnlineRuntime(this.playback, Directory downloads)
     : store = DownloadStore(downloads) {
@@ -61,6 +62,38 @@ final class OnlineRuntime
 
   @override
   Future<CatalogPage> library(RequestScope scope) => _youtube.library(scope);
+
+  @override
+  Future<String> createPlaylist(
+    String title,
+    PlaylistVisibility visibility,
+    RequestScope scope,
+  ) => _youtube.createPlaylist(title, visibility, scope);
+
+  @override
+  Future<void> renamePlaylist(
+    String playlistId,
+    String title,
+    RequestScope scope,
+  ) => _youtube.renamePlaylist(playlistId, title, scope);
+
+  @override
+  Future<void> deletePlaylist(String playlistId, RequestScope scope) =>
+      _youtube.deletePlaylist(playlistId, scope);
+
+  @override
+  Future<Map<String, String>> addToPlaylist(
+    String playlistId,
+    List<String> videoIds,
+    RequestScope scope,
+  ) => _youtube.addToPlaylist(playlistId, videoIds, scope);
+
+  @override
+  Future<void> removeFromPlaylist(
+    String playlistId,
+    List<({String setVideoId, String videoId})> entries,
+    RequestScope scope,
+  ) => _youtube.removeFromPlaylist(playlistId, entries, scope);
 
   @override
   Future<Uint8List> artwork(Uri url, RequestScope scope) =>
