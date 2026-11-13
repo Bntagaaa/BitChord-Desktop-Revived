@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/catalog_controller.dart';
 import '../application/search_suggestions.dart';
 import '../application/download_queue.dart';
-import '../data/browser_sign_in.dart';
+import '../application/account_sign_in.dart';
 import '../domain/catalog.dart';
 import '../domain/online_port.dart';
 
@@ -63,7 +63,7 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
       // is inspected. The returned cookies are held in memory and verified by
       // the existing authenticated YouTube shell before session adoption.
       final cookie = browser
-          ? await BrowserSignIn.captureYouTube(scope)
+          ? await AccountSignIn.captureYouTube(scope)
           : manualCookie;
       scope.check();
       await accounts.signIn(cookie, scope);
