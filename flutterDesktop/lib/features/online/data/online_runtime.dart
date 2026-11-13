@@ -25,6 +25,7 @@ final class OnlineRuntime
         OnlineArtwork,
         OnlineCapabilities,
         OnlineSuggestions,
+        OnlineLibrary,
         OnlinePlaybackIdentity {
   OnlineRuntime(this.playback, Directory downloads)
     : store = DownloadStore(downloads) {
@@ -57,6 +58,9 @@ final class OnlineRuntime
   @override
   Future<List<String>> suggestions(String query, RequestScope scope) =>
       _youtube.suggestions(query, scope);
+
+  @override
+  Future<CatalogPage> library(RequestScope scope) => _youtube.library(scope);
 
   @override
   Future<Uint8List> artwork(Uri url, RequestScope scope) =>
