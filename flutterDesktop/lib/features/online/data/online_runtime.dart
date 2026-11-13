@@ -132,6 +132,7 @@ final class OnlineRuntime
             ProviderProblem.mediaRefused,
             ProviderProblem.tokenUnavailable,
             ProviderProblem.formatUnavailable,
+            ProviderProblem.youtubeUnavailable,
           ].contains(primaryError.problem))
         rethrow;
       final alternative = await RecordingFallback.resolve(

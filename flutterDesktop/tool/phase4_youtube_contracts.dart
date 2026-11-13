@@ -238,6 +238,82 @@ Future<void> youtubeContracts() async {
     },
   };
   final media = YouTubeResolver.parse(extracted, selected);
+  final offered = {
+    ...extracted,
+    'formats': [
+      {
+        ...extracted,
+        'format_id': '140',
+        'url': 'https://r1.googlevideo.com/audio-128',
+        'abr': 128,
+      },
+      {
+        ...extracted,
+        'format_id': '250',
+        'url': 'https://r1.googlevideo.com/audio-64',
+        'abr': 64,
+      },
+      {
+        ...extracted,
+        'format_id': '251',
+        'url': 'https://r1.googlevideo.com/audio-160',
+        'abr': 160,
+      },
+      {
+        ...extracted,
+        'format_id': 'unsafe',
+        'url': 'https://googlevideo.com.attacker.invalid/signed',
+        'abr': 999,
+      },
+      {
+        ...extracted,
+        'format_id': 'manifest',
+        'protocol': 'm3u8_native',
+        'abr': 180,
+      },
+    ],
+  };
+  final lowFormats = YouTubeResolver.candidates(
+    offered,
+    selected,
+    AudioQuality.low,
+  );
+  final highFormats = YouTubeResolver.candidates(
+    offered,
+    selected,
+    AudioQuality.high,
+  );
+  require(
+    lowFormats.first.rendition == 'youtube:250' &&
+        highFormats.first.rendition == 'youtube:251' &&
+        highFormats.every(
+          (candidate) => candidate.url.host.endsWith('googlevideo.com'),
+        ),
+    'Select safe direct adaptive audio-only sources by quality',
+  );
+  var probeCount = 0;
+  final recovered = await YouTubeResolver.firstPlayable(
+    highFormats,
+    (candidate) async {
+      probeCount++;
+      if (probeCount == 1) {
+        throw const ProviderFailure(ProviderProblem.expired, 403);
+      }
+    },
+  );
+  require(
+    probeCount == 2 && recovered.rendition == 'youtube:140',
+    'Retry an alternative CDN audio format after a 403',
+  );
+  try {
+    await YouTubeResolver.firstPlayable(
+      highFormats,
+      (_) async => throw const ProviderFailure(ProviderProblem.expired, 403),
+    );
+    throw StateError('All-refused media was accepted');
+  } on ProviderFailure catch (e) {
+    require(e.problem == ProviderProblem.mediaRefused, 'Keep CDN refusal typed');
+  }
   require(
     media.headers.length == 1 &&
         media.headers['User-Agent'] == 'fixture-client',
@@ -285,13 +361,24 @@ Future<void> youtubeContracts() async {
           args[pluginAt + 1] == pluginDir.path &&
           extractorAt > pluginAt &&
           args[extractorAt + 1] == 'youtube:player_client=mweb' &&
-          args.contains('bestaudio[protocol=https][abr<=128]') &&
+          args.contains('bestaudio[protocol=https][abr<=128]/bestaudio[protocol=https]') &&
           !args.any((argument) => argument.contains('fixture-secret')),
       'Trusted mweb per-video token provider configuration',
     );
     require(
       !args.contains('--cookies-from-browser') && !args.contains('--cookies'),
       'No account secret import into external extractor',
+    );
+    final alternate = enabled.arguments(
+      selected,
+      AudioQuality.medium,
+      alternateClient: true,
+    );
+    require(
+      alternate.contains('youtube:player_client=android_vr,web_embedded') &&
+          alternate.contains('--no-plugin-dirs') &&
+          !alternate.contains('--cookies'),
+      'Alternate client is scoped without importing account cookies',
     );
   } finally {
     await pluginDir.delete(recursive: true);
@@ -470,13 +557,26 @@ Future<void> youtubeContracts() async {
           'ERROR: requested format is not available',
         ).problem ==
         ProviderProblem.formatUnavailable,
-    'No progressive format must be reported explicitly',
+    'Unavailable direct format must be reported explicitly',
   );
   require(
     !YouTubeResolver.classifyExtractorFailure(
       'ERROR: Sign in to confirm you are not a bot https://secret.invalid',
     ).toString().contains('secret.invalid'),
     'Never surface URL-bearing extractor diagnostics',
+  );
+
+  require(
+    YouTubeResolver.classifyExtractorFailure('ERROR: unknown upstream failure')
+            .problem ==
+        ProviderProblem.youtubeUnavailable,
+    'Unclassified yt-dlp failure should not say provider unavailable',
+  );
+  require(
+    YouTubeResolver.classifyExtractorFailure('ERROR: HTTP Error 403: Forbidden')
+            .problem ==
+        ProviderProblem.mediaRefused,
+    'Extractor HTTP refusal must be typed',
   );
 
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

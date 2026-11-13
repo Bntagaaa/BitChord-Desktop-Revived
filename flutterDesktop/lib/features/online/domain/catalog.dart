@@ -41,6 +41,7 @@ enum ProviderProblem {
   loginRequired,
   tokenUnavailable,
   formatUnavailable,
+  youtubeUnavailable,
 }
 
 final class ProviderFailure implements Exception {
@@ -62,8 +63,12 @@ final class ProviderFailure implements Exception {
           'is not usable.';
     }
     if (problem == ProviderProblem.formatUnavailable) {
-      return 'YouTube returned no playable progressive audio '
-          'format for this track.';
+      return 'YouTube offered no compatible direct HTTPS audio-only stream '
+          'for this track. Sign-in or a different client may be required.';
+    }
+    if (problem == ProviderProblem.youtubeUnavailable) {
+      return 'YouTube could not resolve an audio source. The request may '
+          'be restricted by YouTube, a sign-in check, or this connection.';
     }
     return 'Provider ${problem.name}${status == null ? '' : ' (HTTP $status)'}';
   }

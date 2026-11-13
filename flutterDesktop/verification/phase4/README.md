@@ -403,3 +403,10 @@ redacted error categories, not account cookies or signed source URLs.
 **Phase 4 remains INCOMPLETE** until native YouTube playback and
 authenticated/provider/collection parity have credible independent
 evidence. Phase 5 not started.
+
+
+## Direct audio candidate recovery — 2026-11-13
+
+Follow-up to user reports of `Provider unavailable` and `no playable progressive audio format`: the Dart yt-dlp adapter now uses an alternate direct-HTTPS-only audio selection when format bitrate metadata is absent, considers up to 512 extractor-provided formats, ranks at most six trusted audio-only Googlevideo range candidates and probes them before opening the native player. If the first client fails with an upstream login/PO-token/media/format refusal, a second explicitly selected client is attempted (no browser cookies or user configuration imported). Error categories are more specific while stderr and signed URLs remain private. A real YouTube 403 or sign-in requirement is still allowed to fail; this is not a circumvention or a proof of YouTube playback. Native decoder, source broker, download logic and Kotlin references are unchanged.
+
+Targeted synthetic contracts were expanded for filtering, quality ranking, candidate 403 failover, alternate client arguments and typed errors. The patch awaits Windows/Linux exact-SHA CI and a real user-device test; **Phase 4 INCOMPLETE**.

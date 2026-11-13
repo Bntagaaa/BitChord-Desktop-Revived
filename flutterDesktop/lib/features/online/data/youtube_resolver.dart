@@ -104,7 +104,11 @@ final class YouTubeResolver {
   // Dedicated per-video PO Token providers are opt-in because yt-dlp plugins
   // execute external code. Without an explicit directory, disable every plugin
   // search location and never load ambient config or account cookies.
-  List<String> arguments(CatalogEntry track, AudioQuality quality) {
+  List<String> arguments(
+    CatalogEntry track,
+    AudioQuality quality, {
+    bool alternateClient = false,
+  }) {
     final plugin = poTokenPluginDirectory;
     if (plugin != null &&
         (!Directory(plugin).isAbsolute || !Directory(plugin).existsSync())) {
@@ -127,11 +131,11 @@ final class YouTubeResolver {
     return [
       '--ignore-config',
       '--no-plugin-dirs',
-      if (plugin != null) ...[
-        '--plugin-dirs',
-        plugin,
+      if (plugin != null) ...['--plugin-dirs', plugin],
+      if (plugin != null || alternateClient) ...[
         '--extractor-args',
-        'youtube:player_client=mweb'
+        'youtube:player_client='
+            '${alternateClient ? 'android_vr,web_embedded' : 'mweb'}'
             '${serverHome == null ? '' : ';youtubepot-bgutilscript:server_home=$serverHome'}',
       ],
       '--no-remote-components',
@@ -149,7 +153,8 @@ final class YouTubeResolver {
       '--no-js-runtimes',
       if (node != null) ...['--js-runtimes', 'node:$node'],
       '-f',
-      'bestaudio[protocol=https][abr<=$ceiling]',
+      // Missing ABR metadata must not hide a playable direct HTTPS stream.
+      'bestaudio[protocol=https][abr<=$ceiling]/bestaudio[protocol=https]',
       '--',
       'https://www.youtube.com/watch?v=${track.id}',
     ];
@@ -178,7 +183,11 @@ final class YouTubeResolver {
         value.contains('only images are available')) {
       return const ProviderFailure(ProviderProblem.formatUnavailable);
     }
-    return const ProviderFailure(ProviderProblem.unavailable);
+    if (RegExp(r'http error 403|403 forbidden|status code 403').hasMatch(value)) {
+      return const ProviderFailure(ProviderProblem.mediaRefused, 403);
+    }
+    // Upstream extraction is not the same as the catalog provider being down.
+    return const ProviderFailure(ProviderProblem.youtubeUnavailable);
   }
 
   Future<ResolvedMedia> resolve(
@@ -191,7 +200,60 @@ final class YouTubeResolver {
         track.kind != CatalogKind.track) {
       throw const ProviderFailure(ProviderProblem.unsupported);
     }
-    final processArguments = arguments(track, quality);
+    ProviderFailure? firstFailure;
+    for (final alternateClient in [false, true]) {
+      try {
+        return await _resolveOnce(
+          track,
+          quality,
+          scope,
+          alternateClient: alternateClient,
+        );
+      } on ProviderFailure catch (failure) {
+        scope.check();
+        if (!alternateClient &&
+            [
+              ProviderProblem.youtubeUnavailable,
+              ProviderProblem.formatUnavailable,
+              ProviderProblem.loginRequired,
+              ProviderProblem.tokenUnavailable,
+              ProviderProblem.mediaRefused,
+            ].contains(failure.problem)) {
+          firstFailure = failure;
+          continue;
+        }
+        // Keep an actionable primary error if the alternate client only
+        // reports an unspecified extraction failure or missing format.
+        if (firstFailure != null &&
+            [
+              ProviderProblem.loginRequired,
+              ProviderProblem.mediaRefused,
+              ProviderProblem.tokenUnavailable,
+            ].contains(firstFailure.problem) &&
+            [
+              ProviderProblem.youtubeUnavailable,
+              ProviderProblem.formatUnavailable,
+            ].contains(failure.problem)) {
+          throw firstFailure;
+        }
+        rethrow;
+      }
+    }
+    throw firstFailure ??
+        const ProviderFailure(ProviderProblem.formatUnavailable);
+  }
+
+  Future<ResolvedMedia> _resolveOnce(
+    CatalogEntry track,
+    AudioQuality quality,
+    RequestScope scope, {
+    required bool alternateClient,
+  }) async {
+    final processArguments = arguments(
+      track,
+      quality,
+      alternateClient: alternateClient,
+    );
     Process? process;
     final output = StringBuffer();
     var stderrTail = '';
@@ -260,14 +322,17 @@ final class YouTubeResolver {
       if (exit != 0) throw classifyExtractorFailure(stderrTail);
       final decoded = jsonDecode(output.toString());
       if (decoded is! Map<String, dynamic>) throw const FormatException();
-      final media = parse(decoded, track);
-      // Kotlin StreamResolver.probe: actually read a production-sized span,
-      // including past 1 MiB when possible. A URL/exit=0 is not success.
-      final source = RangeSource(media, const ProviderHttp(), scope);
-      await source.chunk(0);
-      if (source.total! > 1024 * 1024) await source.chunk(2);
-      scope.check();
-      return media;
+      // Validate real byte ranges, including beyond the first MiB, before
+      // adopting one of a bounded set of trusted audio-only CDN URLs.
+      return await firstPlayable(
+        candidates(decoded, track, quality),
+        (media) async {
+          final source = RangeSource(media, const ProviderHttp(), scope);
+          await source.chunk(0);
+          if (source.total! > 1024 * 1024) await source.chunk(2);
+          scope.check();
+        },
+      );
     } on ProviderFailure catch (e) {
       // A signed URL does not establish usable media. In particular, GVS may
       // reject clients without a fresh per-video PO Token even after extraction.
@@ -289,6 +354,103 @@ final class YouTubeResolver {
         await process.exitCode;
       }
     }
+  }
+
+  // A direct HTTPS audio-only adaptive URL supports HTTP ranges, unlike an
+  // MPD/HLS manifest. Reuse parse() to enforce codec, CDN and header isolation.
+  static List<ResolvedMedia> candidates(
+    Map<String, dynamic> data,
+    CatalogEntry track,
+    AudioQuality quality,
+  ) {
+    if (data['id'] != track.id || data['is_live'] == true) {
+      throw const ProviderFailure(ProviderProblem.unsupported);
+    }
+    final found = <({ResolvedMedia media, double? bitrate, int order})>[];
+    final seen = <String>{};
+    void add(Map<String, dynamic> format) {
+      final candidate = <String, dynamic>{
+        ...data,
+        ...format,
+        'id': data['id'],
+        'is_live': data['is_live'],
+        'http_headers': format['http_headers'] ?? data['http_headers'],
+      };
+      try {
+        final media = parse(candidate, track);
+        if (seen.add(media.url.toString())) {
+          found.add((
+            media: media,
+            bitrate: (format['abr'] as num? ?? format['tbr'] as num?)
+                ?.toDouble(),
+            order: found.length,
+          ));
+        }
+      } on ProviderFailure {
+        // Video-only, manifest, malformed and non-CDN entries are ignored.
+      }
+    }
+
+    add(data);
+    final formats = data['formats'];
+    if (formats is List) {
+      for (final item in formats.take(512)) {
+        if (item is Map<String, dynamic>) add(item);
+      }
+    }
+    if (found.isEmpty) {
+      throw const ProviderFailure(ProviderProblem.formatUnavailable);
+    }
+    final ceiling = switch (quality) {
+      AudioQuality.low => 64.0,
+      AudioQuality.medium => 128.0,
+      _ => 1000.0,
+    };
+    int rank(double? bitrate) {
+      if (bitrate == null) return 1;
+      return bitrate <= ceiling ? 0 : 2;
+    }
+
+    found.sort((a, b) {
+      final left = rank(a.bitrate), right = rank(b.bitrate);
+      if (left != right) return left.compareTo(right);
+      if (a.bitrate != null && b.bitrate != null) {
+        // Prefer the best format below the target, else the smallest above.
+        final comparison = left == 2
+            ? a.bitrate!.compareTo(b.bitrate!)
+            : b.bitrate!.compareTo(a.bitrate!);
+        if (comparison != 0) return comparison;
+      }
+      return a.order.compareTo(b.order);
+    });
+    // Bound retries; do not repeatedly probe hundreds of candidate URLs.
+    return found.take(6).map((entry) => entry.media).toList();
+  }
+
+  // Inject the probe for controlled tests; production checks real HTTP ranges.
+  static Future<ResolvedMedia> firstPlayable(
+    List<ResolvedMedia> options,
+    Future<void> Function(ResolvedMedia) probe,
+  ) async {
+    ProviderFailure? firstFailure;
+    for (final candidate in options) {
+      try {
+        await probe(candidate);
+        return candidate;
+      } on ProviderFailure catch (failure) {
+        if (failure.problem == ProviderProblem.cancelled) rethrow;
+        final classified = failure.status == 403
+            ? const ProviderFailure(ProviderProblem.mediaRefused, 403)
+            : failure;
+        if (firstFailure == null ||
+            (classified.problem == ProviderProblem.mediaRefused &&
+                firstFailure.problem != ProviderProblem.mediaRefused)) {
+          firstFailure = classified;
+        }
+      }
+    }
+    throw firstFailure ??
+        const ProviderFailure(ProviderProblem.formatUnavailable);
   }
 
   static ResolvedMedia parse(Map<String, dynamic> data, CatalogEntry track) {
