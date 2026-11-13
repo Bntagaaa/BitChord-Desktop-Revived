@@ -352,3 +352,54 @@ has been proven by these runs. Full cross-OS playback and real HTTP 206 ranges
 still require user/device verification; an HTTP 403, geography restriction or
 unsupported video must not be presented as playback success. Phase 4 remains
 INCOMPLETE and Phase 5 is not authorized.
+
+## Investigation: YouTube `Provider unavailable` and source fallback — 2026-11-13
+
+The user reported the packaged Linux UI still could not play YouTube Music
+(`Provider unavailable`). Existing `youtube-bundle-live.json` from
+[43252681732](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43252681732)
+recorded 20 catalog entries and an `unavailable` media resolution. A
+redacted, minimal, separate Linux diagnostic
+[43330853767](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43330853767)
+ran the actual bundled yt-dlp/Node/BgUtils plugin against a public
+test video with both `mweb` and `web_safari`. Both extractor attempts
+exited 1: **authentication requested**, **BgUtils plugin loaded**,
+**token generation not attempted**; no CDN 403 was reached there. This
+is evidence for the hosted runner IP/request, not a proof of what
+happened on the user's residential connection. The previous CDN 403
+on a different client remains an independent unresolved restriction.
+
+`youtube_resolver.dart` now retains at most 96k of ephemeral stderr
+for categorization only; returns an actionable, redacted
+`loginRequired`, `tokenUnavailable` or `formatUnavailable` where
+supported, otherwise the existing generic failure. It must never
+print, persist, upload or surface raw stderr, signed URLs, headers
+or tokens.
+
+`recording_fallback.dart`, based on pinned Kotlin
+`DesktopTrackMatcher.kt`, provides a **conservative alternate JioSaavn
+source** after a YouTube track's extractor or media preflight fails.
+It requires song title/primary artist and matching live/remix/etc.
+version markers, rejects ambiguous cuts and >12-second duration
+mismatches, excludes video surfaces, and never fabricates an
+"unlocked" YouTube URL. `online_runtime.dart` opens the real
+JioSaavn source through the existing native SourceBroker/C++ audio
+engine and uses the real source ID for refresh. The dock discloses
+`Source: JioSaavn (matched)`. Download behavior is unchanged.
+
+Final application source `97d04f5110042c48dba055e141b8444a4d21d8a2`,
+[workflow 43333161732](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43333161732):
+Windows, Linux and retention **SUCCESS**. Both OS pipelines passed
+format/analysis, bounded provider tests (including refusal redaction
+and conservative matcher), native/FFI/broker tests, release output
+and GUI launches. These tests prove packaging and deterministic
+matcher logic, not actual live YouTube audio or physical alternate-
+provider sound from a YouTube catalog selection. Future manual test
+should attempt a mainstream audio-only song from YouTube Music;
+verify audible playback and the JioSaavn source label if substituted,
+and verify nonmatching/remix/live choices remain refused. Capture only
+redacted error categories, not account cookies or signed source URLs.
+
+**Phase 4 remains INCOMPLETE** until native YouTube playback and
+authenticated/provider/collection parity have credible independent
+evidence. Phase 5 not started.
