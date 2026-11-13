@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 enum CatalogKind { track, album, playlist, artist }
 
 enum SearchFilter { all, songs, albums, artists, playlists }
@@ -161,12 +163,31 @@ final class ResolvedMedia {
     this.expiresAt,
     this.downloadsAllowed = true,
     this.manifest = false,
-  }) : headers = Map.unmodifiable(headers);
+    this.warmup,
+  }) : headers = Map.unmodifiable(headers) {
+    warmup?.validateFor(this);
+  }
   final String provider, trackId, rendition;
   final Uri url;
   final Map<String, String> headers;
   final DateTime? expiresAt;
   final bool downloadsAllowed, manifest;
+  final MediaWarmup? warmup;
+  ResolvedMedia withWarmup(MediaWarmup seed) {
+    seed.validateFor(this);
+    return ResolvedMedia(
+      provider: provider,
+      trackId: trackId,
+      rendition: rendition,
+      url: url,
+      headers: headers,
+      expiresAt: expiresAt,
+      downloadsAllowed: downloadsAllowed,
+      manifest: manifest,
+      warmup: seed,
+    );
+  }
+
   void check() {
     if (!['http', 'https'].contains(url.scheme) ||
         url.host.isEmpty ||
@@ -182,6 +203,50 @@ final class ResolvedMedia {
 
   @override
   String toString() => 'ResolvedMedia(redacted)';
+}
+
+// Ephemeral validated prefix. It is bound to the exact URL, track, rendition
+// and headers, and never serialized by queue/download persistence.
+final class MediaWarmup {
+  MediaWarmup(
+    ResolvedMedia media,
+    List<int> bytes,
+    this.totalBytes,
+    this.validator, {
+    required this.verifiedBytes,
+  }) : prefix = Uint8List.fromList(bytes).asUnmodifiableView(),
+       _url = media.url,
+       _provider = media.provider,
+       _track = media.trackId,
+       _rendition = media.rendition,
+       _headers = media.headers;
+  final Uint8List prefix;
+  final int totalBytes, verifiedBytes;
+  final String? validator;
+  final Uri _url;
+  final String _provider, _track, _rendition;
+  final Map<String, String> _headers;
+  void validateFor(ResolvedMedia media) {
+    if (_url != media.url ||
+        _provider != media.provider ||
+        _track != media.trackId ||
+        _rendition != media.rendition ||
+        _headers.length != media.headers.length ||
+        _headers.entries.any((e) => media.headers[e.key] != e.value) ||
+        totalBytes <= 0 ||
+        totalBytes > 8 * 1024 * 1024 * 1024 ||
+        prefix.length != (totalBytes < 16384 ? totalBytes : 16384) ||
+        verifiedBytes < prefix.length ||
+        verifiedBytes > 32768 ||
+        (validator != null &&
+            (validator!.length > 4096 ||
+                RegExp(r'[\r\n\x00]').hasMatch(validator!)))) {
+      throw const ProviderFailure(ProviderProblem.integrity);
+    }
+  }
+
+  @override
+  String toString() => 'MediaWarmup(redacted)';
 }
 
 abstract interface class CatalogProvider {

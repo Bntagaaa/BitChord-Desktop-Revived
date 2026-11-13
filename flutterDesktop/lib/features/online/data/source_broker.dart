@@ -14,17 +14,39 @@ Map<String, Object?> _encode(ResolvedMedia m) => {
   'url': m.url.toString(),
   'headers': m.headers,
   'expiry': m.expiresAt?.millisecondsSinceEpoch,
+  if (m.warmup != null)
+    'warmup': {
+      'prefix': m.warmup!.prefix,
+      'total': m.warmup!.totalBytes,
+      'validator': m.warmup!.validator,
+      'verified': m.warmup!.verifiedBytes,
+    },
 };
-ResolvedMedia _decode(Map m) => ResolvedMedia(
-  provider: m['provider'] as String,
-  trackId: m['track'] as String,
-  rendition: m['rendition'] as String,
-  url: Uri.parse(m['url'] as String),
-  headers: (m['headers'] as Map).cast<String, String>(),
-  expiresAt: m['expiry'] == null
-      ? null
-      : DateTime.fromMillisecondsSinceEpoch(m['expiry'] as int),
-);
+ResolvedMedia _decode(Map m) {
+  final media = ResolvedMedia(
+    provider: m['provider'] as String,
+    trackId: m['track'] as String,
+    rendition: m['rendition'] as String,
+    url: Uri.parse(m['url'] as String),
+    headers: (m['headers'] as Map).cast<String, String>(),
+    expiresAt: m['expiry'] == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(m['expiry'] as int),
+  );
+  final seed = m['warmup'];
+  if (seed is Map) {
+    return media.withWarmup(
+      MediaWarmup(
+        media,
+        (seed['prefix'] as List).cast<int>(),
+        seed['total'] as int,
+        seed['validator'] as String?,
+        verifiedBytes: seed['verified'] as int,
+      ),
+    );
+  }
+  return media;
+}
 
 // A separate Dart IO isolate owns bounded asynchronous upstream range requests.
 // FFmpeg receives an opaque loopback capability, never provider credentials.
@@ -107,10 +129,15 @@ final class SourceBroker {
     final parent = args[0] as SendPort, commands = ReceivePort();
     HttpServer? server;
     final scope = RequestScope();
+    ProviderHttp? transport;
     try {
+      final media = _decode(args[1] as Map);
+      transport = media.provider == 'youtube'
+          ? ProviderHttp.persistent()
+          : const ProviderHttp();
       final source = RangeSource(
-        _decode(args[1] as Map),
-        const ProviderHttp(),
+        media,
+        transport,
         scope,
         refresh: () async {
           final answer = ReceivePort();
@@ -128,9 +155,10 @@ final class SourceBroker {
           }
         },
       );
-      await source.chunk(
-        0,
-      ); // Resolve length/validator before native receives a grant.
+      // A verified prefix already establishes length/validator. Do not fetch
+      // another 512 KiB before granting native access to those same bytes.
+      if (source.total == null) await source.chunk(0);
+      source.media.check();
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final token = List.generate(
         32,
@@ -190,7 +218,10 @@ final class SourceBroker {
             var offset = start;
             while (offset <= end) {
               scope.check();
-              final chunk = await source.chunk(offset ~/ RangeSource.span);
+              final prefix = source.prefix;
+              final chunk = prefix != null && offset < prefix.length
+                  ? prefix
+                  : await source.chunk(offset ~/ RangeSource.span);
               final lo = offset % RangeSource.span;
               final count = (end - offset + 1) < chunk.length - lo
                   ? end - offset + 1
@@ -220,6 +251,7 @@ final class SourceBroker {
       ]);
     } catch (_) {
       scope.cancel();
+      transport?.close();
       await server?.close(force: true);
       commands.close();
       parent.send(['error']);

@@ -121,3 +121,8 @@ Linux hosted validation in run `43041242897` finished with **failure** during
 desktop dependency installation. No Linux runtime or performance measurement
 was obtained; all performance measurements remain unavailable.
 
+
+
+### YouTube startup validation method - 2026-11-13
+
+The fast-start change removes unconditional subprocess extraction on direct guest success and reduces large-file preflight to at most 32 KiB instead of two 512 KiB probes plus a repeated initial 512 KiB broker fetch. These are code-path and byte-budget claims verified by controlled tests, NOT a measured speedup factor. Keep resolve/direct/extractor/probe/broker/native-command timings separate. Native command completion is not the first audible frame. Repeat the same videos on the same device, network, account and quality for old/new first-audible timing and seek/soak acceptance. Physical latency, RAM saving and universal reliability remain unmeasured.

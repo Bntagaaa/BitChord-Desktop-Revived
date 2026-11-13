@@ -7,10 +7,16 @@ import '../../domain/catalog.dart';
 import 'runtime.dart';
 
 final class YouTubeExtraction {
-  const YouTubeExtraction(this.videoId, this.client, {this.cookie});
+  const YouTubeExtraction(
+    this.videoId,
+    this.client, {
+    this.cookie,
+    this.visitorData,
+  });
   final String videoId, client;
   // Provided only by a server-verified, user-entered in-memory session.
   final String? cookie;
+  final String? visitorData;
   @override
   String toString() => 'YouTubeExtraction(redacted)';
 }

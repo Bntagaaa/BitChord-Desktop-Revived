@@ -108,6 +108,7 @@ final class YouTubeMusic implements CatalogProvider {
       quality,
       scope,
       cookie: session?.headers()['Cookie'],
+      visitorData: session == null ? _catalog.guestVisitorData : null,
       requiredRendition: rendition,
     );
   });

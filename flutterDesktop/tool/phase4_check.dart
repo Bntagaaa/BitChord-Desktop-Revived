@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'phase4_youtube_contracts.dart';
 import 'youtube_rewrite_check.dart' show youtubeRewriteChecks;
+import 'youtube_fastpath_check.dart' show youtubeFastPathChecks;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -36,6 +37,7 @@ Future<void> fails(
 Future<void> main(List<String> arguments) async {
   await youtubeContracts();
   await youtubeRewriteChecks();
+  await youtubeFastPathChecks();
   final directory = await Directory.systemTemp.createTemp('bitchord-phase4-');
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final cross = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

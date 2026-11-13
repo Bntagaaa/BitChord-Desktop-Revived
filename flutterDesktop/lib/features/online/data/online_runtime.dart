@@ -24,7 +24,8 @@ final class OnlineRuntime
     : store = DownloadStore(downloads) {
     _providers['youtube'] = YouTubeMusic(
       const ProviderHttp(),
-      resolver: YouTubeResolver.fromEnvironment(),
+      resolver:
+          YouTubeResolver.fromEnvironment() ?? YouTubeResolver.directOnly(),
     );
     _providers['jiosaavn'] = JioSaavn(
       const ProviderHttp(),
@@ -52,6 +53,9 @@ final class OnlineRuntime
       _artwork.load(url, scope);
   final _providers = <String, CatalogProvider>{};
   SourceBroker? _broker;
+  Map<String, Object> _lastYoutubeStartup = const {};
+  Map<String, Object> get lastYoutubeStartup =>
+      Map.unmodifiable(_lastYoutubeStartup);
   Future<void> _tail = Future.value();
   bool _closed = false;
   int _entry = 0;
@@ -116,7 +120,9 @@ final class OnlineRuntime
     // A selected YouTube source must remain YouTube. Do not hide a failed
     // integration by playing a similarly named recording from another provider.
     final generation = _youtube.accountGeneration;
+    final startup = Stopwatch()..start();
     final media = await provider.resolve(entry, quality, scope);
+    final resolveMs = startup.elapsedMilliseconds;
     scope.check();
     final broker = await SourceBroker.open(
       media,
@@ -124,6 +130,7 @@ final class OnlineRuntime
           ? _youtube.renew(entry, quality, media, scope, generation: generation)
           : provider.resolve(entry, quality, scope),
     );
+    final brokerMs = startup.elapsedMilliseconds - resolveMs;
     try {
       scope.check();
       await _ordered(() async {
@@ -142,6 +149,16 @@ final class OnlineRuntime
           broker.path,
         );
         _broker = broker;
+        if (entry.provider == 'youtube') {
+          _lastYoutubeStartup = {
+            ...?_youtube.resolver?.lastReport,
+            'resolve_ms': resolveMs,
+            'broker_ready_ms': brokerMs,
+            'native_command_ms':
+                startup.elapsedMilliseconds - resolveMs - brokerMs,
+            'first_audible_audio': 'NOT_MEASURED',
+          };
+        }
         await old?.close();
       });
     } catch (_) {

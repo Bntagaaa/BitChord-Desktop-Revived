@@ -29,6 +29,18 @@ final class YouTubeCatalogClient {
   final Uri origin;
   _CatalogContext? _context;
 
+  // Reuse a healthy anonymous catalog context without fetching another shell
+  // for every playback. Account changes/expiry cannot leak an old visitor.
+  String? get guestVisitorData {
+    final value = _context;
+    if (accounts.signedIn ||
+        value == null ||
+        value.generation != accounts.generation ||
+        !value.expires.isAfter(DateTime.now()))
+      return null;
+    return value.visitor;
+  }
+
   Future<_CatalogContext> _bootstrap(
     RequestScope scope,
     YouTubeSession? session,

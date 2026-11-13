@@ -12,11 +12,43 @@ final class HttpPayload {
   final Map<String, String> headers;
 }
 
-// Per-request clients give cancellation a real socket owner. No implicit retries,
-// cookie jar, proxy credential persistence, unbounded body, or URL-bearing errors.
+// Opt-in, source-owned keep-alive. Other providers retain per-request clients.
+// A failed/timed-out request discards its connection owner, never leaves an
+// unbounded request alive. Closing the owner prevents all subsequent requests.
+final class _HttpPool {
+  HttpClient? _client;
+  bool _closed = false;
+  HttpClient acquire(Duration timeout) {
+    if (_closed) throw const ProviderFailure(ProviderProblem.cancelled);
+    return _client ??= HttpClient()
+      ..connectionTimeout = timeout
+      ..idleTimeout = const Duration(seconds: 15)
+      ..maxConnectionsPerHost = 2
+      ..autoUncompress = false;
+  }
+
+  void discard(HttpClient client) {
+    if (identical(client, _client)) _client = null;
+    client.close(force: true);
+  }
+
+  void close() {
+    _closed = true;
+    _client?.close(force: true);
+    _client = null;
+  }
+}
+
+// No implicit retries, cookie jar, proxy credential persistence, unbounded body,
+// or URL-bearing errors. Persistent transport is used only with an explicit owner.
 final class ProviderHttp {
-  const ProviderHttp({this.timeout = const Duration(seconds: 25)});
+  const ProviderHttp({this.timeout = const Duration(seconds: 25)})
+    : _pool = null;
+  ProviderHttp.persistent({this.timeout = const Duration(seconds: 25)})
+    : _pool = _HttpPool();
   final Duration timeout;
+  final _HttpPool? _pool;
+  void close() => _pool?.close();
   static const userAgent =
       'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
   Future<HttpPayload> request(
@@ -26,19 +58,24 @@ final class ProviderHttp {
     Map<String, String> headers = const {},
     Object? jsonBody,
     int maxBytes = 4 * 1024 * 1024,
+    bool Function(Uri)? targetAllowed,
   }) async {
     scope.check();
     if (!['https', 'http'].contains(uri.scheme) ||
         uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty) {
+        uri.userInfo.isNotEmpty ||
+        (targetAllowed != null && !targetAllowed(uri))) {
       throw const ProviderFailure(ProviderProblem.unsupported);
     }
-    final client = HttpClient()
-      ..connectionTimeout = timeout
-      ..autoUncompress = false;
+    final client =
+        _pool?.acquire(timeout) ??
+        (HttpClient()
+          ..connectionTimeout = timeout
+          ..autoUncompress = false);
     final detach = scope.onCancel(() => client.close(force: true));
+    var complete = false;
     try {
-      return await (() async {
+      final result = await (() async {
         var target = uri;
         for (var redirects = 0; redirects <= 3; redirects++) {
           scope.check();
@@ -57,10 +94,10 @@ final class ProviderHttp {
             if (location == null)
               throw const ProviderFailure(ProviderProblem.malformed);
             final next = target.resolve(location);
-            // Credentialed redirects must stay in their exact origin. Reject HTTPS downgrade.
             if (!['http', 'https'].contains(next.scheme) ||
                 next.userInfo.isNotEmpty ||
                 (target.scheme == 'https' && next.scheme != 'https') ||
+                (targetAllowed != null && !targetAllowed(next)) ||
                 (headers.keys.any(
                       (k) => ![
                         'accept',
@@ -80,8 +117,9 @@ final class ProviderHttp {
           final data = BytesBuilder(copy: false);
           await for (final part in response) {
             scope.check();
-            if (data.length + part.length > maxBytes)
+            if (data.length + part.length > maxBytes) {
               throw const ProviderFailure(ProviderProblem.unsupported);
+            }
             data.add(part);
           }
           scope.check();
@@ -100,6 +138,8 @@ final class ProviderHttp {
         }
         throw const ProviderFailure(ProviderProblem.unavailable);
       })().timeout(timeout);
+      complete = true;
+      return result;
     } on ProviderFailure {
       rethrow;
     } on TimeoutException {
@@ -109,7 +149,11 @@ final class ProviderHttp {
       throw const ProviderFailure(ProviderProblem.network);
     } finally {
       detach();
-      client.close(force: true);
+      if (_pool == null) {
+        client.close(force: true);
+      } else if (!complete) {
+        _pool.discard(client);
+      }
     }
   }
 
@@ -136,8 +180,9 @@ final class ProviderHttp {
     }
     try {
       final decoded = jsonDecode(utf8.decode(response.bytes));
-      if (decoded is! Map<String, dynamic> || decoded['error'] != null)
+      if (decoded is! Map<String, dynamic> || decoded['error'] != null) {
         throw const FormatException();
+      }
       return decoded;
     } catch (_) {
       throw const ProviderFailure(ProviderProblem.malformed);
