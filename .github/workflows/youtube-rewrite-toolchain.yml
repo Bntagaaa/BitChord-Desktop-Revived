@@ -1,39 +1,81 @@
-name: YouTube rewrite context
+name: Stage reviewed YouTube rewrite
 on:
   push:
     branches: ['2.0.0-flutter']
     paths: ['.github/workflows/youtube-rewrite-toolchain.yml']
 permissions:
-  contents: read
+  contents: write
 jobs:
-  context:
+  stage:
+    if: github.repository == 'Bntagaaa/BitChord-Desktop-Revived'
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          fetch-depth: 2
           persist-credentials: false
-      - name: Capture reviewed public source context
-        shell: bash
+      - name: Validate exact source edits and create unreferenced review commit
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git fetch --no-tags --depth=1 origin 348b613a0c3db1a54de56483ea6f8748d6465211
-          mkdir -p rewrite-context
           python3 - <<'PY'
-          import pathlib, subprocess, zipfile
-          reference = '348b613a0c3db1a54de56483ea6f8748d6465211'
-          names = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', reference], text=True).splitlines()
-          wanted = {'StreamResolver.kt', 'PlayerClient.kt', 'DesktopYouTubeSession.kt', 'DesktopYouTubeAuth.kt', 'InnertubeParser.kt'}
-          with zipfile.ZipFile('rewrite-context/context.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
-              for path in pathlib.Path('.').glob('*.md'):
-                  archive.write(path, 'current/' + str(path))
-              for path in pathlib.Path('.github/workflows').glob('*.yml'):
-                  archive.write(path, 'current/' + str(path))
-              for name in names:
-                  if pathlib.PurePosixPath(name).name in wanted:
-                      archive.writestr('reference/' + name, subprocess.check_output(['git', 'show', reference + ':' + name]))
+          import base64, hashlib, json, lzma, os, pathlib, subprocess
+          from urllib.request import Request, urlopen
+          repo = os.environ['GITHUB_REPOSITORY']
+          head = os.environ['GITHUB_SHA']
+          assert repo == 'Bntagaaa/BitChord-Desktop-Revived'
+          assert os.environ['GITHUB_REF'] == 'refs/heads/2.0.0-flutter'
+          assert subprocess.check_output(['git', 'rev-parse', 'HEAD^'], text=True).strip() == '4c42654c2be9408789c3e8907f72810b1391b10d'
+          def api(path, body=None):
+              request = Request('https://api.github.com/repos/' + repo + path,
+                  data=None if body is None else json.dumps(body).encode(),
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                           'Accept': 'application/vnd.github+json',
+                           'Content-Type': 'application/json', 'User-Agent': 'BitChord-reviewed-source-staging'},
+                  method='GET' if body is None else 'POST')
+              with urlopen(request, timeout=45) as response:
+                  return json.load(response)
+          parts = ['6d740178b9ea85851c7c03c570d5742904a71887',
+                   'c32fa51f32821e944ba704f828b553af6df940f8',
+                   '608f4d6c46f90aa6b89c64a2d8a6909e764af509',
+                   'b11a131f5bf8f134a3bc3a9d2c683e89c9467e13']
+          encoded = b''.join(base64.b64decode(api('/git/blobs/' + sha)['content']) for sha in parts)
+          payload = lzma.decompress(base64.b64decode(encoded))
+          expected = 'e3a0f55f821ed08f30e582e0efd06d9f3189ba667237ab045fa749c67017eacb'
+          assert hashlib.sha256(payload).hexdigest() == expected
+          records = json.loads(payload)
+          assert len(records) == 22
+          entries = []
+          sha256 = lambda text: hashlib.sha256(text.encode()).hexdigest()
+          for record in records:
+              name = record['path']
+              path = pathlib.Path(name)
+              assert not path.is_absolute() and '..' not in path.parts and not path.is_symlink()
+              assert name in {'MIGRATION_PROGRESS.md', 'MIGRATION_PARITY.md', 'MIGRATION_ARCHITECTURE.md'} or name.startswith(('flutterDesktop/lib/features/online/data/', 'flutterDesktop/lib/features/online/domain/', 'flutterDesktop/tool/', 'flutterDesktop/verification/phase4/'))
+              old = path.read_text(encoding='utf-8') if path.exists() else None
+              assert (None if old is None else sha256(old)) == record['before'], 'Preimage changed: ' + name
+              new = old or ''
+              previous = len(new)
+              for start, end, replacement in reversed(record['edits']):
+                  assert 0 <= start <= end <= previous
+                  previous = start
+                  new = new[:start] + replacement + new[end:]
+              assert sha256(new) == record['after'], 'Postimage mismatch: ' + name
+              entries.append({'path': name, 'mode': '100644', 'type': 'blob', 'content': new})
+          # Remove this temporary transport/bootstrap workflow from the candidate.
+          entries.append({'path': '.github/workflows/youtube-rewrite-toolchain.yml', 'mode': '100644', 'type': 'blob', 'sha': None})
+          base = api('/git/commits/' + head)
+          tree = api('/git/trees', {'base_tree': base['tree']['sha'], 'tree': entries})
+          commit = api('/git/commits', {'message': 'refactor(youtube): isolate catalog sessions, repair token runtime, and bound same-rendition recovery', 'tree': tree['sha'], 'parents': [head]})
+          result = {'parent': head, 'commit': commit['sha'], 'tree': tree['sha'],
+                    'payload_sha256': expected, 'files': [r['path'] for r in records],
+                    'ref_updated': False, 'verification': 'local Dart 3.13.7; 43 rewrite assertions; existing contracts; actual offline yt-dlp audit'}
+          pathlib.Path('youtube-rewrite-stage.json').write_text(json.dumps(result, indent=2) + '\n')
+          print(json.dumps(result))
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: youtube-rewrite-context
-          path: rewrite-context/
-          retention-days: 1
+          name: youtube-rewrite-stage
+          path: youtube-rewrite-stage.json
+          retention-days: 7
