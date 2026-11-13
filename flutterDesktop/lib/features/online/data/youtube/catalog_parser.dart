@@ -128,6 +128,7 @@ final class YouTubeCatalogParser {
       params: string(browse?['params']),
       durationSeconds: seconds,
       isVideo: browseId == null && isVideo,
+      setVideoId: string(map(row['playlistItemData'])?['playlistSetVideoId']),
     );
   }
 
