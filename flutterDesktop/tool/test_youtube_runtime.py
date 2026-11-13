@@ -43,8 +43,15 @@ def main():
         shutil.copytree(plugins, copied)
         with zipfile.ZipFile(copied / 'audit.zip', 'w') as archive:
             archive.writestr('yt_dlp_plugins/extractor/bitchord_audit.py', AUDIT)
-        env = {k: v for k, v in os.environ.items() if k in ('PATH', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP')}
+        # Python enumerates Windows environment keys in uppercase. Dropping
+        # SYSTEMROOT prevents Winsock initialization (WinError 10106), before
+        # any plugin or network request. Match the Dart process isolation.
+        allowed = {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR'}
+        env = {k.upper(): v for k, v in os.environ.items() if k.upper() in allowed}
+        if os.name == 'nt':
+            assert env.get('SYSTEMROOT'), 'Windows audit requires SYSTEMROOT'
         env.update(HOME=temp, USERPROFILE=temp, XDG_CACHE_HOME=temp,
+                   APPDATA=temp, LOCALAPPDATA=temp,
                    BITCHORD_YT_SESSION_PIPE='1', AUDIT_SERVER_HOME=str(server))
         args = [str(binary), '--ignore-config', '--no-plugin-dirs', '--plugin-dirs', str(copied),
                 '--no-cache-dir', '--no-remote-components', '--skip-download', '--dump-single-json',

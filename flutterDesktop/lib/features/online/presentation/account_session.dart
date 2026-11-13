@@ -79,7 +79,7 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Use an existing YouTube Music cookie for this app session. It is sent only to music.youtube.com and cleared on exit. Browser sign-in and protected account storage are not available.',
+            'Use an existing YouTube Music cookie for this app session. It is used for YouTube catalog and playback requests, passed to the bundled resolver in memory, and cleared on exit. No cookie file is saved. Browser sign-in and protected account storage are not available.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           if (!accounts.signedIn) ...[
