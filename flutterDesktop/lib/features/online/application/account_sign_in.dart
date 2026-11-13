@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../domain/catalog.dart';
 
 /// The composition root injects a desktop browser capability. No application

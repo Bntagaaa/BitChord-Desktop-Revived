@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:io';
+
 import '../domain/failure_reporter.dart';
 
 final class Diagnostics implements FailureReporter {

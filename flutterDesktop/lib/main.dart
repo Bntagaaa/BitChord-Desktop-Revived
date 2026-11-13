@@ -92,7 +92,9 @@ Future<void> main(List<String> arguments) async {
   final container = ProviderContainer(
     overrides: [
       onlinePortProvider.overrideWithValue(online),
-      browserSignInCaptureProvider.overrideWithValue(BrowserSignIn.captureYouTube),
+      browserSignInCaptureProvider.overrideWithValue(
+        BrowserSignIn.captureYouTube,
+      ),
       settingsStoreProvider.overrideWithValue(store),
       initialSettingsProvider.overrideWithValue(settings),
       desktopWindowProvider.overrideWithValue(host),

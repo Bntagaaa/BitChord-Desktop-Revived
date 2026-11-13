@@ -221,10 +221,10 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                 onPressed: () {
                   final title = input.text.trim();
                   if (title.isNotEmpty) {
-                    Navigator.pop(
-                      dialogContext,
-                      (title: title, visibility: visibility),
-                    );
+                    Navigator.pop(dialogContext, (
+                      title: title,
+                      visibility: visibility,
+                    ));
                   }
                 },
                 child: const Text('Create playlist'),
@@ -275,7 +275,10 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     final id = widget.browseId;
     if (id == null || !_canEditPlaylists) return;
     final original = ref.read(catalogProvider).header?.title ?? widget.title;
-    final name = await _playlistNameDialog('Rename playlist', initial: original);
+    final name = await _playlistNameDialog(
+      'Rename playlist',
+      initial: original,
+    );
     if (name == null || !mounted || name == original) return;
     try {
       await ref.read(catalogProvider.notifier).renamePlaylist(id, name);
@@ -326,7 +329,9 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
       return;
     }
     try {
-      final playlists = await ref.read(catalogProvider.notifier).accountPlaylists();
+      final playlists = await ref
+          .read(catalogProvider.notifier)
+          .accountPlaylists();
       if (!mounted) return;
       if (playlists.isEmpty) {
         _message('No account playlists. Create one in Library first.');
@@ -346,9 +351,9 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
         ),
       );
       if (selected == null || !mounted) return;
-      await ref
-          .read(catalogProvider.notifier)
-          .addToPlaylist(selected.id, [track.id]);
+      await ref.read(catalogProvider.notifier).addToPlaylist(selected.id, [
+        track.id,
+      ]);
       _message('Added to playlist.');
     } catch (error) {
       _message(_playlistError(error));
@@ -360,7 +365,8 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     if (!_canEditPlaylists ||
         id == null ||
         setId == null ||
-        track.provider != 'youtube') return;
+        track.provider != 'youtube')
+      return;
     try {
       await ref.read(catalogProvider.notifier).removeFromPlaylist(id, [
         (setVideoId: setId, videoId: track.id),
@@ -433,7 +439,8 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
         onAddToPlaylist: _canEditPlaylists && entry.provider == 'youtube'
             ? () => _addToPlaylist(entry)
             : null,
-        onRemoveFromPlaylist: _canEditPlaylists &&
+        onRemoveFromPlaylist:
+            _canEditPlaylists &&
                 (ref.read(catalogProvider).header?.ownedByAccount == true) &&
                 entry.setVideoId != null
             ? () => _removeFromPlaylist(entry)
@@ -545,9 +552,13 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     final search = widget.destination == 'search';
     final catalog =
         widget.browseId != null ||
-        ['listen-now', 'new', 'explore', 'search', 'library'].contains(
-          widget.destination,
-        );
+        [
+          'listen-now',
+          'new',
+          'explore',
+          'search',
+          'library',
+        ].contains(widget.destination);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -731,18 +742,19 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
           Expanded(
             child:
                 state.entries.isEmpty &&
-                state.shelves.isEmpty &&
-                !state.loading &&
-                state.error == null
+                    state.shelves.isEmpty &&
+                    !state.loading &&
+                    state.error == null
                 ? Center(
                     child: Text(
                       search
                           ? 'Search for music'
                           : widget.destination == 'library' &&
-                                ref.read(onlinePortProvider) is OnlineAccounts &&
-                                !(ref.read(onlinePortProvider)
-                                        as OnlineAccounts)
-                                    .signedIn
+                                ref.read(onlinePortProvider)
+                                    is OnlineAccounts &&
+                                !(ref.read(
+                                  onlinePortProvider,
+                                ) as OnlineAccounts).signedIn
                           ? 'Sign in from Accounts to view your library.'
                           : 'No catalog items available.',
                     ),
@@ -780,12 +792,14 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                                   context: state.entries,
                                   index: 0,
                                 ),
-                          onRename: _canEditPlaylists &&
+                          onRename:
+                              _canEditPlaylists &&
                                   widget.browseId!.startsWith('VL') &&
                                   state.header?.ownedByAccount == true
                               ? _renamePlaylist
                               : null,
-                          onDelete: _canEditPlaylists &&
+                          onDelete:
+                              _canEditPlaylists &&
                                   widget.browseId!.startsWith('VL') &&
                                   state.header?.ownedByAccount == true
                               ? _deletePlaylist

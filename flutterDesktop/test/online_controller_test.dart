@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import '../lib/core/domain/audio_contract.dart';
 import '../lib/design_system/palette.dart';
 import '../lib/features/online/application/catalog_controller.dart';
@@ -175,51 +177,51 @@ class LibraryCatalog extends ControlledCatalog
 }
 
 void main() {
-  test('guest Library shows no fake account shelves and refreshes after sign-in',
-      () async {
-    final port = LibraryCatalog();
-    final container = ProviderContainer(
-      overrides: [onlinePortProvider.overrideWithValue(port)],
-    );
-    addTearDown(container.dispose);
-    final controller = container.read(catalogProvider.notifier);
+  test(
+    'guest Library shows no fake account shelves and refreshes after sign-in',
+    () async {
+      final port = LibraryCatalog();
+      final container = ProviderContainer(
+        overrides: [onlinePortProvider.overrideWithValue(port)],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(catalogProvider.notifier);
 
-    await controller.load(browseId: 'app:library');
-    expect(port.libraryCalls, 0);
-    expect(container.read(catalogProvider).browseId, 'app:library');
-    expect(container.read(catalogProvider).shelves, isEmpty);
-    expect(container.read(catalogProvider).error, isNull);
+      await controller.load(browseId: 'app:library');
+      expect(port.libraryCalls, 0);
+      expect(container.read(catalogProvider).browseId, 'app:library');
+      expect(container.read(catalogProvider).shelves, isEmpty);
+      expect(container.read(catalogProvider).error, isNull);
 
-    await port.signIn('fixture', RequestScope());
-    await controller.load(browseId: 'app:library');
-    expect(port.libraryCalls, 1);
-    expect(container.read(catalogProvider).shelves.single.title, 'Playlists');
-    expect(
-      container.read(catalogProvider).shelves.single.entries.single.id,
-      'VLmyplaylist',
-    );
+      await port.signIn('fixture', RequestScope());
+      await controller.load(browseId: 'app:library');
+      expect(port.libraryCalls, 1);
+      expect(container.read(catalogProvider).shelves.single.title, 'Playlists');
+      expect(
+        container.read(catalogProvider).shelves.single.entries.single.id,
+        'VLmyplaylist',
+      );
 
-    await port.signOut();
-    await controller.load(browseId: 'app:library');
-    expect(port.libraryCalls, 1);
-    expect(container.read(catalogProvider).shelves, isEmpty);
-  });
+      await port.signOut();
+      await controller.load(browseId: 'app:library');
+      expect(port.libraryCalls, 1);
+      expect(container.read(catalogProvider).shelves, isEmpty);
+    },
+  );
 
-  test('unsupported Library port fails explicitly instead of using mock data',
-      () async {
-    final container = ProviderContainer(
-      overrides: [onlinePortProvider.overrideWithValue(ControlledCatalog())],
-    );
-    addTearDown(container.dispose);
-    await container.read(catalogProvider.notifier).load(
-      browseId: 'app:library',
-    );
-    expect(
-      container.read(catalogProvider).error,
-      contains('unsupported'),
-    );
-  });
-
+  test(
+    'unsupported Library port fails explicitly instead of using mock data',
+    () async {
+      final container = ProviderContainer(
+        overrides: [onlinePortProvider.overrideWithValue(ControlledCatalog())],
+      );
+      addTearDown(container.dispose);
+      await container
+          .read(catalogProvider.notifier)
+          .load(browseId: 'app:library');
+      expect(container.read(catalogProvider).error, contains('unsupported'));
+    },
+  );
 
   test(
     'failed pagination preserves rows and retries the same token once',
@@ -257,38 +259,32 @@ void main() {
     },
   );
 
-  test(
-    'Back restores Search and parent data; account cancellation evicts saved pages',
-    () async {
-      final port = ControlledCatalog();
-      final container = ProviderContainer(
-        overrides: [onlinePortProvider.overrideWithValue(port)],
-      );
-      addTearDown(container.dispose);
-      final controller = container.read(catalogProvider.notifier);
-      expect(controller.activate('search'), isFalse);
-      final search = controller.load(
-        query: 'album',
-        filter: SearchFilter.albums,
-      );
-      port.requests['album']!.complete(
-        CatalogPage([
-          const CatalogEntry(provider: 'youtube', id: 'MPRE1', title: 'Result'),
-        ], continuation: 'next'),
-      );
-      await search;
-      controller.activate('MPRE1');
-      await controller.load(browseId: 'MPRE1');
-      expect(controller.activate('search'), isTrue);
-      expect(container.read(catalogProvider).query, 'album');
-      expect(container.read(catalogProvider).filter, SearchFilter.albums);
-      expect(container.read(catalogProvider).continuation, 'next');
-      controller.cancel();
-      expect(container.read(catalogProvider).entries, isEmpty);
-      expect(container.read(catalogProvider).query, 'album');
-      expect(controller.activate('MPRE1'), isFalse);
-    },
-  );
+  test('Back restores Search and parent data; account cancellation evicts saved pages', () async {
+    final port = ControlledCatalog();
+    final container = ProviderContainer(
+      overrides: [onlinePortProvider.overrideWithValue(port)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(catalogProvider.notifier);
+    expect(controller.activate('search'), isFalse);
+    final search = controller.load(query: 'album', filter: SearchFilter.albums);
+    port.requests['album']!.complete(
+      CatalogPage([
+        const CatalogEntry(provider: 'youtube', id: 'MPRE1', title: 'Result'),
+      ], continuation: 'next'),
+    );
+    await search;
+    controller.activate('MPRE1');
+    await controller.load(browseId: 'MPRE1');
+    expect(controller.activate('search'), isTrue);
+    expect(container.read(catalogProvider).query, 'album');
+    expect(container.read(catalogProvider).filter, SearchFilter.albums);
+    expect(container.read(catalogProvider).continuation, 'next');
+    controller.cancel();
+    expect(container.read(catalogProvider).entries, isEmpty);
+    expect(container.read(catalogProvider).query, 'album');
+    expect(controller.activate('MPRE1'), isFalse);
+  });
 
   test('editing Search rejects the late committed query', () async {
     final port = ControlledCatalog();

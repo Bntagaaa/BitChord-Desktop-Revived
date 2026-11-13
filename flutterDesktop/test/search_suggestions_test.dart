@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import '../lib/features/online/application/catalog_controller.dart';
 import '../lib/features/online/application/search_suggestions.dart';
 import '../lib/features/online/domain/catalog.dart';
@@ -226,9 +228,8 @@ void main() {
               );
               final dir = Directory('verification/phase4-search-download');
               await dir.create(recursive: true);
-              await File(
-                '${dir.path}/${dark ? 'dark' : 'light'}-$name.png',
-              ).writeAsBytes(bytes!.buffer.asUint8List());
+              await File('${dir.path}/${dark ? 'dark' : 'light'}-$name.png')
+                  .writeAsBytes(bytes!.buffer.asUint8List());
             } finally {
               image.dispose();
             }

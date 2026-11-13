@@ -73,9 +73,9 @@ final class YouTubeCatalogClient {
       );
     final html = utf8.decode(response.bytes);
     if (session != null &&
-        RegExp(
-              r'"LOGGED_IN"\s*:\s*(true|false)\b',
-            ).firstMatch(html)?.group(1) !=
+        RegExp(r'"LOGGED_IN"\s*:\s*(true|false)\b')
+                .firstMatch(html)
+                ?.group(1) !=
             'true') {
       throw const ProviderFailure(ProviderProblem.unauthorized);
     }
@@ -238,8 +238,7 @@ final class YouTubeCatalogClient {
           'Origin': origin.origin,
           'X-YouTube-Client-Name': '67',
           'X-YouTube-Client-Version': context.version,
-          if (context.visitor != null)
-            'X-Goog-Visitor-Id': context.visitor!,
+          if (context.visitor != null) 'X-Goog-Visitor-Id': context.visitor!,
           ...session.headers(),
         },
         jsonBody: {
@@ -285,5 +284,4 @@ final class YouTubeCatalogClient {
       return decoded;
     });
   }
-
 }

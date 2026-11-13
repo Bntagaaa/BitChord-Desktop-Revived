@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../application/catalog_controller.dart';
 import '../application/search_suggestions.dart';
 import '../application/download_queue.dart';
@@ -36,13 +37,15 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
   Future<void> _reloadCurrentCatalog() async {
     final current = ref.read(catalogProvider);
     if (current.browseId != null || current.query.isNotEmpty) {
-      await ref.read(catalogProvider.notifier).load(
-        provider: current.provider,
-        query: current.query,
-        browseId: current.browseId,
-        params: current.params,
-        filter: current.filter,
-      );
+      await ref
+          .read(catalogProvider.notifier)
+          .load(
+            provider: current.provider,
+            query: current.query,
+            browseId: current.browseId,
+            params: current.params,
+            filter: current.filter,
+          );
     }
   }
 
@@ -64,7 +67,9 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
       // the existing authenticated YouTube shell before session adoption.
       final cookie = browser
           ? await (ref.read(browserSignInCaptureProvider)?.call(scope) ??
-                Future<String>.error(StateError('Browser sign-in is not available.')))
+                Future<String>.error(
+                  StateError('Browser sign-in is not available.'),
+                ))
           : manualCookie;
       scope.check();
       await accounts.signIn(cookie, scope);
@@ -139,7 +144,9 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
               key: const Key('browser-sign-in'),
               onPressed: _busy ? null : () => _connect(accounts, browser: true),
               child: Text(
-                _browserBusy ? 'Complete sign-in in browser…' : 'Sign in with browser',
+                _browserBusy
+                    ? 'Complete sign-in in browser…'
+                    : 'Sign in with browser',
               ),
             ),
             if (_browserBusy)
@@ -167,7 +174,11 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
             ),
             TextButton(
               onPressed: _busy ? null : () => _connect(accounts),
-              child: Text(_busy && !_browserBusy ? 'Verifying session…' : 'Verify session'),
+              child: Text(
+                _busy && !_browserBusy
+                    ? 'Verifying session…'
+                    : 'Verify session',
+              ),
             ),
           ] else ...[
             Text(
@@ -181,10 +192,7 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
             ),
           ],
           if (_error != null)
-            Text(
-              _error!,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            Text(_error!, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

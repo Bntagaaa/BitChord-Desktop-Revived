@@ -56,9 +56,8 @@ final class YouTubeProcessExtractor implements YouTubeExtractor {
     ).hasMatch(text)) {
       return const ProviderFailure(ProviderProblem.tokenUnavailable);
     }
-    if (RegExp(
-      r'http error 403|403 forbidden|status code 403',
-    ).hasMatch(text)) {
+    if (RegExp(r'http error 403|403 forbidden|status code 403')
+        .hasMatch(text)) {
       return const ProviderFailure(ProviderProblem.mediaRefused, 403);
     }
     if (RegExp(

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/domain/failure_reporter.dart';
 import '../domain/shell_settings.dart';
 

@@ -27,8 +27,7 @@ final class BrowserSignIn {
         if (env['PROGRAMFILES'] != null)
           env['PROGRAMFILES']! + r'\Microsoft\Edge\Application\msedge.exe',
         if (env['PROGRAMFILES(X86)'] != null)
-          env['PROGRAMFILES(X86)']! +
-              r'\Microsoft\Edge\Application\msedge.exe',
+          env['PROGRAMFILES(X86)']! + r'\Microsoft\Edge\Application\msedge.exe',
       ];
       for (final path in paths) {
         if (await File(path).exists()) return path;
@@ -82,9 +81,7 @@ final class BrowserSignIn {
     final jar = <String, String>{};
     for (final item in cookies) {
       if (item is! Map) continue;
-      final domain = (item['domain'] is String
-              ? item['domain'] as String
-              : '')
+      final domain = (item['domain'] is String ? item['domain'] as String : '')
           .toLowerCase()
           .replaceFirst(RegExp(r'^\.'), '');
       if (domain != 'youtube.com' && !domain.endsWith('.youtube.com')) {
@@ -182,9 +179,8 @@ final class BrowserSignIn {
       }
       for (var attempt = 0; attempt < 12; attempt++) {
         scope.check();
-        final socket = await WebSocket.connect(
-          endpoint,
-        ).timeout(const Duration(seconds: 8));
+        final socket = await WebSocket.connect(endpoint)
+            .timeout(const Duration(seconds: 8));
         try {
           socket.add(jsonEncode({'id': 1, 'method': 'Storage.getCookies'}));
           final response = await socket

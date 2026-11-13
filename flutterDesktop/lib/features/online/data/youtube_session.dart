@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:crypto/crypto.dart';
+
 import '../domain/catalog.dart';
 import 'provider_http.dart';
 
@@ -67,9 +69,9 @@ final class YouTubeSession {
 
   static YouTubeSession fromVerifiedShell(String cookie, String html) {
     final secret = signingSecret(cookie);
-    if (RegExp(
-          r'"LOGGED_IN"\s*:\s*(true|false)\b',
-        ).firstMatch(html)?.group(1) !=
+    if (RegExp(r'"LOGGED_IN"\s*:\s*(true|false)\b')
+            .firstMatch(html)
+            ?.group(1) !=
         'true') {
       throw const ProviderFailure(ProviderProblem.unauthorized);
     }

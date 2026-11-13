@@ -1,4 +1,5 @@
 import 'dart:isolate';
+
 import '../../../core/platform/audio/native_api.dart';
 import '../domain/catalog.dart';
 import 'provider_http.dart';

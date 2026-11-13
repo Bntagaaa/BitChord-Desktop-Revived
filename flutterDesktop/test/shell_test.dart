@@ -1,6 +1,8 @@
 import 'dart:io';
+
 import 'package:bitchord_desktop/features/shell/data/preferences_store.dart';
 import 'package:bitchord_desktop/l10n/shell_strings.dart';
+
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../features/shell/domain/shell_settings.dart';
 
 // Values transcribed from DesktopTheme.kt at Kotlin 1.9.2.

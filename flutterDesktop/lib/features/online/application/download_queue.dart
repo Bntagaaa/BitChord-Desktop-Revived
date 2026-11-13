@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../domain/catalog.dart';
 import 'catalog_controller.dart';
 

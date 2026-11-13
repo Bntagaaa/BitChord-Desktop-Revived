@@ -24,9 +24,7 @@ void main() {
         isNull,
       );
       expect(
-        BrowserSignIn.endpointFromPortFile(
-          '81\n/devtools/page/123456789\n',
-        ),
+        BrowserSignIn.endpointFromPortFile('81\n/devtools/page/123456789\n'),
         isNull,
       );
       expect(
@@ -54,11 +52,7 @@ void main() {
               'name': 'PASSWORD',
               'value': 'must-not-leak',
             },
-            {
-              'domain': 'google.com',
-              'name': 'SID',
-              'value': 'unrelated',
-            },
+            {'domain': 'google.com', 'name': 'SID', 'value': 'unrelated'},
             {
               'domain': 'evil.youtube.com.attacker.test',
               'name': 'LEAK',
@@ -80,11 +74,7 @@ void main() {
         () => BrowserSignIn.youtubeCookieHeader({
           'result': {
             'cookies': [
-              {
-                'domain': '.youtube.com',
-                'name': 'PREF',
-                'value': 'test',
-              },
+              {'domain': '.youtube.com', 'name': 'PREF', 'value': 'test'},
             ],
           },
         }),
@@ -128,9 +118,7 @@ void main() {
         throwsA(isA<ProviderFailure>()),
       );
       expect(
-        () => BrowserSignIn.youtubeCookieHeader({
-          'result': null,
-        }),
+        () => BrowserSignIn.youtubeCookieHeader({'result': null}),
         throwsA(isA<ProviderFailure>()),
       );
     });

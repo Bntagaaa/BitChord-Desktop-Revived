@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/domain/audio_contract.dart';
 import '../domain/catalog.dart';
 import '../domain/online_port.dart';
@@ -119,9 +121,7 @@ final class CatalogController extends Notifier<CatalogView> {
       return;
     // Guest users have no account library. Keep the real route identity so a
     // subsequent verified sign-in can refresh it, without any fake result.
-    if (browseId == 'app:library' &&
-        api is OnlineAccounts &&
-        !api.signedIn) {
+    if (browseId == 'app:library' && api is OnlineAccounts && !api.signedIn) {
       _queryScope?.cancel();
       ++_generation;
       state = const CatalogView(browseId: 'app:library');
@@ -267,7 +267,6 @@ final class CatalogController extends Notifier<CatalogView> {
     }
   }
 
-
   // Mutations never retry automatically: a server can commit a playlist edit
   // even if its HTTP response is lost. A request needs a verified identity.
   Future<T> _edit<T>(
@@ -294,34 +293,22 @@ final class CatalogController extends Notifier<CatalogView> {
     }
   }
 
-  Future<String> createPlaylist(
-    String title,
-    PlaylistVisibility visibility,
-  ) => _edit(
-    (api, scope) => api.createPlaylist(title, visibility, scope),
-  );
+  Future<String> createPlaylist(String title, PlaylistVisibility visibility) =>
+      _edit((api, scope) => api.createPlaylist(title, visibility, scope));
 
-  Future<void> renamePlaylist(String id, String title) => _edit(
-    (api, scope) => api.renamePlaylist(id, title, scope),
-  );
+  Future<void> renamePlaylist(String id, String title) =>
+      _edit((api, scope) => api.renamePlaylist(id, title, scope));
 
-  Future<void> deletePlaylist(String id) => _edit(
-    (api, scope) => api.deletePlaylist(id, scope),
-  );
+  Future<void> deletePlaylist(String id) =>
+      _edit((api, scope) => api.deletePlaylist(id, scope));
 
-  Future<Map<String, String>> addToPlaylist(
-    String id,
-    List<String> videoIds,
-  ) => _edit(
-    (api, scope) => api.addToPlaylist(id, videoIds, scope),
-  );
+  Future<Map<String, String>> addToPlaylist(String id, List<String> videoIds) =>
+      _edit((api, scope) => api.addToPlaylist(id, videoIds, scope));
 
   Future<void> removeFromPlaylist(
     String id,
     List<({String setVideoId, String videoId})> entries,
-  ) => _edit(
-    (api, scope) => api.removeFromPlaylist(id, entries, scope),
-  );
+  ) => _edit((api, scope) => api.removeFromPlaylist(id, entries, scope));
 
   Future<List<CatalogEntry>> accountPlaylists() async {
     final api = port;
@@ -344,9 +331,13 @@ final class CatalogController extends Notifier<CatalogView> {
               e.provider == 'youtube' &&
               e.kind == CatalogKind.playlist &&
               e.id.startsWith('VL') &&
-              !['VLLM', 'VLSE', 'VLRD', 'VLOLAK', 'VLMPRE'].any(
-                (blocked) => e.id.startsWith(blocked),
-              ),
+              ![
+                'VLLM',
+                'VLSE',
+                'VLRD',
+                'VLOLAK',
+                'VLMPRE',
+              ].any((blocked) => e.id.startsWith(blocked)),
         ),
       );
     } finally {

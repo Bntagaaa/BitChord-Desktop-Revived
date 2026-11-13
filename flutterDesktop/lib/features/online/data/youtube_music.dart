@@ -149,11 +149,7 @@ final class YouTubeMusic implements CatalogProvider {
         String? token;
         for (var pageCount = 0; pageCount < 10; pageCount++) {
           scope.check();
-          final page = await browse(
-            browseId,
-            scope,
-            continuation: token,
-          );
+          final page = await browse(browseId, scope, continuation: token);
           final entries = page.entries.isNotEmpty
               ? page.entries
               : [for (final shelf in page.shelves) ...shelf.entries];
@@ -259,15 +255,15 @@ final class YouTubeMusic implements CatalogProvider {
     await _catalog.mutate('browse/edit_playlist', {
       'playlistId': _playlistId(playlistId),
       'actions': [
-        {'action': 'ACTION_SET_PLAYLIST_NAME', 'playlistName': _safeTitle(title)},
+        {
+          'action': 'ACTION_SET_PLAYLIST_NAME',
+          'playlistName': _safeTitle(title),
+        },
       ],
     }, scope);
   }
 
-  Future<void> deletePlaylist(
-    String playlistId,
-    RequestScope scope,
-  ) async {
+  Future<void> deletePlaylist(String playlistId, RequestScope scope) async {
     await _catalog.mutate('playlist/delete', {
       'playlistId': _playlistId(playlistId),
     }, scope);

@@ -6,6 +6,7 @@ import 'package:bitchord_desktop/features/online/application/catalog_controller.
 import 'package:bitchord_desktop/features/online/data/youtube_music.dart';
 import 'package:bitchord_desktop/features/online/domain/catalog.dart';
 import 'package:bitchord_desktop/features/online/domain/online_port.dart';
+
 import 'online_controller_test.dart' show ControlledCatalog;
 
 class EditableCatalog extends ControlledCatalog
@@ -51,10 +52,7 @@ class EditableCatalog extends ControlledCatalog
   }
 
   @override
-  Future<void> deletePlaylist(
-    String playlistId,
-    RequestScope scope,
-  ) async {
+  Future<void> deletePlaylist(String playlistId, RequestScope scope) async {
     scope.check();
     edits.add('delete:' + playlistId);
   }
@@ -89,10 +87,9 @@ void main() {
     );
     addTearDown(container.dispose);
     expect(
-      () => container.read(catalogProvider.notifier).createPlaylist(
-        'My playlist',
-        PlaylistVisibility.private,
-      ),
+      () => container
+          .read(catalogProvider.notifier)
+          .createPlaylist('My playlist', PlaylistVisibility.private),
       throwsA(
         isA<ProviderFailure>().having(
           (f) => f.problem,
@@ -104,35 +101,40 @@ void main() {
     expect(port.edits, isEmpty);
   });
 
-  test('signed-in editor sends real operations and retains entry identity',
-      () async {
-    final port = EditableCatalog()..signedIn = true;
-    final container = ProviderContainer(
-      overrides: [onlinePortProvider.overrideWithValue(port)],
-    );
-    addTearDown(container.dispose);
-    final controller = container.read(catalogProvider.notifier);
-    expect(
-      await controller.createPlaylist('User list', PlaylistVisibility.private),
-      'PL1234567890',
-    );
-    await controller.renamePlaylist('VLPL1234567890', 'New name');
-    final added = await controller.addToPlaylist('VLPL1234567890', [
-      'abcdefghijk',
-    ]);
-    expect(added['abcdefghijk'], 'set-entry-123');
-    await controller.removeFromPlaylist('VLPL1234567890', [
-      (setVideoId: 'set-entry-123', videoId: 'abcdefghijk'),
-    ]);
-    await controller.deletePlaylist('VLPL1234567890');
-    expect(port.edits, [
-      'create:User list:private',
-      'rename:VLPL1234567890:New name',
-      'add:VLPL1234567890:1',
-      'remove:VLPL1234567890:set-entry-123',
-      'delete:VLPL1234567890',
-    ]);
-  });
+  test(
+    'signed-in editor sends real operations and retains entry identity',
+    () async {
+      final port = EditableCatalog()..signedIn = true;
+      final container = ProviderContainer(
+        overrides: [onlinePortProvider.overrideWithValue(port)],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(catalogProvider.notifier);
+      expect(
+        await controller.createPlaylist(
+          'User list',
+          PlaylistVisibility.private,
+        ),
+        'PL1234567890',
+      );
+      await controller.renamePlaylist('VLPL1234567890', 'New name');
+      final added = await controller.addToPlaylist('VLPL1234567890', [
+        'abcdefghijk',
+      ]);
+      expect(added['abcdefghijk'], 'set-entry-123');
+      await controller.removeFromPlaylist('VLPL1234567890', [
+        (setVideoId: 'set-entry-123', videoId: 'abcdefghijk'),
+      ]);
+      await controller.deletePlaylist('VLPL1234567890');
+      expect(port.edits, [
+        'create:User list:private',
+        'rename:VLPL1234567890:New name',
+        'add:VLPL1234567890:1',
+        'remove:VLPL1234567890:set-entry-123',
+        'delete:VLPL1234567890',
+      ]);
+    },
+  );
 
   test('account cancellation fences a pending mutation', () async {
     final port = EditableCatalog()

@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+
 import '../../design_system/theme.dart';
 import '../../features/shell/domain/shell_settings.dart';
 import 'diagnostics.dart';

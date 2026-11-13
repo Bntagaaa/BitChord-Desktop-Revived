@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../application/catalog_controller.dart';
 import '../domain/catalog.dart';
 import '../../../design_system/palette.dart';
@@ -116,9 +118,8 @@ class CollectionHeader extends StatelessWidget {
                   header.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: Theme.of(context).textTheme.displaySmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 if (credit != null) ...[
                   const SizedBox(height: 6),
@@ -126,17 +127,15 @@ class CollectionHeader extends StatelessWidget {
                     credit,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: palette['accent']),
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(color: palette['accent']),
                   ),
                 ],
                 const SizedBox(height: 8),
                 Text(
                   metadata,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: palette['secondary']),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: palette['secondary']),
                 ),
                 const SizedBox(height: 24),
                 Wrap(
@@ -253,9 +252,8 @@ class CollectionTrackRow extends StatelessWidget {
                   entry.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w500),
                 ),
               ),
               Expanded(
@@ -414,9 +412,8 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
         entry.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(
-          context,
-        ).textTheme.titleMedium?.copyWith(color: white ? Colors.white : null),
+        style: Theme.of(context).textTheme.titleMedium
+            ?.copyWith(color: white ? Colors.white : null),
       ),
       Text(
         entry.subtitle,

@@ -49,15 +49,15 @@ final class YouTubeCatalogParser {
   static String text(Object? value) {
     if (value is! Map) return '';
     if (value['simpleText'] case final String text) return text;
-    return list(
-      value['runs'],
-    ).whereType<Map>().map((run) => string(run['text']) ?? '').join();
+    return list(value['runs'])
+        .whereType<Map>()
+        .map((run) => string(run['text']) ?? '')
+        .join();
   }
 
   static int? duration(String text) {
-    final match = RegExp(
-      r'^(?:(\d+):)?(\d{1,2}):(\d{2})$',
-    ).firstMatch(text.trim());
+    final match = RegExp(r'^(?:(\d+):)?(\d{1,2}):(\d{2})$')
+        .firstMatch(text.trim());
     if (match == null) return null;
     final hours = int.tryParse(match[1] ?? '0') ?? 0;
     final minutes = int.parse(match[2]!), seconds = int.parse(match[3]!);
@@ -178,14 +178,10 @@ final class YouTubeCatalogParser {
   /// Mirrors the pinned Kotlin ownership check. A saved stranger's playlist
   /// must not be offered rename/delete actions. Unknown headers stay unknown.
   static bool? playlistOwned(Map<String, dynamic> data) {
-    if (nodes(data, 'musicEditablePlaylistDetailHeaderRenderer')
-        .isNotEmpty) {
+    if (nodes(data, 'musicEditablePlaylistDetailHeaderRenderer').isNotEmpty) {
       return true;
     }
-    final header = nodes(
-      data,
-      'musicResponsiveHeaderRenderer',
-    ).firstOrNull;
+    final header = nodes(data, 'musicResponsiveHeaderRenderer').firstOrNull;
     if (header == null) return null;
     for (final item in nodes(header, 'menuNavigationItemRenderer')) {
       final icon = string(map(item['icon'])?['iconType']);

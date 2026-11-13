@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../features/shell/presentation/desktop_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
