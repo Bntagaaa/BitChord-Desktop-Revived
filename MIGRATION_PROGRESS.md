@@ -1267,3 +1267,59 @@ artist/shelf/discovery/custom-menu and matched native visual/DPI/live gates rema
 unfinished. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** New exact-SHA CI status
 will be recorded after this increment is pushed; baseline success is not reused
 as evidence for new source.
+
+### Phase 4 increment — final checked Windows/Linux and live evidence
+
+Implemented source **`a1ddef06f873c08d942d3326655f383d72f2feb3`** passed
+[Actions 43373451431](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43373451431).
+Both platform jobs and the trusted retention job completed **SUCCESS**.
+Downloaded and inspected both `flutter-foundation-linux` and
+`flutter-foundation-windows` artifacts, including test summaries, provider/native
+reports and native GUI JSON. Each OS passed **56 tests, 0 failed, 0 skipped**,
+fatal analysis, format, native CMake/CTest, provider/broker/download contracts,
+release bundle/runtime packaging and native GUI launch/close/fullscreen checks.
+Both controlled broker→decoder trials produced **384000 exact PCM frames** with
+zero retained decoders. Native captures cover 1220×780 and 900×600 at hosted
+96 DPI plus account/drawer/settings/theme states; they are not Kotlin goldens.
+
+Retention commit **`6ca0c40c`** was fast-forwarded locally. It updates generated
+verification evidence; `lib/` and `test/` have no changes relative to tested
+`a1ddef06`. Its `verification/hosted-run.json` records the correct tested SHA/run.
+The pre-retention `hosted-run.json` inside uploaded artifacts still describes the
+previous run and is not used to identify this build; Actions head SHA, job logs,
+fresh test/native reports and the retained provenance are authoritative here.
+
+Additional local Linux anonymous live trial, **2026-11-13 05:42 UTC**, used the
+production `YouTubeMusic`/`YouTubeResolver.directOnly` → `SourceBroker` →
+`RangeSource`/`DownloadStore` path, with temporary app-owned storage and no account:
+
+- One direct player request, zero extractor attempts; media range preflight
+  verified 32768 bytes and reused its 16384-byte prefix. The logged 425ms direct
+  and 228ms probe observations are individual stage timings, not audible latency.
+- Broker returned **HTTP 206 / 4096 bytes**. A **16289194-byte** actual progressive
+  recording downloaded successfully; a new `DownloadStore` instance returned
+  one hash-verified completed file.
+- A temporary Clang-built reader using production `native/audio/src/decoder.cpp`
+  drained that reopened offline file to EOF: **43204859 frames, 48000 Hz,
+  2 channels**, PCM high-water **637440 bytes**, zero surviving decoders, exit 0.
+  This was decoder validation without a speaker, not physical audio playback or
+  a full fresh-app restart. Temporary media was deleted after the trial.
+- Reproduction helpers in this task workspace were `/tmp/phase4-media-live.dart`
+  and `/tmp/phase4-native/decode_live.cpp`; redacted output is
+  `/tmp/phase4-media-live-report.json`. No signed location/cookie/track identity
+  or media content is committed.
+
+The CI runner's separate anonymous bundled probe reported **loginRequired** for
+all three selections. Preserve this truthful upstream refusal; do not generalize
+the local guest success to all networks. Windows hosted WASAPI physical output
+remains BLOCKED: no audio endpoint (probe error 105, zero played frames). Physical
+audibility/hotplug/calibrated latency and authenticated-account scenarios remain
+unverified on both OSs.
+
+**Final Phase 4 status: INCOMPLETE.** This increment closes specific catalog,
+context, download and recovery defects, but browser/protected accounts,
+Spotify/library mutations, custom modules/source/quality/manifest/cache work and
+the complete matched native visual/interaction matrix are still unfinished as
+listed in the audit. The user is willing to log in after a real login UI exists.
+**Phase 5 NOT STARTED.** This evidence-only root-document update changes no tested
+application source and uses the workflow's existing path filters normally.

@@ -1526,3 +1526,36 @@ local CMake/Xvfb absent, Windows/Linux release/native GUI matrix pending the pus
 Baseline success [43364580612](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43364580612)
 is not promoted to new-source evidence. All reference Kotlin trees are unchanged.
 **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
+
+### Phase 4 catalog/download increment — exact-SHA platform promotion
+
+Source `a1ddef06f873c08d942d3326655f383d72f2feb3` passed
+[43373451431](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43373451431)
+on Windows and Linux; both downloaded artifacts were inspected. **56/56 Flutter
+tests per OS**, no failures/skips; fatal analyzer, format, native CMake/CTest,
+provider/download/broker regressions, release builds/runtime bundles and native
+GUI lifecycle smokes passed. Retention `6ca0c40c` records the current SHA/run and
+changes no `lib/`/`test/` source. Uploaded pre-retention `hosted-run.json` is stale;
+use Actions head SHA, fresh reports/logs and retained provenance instead.
+
+Promote **only the controlled delivered subsets** of P02/P03/P04/P05/P08/P35/P36
+above to PLATFORM_VERIFIED for their listed fixture/GUI/build checks. Full P-IDs
+remain below PARITY_ACCEPTED: authenticated library/account/Spotify/module/source
+flows, complete quality/manifest/cache/fault contracts and matched Kotlin visual
+evidence are missing. Hosted GUI captures at both client sizes/96 DPI are real
+Flutter captures, not a source-matched complete Phase 4 comparison.
+
+Local Linux guest production-adapter trial additionally verified a real media
+range, opaque broker HTTP 206, **16289194 downloaded bytes**, hash verification
+through a new store instance, and reopened offline native decode to EOF:
+**43204859 frames / 48000 Hz / stereo**, **637440-byte PCM high-water**, zero
+surviving decoders. It used task-temporary media and no physical sink, account,
+full app restart, expired-source scenario or audible-latency measurement. Both
+CI controlled decode fixtures still produced **384000 exact frames**. The CI
+anonymous live probe was refused with `loginRequired`, and its Windows physical
+output probe had no WASAPI endpoint (error 105); neither is a live playback pass.
+
+Current status: **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** See the final
+increment record in MIGRATION_PROGRESS and the scoped completion audit for
+remaining implementation and evidence gates. No Kotlin reference modification,
+performance improvement, universal provider availability or 1:1 parity is claimed.
