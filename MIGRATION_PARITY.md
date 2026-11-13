@@ -1490,3 +1490,10 @@ P03/P04/P05: catalog requests, client/visitor refresh, pagination-compatible par
 ### P19/P11/P12 - YouTube direct fast-start, 2026-11-13
 
 IMPLEMENTED: independent direct VISIONOS guest player request before the maintained extractor, shared warm visitor context, 16 KiB prefix plus bounded beyond-1-MiB verification, immutable seed handoff to the existing broker, YouTube-only keep-alive, redacted per-stage timings. Tests assert zero extractor invocations on direct success and no duplicate initial media request during broker startup. Same-rendition and account cancellation remain enforced. No JioSaavn/add-on/native engine/UI rewrite. Source/build/fixture verification is not a live first-audible or all-tracks reliability measurement; exact-SHA results remain to be recorded. Phase 4 INCOMPLETE.
+
+
+### P11/P12/P24 — early progress-scrub regression, 2026-11-13
+
+User-reported live YouTube start was fast and functional, but scrubbing immediately after play caused `Playback failed`. The dock's Flutter slider had dispatched a native seek for every drag update. The `OnlineTransport` change in `dd0af8f2` / `972870c3` previews position locally and dispatches only one final seek; drag callbacks are fenced to the same entry/selection/revision and nominal EOF is avoided. No change to native C++ seek implementation or other providers. Two widget tests confirm one seek per drag and no seek from an obsolete song gesture.
+
+[Exact-source CI 43362441316](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43362441316) **SUCCESS on Linux and Windows**: 40 Flutter tests per OS, formatter, analyzer, native/provider/broker checks, release builds and GUI smokes. P24 delivered gesture is PLATFORM_VERIFIED (automated); P11/P12 remain only regression/platform-verified under controlled playback. Real immediate live YouTube seek and long repeated scrubbing are not physically verified by hosted CI. Phase 4 INCOMPLETE, Phase 5 NOT STARTED.
