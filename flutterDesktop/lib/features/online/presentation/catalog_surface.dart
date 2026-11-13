@@ -617,7 +617,8 @@ class _OnlineTransportState extends ConsumerState<OnlineTransport> {
                     },
                     onChangeEnd: (value) async {
                       final latest = ref.read(transportProvider);
-                      final valid = latest != null &&
+                      final valid =
+                          latest != null &&
                           _isCurrentScrub(latest) &&
                           latest.phase != AudioPhase.failed &&
                           latest.durationUs > 0;
@@ -635,7 +636,9 @@ class _OnlineTransportState extends ConsumerState<OnlineTransport> {
                           ? latest.durationUs - 250000
                           : latest.durationUs - 1;
                       try {
-                        await port?.seek(value.round().clamp(0, maxSeek).toInt());
+                        await port?.seek(
+                          value.round().clamp(0, maxSeek).toInt(),
+                        );
                       } catch (_) {}
                     },
                   ),
