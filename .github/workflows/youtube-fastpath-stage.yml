@@ -50,16 +50,20 @@ jobs:
           patch = pathlib.Path('/tmp/apply-youtube-fastpath.py')
           patch.write_bytes(read_blob('b2cbcea8431def341dfc1292b45ef4799f08d7f7'))
           subprocess.run(['python3', str(patch)], check=True)
-          # Validate an exact-source seed at construction, before it can cross
-          # an isolate boundary. Serialization must not rebind an invalid seed.
           path = pathlib.Path('flutterDesktop/lib/features/online/domain/catalog.dart')
           text = path.read_text()
           old = '  }) : headers = Map.unmodifiable(headers);'
           assert text.count(old) == 1
           text = text.replace(old, '  }) : headers = Map.unmodifiable(headers) {\n    warmup?.validateFor(this);\n  }')
           path.write_text(text)
-          # Leave scheduling headroom on hosted runners; the slow endpoint is
-          # still strictly slower than the timeout under test.
+          path = pathlib.Path('flutterDesktop/lib/features/online/data/youtube_resolver.dart')
+          text = path.read_text()
+          assert text.count("'direct_failure': directFailure!") == 1
+          path.write_text(text.replace("'direct_failure': directFailure!", "'direct_failure': directFailure"))
+          path = pathlib.Path('flutterDesktop/lib/features/online/data/source_broker.dart')
+          text = path.read_text()
+          assert text.count('      media.check();') == 1
+          path.write_text(text.replace('      media.check();', '      source.media.check();'))
           path = pathlib.Path('flutterDesktop/tool/youtube_fastpath_check.dart')
           text = path.read_text().replace('Duration(milliseconds: 200)', 'Duration(milliseconds: 600)').replace('Duration(milliseconds: 50)', 'Duration(milliseconds: 200)')
           path.write_text(text)
