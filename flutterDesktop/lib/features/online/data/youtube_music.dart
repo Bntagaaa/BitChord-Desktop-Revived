@@ -191,6 +191,165 @@ final class YouTubeMusic implements CatalogProvider {
     return CatalogPage(const [], shelves: shelves);
   }
 
+  static String _safeTitle(String title) {
+    final value = title.trim();
+    if (value.isEmpty ||
+        value.length > 150 ||
+        RegExp(r'[\x00-\x1f\x7f]').hasMatch(value)) {
+      throw const ProviderFailure(ProviderProblem.malformed);
+    }
+    return value;
+  }
+
+  static String _playlistId(String input) {
+    final id = input.startsWith('VL') ? input.substring(2) : input;
+    if (!RegExp(r'^[A-Za-z0-9_-]{8,128}
+  static Iterable<Map<String, dynamic>> nodes(Object? value, String key) =>
+      YouTubeCatalogParser.nodes(value, key);
+  static String text(Object? value) => YouTubeCatalogParser.text(value);
+  static CatalogPage parsePage(Map<String, dynamic> data, {String? browseId}) =>
+      YouTubeCatalogParser.parsePage(data, browseId: browseId);
+}
+).hasMatch(id)) {
+      throw const ProviderFailure(ProviderProblem.malformed);
+    }
+    return id;
+  }
+
+  static String _videoId(String input) {
+    if (!RegExp(r'^[A-Za-z0-9_-]{11}
+  static Iterable<Map<String, dynamic>> nodes(Object? value, String key) =>
+      YouTubeCatalogParser.nodes(value, key);
+  static String text(Object? value) => YouTubeCatalogParser.text(value);
+  static CatalogPage parsePage(Map<String, dynamic> data, {String? browseId}) =>
+      YouTubeCatalogParser.parsePage(data, browseId: browseId);
+}
+).hasMatch(input)) {
+      throw const ProviderFailure(ProviderProblem.malformed);
+    }
+    return input;
+  }
+
+  static String? _resultPlaylistId(Object? value, [int depth = 0]) {
+    if (depth > 12) return null;
+    if (value is Map) {
+      final id = value['playlistId'];
+      if (id is String && id.isNotEmpty) return id;
+      for (final child in value.values) {
+        final nested = _resultPlaylistId(child, depth + 1);
+        if (nested != null) return nested;
+      }
+    } else if (value is List) {
+      for (final child in value) {
+        final nested = _resultPlaylistId(child, depth + 1);
+        if (nested != null) return nested;
+      }
+    }
+    return null;
+  }
+
+  Future<String> createPlaylist(
+    String title,
+    PlaylistVisibility visibility,
+    RequestScope scope,
+  ) async {
+    final response = await _catalog.mutate('playlist/create', {
+      'title': _safeTitle(title),
+      'description': '',
+      'privacyStatus': visibility.name.toUpperCase(),
+    }, scope);
+    final result = _resultPlaylistId(response);
+    if (result == null) {
+      throw const ProviderFailure(ProviderProblem.malformed);
+    }
+    return _playlistId(result);
+  }
+
+  Future<void> renamePlaylist(
+    String playlistId,
+    String title,
+    RequestScope scope,
+  ) async {
+    await _catalog.mutate('browse/edit_playlist', {
+      'playlistId': _playlistId(playlistId),
+      'actions': [
+        {'action': 'ACTION_SET_PLAYLIST_NAME', 'playlistName': _safeTitle(title)},
+      ],
+    }, scope);
+  }
+
+  Future<void> deletePlaylist(
+    String playlistId,
+    RequestScope scope,
+  ) async {
+    await _catalog.mutate('playlist/delete', {
+      'playlistId': _playlistId(playlistId),
+    }, scope);
+  }
+
+  Future<Map<String, String>> addToPlaylist(
+    String playlistId,
+    List<String> videoIds,
+    RequestScope scope,
+  ) async {
+    if (videoIds.isEmpty || videoIds.length > 100) {
+      throw const ProviderFailure(ProviderProblem.malformed);
+    }
+    final response = await _catalog.mutate('browse/edit_playlist', {
+      'playlistId': _playlistId(playlistId),
+      'actions': [
+        for (final id in videoIds)
+          {'action': 'ACTION_ADD_VIDEO', 'addedVideoId': _videoId(id)},
+      ],
+    }, scope);
+    final entries = response['playlistEditResults'];
+    final result = <String, String>{};
+    if (entries is List) {
+      for (final item in entries) {
+        if (item is! Map) continue;
+        final added = item['playlistEditVideoAddedResultData'];
+        if (added is! Map) continue;
+        final id = added['videoId'], setId = added['setVideoId'];
+        if (id is String && setId is String && setId.isNotEmpty) {
+          result[id] = setId;
+        }
+      }
+    }
+    return Map.unmodifiable(result);
+  }
+
+  Future<void> removeFromPlaylist(
+    String playlistId,
+    List<({String setVideoId, String videoId})> entries,
+    RequestScope scope,
+  ) async {
+    if (entries.isEmpty || entries.length > 100) {
+      throw const ProviderFailure(ProviderProblem.malformed);
+    }
+    final actions = <Map<String, String>>[];
+    for (final entry in entries) {
+      if (!RegExp(r'^[A-Za-z0-9_-]{6,160}
+  static Iterable<Map<String, dynamic>> nodes(Object? value, String key) =>
+      YouTubeCatalogParser.nodes(value, key);
+  static String text(Object? value) => YouTubeCatalogParser.text(value);
+  static CatalogPage parsePage(Map<String, dynamic> data, {String? browseId}) =>
+      YouTubeCatalogParser.parsePage(data, browseId: browseId);
+}
+).hasMatch(entry.setVideoId)) {
+        throw const ProviderFailure(ProviderProblem.malformed);
+      }
+      actions.add({
+        'action': 'ACTION_REMOVE_VIDEO',
+        'setVideoId': entry.setVideoId,
+        'removedVideoId': _videoId(entry.videoId),
+      });
+    }
+    await _catalog.mutate('browse/edit_playlist', {
+      'playlistId': _playlistId(playlistId),
+      'actions': actions,
+    }, scope);
+  }
+
   // Compatibility entrypoints for reference fixtures and existing consumers.
   static Iterable<Map<String, dynamic>> nodes(Object? value, String key) =>
       YouTubeCatalogParser.nodes(value, key);
