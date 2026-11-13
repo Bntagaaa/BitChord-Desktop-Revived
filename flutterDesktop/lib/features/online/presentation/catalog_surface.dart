@@ -78,6 +78,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
             'listen-now' => 'FEmusic_home',
             'new' => 'FEmusic_new_releases',
             'explore' => 'FEmusic_explore',
+            'library' => 'app:library',
             _ => null,
           };
       if (browse != null && !restored)
@@ -278,7 +279,9 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     final search = widget.destination == 'search';
     final catalog =
         widget.browseId != null ||
-        ['listen-now', 'new', 'explore', 'search'].contains(widget.destination);
+        ['listen-now', 'new', 'explore', 'search', 'library'].contains(
+          widget.destination,
+        );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -451,11 +454,20 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
         if (catalog)
           Expanded(
             child:
-                state.entries.isEmpty && !state.loading && state.error == null
+                state.entries.isEmpty &&
+                state.shelves.isEmpty &&
+                !state.loading &&
+                state.error == null
                 ? Center(
                     child: Text(
                       search
                           ? 'Search for music'
+                          : widget.destination == 'library' &&
+                                ref.read(onlinePortProvider) is OnlineAccounts &&
+                                !(ref.read(onlinePortProvider)
+                                        as OnlineAccounts)
+                                    .signedIn
+                          ? 'Sign in from Accounts to view your library.'
                           : 'No catalog items available.',
                     ),
                   )
