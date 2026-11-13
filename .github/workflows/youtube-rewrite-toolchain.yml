@@ -1,0 +1,41 @@
+name: YouTube rewrite toolchain
+on:
+  push:
+    branches: ['2.0.0-flutter']
+    paths: ['.github/workflows/youtube-rewrite-toolchain.yml']
+permissions:
+  contents: read
+jobs:
+  toolchain:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - name: Resolve locked public packages
+        working-directory: flutterDesktop
+        run: flutter pub get --enforce-lockfile
+      - name: Archive public SDK and package sources only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, zipfile
+          sdk = pathlib.Path(os.environ['FLUTTER_ROOT']) / 'bin/cache/dart-sdk'
+          hosted = pathlib.Path(os.environ.get('PUB_CACHE', str(pathlib.Path.home()/'.pub-cache'))) / 'hosted/pub.dev'
+          with zipfile.ZipFile('youtube-dart-toolchain.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for root, prefix in [(sdk, 'dart-sdk'), (hosted, 'packages')]:
+                  for path in root.rglob('*'):
+                      if path.is_file() and not path.is_symlink():
+                          archive.write(path, str(pathlib.Path(prefix) / path.relative_to(root)))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: youtube-dart-toolchain
+          path: youtube-dart-toolchain.zip
+          retention-days: 1
