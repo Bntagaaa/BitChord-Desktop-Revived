@@ -175,6 +175,33 @@ final class YouTubeCatalogParser {
     return entries;
   }
 
+  /// Mirrors the pinned Kotlin ownership check. A saved stranger's playlist
+  /// must not be offered rename/delete actions. Unknown headers stay unknown.
+  static bool? playlistOwned(Map<String, dynamic> data) {
+    if (nodes(data, 'musicEditablePlaylistDetailHeaderRenderer')
+        .isNotEmpty) {
+      return true;
+    }
+    final header = nodes(
+      data,
+      'musicResponsiveHeaderRenderer',
+    ).firstOrNull;
+    if (header == null) return null;
+    for (final item in nodes(header, 'menuNavigationItemRenderer')) {
+      final icon = string(map(item['icon'])?['iconType']);
+      if (icon == 'DELETE' || icon == 'EDIT') return true;
+    }
+    final buttons = list(header['buttons']);
+    final hasBookmark = buttons.any((button) {
+      final toggle = nodes(button, 'toggleButtonRenderer').firstOrNull;
+      if (toggle == null) return false;
+      return string(map(toggle['defaultIcon'])?['iconType']) ==
+              'BOOKMARK_BORDER' ||
+          string(map(toggle['toggledIcon'])?['iconType']) == 'BOOKMARK';
+    });
+    return !hasBookmark;
+  }
+
   static CatalogPage parsePage(
     Map<String, dynamic> data, {
     String? browseId,
@@ -260,6 +287,7 @@ final class YouTubeCatalogParser {
             : null);
     final entries = _entries(playlist ?? root);
     final header =
+        nodes(data, 'musicEditablePlaylistDetailHeaderRenderer').firstOrNull ??
         nodes(data, 'musicResponsiveHeaderRenderer').firstOrNull ??
         nodes(data['header'], 'musicDetailHeaderRenderer').firstOrNull ??
         nodes(data['header'], 'musicImmersiveHeaderRenderer').firstOrNull ??
@@ -320,6 +348,9 @@ final class YouTubeCatalogParser {
               title: headerTitle,
               subtitle: text(header?['subtitle']),
               artwork: art == null ? null : Uri.tryParse(art),
+              ownedByAccount: browseId?.startsWith('VL') ?? false
+                  ? playlistOwned(data)
+                  : null,
             ),
     );
   }
