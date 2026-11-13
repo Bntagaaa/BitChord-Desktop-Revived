@@ -1,4 +1,4 @@
-name: YouTube rewrite toolchain
+name: YouTube rewrite context
 on:
   push:
     branches: ['2.0.0-flutter']
@@ -6,36 +6,35 @@ on:
 permissions:
   contents: read
 jobs:
-  toolchain:
+  context:
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
-        with:
-          flutter-version: '3.47.9'
-          channel: stable
-          cache: true
-      - name: Resolve locked public packages
-        working-directory: flutterDesktop
-        run: flutter pub get --enforce-lockfile
-      - name: Archive public SDK and package sources only
+      - name: Capture reviewed public source context
         shell: bash
         run: |
+          git fetch --no-tags --depth=1 origin 348b613a0c3db1a54de56483ea6f8748d6465211
+          mkdir -p rewrite-context
+          python3 -m pip download --no-deps yt-dlp==2026.10.26 -d rewrite-context
           python3 - <<'PY'
-          import os, pathlib, zipfile
-          sdk = pathlib.Path(os.environ['FLUTTER_ROOT']) / 'bin/cache/dart-sdk'
-          hosted = pathlib.Path(os.environ.get('PUB_CACHE', str(pathlib.Path.home()/'.pub-cache'))) / 'hosted/pub.dev'
-          with zipfile.ZipFile('youtube-dart-toolchain.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
-              for root, prefix in [(sdk, 'dart-sdk'), (hosted, 'packages')]:
-                  for path in root.rglob('*'):
-                      if path.is_file() and not path.is_symlink():
-                          archive.write(path, str(pathlib.Path(prefix) / path.relative_to(root)))
+          import pathlib, subprocess, zipfile
+          reference = '348b613a0c3db1a54de56483ea6f8748d6465211'
+          names = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', reference], text=True).splitlines()
+          wanted = {'StreamResolver.kt', 'PlayerClient.kt', 'DesktopYouTubeSession.kt', 'DesktopYouTubeAuth.kt', 'InnertubeParser.kt'}
+          with zipfile.ZipFile('rewrite-context/context.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for path in pathlib.Path('.').glob('*.md'):
+                  archive.write(path, 'current/' + str(path))
+              for path in pathlib.Path('.github/workflows').glob('*.yml'):
+                  archive.write(path, 'current/' + str(path))
+              for name in names:
+                  if pathlib.PurePosixPath(name).name in wanted:
+                      archive.writestr('reference/' + name, subprocess.check_output(['git', 'show', reference + ':' + name]))
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: youtube-dart-toolchain
-          path: youtube-dart-toolchain.zip
+          name: youtube-rewrite-context
+          path: rewrite-context/
           retention-days: 1
