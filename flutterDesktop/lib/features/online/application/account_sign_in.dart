@@ -1,11 +1,10 @@
-import '../data/browser_sign_in.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/catalog.dart';
 
-/// Application boundary for user-initiated desktop sign-in. Presentation
-/// never starts a process or reads browser cookies directly.
-final class AccountSignIn {
-  AccountSignIn._();
+/// The composition root injects a desktop browser capability. No application
+/// state depends on a concrete browser process or reads browser data directly.
+typedef BrowserSignInCapture = Future<String> Function(RequestScope scope);
 
-  static Future<String> captureYouTube(RequestScope scope) =>
-      BrowserSignIn.captureYouTube(scope);
-}
+final browserSignInCaptureProvider = Provider<BrowserSignInCapture?>(
+  (ref) => null,
+);
