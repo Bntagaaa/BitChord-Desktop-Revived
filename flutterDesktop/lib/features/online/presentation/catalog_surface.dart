@@ -364,7 +364,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
             ? () => _addToPlaylist(entry)
             : null,
         onRemoveFromPlaylist: _canEditPlaylists &&
-                !widget.browseId!.startsWith('MPRE') &&
+                (ref.read(catalogProvider).header?.ownedByAccount == true) &&
                 entry.setVideoId != null
             ? () => _removeFromPlaylist(entry)
             : null,
@@ -712,12 +712,12 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                                 ),
                           onRename: _canEditPlaylists &&
                                   widget.browseId!.startsWith('VL') &&
-                                  widget.browseId != 'VLLM'
+                                  state.header?.ownedByAccount == true
                               ? _renamePlaylist
                               : null,
                           onDelete: _canEditPlaylists &&
                                   widget.browseId!.startsWith('VL') &&
-                                  widget.browseId != 'VLLM'
+                                  state.header?.ownedByAccount == true
                               ? _deletePlaylist
                               : null,
                           onFind: () => setState(() {
