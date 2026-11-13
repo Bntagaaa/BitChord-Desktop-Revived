@@ -52,7 +52,7 @@ final class CatalogView {
 }
 
 final class CatalogController extends Notifier<CatalogView> {
-  RequestScope? _queryScope, _connectScope;
+  RequestScope? _queryScope, _connectScope, _editScope;
   int _generation = 0;
   bool _disposed = false;
   final _pages = <String, CatalogView>{};
@@ -71,6 +71,7 @@ final class CatalogController extends Notifier<CatalogView> {
     ++_generation;
     _pages.clear();
     _queryScope?.cancel();
+    _editScope?.cancel();
     if (!_disposed) {
       ref.read(catalogPlaybackProvider.notifier).cancel();
       state = CatalogView(
@@ -261,6 +262,90 @@ final class CatalogController extends Notifier<CatalogView> {
       return null;
     } catch (e) {
       return _message(e);
+    } finally {
+      scope.cancel();
+    }
+  }
+
+
+  // Mutations never retry automatically: a server can commit a playlist edit
+  // even if its HTTP response is lost. A request needs a verified identity.
+  Future<T> _edit<T>(
+    Future<T> Function(OnlinePlaylistEditor editor, RequestScope scope) action,
+  ) async {
+    final api = port;
+    if (api is! OnlinePlaylistEditor) {
+      throw const ProviderFailure(ProviderProblem.unsupported);
+    }
+    if (api is! OnlineAccounts || !api.signedIn) {
+      throw const ProviderFailure(ProviderProblem.unauthorized);
+    }
+    if (_editScope != null) {
+      throw const ProviderFailure(ProviderProblem.unavailable);
+    }
+    final scope = _editScope = RequestScope();
+    try {
+      final result = await action(api, scope);
+      scope.check();
+      return result;
+    } finally {
+      scope.cancel();
+      if (identical(_editScope, scope)) _editScope = null;
+    }
+  }
+
+  Future<String> createPlaylist(
+    String title,
+    PlaylistVisibility visibility,
+  ) => _edit(
+    (api, scope) => api.createPlaylist(title, visibility, scope),
+  );
+
+  Future<void> renamePlaylist(String id, String title) => _edit(
+    (api, scope) => api.renamePlaylist(id, title, scope),
+  );
+
+  Future<void> deletePlaylist(String id) => _edit(
+    (api, scope) => api.deletePlaylist(id, scope),
+  );
+
+  Future<Map<String, String>> addToPlaylist(
+    String id,
+    List<String> videoIds,
+  ) => _edit(
+    (api, scope) => api.addToPlaylist(id, videoIds, scope),
+  );
+
+  Future<void> removeFromPlaylist(
+    String id,
+    List<({String setVideoId, String videoId})> entries,
+  ) => _edit(
+    (api, scope) => api.removeFromPlaylist(id, entries, scope),
+  );
+
+  Future<List<CatalogEntry>> accountPlaylists() async {
+    final api = port;
+    if (api is! OnlineAccounts || !api.signedIn) {
+      throw const ProviderFailure(ProviderProblem.unauthorized);
+    }
+    if (api == null) {
+      throw const ProviderFailure(ProviderProblem.unavailable);
+    }
+    final scope = RequestScope();
+    try {
+      final page = await api.browse('FEmusic_liked_playlists', scope);
+      scope.check();
+      final entries = page.entries.isEmpty
+          ? [for (final shelf in page.shelves) ...shelf.entries]
+          : page.entries;
+      return List.unmodifiable(
+        entries.where(
+          (e) =>
+              e.provider == 'youtube' &&
+              e.kind == CatalogKind.playlist &&
+              e.id.startsWith('VL'),
+        ),
+      );
     } finally {
       scope.cancel();
     }
