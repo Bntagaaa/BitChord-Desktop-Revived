@@ -205,4 +205,85 @@ final class YouTubeCatalogClient {
       }
     });
   }
+
+  /// A non-idempotent, account-bound write. Unlike search/browse, mutations
+  /// are never retried: replaying a playlist/create or an add could duplicate
+  /// records even when the first response was lost.
+  Future<Map<String, dynamic>> mutate(
+    String endpoint,
+    Map<String, Object?> body,
+    RequestScope parent,
+  ) {
+    if (![
+      'playlist/create',
+      'playlist/delete',
+      'browse/edit_playlist',
+    ].contains(endpoint)) {
+      throw const ProviderFailure(ProviderProblem.unsupported);
+    }
+    if (origin.origin != YouTubeSession.origin || !accounts.signedIn) {
+      throw const ProviderFailure(ProviderProblem.unauthorized);
+    }
+    return accounts.run(parent, (scope, session) async {
+      if (session == null) {
+        throw const ProviderFailure(ProviderProblem.unauthorized);
+      }
+      final context = await _bootstrap(scope, session);
+      scope.check();
+      final response = await http.request(
+        origin.resolve('/youtubei/v1/$endpoint?prettyPrint=false'),
+        scope,
+        method: 'POST',
+        headers: {
+          'Origin': origin.origin,
+          'X-YouTube-Client-Name': '67',
+          'X-YouTube-Client-Version': context.version,
+          if (context.visitor != null)
+            'X-Goog-Visitor-Id': context.visitor!,
+          ...session.headers(),
+        },
+        jsonBody: {
+          'context': {
+            'client': {
+              'clientName': 'WEB_REMIX',
+              'clientVersion': context.version,
+              'hl': 'en',
+              'gl': 'US',
+              if (context.visitor != null) 'visitorData': context.visitor,
+            },
+            if (session.dataSyncId != null)
+              'user': {'onBehalfOfUser': session.dataSyncId},
+          },
+          ...body,
+        },
+      );
+      scope.check();
+      if (response.status == 429) {
+        throw const ProviderFailure(ProviderProblem.youtubeRateLimited, 429);
+      }
+      if ([401, 403].contains(response.status)) {
+        accounts.signOut();
+        _context = null;
+        throw ProviderFailure(ProviderProblem.unauthorized, response.status);
+      }
+      if (response.status != 200) {
+        throw ProviderFailure(ProviderProblem.unavailable, response.status);
+      }
+      Object? decoded;
+      try {
+        decoded = jsonDecode(utf8.decode(response.bytes));
+      } catch (_) {
+        throw const ProviderFailure(ProviderProblem.malformed);
+      }
+      if (decoded is! Map<String, dynamic> || decoded['error'] != null) {
+        throw const ProviderFailure(ProviderProblem.unavailable);
+      }
+      final status = decoded['status'];
+      if (status != null && status != 'STATUS_SUCCEEDED') {
+        throw const ProviderFailure(ProviderProblem.unavailable);
+      }
+      return decoded;
+    });
+  }
+
 }
