@@ -31,32 +31,36 @@ jobs:
               package.fetch_pinned(f'https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/{package.POT_VERSION}/bgutil-ytdlp-pot-provider.zip', plugins/'bgutil-ytdlp-pot-provider.zip', package.PLUGIN_SHA256, 2*1024*1024)
               package.package_plugins(plugins)
               module = runpy.run_path('tool/test_youtube_runtime.py')
-              code = module['AUDIT']
               lines = []
               stage = 0
-              for line in code.splitlines():
+              for line in module['AUDIT'].splitlines():
                   if line.startswith('        ') and line.strip() and not line.strip().startswith('#'):
                       stage += 1
                       lines.append('        __import__("sys").stderr.write("BCA_STAGE_' + str(stage) + '\\n")')
                   lines.append(line)
               module['main'].__globals__['AUDIT'] = '\n'.join(lines)
               original = subprocess.run
+              mode = 'original'
               def observed(*args, **kwargs):
+                  if mode == 'production_environment':
+                      kwargs['env']['APPDATA'] = kwargs['env']['HOME']
+                      kwargs['env']['LOCALAPPDATA'] = kwargs['env']['HOME']
                   result = original(*args, **kwargs)
                   error = result.stderr or ''
-                  print(json.dumps({'exit': result.returncode,
+                  print(json.dumps({'mode': mode, 'exit': result.returncode,
                       'stages': re.findall(r'BCA_STAGE_(\d+)', error),
-                      'assertion': 'AssertionError' in error,
-                      'missing_module': 'No module named' in error,
+                      'error_types': re.findall(r'(?:^|\n)([A-Za-z]+Error):', error),
+                      'none_type': 'NoneType' in error,
+                      'appdata': 'APPDATA' in error,
                       'session_rejected': 'BitChord session input rejected' in error,
-                      'unsupported_url': 'Unsupported URL' in error,
-                      'invalid_url': 'not a valid URL' in error,
-                      'plugin_error': 'Error loading plugin' in error,
-                      'extractor_error': 'ExtractorError' in error,
-                      'network_error': 'Unable to download' in error,
                       'stderr_length': len(error)}))
                   return result
               subprocess.run = observed
               sys.argv = ['test_youtube_runtime.py', str(executable), str(plugins), str(root/'synthetic server')]
+              try:
+                  module['main']()
+              except SystemExit:
+                  print('Original isolated environment rejected')
+              mode = 'production_environment'
               module['main']()
           PY
