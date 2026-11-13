@@ -13,6 +13,8 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
+import zipfile
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,6 +64,26 @@ def bundle_dir(target: str) -> Path:
     raise ValueError("Expected linux or windows release target")
 
 
+def package_plugins(plugins: Path) -> None:
+    # Verify the downloaded upstream archive first, then retain only script
+    # mode. Ambient localhost HTTP services must not override bundled tokens.
+    original = plugins / "bgutil-ytdlp-pot-provider.zip"
+    with zipfile.ZipFile(original) as archive:
+        retained = {
+            name: archive.read(name) for name in archive.namelist()
+            if not name.endswith("getpot_bgutil_http.py") and not name.endswith("/")
+        }
+    with zipfile.ZipFile(original, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in sorted(retained.items()):
+            entry = zipfile.ZipInfo(name, date_time=(2020, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(entry, content)
+    with zipfile.ZipFile(plugins / "bitchord-session.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+        entry = zipfile.ZipInfo("yt_dlp_plugins/extractor/bitchord_session.py", date_time=(2020, 1, 1, 0, 0, 0))
+        entry.compress_type = zipfile.ZIP_DEFLATED
+        archive.writestr(entry, (ROOT / "tool/youtube_plugins/bitchord_session.py").read_bytes())
+
+
 def main() -> None:
     if len(sys.argv) != 3:
         raise SystemExit("Usage: package_youtube_runtime.py linux|windows <pinned-provider-checkout>")
@@ -106,6 +128,7 @@ def main() -> None:
         plugins / "bgutil-ytdlp-pot-provider.zip",
         PLUGIN_SHA256, 2 * 1024 * 1024,
     )
+    package_plugins(plugins)
     dest_server = out / "server"
     dest_server.mkdir()
     for name in ("build", "node_modules"):
@@ -129,9 +152,12 @@ def main() -> None:
         "po_token_provider": {
             "version": POT_VERSION,
             "source_commit": "26475e9d3665b972c4aeb83b4dbaafcf64b88438",
+            "upstream_plugin_zip_sha256": PLUGIN_SHA256,
+            "mode": "script-only; HTTP provider removed",
             "plugin_zip_sha256": digest(plugins / "bgutil-ytdlp-pot-provider.zip"),
             "license": "GPL-3.0-only",
         },
+        "session_bridge_sha256": digest(plugins / "bitchord-session.zip"),
         "distribution": "bundled-at-build, no user setup or runtime downloads",
         "physical_youtube_playback": "not_verified",
     }
@@ -146,6 +172,10 @@ def main() -> None:
     if subprocess.run([str(out / binary_name), "--version"],
                       timeout=30, capture_output=True).returncode != 0:
         raise SystemExit("Bundled yt-dlp failed its startup check")
+    # Real CLI/plugin contract check, independent of Internet/bot-gated media.
+    subprocess.run([sys.executable, str(ROOT / "tool/test_youtube_runtime.py"),
+                    str(out / binary_name), str(plugins), str(dest_server)],
+                   check=True, timeout=45)
     print(f"Bundled verified YouTube resolver for {target}: Node {NODE_VERSION}, yt-dlp {YT_VERSION}, PO provider {POT_VERSION}")
 
 

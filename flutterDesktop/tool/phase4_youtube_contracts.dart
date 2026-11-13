@@ -292,15 +292,14 @@ Future<void> youtubeContracts() async {
     'Select safe direct adaptive audio-only sources by quality',
   );
   var probeCount = 0;
-  final recovered = await YouTubeResolver.firstPlayable(
-    highFormats,
-    (candidate) async {
-      probeCount++;
-      if (probeCount == 1) {
-        throw const ProviderFailure(ProviderProblem.expired, 403);
-      }
-    },
-  );
+  final recovered = await YouTubeResolver.firstPlayable(highFormats, (
+    candidate,
+  ) async {
+    probeCount++;
+    if (probeCount == 1) {
+      throw const ProviderFailure(ProviderProblem.expired, 403);
+    }
+  });
   require(
     probeCount == 2 && recovered.rendition == 'youtube:140',
     'Retry an alternative CDN audio format after a 403',
@@ -312,7 +311,10 @@ Future<void> youtubeContracts() async {
     );
     throw StateError('All-refused media was accepted');
   } on ProviderFailure catch (e) {
-    require(e.problem == ProviderProblem.mediaRefused, 'Keep CDN refusal typed');
+    require(
+      e.problem == ProviderProblem.mediaRefused,
+      'Keep CDN refusal typed',
+    );
   }
   require(
     media.headers.length == 1 &&
@@ -344,8 +346,8 @@ Future<void> youtubeContracts() async {
   require(
     baseArgs.contains('--no-plugin-dirs') &&
         !baseArgs.contains('--plugin-dirs') &&
-        !baseArgs.contains('--extractor-args'),
-    'No implicit PO Token plugin or extractor overrides',
+        baseArgs.contains('youtube:player_client=mweb'),
+    'No implicit PO Token plugin or ambient config; explicit client',
   );
   final pluginDir = await Directory.systemTemp.createTemp('bitchord-pot-');
   try {
@@ -361,7 +363,7 @@ Future<void> youtubeContracts() async {
           args[pluginAt + 1] == pluginDir.path &&
           extractorAt > pluginAt &&
           args[extractorAt + 1] == 'youtube:player_client=mweb' &&
-          args.contains('bestaudio[protocol=https][abr<=128]/bestaudio[protocol=https]') &&
+          args.contains('bestaudio[protocol=https]') &&
           !args.any((argument) => argument.contains('fixture-secret')),
       'Trusted mweb per-video token provider configuration',
     );
@@ -375,7 +377,7 @@ Future<void> youtubeContracts() async {
       alternateClient: true,
     );
     require(
-      alternate.contains('youtube:player_client=android_vr,web_embedded') &&
+      alternate.contains('youtube:player_client=android_vr') &&
           alternate.contains('--no-plugin-dirs') &&
           !alternate.contains('--cookies'),
       'Alternate client is scoped without importing account cookies',
@@ -410,18 +412,21 @@ Future<void> youtubeContracts() async {
     final portable = Directory('${bundle.path}/youtube_runtime');
     await Directory('${portable.path}/plugins').create(recursive: true);
     await Directory('${portable.path}/server/build').create(recursive: true);
-    await Directory('${portable.path}/server/node_modules/bgutils-js')
-        .create(recursive: true);
+    await Directory(
+      '${portable.path}/server/node_modules/bgutils-js',
+    ).create(recursive: true);
     require(
       YouTubeResolver.fromBundleDirectory(bundle) == null,
       'Partial resolver bundle must never be adopted',
     );
     await File('${portable.path}/$binary').writeAsString('fixture');
     await File('${portable.path}/$nodeName').writeAsString('fixture');
-    await File('${portable.path}/server/build/generate_once.js')
-        .writeAsString('fixture');
-    await File('${portable.path}/server/node_modules/bgutils-js/package.json')
-        .writeAsString('{}');
+    await File(
+      '${portable.path}/server/build/generate_once.js',
+    ).writeAsString('fixture');
+    await File(
+      '${portable.path}/server/node_modules/bgutils-js/package.json',
+    ).writeAsString('{}');
     final detected = YouTubeResolver.fromBundleDirectory(bundle);
     if (detected == null) {
       throw StateError('Bundled resolver was not discovered');
@@ -444,13 +449,16 @@ Future<void> youtubeContracts() async {
       );
     }
     final builtArgs = detected.arguments(selected, AudioQuality.high);
+    final playerAt = builtArgs.indexOf('youtube:player_client=mweb');
+    final tokenAt = builtArgs.indexOf(
+      'youtubepot-bgutilscript:server_home=${detected.poTokenServerHome}',
+    );
     require(
-      builtArgs.any(
-        (arg) =>
-            arg.contains('youtubepot-bgutilscript:server_home=') &&
-            arg.contains('player_client=mweb'),
-      ),
-      'PO Token generation script must be selected automatically',
+      playerAt > 0 &&
+          tokenAt > playerAt &&
+          builtArgs[playerAt - 1] == '--extractor-args' &&
+          builtArgs[tokenAt - 1] == '--extractor-args',
+      'Token namespace MUST be a separate extractor-args value, not a YouTube option',
     );
     await File('${portable.path}/server/build/generate_once.js').delete();
     require(
@@ -567,14 +575,16 @@ Future<void> youtubeContracts() async {
   );
 
   require(
-    YouTubeResolver.classifyExtractorFailure('ERROR: unknown upstream failure')
-            .problem ==
+    YouTubeResolver.classifyExtractorFailure(
+          'ERROR: unknown upstream failure',
+        ).problem ==
         ProviderProblem.youtubeUnavailable,
     'Unclassified yt-dlp failure should not say provider unavailable',
   );
   require(
-    YouTubeResolver.classifyExtractorFailure('ERROR: HTTP Error 403: Forbidden')
-            .problem ==
+    YouTubeResolver.classifyExtractorFailure(
+          'ERROR: HTTP Error 403: Forbidden',
+        ).problem ==
         ProviderProblem.mediaRefused,
     'Extractor HTTP refusal must be typed',
   );

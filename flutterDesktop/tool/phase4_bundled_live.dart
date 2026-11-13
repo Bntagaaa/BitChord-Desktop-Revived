@@ -1,6 +1,6 @@
-// Optional public-media integration check for the built-in portable runtime.
-// Never logs video ids, URLs, tokens, extractor logs, cookies or audio data.
-// A datacenter IP/media policy may refuse access even with valid PO Tokens.
+// Anonymous integration evidence: multiple catalog selections plus repeat and
+// exact-rendition renewal. No credentials, signed URLs, ids or raw stderr saved.
+// An upstream datacenter/bot refusal is recorded as a failure, never green audio.
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,16 +11,25 @@ import '../lib/features/online/domain/catalog.dart';
 
 Future<void> main(List<String> args) async {
   final report = <String, Object?>{
-    'mode': 'anonymous bundled runtime',
+    'mode': 'anonymous bundled rewrite',
     'media': 'UNVERIFIED',
   };
   final scope = RequestScope();
+  final trials = <Map<String, Object?>>[];
   try {
     if (args.length != 1) throw const FormatException();
-    final resolver = YouTubeResolver.fromBundleDirectory(
+    final detected = YouTubeResolver.fromBundleDirectory(
       Directory(args.single),
     );
-    if (resolver == null) throw const FormatException();
+    if (detected == null) throw const FormatException();
+    final resolver = YouTubeResolver(
+      detected.executable,
+      node: detected.node,
+      poTokenPluginDirectory: detected.poTokenPluginDirectory,
+      poTokenServerHome: detected.poTokenServerHome,
+      bundled: true,
+      timeout: const Duration(seconds: 30),
+    );
     report['bundle'] = 'DETECTED';
     final youtube = YouTubeMusic(
       const ProviderHttp(timeout: Duration(seconds: 15)),
@@ -32,16 +41,48 @@ Future<void> main(List<String> args) async {
       filter: SearchFilter.songs,
     );
     report['catalog_entries'] = search.entries.length;
-    final track = search.entries
+    final tracks = search.entries
         .where((entry) => entry.kind == CatalogKind.track)
-        .firstOrNull;
-    if (track == null) {
-      throw const ProviderFailure(ProviderProblem.unavailable);
+        .take(3)
+        .toList();
+    if (tracks.isEmpty)
+      throw const ProviderFailure(ProviderProblem.youtubeUnavailable);
+    for (var index = 0; index < tracks.length; index++) {
+      final trial = <String, Object?>{
+        'selection': index,
+        'result': 'UNVERIFIED',
+      };
+      try {
+        final first = await youtube.resolve(
+          tracks[index],
+          AudioQuality.medium,
+          scope,
+        );
+        trial['result'] = 'RANGE_VERIFIED';
+        trial['resolver'] = resolver.lastReport;
+        if (index == 0) {
+          // Simulate an expired location request without changing media bytes.
+          final next = await youtube.renew(
+            tracks[index],
+            AudioQuality.medium,
+            first,
+            scope,
+            generation: youtube.accountGeneration,
+          );
+          trial['same_rendition_renewal'] = next.rendition == first.rendition;
+        }
+      } on ProviderFailure catch (failure) {
+        trial['result'] = 'REFUSED_OR_UNAVAILABLE';
+        trial['failure'] = failure.problem.name;
+        trial['resolver'] = resolver.lastReport;
+        if (failure.status != null) trial['http_status'] = failure.status;
+      }
+      trials.add(trial);
     }
-    // resolve() checks actual HTTP 206 ranges (including beyond 1 MiB) before
-    // deeming the source valid. A successful extractor exit alone is not proof.
-    await youtube.resolve(track, AudioQuality.medium, scope);
-    report['media'] = 'RANGE_VERIFIED';
+    report['media'] = trials.every((t) => t['result'] == 'RANGE_VERIFIED')
+        ? 'MULTI_TRACK_RANGES_VERIFIED'
+        : 'REFUSED_OR_PARTIAL';
+    report['native_audibility'] = 'NOT_TESTED';
   } on ProviderFailure catch (failure) {
     report['media'] = 'REFUSED_OR_UNAVAILABLE';
     report['failure'] = failure.problem.name;
@@ -52,5 +93,6 @@ Future<void> main(List<String> args) async {
   } finally {
     scope.cancel();
   }
+  report['trials'] = trials;
   stdout.writeln(jsonEncode(report));
 }

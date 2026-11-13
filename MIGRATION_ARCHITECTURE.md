@@ -283,3 +283,10 @@ there is no plaintext storage fallback. Artwork fetches use a credential-free
 port with four active transfers, 2 MiB body cap and scoped cancellation; Flutter
 uses size-aware decodes and a 64 MiB ImageCache budget, without any measurement
 claim about total process/GPU/retained-image memory.
+
+
+## YouTube backend rewrite boundaries (2026-11-13)
+
+This supersedes earlier optional-extractor notes for the delivered YouTube path. The public YouTubeMusic facade delegates to `youtube/catalog_client.dart`, `catalog_parser.dart`, `accounts.dart`, `runtime.dart`, `extractor.dart` and `formats.dart`; YouTubeResolver coordinates a bounded extraction/preflight state machine. The native C++ engine and shared source broker remain sole audio owners. Explicit runtime deployment packages pinned yt-dlp/Node plus script-only BgUtils and the reviewed `bitchord_session.py` override. Per-operation temporary directories isolate BgUtils' independent token cache; raw subprocess output never becomes logs, persistence or UI. A verified primary account cookie crosses only the stdin pipe and the extractor's in-memory YouTube-domain cookie jar; no browser scraping, cookie file or argv/environment secret.
+
+A rejected URL triggers bounded fresh-context recovery, not an unbounded client loop. Renewal is same video/rendition/account generation, preserving ranged-file identity. Account/rights/rate-limit errors are terminal; declared session mode never silently downgrades to guest. The prior automatic JioSaavn substitute is not part of YouTube success. Diagnostics expose only fixed categories/counts/timing, not identities or signed URLs. UI, JioSaavn/add-on adapters, native decoder/sinks and generic storage are unchanged. Live/HLS/MPD/SABR and delegated media accounts remain explicit unsupported contracts; external service refusals remain possible and must be reported honestly.

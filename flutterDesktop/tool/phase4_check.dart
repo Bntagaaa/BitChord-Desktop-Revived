@@ -2,6 +2,7 @@
 // No server fixtures are installed into application bootstrap.
 import 'dart:async';
 import 'phase4_youtube_contracts.dart';
+import 'youtube_rewrite_check.dart' show youtubeRewriteChecks;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -34,6 +35,7 @@ Future<void> fails(
 
 Future<void> main(List<String> arguments) async {
   await youtubeContracts();
+  await youtubeRewriteChecks();
   final directory = await Directory.systemTemp.createTemp('bitchord-phase4-');
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final cross = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

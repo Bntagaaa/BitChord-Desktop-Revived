@@ -15,7 +15,6 @@ import 'source_broker.dart';
 import 'youtube_music.dart';
 import 'jiosaavn.dart';
 import 'youtube_resolver.dart';
-import 'recording_fallback.dart';
 import 'artwork_loader.dart';
 import '../../../core/platform/audio/native_api.dart';
 
@@ -56,7 +55,6 @@ final class OnlineRuntime
   Future<void> _tail = Future.value();
   bool _closed = false;
   int _entry = 0;
-  bool _matchedAlternate = false;
   // Playback/persistence has a single coordinator across polls, commands, close.
   Future<T> _ordered<T>(Future<T> Function() work) {
     final result = _tail.then((_) {
@@ -70,10 +68,7 @@ final class OnlineRuntime
   @override
   String get currentTitle => playback.state.queue.current?.title ?? '';
   @override
-  String get currentSubtitle {
-    final artist = playback.state.queue.current?.artist ?? '';
-    return _matchedAlternate ? '$artist · Source: JioSaavn (matched)' : artist;
-  }
+  String get currentSubtitle => playback.state.queue.current?.artist ?? '';
 
   @override
   List<String> get providers => List.unmodifiable(_providers.keys);
@@ -118,40 +113,16 @@ final class OnlineRuntime
     RequestScope scope,
   ) async {
     final provider = _provider(entry.provider);
-    var sourceProvider = provider;
-    var sourceEntry = entry;
-    var matchedAlternate = false;
-    ResolvedMedia media;
-    try {
-      media = await provider.resolve(entry, quality, scope);
-    } on ProviderFailure catch (primaryError) {
-      if (entry.provider != 'youtube' ||
-          ![
-            ProviderProblem.unavailable,
-            ProviderProblem.loginRequired,
-            ProviderProblem.mediaRefused,
-            ProviderProblem.tokenUnavailable,
-            ProviderProblem.formatUnavailable,
-            ProviderProblem.youtubeUnavailable,
-          ].contains(primaryError.problem))
-        rethrow;
-      final alternative = await RecordingFallback.resolve(
-        entry,
-        _provider('jiosaavn'),
-        quality,
-        scope,
-      );
-      if (alternative == null) rethrow; // preserve the real YouTube failure
-      sourceProvider = _provider('jiosaavn');
-      sourceEntry = alternative.entry;
-      media = alternative.media;
-      matchedAlternate = true;
-    }
+    // A selected YouTube source must remain YouTube. Do not hide a failed
+    // integration by playing a similarly named recording from another provider.
+    final generation = _youtube.accountGeneration;
+    final media = await provider.resolve(entry, quality, scope);
     scope.check();
-    final activeProvider = sourceProvider, activeEntry = sourceEntry;
     final broker = await SourceBroker.open(
       media,
-      refresh: () => activeProvider.resolve(activeEntry, quality, scope),
+      refresh: () => entry.provider == 'youtube'
+          ? _youtube.renew(entry, quality, media, scope, generation: generation)
+          : provider.resolve(entry, quality, scope),
     );
     try {
       scope.check();
@@ -170,7 +141,6 @@ final class OnlineRuntime
           ),
           broker.path,
         );
-        _matchedAlternate = matchedAlternate;
         _broker = broker;
         await old?.close();
       });
@@ -197,11 +167,15 @@ final class OnlineRuntime
     void Function(int, int) progress,
   ) async {
     final provider = _provider(entry.provider);
+    final generation = _youtube.accountGeneration;
+    final media = await provider.resolve(entry, quality, scope);
     final source = RangeSource(
-      await provider.resolve(entry, quality, scope),
+      media,
       const ProviderHttp(),
       scope,
-      refresh: () => provider.resolve(entry, quality, scope),
+      refresh: () => entry.provider == 'youtube'
+          ? _youtube.renew(entry, quality, media, scope, generation: generation)
+          : provider.resolve(entry, quality, scope),
     );
     try {
       await store.save(entry, source, progress: progress);
@@ -237,7 +211,6 @@ final class OnlineRuntime
       );
       await _broker?.close();
       _broker = null;
-      _matchedAlternate = false;
     });
   }
 

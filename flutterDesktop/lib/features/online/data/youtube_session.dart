@@ -24,7 +24,7 @@ final class YouTubeSession {
       RegExp('"$key"\\s*:\\s*"([^"\\r\\n]+)"').firstMatch(html)?.group(1);
 
   static String signingSecret(String cookie) {
-    if (cookie.length > 32768 || RegExp(r'[\r\n]').hasMatch(cookie)) {
+    if (cookie.length > 32768 || RegExp(r'[\x00-\x1f\x7f]').hasMatch(cookie)) {
       throw const ProviderFailure(ProviderProblem.malformed);
     }
     final jar = <String, String>{};

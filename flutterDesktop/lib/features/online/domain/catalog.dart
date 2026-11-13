@@ -42,6 +42,9 @@ enum ProviderProblem {
   tokenUnavailable,
   formatUnavailable,
   youtubeUnavailable,
+  youtubeRuntimeUnavailable,
+  youtubeContentUnavailable,
+  youtubeRateLimited,
 }
 
 final class ProviderFailure implements Exception {
@@ -69,6 +72,15 @@ final class ProviderFailure implements Exception {
     if (problem == ProviderProblem.youtubeUnavailable) {
       return 'YouTube could not resolve an audio source. The request may '
           'be restricted by YouTube, a sign-in check, or this connection.';
+    }
+    if (problem == ProviderProblem.youtubeRuntimeUnavailable) {
+      return 'The bundled YouTube runtime is missing or incomplete. Re-extract the full application bundle.';
+    }
+    if (problem == ProviderProblem.youtubeContentUnavailable) {
+      return 'This YouTube item is private, removed, or restricted for this account or region.';
+    }
+    if (problem == ProviderProblem.youtubeRateLimited) {
+      return 'YouTube is rate-limiting this connection. Pause requests and try again later.';
     }
     return 'Provider ${problem.name}${status == null ? '' : ' (HTTP $status)'}';
   }
