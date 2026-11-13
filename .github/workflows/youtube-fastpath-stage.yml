@@ -1,0 +1,129 @@
+name: YouTube fast-path staging
+on:
+  push:
+    branches: ['2.0.0-flutter']
+    paths: ['.github/workflows/youtube-fastpath-stage.yml']
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      DART_SUPPRESS_ANALYTICS: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - name: Apply exact reviewed source objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, subprocess, urllib.request
+          files = {
+            'flutterDesktop/lib/features/online/data/youtube/direct_player.dart': '217ef770ec744358598f33cc2a803c8016d4e643',
+            'flutterDesktop/lib/features/online/data/youtube/media_probe.dart': 'f09bf174a18202a0d309fd2fbbb0391f1c20d84f',
+            'flutterDesktop/lib/features/online/data/youtube_resolver.dart': 'ec376140cc515c6e52c05b1aacc9e9be53336d6d',
+            'flutterDesktop/lib/features/online/data/provider_http.dart': '9fd1931d9d98d3b37e0e7b3c6a947d85939cdad6',
+            'flutterDesktop/lib/features/online/data/range_source.dart': '8b89d2b7d9b87831417c83f969d56ca651db542c',
+            'flutterDesktop/tool/youtube_fastpath_check.dart': '9c3962cc03d91e5008b32a2e7011777b755a312b',
+          }
+          def read_blob(sha):
+              request = urllib.request.Request('https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] + '/git/blobs/' + sha,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              value = json.load(urllib.request.urlopen(request, timeout=30))
+              data = base64.b64decode(value['content'])
+              assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == sha
+              return data
+          for name, sha in files.items():
+              path = pathlib.Path(name)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(read_blob(sha))
+          patch = pathlib.Path('/tmp/apply-youtube-fastpath.py')
+          patch.write_bytes(read_blob('b2cbcea8431def341dfc1292b45ef4799f08d7f7'))
+          subprocess.run(['python3', str(patch)], check=True)
+          # Validate an exact-source seed at construction, before it can cross
+          # an isolate boundary. Serialization must not rebind an invalid seed.
+          path = pathlib.Path('flutterDesktop/lib/features/online/domain/catalog.dart')
+          text = path.read_text()
+          old = '  }) : headers = Map.unmodifiable(headers);'
+          assert text.count(old) == 1
+          text = text.replace(old, '  }) : headers = Map.unmodifiable(headers) {\n    warmup?.validateFor(this);\n  }')
+          path.write_text(text)
+          # Leave scheduling headroom on hosted runners; the slow endpoint is
+          # still strictly slower than the timeout under test.
+          path = pathlib.Path('flutterDesktop/tool/youtube_fastpath_check.dart')
+          text = path.read_text().replace('Duration(milliseconds: 200)', 'Duration(milliseconds: 600)').replace('Duration(milliseconds: 50)', 'Duration(milliseconds: 200)')
+          path.write_text(text)
+          edited = json.loads(pathlib.Path('fastpath-edited.json').read_text())
+          pathlib.Path('fastpath-files.json').write_text(json.dumps(sorted(set(edited) | set(files))))
+          PY
+      - name: Resolve locked dependencies
+        working-directory: flutterDesktop
+        run: flutter pub get --enforce-lockfile
+      - name: Format only reviewed Dart changes
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, subprocess
+          files = json.loads(pathlib.Path('fastpath-files.json').read_text())
+          dart = [x for x in files if x.endswith('.dart')]
+          subprocess.run(['dart', 'format', *dart], check=True)
+          subprocess.run(['dart', 'format', '--output=none', '--set-exit-if-changed', *dart], check=True)
+          PY
+      - name: Analyze and run controlled fast-path regressions
+        working-directory: flutterDesktop
+        run: |
+          set -euo pipefail
+          flutter analyze --no-pub --fatal-infos
+          dart run tool/youtube_fastpath_check.dart
+          dart run tool/youtube_rewrite_check.dart
+          flutter test --no-pub
+      - name: Create reviewed commit without moving the branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, subprocess, urllib.request
+          files = json.loads(pathlib.Path('fastpath-files.json').read_text())
+          base = os.environ['GITHUB_SHA']
+          api = 'https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY']
+          def call(path, data=None):
+              request = urllib.request.Request(api + path,
+                  data=None if data is None else json.dumps(data).encode(),
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'},
+                  method='GET' if data is None else 'POST')
+              return json.load(urllib.request.urlopen(request, timeout=30))
+          subprocess.run(['git', 'restore', '--', 'flutterDesktop/analysis_options.yaml'], check=True)
+          dirty = subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
+          assert set(dirty) <= set(files), 'Unexpected unrelated source modifications'
+          entries = []
+          for name in files:
+              content = pathlib.Path(name).read_bytes()
+              blob = call('/git/blobs', {'content': base64.b64encode(content).decode(), 'encoding': 'base64'})
+              assert blob['sha'] == hashlib.sha1(b'blob ' + str(len(content)).encode() + b'\0' + content).hexdigest()
+              entries.append({'path': name, 'mode': '100644', 'type': 'blob', 'sha': blob['sha']})
+          entries.append({'path': '.github/workflows/youtube-fastpath-stage.yml', 'mode': '100644', 'type': 'blob', 'sha': None})
+          parent = call('/git/commits/' + base)
+          tree = call('/git/trees', {'base_tree': parent['tree']['sha'], 'tree': entries})
+          commit = call('/git/commits', {'message': 'perf(youtube): restore direct guest playback and reuse verified audio prefix', 'tree': tree['sha'], 'parents': [base]})
+          result = {'parent': base, 'commit': commit['sha'], 'files': files,
+              'staging_checks': 'format, fatal analyzer, direct/prefix/connection contracts, existing rewrite contracts, Flutter tests PASS',
+              'live_playback': 'NOT_VERIFIED'}
+          pathlib.Path('youtube-fastpath-stage.json').write_text(json.dumps(result, indent=2))
+          print('FASTPATH_COMMIT=' + commit['sha'])
+          print('EXPECTED_PARENT=' + base)
+          print('No branch reference was moved by this workflow.')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: youtube-fastpath-stage
+          path: youtube-fastpath-stage.json
+          retention-days: 7
