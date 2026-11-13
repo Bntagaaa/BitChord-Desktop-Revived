@@ -341,7 +341,8 @@ Future<void> youtubeContracts() async {
 
   // A trusted plugin must be selected explicitly. No ambient yt-dlp plugins,
   // config files, signed URLs or account credentials may be picked up.
-  final unconfigured = YouTubeResolver('/path/to/yt-dlp');
+  final extractorFixture = File('fixture-yt-dlp').absolute.path;
+  final unconfigured = YouTubeResolver(extractorFixture);
   final baseArgs = unconfigured.arguments(selected, AudioQuality.high);
   require(
     baseArgs.contains('--no-plugin-dirs') &&
@@ -352,7 +353,7 @@ Future<void> youtubeContracts() async {
   final pluginDir = await Directory.systemTemp.createTemp('bitchord-pot-');
   try {
     final enabled = YouTubeResolver(
-      '/path/to/yt-dlp',
+      extractorFixture,
       poTokenPluginDirectory: pluginDir.path,
     );
     final args = enabled.arguments(selected, AudioQuality.medium);
@@ -387,7 +388,7 @@ Future<void> youtubeContracts() async {
   }
   try {
     YouTubeResolver(
-      '/path/to/yt-dlp',
+      extractorFixture,
       poTokenPluginDirectory: '../untrusted',
     ).arguments(selected, AudioQuality.high);
     throw StateError('Relative plugin directory accepted');
