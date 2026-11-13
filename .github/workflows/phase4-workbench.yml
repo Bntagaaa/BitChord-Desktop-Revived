@@ -18,43 +18,20 @@ jobs:
           flutter-version: '3.47.9'
           channel: stable
           cache: true
-      - name: Prepare isolated source and SDK inputs
+      - name: Export complete cross-platform framework source for widget tests
         shell: bash
         run: |
-          set -euo pipefail
-          git fetch --no-tags --depth=1 origin 348b613a0c3db1a54de56483ea6f8748d6465211
-          cd flutterDesktop
-          flutter pub get --enforce-lockfile
-          cd ..
           python - <<'PY'
           from pathlib import Path
-          import os, subprocess, zipfile, json
-          root = Path.cwd()
-          ref = '348b613a0c3db1a54de56483ea6f8748d6465211'
-          paths = subprocess.check_output(['git','ls-tree','-r','--name-only',ref], text=True).splitlines()
-          with zipfile.ZipFile('phase4-reference.zip','w',zipfile.ZIP_DEFLATED) as z:
-              for name in paths:
-                  if name.endswith(('.kt','.java')) and name.startswith(('desktopApp/','shared/','sharedUi/')):
-                      z.writestr('reference/'+name, subprocess.check_output(['git','show',ref+':'+name]))
-              for name in ['AGENTS.md','MIGRATION_PROGRESS.md','MIGRATION_PARITY.md','MIGRATION_ARCHITECTURE.md','PERFORMANCE_BASELINE.md','.codex/phases/phase-4.md','.github/workflows/flutter-desktop.yml']:
-                  z.write(root/name,'current/'+name)
-          sdk = Path(os.environ['FLUTTER_ROOT'])
-          with zipfile.ZipFile('phase4-flutter-offline.zip','w',zipfile.ZIP_DEFLATED) as z:
-              for folder in ['bin','packages','version']:
-                  target=sdk/folder
-                  for path in ([target] if target.is_file() else target.rglob('*')):
-                      if not path.is_file() or path.is_symlink(): continue
-                      rel=path.relative_to(sdk)
-                      if str(rel).startswith('bin/cache/dart-sdk/') or 'android' in str(rel) or 'canvaskit' in str(rel) or 'web_sdk' in str(rel): continue
-                      z.write(path,'flutter/'+str(rel))
-              config=json.loads((root/'flutterDesktop/.dart_tool/package_config.json').read_text())
-              z.writestr('project-package-config.json',json.dumps(config))
-              z.writestr('sdk-provenance.txt',subprocess.check_output(['flutter','--version','--machine'],text=True))
+          import os, zipfile
+          sdk=Path(os.environ['FLUTTER_ROOT'])
+          with zipfile.ZipFile('phase4-sdk-source-supplement.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for path in (sdk/'packages').rglob('*'):
+                  if path.is_file() and not path.is_symlink() and 'android' in str(path.relative_to(sdk)):
+                      z.write(path,'flutter/'+str(path.relative_to(sdk)))
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: phase4-reference-and-validation
-          path: |
-            phase4-reference.zip
-            phase4-flutter-offline.zip
+          name: phase4-sdk-source-supplement
+          path: phase4-sdk-source-supplement.zip
           retention-days: 3
