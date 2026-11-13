@@ -1,0 +1,62 @@
+name: YouTube runtime audit
+on:
+  push:
+    branches: ['2.0.0-flutter']
+    paths: ['.github/workflows/youtube-runtime-audit.yml']
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exercise offline synthetic runtime contract
+        working-directory: flutterDesktop
+        shell: bash
+        run: |
+          python - <<'PY'
+          import importlib.util, json, os, pathlib, re, runpy, subprocess, sys, tempfile
+          spec = importlib.util.spec_from_file_location('packaging_audit', 'tool/package_youtube_runtime.py')
+          package = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(package)
+          with tempfile.TemporaryDirectory(prefix='bitchord-offline-audit-') as temp:
+              root = pathlib.Path(temp)
+              plugins = root/'plugins'
+              plugins.mkdir()
+              executable = root/'yt-dlp.exe'
+              package.fetch_pinned(f'https://github.com/yt-dlp/yt-dlp/releases/download/{package.YT_VERSION}/yt-dlp.exe', executable, package.YTDLP_SHA256['windows'], 100*1024*1024)
+              package.fetch_pinned(f'https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/{package.POT_VERSION}/bgutil-ytdlp-pot-provider.zip', plugins/'bgutil-ytdlp-pot-provider.zip', package.PLUGIN_SHA256, 2*1024*1024)
+              package.package_plugins(plugins)
+              module = runpy.run_path('tool/test_youtube_runtime.py')
+              code = module['AUDIT']
+              lines = []
+              stage = 0
+              for line in code.splitlines():
+                  if line.startswith('        ') and line.strip() and not line.strip().startswith('#'):
+                      stage += 1
+                      lines.append('        __import__("sys").stderr.write("BCA_STAGE_' + str(stage) + '\\n")')
+                  lines.append(line)
+              module['main'].__globals__['AUDIT'] = '\n'.join(lines)
+              original = subprocess.run
+              def observed(*args, **kwargs):
+                  result = original(*args, **kwargs)
+                  error = result.stderr or ''
+                  print(json.dumps({'exit': result.returncode,
+                      'stages': re.findall(r'BCA_STAGE_(\d+)', error),
+                      'assertion': 'AssertionError' in error,
+                      'missing_module': 'No module named' in error,
+                      'session_rejected': 'BitChord session input rejected' in error,
+                      'unsupported_url': 'Unsupported URL' in error,
+                      'invalid_url': 'not a valid URL' in error,
+                      'plugin_error': 'Error loading plugin' in error,
+                      'extractor_error': 'ExtractorError' in error,
+                      'network_error': 'Unable to download' in error,
+                      'stderr_length': len(error)}))
+                  return result
+              subprocess.run = observed
+              sys.argv = ['test_youtube_runtime.py', str(executable), str(plugins), str(root/'synthetic server')]
+              module['main']()
+          PY
