@@ -203,28 +203,14 @@ final class YouTubeMusic implements CatalogProvider {
 
   static String _playlistId(String input) {
     final id = input.startsWith('VL') ? input.substring(2) : input;
-    if (!RegExp(r'^[A-Za-z0-9_-]{8,128}
-  static Iterable<Map<String, dynamic>> nodes(Object? value, String key) =>
-      YouTubeCatalogParser.nodes(value, key);
-  static String text(Object? value) => YouTubeCatalogParser.text(value);
-  static CatalogPage parsePage(Map<String, dynamic> data, {String? browseId}) =>
-      YouTubeCatalogParser.parsePage(data, browseId: browseId);
-}
-).hasMatch(id)) {
+    if (!RegExp(r'^[A-Za-z0-9_-]{8,128}$').hasMatch(id)) {
       throw const ProviderFailure(ProviderProblem.malformed);
     }
     return id;
   }
 
   static String _videoId(String input) {
-    if (!RegExp(r'^[A-Za-z0-9_-]{11}
-  static Iterable<Map<String, dynamic>> nodes(Object? value, String key) =>
-      YouTubeCatalogParser.nodes(value, key);
-  static String text(Object? value) => YouTubeCatalogParser.text(value);
-  static CatalogPage parsePage(Map<String, dynamic> data, {String? browseId}) =>
-      YouTubeCatalogParser.parsePage(data, browseId: browseId);
-}
-).hasMatch(input)) {
+    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(input)) {
       throw const ProviderFailure(ProviderProblem.malformed);
     }
     return input;
@@ -328,14 +314,7 @@ final class YouTubeMusic implements CatalogProvider {
     }
     final actions = <Map<String, String>>[];
     for (final entry in entries) {
-      if (!RegExp(r'^[A-Za-z0-9_-]{6,160}
-  static Iterable<Map<String, dynamic>> nodes(Object? value, String key) =>
-      YouTubeCatalogParser.nodes(value, key);
-  static String text(Object? value) => YouTubeCatalogParser.text(value);
-  static CatalogPage parsePage(Map<String, dynamic> data, {String? browseId}) =>
-      YouTubeCatalogParser.parsePage(data, browseId: browseId);
-}
-).hasMatch(entry.setVideoId)) {
+      if (!RegExp(r'^[A-Za-z0-9_-]{6,160}$').hasMatch(entry.setVideoId)) {
         throw const ProviderFailure(ProviderProblem.malformed);
       }
       actions.add({
