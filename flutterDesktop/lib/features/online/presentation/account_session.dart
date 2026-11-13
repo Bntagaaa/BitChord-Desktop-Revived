@@ -63,7 +63,8 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
       // is inspected. The returned cookies are held in memory and verified by
       // the existing authenticated YouTube shell before session adoption.
       final cookie = browser
-          ? await AccountSignIn.captureYouTube(scope)
+          ? await (ref.read(browserSignInCaptureProvider)?.call(scope) ??
+                Future<String>.error(StateError('Browser sign-in is not available.')))
           : manualCookie;
       scope.check();
       await accounts.signIn(cookie, scope);
