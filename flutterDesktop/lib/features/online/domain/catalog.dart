@@ -22,9 +22,15 @@ final class CatalogShelf {
 }
 
 final class CatalogHeader {
-  const CatalogHeader({required this.title, this.subtitle = '', this.artwork});
+  const CatalogHeader({
+    required this.title,
+    this.subtitle = '',
+    this.artwork,
+    this.ownedByAccount,
+  });
   final String title, subtitle;
   final Uri? artwork;
+  final bool? ownedByAccount;
 }
 
 enum AudioQuality { low, medium, high, lossless }
