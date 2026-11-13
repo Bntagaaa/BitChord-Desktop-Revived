@@ -122,6 +122,75 @@ final class YouTubeMusic implements CatalogProvider {
     );
   });
 
+  /// Kotlin YtMusicRepository.library: real signed-in liked music, saved
+  /// tracks, playlists, albums, artists, subscriptions and podcasts. Each
+  /// section uses the existing authenticated and cancellation-fenced browse
+  /// adapter. No guest library is invented.
+  Future<CatalogPage> library(RequestScope scope) async {
+    if (!signedIn) {
+      throw const ProviderFailure(ProviderProblem.unauthorized);
+    }
+    const sources = <(String, String, ShelfLayout)>[
+      ('Liked Music', 'VLLM', ShelfLayout.tracks),
+      ('Songs', 'FEmusic_liked_videos', ShelfLayout.tracks),
+      ('Playlists', 'FEmusic_liked_playlists', ShelfLayout.cards),
+      ('Albums', 'FEmusic_liked_albums', ShelfLayout.cards),
+      ('Artists', 'FEmusic_library_corpus_track_artists', ShelfLayout.cards),
+      ('Subscriptions', 'FEmusic_library_corpus_artists', ShelfLayout.cards),
+      ('Podcasts', 'FEmusic_library_non_music_audio_list', ShelfLayout.cards),
+    ];
+    final shelves = <CatalogShelf>[];
+    ProviderFailure? firstFailure;
+    for (final (title, browseId, layout) in sources) {
+      scope.check();
+      try {
+        final rows = <CatalogEntry>[];
+        final seen = <String>{};
+        String? token;
+        for (var pageCount = 0; pageCount < 10; pageCount++) {
+          scope.check();
+          final page = await browse(
+            browseId,
+            scope,
+            continuation: token,
+          );
+          final entries = page.entries.isNotEmpty
+              ? page.entries
+              : [for (final shelf in page.shelves) ...shelf.entries];
+          for (final entry in entries) {
+            if (seen.add(entry.key)) rows.add(entry);
+            if (rows.length >= 400) break;
+          }
+          final next = page.continuation;
+          if (next == null || next == token || rows.length >= 400) break;
+          token = next;
+        }
+        if (rows.isNotEmpty) {
+          shelves.add(
+            CatalogShelf(
+              title: title,
+              entries: rows,
+              layout: layout,
+              moreId: browseId,
+            ),
+          );
+        }
+      } on ProviderFailure catch (error) {
+        if ([
+          ProviderProblem.cancelled,
+          ProviderProblem.unauthorized,
+          ProviderProblem.loginRequired,
+        ].contains(error.problem)) {
+          rethrow;
+        }
+        firstFailure ??= error;
+      }
+    }
+    scope.check();
+    if (shelves.isEmpty && firstFailure != null) throw firstFailure;
+    return CatalogPage(const [], shelves: shelves);
+  }
+
   // Compatibility entrypoints for reference fixtures and existing consumers.
   static Iterable<Map<String, dynamic>> nodes(Object? value, String key) =>
       YouTubeCatalogParser.nodes(value, key);
