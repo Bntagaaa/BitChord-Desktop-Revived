@@ -278,8 +278,7 @@ final class CatalogController extends Notifier<CatalogView> {
     if (api is! OnlinePlaylistEditor) {
       throw const ProviderFailure(ProviderProblem.unsupported);
     }
-    if (api is! OnlineAccounts ||
-        !(api as OnlineAccounts).signedIn) {
+    if (api is! OnlineAccounts || !(api as OnlineAccounts).signedIn) {
       throw const ProviderFailure(ProviderProblem.unauthorized);
     }
     if (_editScope != null) {
@@ -315,8 +314,7 @@ final class CatalogController extends Notifier<CatalogView> {
 
   Future<List<CatalogEntry>> accountPlaylists() async {
     final api = port;
-    if (api is! OnlineAccounts ||
-        !(api as OnlineAccounts).signedIn) {
+    if (api is! OnlineAccounts || !(api as OnlineAccounts).signedIn) {
       throw const ProviderFailure(ProviderProblem.unauthorized);
     }
     if (api == null) {
