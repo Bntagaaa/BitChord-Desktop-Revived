@@ -114,11 +114,6 @@ jobs:
       - name: Check Dart formatting
         run: |
           python tool/run_checked.py format-check dart format --output=none --set-exit-if-changed lib test
-      - name: Diagnose Dart formatting differences
-        if: failure() && runner.os == 'Linux'
-        run: |
-          dart format lib/features/online/data/youtube_resolver.dart
-          git --no-pager diff -- lib/features/online/data/youtube_resolver.dart
       - name: Check real FFI, transactional import and queue corpus
         run: |
           python tool/run_checked.py kotlin-import python tool/test_kotlin_export.py

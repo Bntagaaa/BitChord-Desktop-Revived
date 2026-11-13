@@ -326,15 +326,14 @@ final class YouTubeResolver {
       if (decoded is! Map<String, dynamic>) throw const FormatException();
       // Validate real byte ranges, including beyond the first MiB, before
       // adopting one of a bounded set of trusted audio-only CDN URLs.
-      return await firstPlayable(
-        candidates(decoded, track, quality),
-        (media) async {
-          final source = RangeSource(media, const ProviderHttp(), scope);
-          await source.chunk(0);
-          if (source.total! > 1024 * 1024) await source.chunk(2);
-          scope.check();
-        },
-      );
+      return await firstPlayable(candidates(decoded, track, quality), (
+        media,
+      ) async {
+        final source = RangeSource(media, const ProviderHttp(), scope);
+        await source.chunk(0);
+        if (source.total! > 1024 * 1024) await source.chunk(2);
+        scope.check();
+      });
     } on ProviderFailure catch (e) {
       // A signed URL does not establish usable media. In particular, GVS may
       // reject clients without a fresh per-video PO Token even after extraction.
