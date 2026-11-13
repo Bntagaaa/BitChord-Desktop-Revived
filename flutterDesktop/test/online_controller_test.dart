@@ -133,7 +133,94 @@ PlaybackSnapshot transportFixture({
   precisionBits: 16,
 );
 
+class LibraryCatalog extends ControlledCatalog
+    implements OnlineLibrary, OnlineAccounts {
+  @override
+  bool signedIn = false;
+  int libraryCalls = 0;
+
+  @override
+  Future<void> signIn(String cookie, RequestScope scope) async {
+    scope.check();
+    signedIn = true;
+  }
+
+  @override
+  Future<void> signOut() async {
+    signedIn = false;
+  }
+
+  @override
+  Future<CatalogPage> library(RequestScope scope) async {
+    scope.check();
+    libraryCalls++;
+    return CatalogPage(
+      const [],
+      shelves: [
+        CatalogShelf(
+          title: 'Playlists',
+          moreId: 'FEmusic_liked_playlists',
+          entries: [
+            const CatalogEntry(
+              provider: 'youtube',
+              id: 'VLmyplaylist',
+              title: 'My playlist',
+              kind: CatalogKind.playlist,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 void main() {
+  test('guest Library shows no fake account shelves and refreshes after sign-in',
+      () async {
+    final port = LibraryCatalog();
+    final container = ProviderContainer(
+      overrides: [onlinePortProvider.overrideWithValue(port)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(catalogProvider.notifier);
+
+    await controller.load(browseId: 'app:library');
+    expect(port.libraryCalls, 0);
+    expect(container.read(catalogProvider).browseId, 'app:library');
+    expect(container.read(catalogProvider).shelves, isEmpty);
+    expect(container.read(catalogProvider).error, isNull);
+
+    await port.signIn('fixture', RequestScope());
+    await controller.load(browseId: 'app:library');
+    expect(port.libraryCalls, 1);
+    expect(container.read(catalogProvider).shelves.single.title, 'Playlists');
+    expect(
+      container.read(catalogProvider).shelves.single.entries.single.id,
+      'VLmyplaylist',
+    );
+
+    await port.signOut();
+    await controller.load(browseId: 'app:library');
+    expect(port.libraryCalls, 1);
+    expect(container.read(catalogProvider).shelves, isEmpty);
+  });
+
+  test('unsupported Library port fails explicitly instead of using mock data',
+      () async {
+    final container = ProviderContainer(
+      overrides: [onlinePortProvider.overrideWithValue(ControlledCatalog())],
+    );
+    addTearDown(container.dispose);
+    await container.read(catalogProvider.notifier).load(
+      browseId: 'app:library',
+    );
+    expect(
+      container.read(catalogProvider).error,
+      contains('unsupported'),
+    );
+  });
+
+
   test(
     'failed pagination preserves rows and retries the same token once',
     () async {
