@@ -168,6 +168,76 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     }
   }
 
+  Future<({String title, PlaylistVisibility visibility})?>
+  _createPlaylistDialog() async {
+    final input = TextEditingController();
+    var visibility = PlaylistVisibility.private;
+    try {
+      return await showDialog<({String title, PlaylistVisibility visibility})>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, update) => AlertDialog(
+            title: const Text('New playlist'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  key: const Key('playlist-name'),
+                  controller: input,
+                  autofocus: true,
+                  maxLength: 150,
+                  decoration: const InputDecoration(labelText: 'Playlist name'),
+                ),
+                DropdownButton<PlaylistVisibility>(
+                  key: const Key('playlist-privacy'),
+                  isExpanded: true,
+                  value: visibility,
+                  items: const [
+                    DropdownMenuItem(
+                      value: PlaylistVisibility.private,
+                      child: Text('Private'),
+                    ),
+                    DropdownMenuItem(
+                      value: PlaylistVisibility.unlisted,
+                      child: Text('Unlisted'),
+                    ),
+                    DropdownMenuItem(
+                      value: PlaylistVisibility.public,
+                      child: Text('Public'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) update(() => visibility = value);
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final title = input.text.trim();
+                  if (title.isNotEmpty) {
+                    Navigator.pop(
+                      dialogContext,
+                      (title: title, visibility: visibility),
+                    );
+                  }
+                },
+                child: const Text('Create playlist'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      input.dispose();
+    }
+  }
+
   String _playlistError(Object error) => error is ProviderFailure
       ? error.toString()
       : 'Could not update playlist. Try again.';
@@ -177,12 +247,12 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
       _message('Sign in to create an account playlist.');
       return;
     }
-    final title = await _playlistNameDialog('New playlist');
-    if (title == null || !mounted) return;
+    final form = await _createPlaylistDialog();
+    if (form == null || !mounted) return;
     try {
       final id = await ref
           .read(catalogProvider.notifier)
-          .createPlaylist(title, PlaylistVisibility.private);
+          .createPlaylist(form.title, form.visibility);
       if (!mounted) return;
       _message('Playlist created.');
       final ctrl = ref.read(catalogProvider.notifier);
@@ -192,7 +262,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
         CatalogEntry(
           provider: 'youtube',
           id: 'VL$id',
-          title: title,
+          title: form.title,
           kind: CatalogKind.playlist,
         ),
       );
