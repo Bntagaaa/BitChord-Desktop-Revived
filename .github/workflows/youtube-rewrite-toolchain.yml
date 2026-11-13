@@ -18,7 +18,6 @@ jobs:
         run: |
           git fetch --no-tags --depth=1 origin 348b613a0c3db1a54de56483ea6f8748d6465211
           mkdir -p rewrite-context
-          python3 -m pip download --no-deps yt-dlp==2026.10.26 -d rewrite-context
           python3 - <<'PY'
           import pathlib, subprocess, zipfile
           reference = '348b613a0c3db1a54de56483ea6f8748d6465211'
