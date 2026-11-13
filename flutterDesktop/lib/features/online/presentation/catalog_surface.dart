@@ -511,7 +511,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
   }
 }
 
-class OnlineTransport extends ConsumerWidget {
+class OnlineTransport extends ConsumerStatefulWidget {
   const OnlineTransport({
     super.key,
     required this.empty,
@@ -521,20 +521,40 @@ class OnlineTransport extends ConsumerWidget {
   final Widget empty;
   final BitChordPalette palette;
   final bool reduceBlur;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OnlineTransport> createState() => _OnlineTransportState();
+}
+
+class _OnlineTransportState extends ConsumerState<OnlineTransport> {
+  double? _scrubPreview;
+  int? _scrubSelection, _scrubRevision;
+  String? _scrubEntry;
+
+  bool _isCurrentScrub(PlaybackSnapshot snapshot) =>
+      _scrubPreview != null &&
+      _scrubEntry == snapshot.entryId &&
+      _scrubSelection == snapshot.selection &&
+      _scrubRevision == snapshot.queueRevision;
+
+  @override
+  Widget build(BuildContext context) {
     final snapshot = ref.watch(transportProvider);
     if (snapshot == null ||
         snapshot.entryId.isEmpty ||
-        snapshot.phase == AudioPhase.idle)
-      return empty;
+        snapshot.phase == AudioPhase.idle) {
+      return widget.empty;
+    }
     final port = ref.read(onlinePortProvider);
-    final position = snapshot.positionUs ~/ 1000000;
+    final displayUs = _isCurrentScrub(snapshot)
+        ? _scrubPreview!
+        : snapshot.positionUs.toDouble();
+    final position = displayUs ~/ 1000000;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 760),
       child: GlassSurface(
-        palette: palette,
-        reduceBlur: reduceBlur,
+        palette: widget.palette,
+        reduceBlur: widget.reduceBlur,
         child: SizedBox(
           height: 58,
           child: Row(
@@ -579,13 +599,43 @@ class OnlineTransport extends ConsumerWidget {
                 SizedBox(
                   width: 110,
                   child: Slider(
-                    value: snapshot.positionUs
-                        .clamp(0, snapshot.durationUs)
-                        .toDouble(),
+                    value: displayUs.clamp(0, snapshot.durationUs).toDouble(),
                     max: snapshot.durationUs.toDouble(),
-                    onChanged: (v) async {
+                    // Dragging is only a visual preview. Restarting FFmpeg for
+                    // every pointer movement can exhaust live broker requests
+                    // and fail playback, especially immediately after play.
+                    onChangeStart: (value) => setState(() {
+                      _scrubPreview = value;
+                      _scrubSelection = snapshot.selection;
+                      _scrubRevision = snapshot.queueRevision;
+                      _scrubEntry = snapshot.entryId;
+                    }),
+                    onChanged: (value) {
+                      if (_isCurrentScrub(snapshot)) {
+                        setState(() => _scrubPreview = value);
+                      }
+                    },
+                    onChangeEnd: (value) async {
+                      final latest = ref.read(transportProvider);
+                      final valid = latest != null &&
+                          _isCurrentScrub(latest) &&
+                          latest.phase != AudioPhase.failed &&
+                          latest.durationUs > 0;
+                      if (!mounted) return;
+                      setState(() {
+                        _scrubPreview = null;
+                        _scrubSelection = null;
+                        _scrubRevision = null;
+                        _scrubEntry = null;
+                      });
+                      if (!valid) return;
+                      // The nominal end can be beyond the last seekable audio
+                      // packet. Leave a small tail rather than seeking to EOF.
+                      final maxSeek = latest.durationUs > 250000
+                          ? latest.durationUs - 250000
+                          : latest.durationUs - 1;
                       try {
-                        await port?.seek(v.round());
+                        await port?.seek(value.round().clamp(0, maxSeek).toInt());
                       } catch (_) {}
                     },
                   ),

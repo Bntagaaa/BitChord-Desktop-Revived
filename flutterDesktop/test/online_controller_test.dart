@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/core/domain/audio_contract.dart';
+import '../lib/design_system/palette.dart';
 import '../lib/features/online/application/catalog_controller.dart';
 import '../lib/features/online/domain/catalog.dart';
 import '../lib/features/online/domain/online_port.dart';
@@ -16,6 +17,8 @@ final class ControlledCatalog implements OnlinePort, OnlineCapabilities {
   @override
   bool get youtubeAudioConfigured => resolverConfigured;
   SearchFilter? requestedFilter;
+  PlaybackSnapshot? currentSnapshot;
+  final seekCalls = <int>[];
 
   final requests = <String, Completer<CatalogPage>>{};
   final scopes = <String, RequestScope>{};
@@ -76,10 +79,11 @@ final class ControlledCatalog implements OnlinePort, OnlineCapabilities {
   @override
   Future<void> resume() async {}
   @override
-  Future<void> seek(int positionUs) async {}
+  Future<void> seek(int positionUs) async => seekCalls.add(positionUs);
   @override
   Future<PlaybackSnapshot> snapshot() async =>
-      throw StateError('No native engine in controller fixture');
+      currentSnapshot ??
+      (throw StateError('No native engine in controller fixture'));
   @override
   Future<void> download(
     CatalogEntry entry,
@@ -92,6 +96,36 @@ final class ControlledCatalog implements OnlinePort, OnlineCapabilities {
   @override
   Future<void> removeDownload(CatalogEntry entry) async {}
 }
+
+PlaybackSnapshot transportFixture({
+  int selection = 1,
+  String entryId = 'fixture:first',
+}) => PlaybackSnapshot(
+  phase: AudioPhase.playing,
+  selection: selection,
+  queueRevision: 1,
+  sequence: 1,
+  eventWatermark: 0,
+  renditionId: 'youtube:251',
+  positionUs: 2000000,
+  durationUs: 120000000,
+  sampledAtNativeNs: 0,
+  discontinuity: 0,
+  entryId: entryId,
+  awaitingAudio: false,
+  error: 0,
+  submittedFrames: 0,
+  playedFrames: 0,
+  deviceEpoch: 0,
+  pcmBytes: 0,
+  pcmHighWater: 0,
+  quiescent: false,
+  timingQuality: 0,
+  backend: 0,
+  outputRate: 48000,
+  outputChannels: 2,
+  precisionBits: 16,
+);
 
 void main() {
   test('late query result cannot overwrite a newer query/provider', () async {
@@ -368,4 +402,76 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('Scrub previews many positions but sends one seek on release', (
+    tester,
+  ) async {
+    final port = ControlledCatalog()..currentSnapshot = transportFixture();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [onlinePortProvider.overrideWithValue(port)],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: OnlineTransport(
+              empty: SizedBox.shrink(),
+              palette: BitChordPalette.dark,
+              reduceBlur: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 501));
+    await tester.pump();
+    final slider = find.byType(Slider);
+    expect(slider, findsOneWidget);
+
+    tester.widget<Slider>(slider).onChangeStart!(1000000);
+    tester.widget<Slider>(slider).onChanged!(10000000);
+    await tester.pump();
+    tester.widget<Slider>(slider).onChanged!(15000000);
+    await tester.pump(const Duration(milliseconds: 501));
+    expect(port.seekCalls, isEmpty);
+    expect(tester.widget<Slider>(slider).value, 15000000);
+
+    tester.widget<Slider>(slider).onChangeEnd!(15000000);
+    await tester.pump();
+    expect(port.seekCalls, [15000000]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A superseded scrub never seeks the next track', (tester) async {
+    final port = ControlledCatalog()..currentSnapshot = transportFixture();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [onlinePortProvider.overrideWithValue(port)],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: OnlineTransport(
+              empty: SizedBox.shrink(),
+              palette: BitChordPalette.dark,
+              reduceBlur: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 501));
+    await tester.pump();
+    final slider = find.byType(Slider);
+    tester.widget<Slider>(slider).onChangeStart!(1000000);
+    tester.widget<Slider>(slider).onChanged!(30000000);
+    await tester.pump();
+
+    port.currentSnapshot = transportFixture(
+      selection: 2,
+      entryId: 'fixture:second',
+    );
+    await tester.pump(const Duration(milliseconds: 501));
+    await tester.pump();
+    expect(tester.widget<Slider>(slider).value, 2000000);
+    tester.widget<Slider>(slider).onChangeEnd!(30000000);
+    await tester.pump();
+    expect(port.seekCalls, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 }
