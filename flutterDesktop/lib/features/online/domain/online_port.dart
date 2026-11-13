@@ -21,6 +21,31 @@ abstract interface class OnlineLibrary {
   Future<CatalogPage> library(RequestScope scope);
 }
 
+/// Mutations always use a verified YouTube account; no optimistic fake writes.
+abstract interface class OnlinePlaylistEditor {
+  Future<String> createPlaylist(
+    String title,
+    PlaylistVisibility visibility,
+    RequestScope scope,
+  );
+  Future<void> renamePlaylist(
+    String playlistId,
+    String title,
+    RequestScope scope,
+  );
+  Future<void> deletePlaylist(String playlistId, RequestScope scope);
+  Future<Map<String, String>> addToPlaylist(
+    String playlistId,
+    List<String> videoIds,
+    RequestScope scope,
+  );
+  Future<void> removeFromPlaylist(
+    String playlistId,
+    List<({String setVideoId, String videoId})> entries,
+    RequestScope scope,
+  );
+}
+
 abstract interface class OnlinePlaybackIdentity {
   String get currentEntryId;
 }
