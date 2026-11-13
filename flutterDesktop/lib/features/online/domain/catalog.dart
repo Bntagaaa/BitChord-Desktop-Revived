@@ -29,6 +29,8 @@ final class CatalogHeader {
 
 enum AudioQuality { low, medium, high, lossless }
 
+enum PlaylistVisibility { private, unlisted, public }
+
 enum ProviderProblem {
   cancelled,
   timeout,
@@ -128,6 +130,7 @@ final class CatalogEntry {
     this.artwork,
     this.params,
     this.isVideo = false,
+    this.setVideoId,
   });
   final String provider, id, title, subtitle;
   final CatalogKind kind;
@@ -135,6 +138,7 @@ final class CatalogEntry {
   final Uri? artwork;
   final String? params;
   final bool isVideo;
+  final String? setVideoId;
   String get key => '$provider:$id';
 }
 
