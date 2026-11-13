@@ -124,6 +124,185 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     showDialog<void>(context: context, builder: (_) => const DownloadManager());
   }
 
+  bool get _canEditPlaylists {
+    final port = ref.read(onlinePortProvider);
+    return port is OnlineAccounts &&
+        port.signedIn &&
+        port is OnlinePlaylistEditor;
+  }
+
+  Future<String?> _playlistNameDialog(
+    String title, {
+    String initial = '',
+  }) async {
+    final controller = TextEditingController(text: initial);
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            key: const Key('playlist-name'),
+            controller: controller,
+            autofocus: true,
+            maxLength: 150,
+            decoration: const InputDecoration(labelText: 'Playlist name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final name = controller.text.trim();
+                if (name.isNotEmpty) Navigator.pop(dialogContext, name);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  String _playlistError(Object error) => error is ProviderFailure
+      ? error.toString()
+      : 'Could not update playlist. Try again.';
+
+  Future<void> _createPlaylist() async {
+    if (!_canEditPlaylists) {
+      _message('Sign in to create an account playlist.');
+      return;
+    }
+    final title = await _playlistNameDialog('New playlist');
+    if (title == null || !mounted) return;
+    try {
+      final id = await ref
+          .read(catalogProvider.notifier)
+          .createPlaylist(title, PlaylistVisibility.private);
+      if (!mounted) return;
+      _message('Playlist created.');
+      final ctrl = ref.read(catalogProvider.notifier);
+      await ctrl.load(browseId: 'app:library');
+      if (!mounted) return;
+      _open(
+        CatalogEntry(
+          provider: 'youtube',
+          id: 'VL$id',
+          title: title,
+          kind: CatalogKind.playlist,
+        ),
+      );
+    } catch (error) {
+      _message(_playlistError(error));
+    }
+  }
+
+  Future<void> _renamePlaylist() async {
+    final id = widget.browseId;
+    if (id == null || !_canEditPlaylists) return;
+    final original = ref.read(catalogProvider).header?.title ?? widget.title;
+    final name = await _playlistNameDialog('Rename playlist', initial: original);
+    if (name == null || !mounted || name == original) return;
+    try {
+      await ref.read(catalogProvider.notifier).renamePlaylist(id, name);
+      if (!mounted) return;
+      await ref.read(catalogProvider.notifier).load(browseId: id);
+      _message('Playlist renamed.');
+    } catch (error) {
+      _message(_playlistError(error));
+    }
+  }
+
+  Future<void> _deletePlaylist() async {
+    final id = widget.browseId;
+    if (id == null || !_canEditPlaylists) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete playlist?'),
+        content: const Text(
+          'This deletes the playlist from your YouTube Music account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref.read(catalogProvider.notifier).deletePlaylist(id);
+      if (!mounted) return;
+      ref.read(historyProvider.notifier).visit('/library');
+      context.go('/library');
+    } catch (error) {
+      _message(_playlistError(error));
+    }
+  }
+
+  Future<void> _addToPlaylist(CatalogEntry track) async {
+    if (!_canEditPlaylists || track.provider != 'youtube') {
+      _message('Sign in to add YouTube Music tracks to a playlist.');
+      return;
+    }
+    try {
+      final playlists = await ref.read(catalogProvider.notifier).accountPlaylists();
+      if (!mounted) return;
+      if (playlists.isEmpty) {
+        _message('No account playlists. Create one in Library first.');
+        return;
+      }
+      final selected = await showDialog<CatalogEntry>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('Add to playlist'),
+          children: [
+            for (final playlist in playlists)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dialogContext, playlist),
+                child: Text(playlist.title),
+              ),
+          ],
+        ),
+      );
+      if (selected == null || !mounted) return;
+      await ref
+          .read(catalogProvider.notifier)
+          .addToPlaylist(selected.id, [track.id]);
+      _message('Added to playlist.');
+    } catch (error) {
+      _message(_playlistError(error));
+    }
+  }
+
+  Future<void> _removeFromPlaylist(CatalogEntry track) async {
+    final id = widget.browseId, setId = track.setVideoId;
+    if (!_canEditPlaylists ||
+        id == null ||
+        setId == null ||
+        track.provider != 'youtube') return;
+    try {
+      await ref.read(catalogProvider.notifier).removeFromPlaylist(id, [
+        (setVideoId: setId, videoId: track.id),
+      ]);
+      if (!mounted) return;
+      await ref.read(catalogProvider.notifier).load(browseId: id);
+      _message('Removed from playlist.');
+    } catch (error) {
+      _message(_playlistError(error));
+    }
+  }
+
   void _select(CatalogEntry entry) {
     ref.read(searchSuggestionsProvider.notifier).dismiss();
     if (entry.kind == CatalogKind.track) {
@@ -181,6 +360,14 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
               )
             : null,
         onDownload: playable ? () => _download(entry) : null,
+        onAddToPlaylist: _canEditPlaylists && entry.provider == 'youtube'
+            ? () => _addToPlaylist(entry)
+            : null,
+        onRemoveFromPlaylist: _canEditPlaylists &&
+                !widget.browseId!.startsWith('MPRE') &&
+                entry.setVideoId != null
+            ? () => _removeFromPlaylist(entry)
+            : null,
       );
     }
     return Padding(
@@ -249,6 +436,15 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
               tooltip: 'Download',
               onPressed: () => _download(entry),
               icon: const Icon(Icons.download_outlined, size: 20),
+            ),
+          if (!offline &&
+              entry.kind == CatalogKind.track &&
+              entry.provider == 'youtube' &&
+              _canEditPlaylists)
+            IconButton(
+              tooltip: 'Add to playlist',
+              onPressed: () => _addToPlaylist(entry),
+              icon: const Icon(Icons.playlist_add, size: 20),
             ),
           if (offline)
             IconButton(
@@ -439,6 +635,16 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
               child: Text('Downloads · ${tasks.length}'),
             ),
           ),
+        if (widget.destination == 'library' && _canEditPlaylists)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('new-account-playlist'),
+              onPressed: _createPlaylist,
+              icon: const Icon(Icons.playlist_add),
+              label: const Text('New playlist'),
+            ),
+          ),
         if (catalog && state.loading)
           const LinearProgressIndicator(minHeight: 2),
         if (catalog && state.error != null)
@@ -504,6 +710,16 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                                   context: state.entries,
                                   index: 0,
                                 ),
+                          onRename: _canEditPlaylists &&
+                                  widget.browseId!.startsWith('VL') &&
+                                  widget.browseId != 'VLLM'
+                              ? _renamePlaylist
+                              : null,
+                          onDelete: _canEditPlaylists &&
+                                  widget.browseId!.startsWith('VL') &&
+                                  widget.browseId != 'VLLM'
+                              ? _deletePlaylist
+                              : null,
                           onFind: () => setState(() {
                             _finding = !_finding;
                             _listQuery = '';
