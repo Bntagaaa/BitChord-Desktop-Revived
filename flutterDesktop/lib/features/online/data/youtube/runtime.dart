@@ -28,8 +28,9 @@ final class YouTubeRuntime {
         !node.existsSync() ||
         !plugins.existsSync() ||
         !File('${server.path}/build/generate_once.js').existsSync() ||
-        !File('${server.path}/node_modules/bgutils-js/package.json')
-            .existsSync()) {
+        !File(
+          '${server.path}/node_modules/bgutils-js/package.json',
+        ).existsSync()) {
       return null;
     }
     return YouTubeRuntime(

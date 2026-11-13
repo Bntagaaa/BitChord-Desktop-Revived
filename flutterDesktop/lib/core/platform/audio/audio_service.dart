@@ -50,15 +50,16 @@ final class AudioService implements LocalAudioPort {
   @override
   Future<Admission> submit(AudioRequest r) async =>
       Admission.values[await _call('submit', {
-        'id': r.commandId,
-        'selection': r.selection,
-        'revision': r.queueRevision,
-        'type': r.operation.index + 1,
-        'value': r.value,
-        'path': r.path,
-        'entry': r.entryId,
-        'rendition': r.renditionId,
-      }) as int];
+            'id': r.commandId,
+            'selection': r.selection,
+            'revision': r.queueRevision,
+            'type': r.operation.index + 1,
+            'value': r.value,
+            'path': r.path,
+            'entry': r.entryId,
+            'rendition': r.renditionId,
+          })
+          as int];
   @override
   Future<PlaybackSnapshot> snapshot() async {
     final s = await _call('snapshot') as Map;

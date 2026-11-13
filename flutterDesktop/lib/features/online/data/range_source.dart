@@ -95,8 +95,9 @@ final class RangeSource {
       media = replacement;
       return chunk(index);
     }
-    final range = RegExp(r'^bytes (\d+)-(\d+)/(\d+)$')
-        .firstMatch(response.headers['content-range'] ?? '');
+    final range = RegExp(
+      r'^bytes (\d+)-(\d+)/(\d+)$',
+    ).firstMatch(response.headers['content-range'] ?? '');
     int size;
     if (response.status == 206 && range != null) {
       final lo = int.parse(range[1]!), hi = int.parse(range[2]!);

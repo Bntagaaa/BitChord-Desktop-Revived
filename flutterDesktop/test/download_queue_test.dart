@@ -44,54 +44,60 @@ Future<void> flush() async {
 }
 
 void main() {
-  test('four workers, duplicate suppression, FIFO, quality and verified completion', () async {
-    final port = ControlledDownloads();
-    final container = ProviderContainer(
-      overrides: [onlinePortProvider.overrideWithValue(port)],
-    );
-    addTearDown(container.dispose);
-    final queue = container.read(downloadQueueProvider.notifier);
-    for (var i = 0; i < 6; i++) {
-      queue.enqueue(track(i), quality: AudioQuality.high);
-    }
-    queue.enqueue(track(0));
-    expect(port.jobs.keys, ['0', '1', '2', '3']);
-    expect(container.read(downloadQueueProvider).length, 6);
-    port.progress['0']!(50, 100);
-    expect(container.read(downloadQueueProvider).first.done, 50);
-    port.jobs['0']!.complete();
-    await flush();
-    expect(port.jobs.keys, ['0', '1', '2', '3', '4']);
-    expect(port.qualities['4'], AudioQuality.high);
-    expect(container.read(downloadRevisionProvider), 1);
-    expect(port.highWater, 4);
-  });
+  test(
+    'four workers, duplicate suppression, FIFO, quality and verified completion',
+    () async {
+      final port = ControlledDownloads();
+      final container = ProviderContainer(
+        overrides: [onlinePortProvider.overrideWithValue(port)],
+      );
+      addTearDown(container.dispose);
+      final queue = container.read(downloadQueueProvider.notifier);
+      for (var i = 0; i < 6; i++) {
+        queue.enqueue(track(i), quality: AudioQuality.high);
+      }
+      queue.enqueue(track(0));
+      expect(port.jobs.keys, ['0', '1', '2', '3']);
+      expect(container.read(downloadQueueProvider).length, 6);
+      port.progress['0']!(50, 100);
+      expect(container.read(downloadQueueProvider).first.done, 50);
+      port.jobs['0']!.complete();
+      await flush();
+      expect(port.jobs.keys, ['0', '1', '2', '3', '4']);
+      expect(port.qualities['4'], AudioQuality.high);
+      expect(container.read(downloadRevisionProvider), 1);
+      expect(port.highWater, 4);
+    },
+  );
 
-  test('cancelled writer quiesces before same-key reenqueue and ignores late progress', () async {
-    final port = ControlledDownloads();
-    final container = ProviderContainer(
-      overrides: [onlinePortProvider.overrideWithValue(port)],
-    );
-    addTearDown(container.dispose);
-    final queue = container.read(downloadQueueProvider.notifier);
-    queue.enqueue(track(0));
-    final old = port.jobs['0']!;
-    final late = port.progress['0']!;
-    queue.cancel(track(0).key);
-    expect(port.jobScopes['0']!.cancelled, isTrue);
-    queue.enqueue(track(0), quality: AudioQuality.low);
-    late(80, 100);
-    expect(
-      container.read(downloadQueueProvider).single.phase,
-      DownloadPhase.queued,
-    );
-    old.complete();
-    await flush();
-    expect(port.jobs['0'], isNot(same(old)));
-    expect(port.qualities['0'], AudioQuality.low);
-    expect(container.read(downloadQueueProvider).single.done, 0);
-    expect(container.read(downloadRevisionProvider), 0);
-  });
+  test(
+    'cancelled writer quiesces before same-key reenqueue and ignores late progress',
+    () async {
+      final port = ControlledDownloads();
+      final container = ProviderContainer(
+        overrides: [onlinePortProvider.overrideWithValue(port)],
+      );
+      addTearDown(container.dispose);
+      final queue = container.read(downloadQueueProvider.notifier);
+      queue.enqueue(track(0));
+      final old = port.jobs['0']!;
+      final late = port.progress['0']!;
+      queue.cancel(track(0).key);
+      expect(port.jobScopes['0']!.cancelled, isTrue);
+      queue.enqueue(track(0), quality: AudioQuality.low);
+      late(80, 100);
+      expect(
+        container.read(downloadQueueProvider).single.phase,
+        DownloadPhase.queued,
+      );
+      old.complete();
+      await flush();
+      expect(port.jobs['0'], isNot(same(old)));
+      expect(port.qualities['0'], AudioQuality.low);
+      expect(container.read(downloadQueueProvider).single.done, 0);
+      expect(container.read(downloadRevisionProvider), 0);
+    },
+  );
 
   test(
     'failed jobs remain retryable and cancel all cannot resurrect rows',
