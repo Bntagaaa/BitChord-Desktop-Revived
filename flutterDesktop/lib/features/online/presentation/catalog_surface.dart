@@ -127,7 +127,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
   bool get _canEditPlaylists {
     final port = ref.read(onlinePortProvider);
     return port is OnlineAccounts &&
-        port.signedIn &&
+        (port as OnlineAccounts).signedIn &&
         port is OnlinePlaylistEditor;
   }
 
