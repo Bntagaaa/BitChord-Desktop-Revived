@@ -116,6 +116,16 @@ final class CatalogController extends Notifier<CatalogView> {
     final api = port;
     if (api == null || (more && (state.loading || state.continuation == null)))
       return;
+    // Guest users have no account library. Keep the real route identity so a
+    // subsequent verified sign-in can refresh it, without any fake result.
+    if (browseId == 'app:library' &&
+        api is OnlineAccounts &&
+        !api.signedIn) {
+      _queryScope?.cancel();
+      ++_generation;
+      state = const CatalogView(browseId: 'app:library');
+      return;
+    }
     _queryScope?.cancel();
     final scope = _queryScope = RequestScope(), generation = ++_generation;
     final before = state;
@@ -132,7 +142,11 @@ final class CatalogController extends Notifier<CatalogView> {
       params: params,
     );
     try {
-      final page = browseId == null
+      final page = browseId == 'app:library'
+          ? api is OnlineLibrary
+                ? await api.library(scope)
+                : (throw const ProviderFailure(ProviderProblem.unsupported))
+          : browseId == null
           ? await api.search(
               provider,
               query,
