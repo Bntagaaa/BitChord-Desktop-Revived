@@ -17,12 +17,15 @@ class CollectionHeader extends StatelessWidget {
     required this.onFind,
     required this.onDownload,
     required this.onShare,
+    this.onRename,
+    this.onDelete,
   });
   final CatalogHeader header;
   final bool album;
   final List<CatalogEntry> entries;
   final VoidCallback? onPlay, onShuffle;
   final VoidCallback onFind, onDownload, onShare;
+  final VoidCallback? onRename, onDelete;
   @override
   Widget build(BuildContext context) {
     final palette = Theme.of(context).brightness == Brightness.dark
@@ -161,6 +164,8 @@ class CollectionHeader extends StatelessWidget {
                         onSelected: (value) {
                           if (value == 'download') onDownload();
                           if (value == 'share') onShare();
+                          if (value == 'rename') onRename?.call();
+                          if (value == 'delete') onDelete?.call();
                         },
                         itemBuilder: (_) => [
                           PopupMenuItem(
@@ -172,6 +177,16 @@ class CollectionHeader extends StatelessWidget {
                             value: 'share',
                             child: Text('Share'),
                           ),
+                          if (onRename != null)
+                            const PopupMenuItem(
+                              value: 'rename',
+                              child: Text('Rename playlist'),
+                            ),
+                          if (onDelete != null)
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete playlist'),
+                            ),
                         ],
                       ),
                     ),
@@ -194,11 +209,14 @@ class CollectionTrackRow extends StatelessWidget {
     required this.album,
     required this.onPlay,
     required this.onDownload,
+    this.onAddToPlaylist,
+    this.onRemoveFromPlaylist,
   });
   final CatalogEntry entry;
   final int index;
   final bool album;
-  final VoidCallback? onPlay, onDownload;
+  final VoidCallback? onPlay, onDownload, onAddToPlaylist;
+  final VoidCallback? onRemoveFromPlaylist;
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -273,6 +291,32 @@ class CollectionTrackRow extends StatelessWidget {
                   icon: const Icon(Icons.download_outlined),
                 ),
               ),
+              if (onAddToPlaylist != null || onRemoveFromPlaylist != null)
+                SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: PopupMenuButton<String>(
+                    tooltip: 'Song options',
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.more_horiz, size: 18),
+                    onSelected: (action) {
+                      if (action == 'add') onAddToPlaylist?.call();
+                      if (action == 'remove') onRemoveFromPlaylist?.call();
+                    },
+                    itemBuilder: (_) => [
+                      if (onAddToPlaylist != null)
+                        const PopupMenuItem(
+                          value: 'add',
+                          child: Text('Add to playlist'),
+                        ),
+                      if (onRemoveFromPlaylist != null)
+                        const PopupMenuItem(
+                          value: 'remove',
+                          child: Text('Remove from playlist'),
+                        ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
