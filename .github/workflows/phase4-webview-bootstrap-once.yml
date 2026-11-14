@@ -40,3 +40,4 @@ jobs:
           git diff --cached --check
           git -c user.name="BitChord Phase4 Bootstrap" -c user.email="actions@users.noreply.github.com" commit -m "build(phase4): lock and format the built-in WebView sign-in"
           git push origin HEAD:2.0.0-flutter
+# Temporary bootstrap only; this workflow removes itself once the lock is retained.
