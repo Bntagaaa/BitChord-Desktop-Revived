@@ -10,4 +10,7 @@ linux/
 .metadata
 
 __pycache__/
-verification/
+verification/*
+!verification/phase5/
+verification/phase5/*
+!verification/phase5/README.md

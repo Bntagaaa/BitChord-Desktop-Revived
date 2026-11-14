@@ -1,5 +1,14 @@
 # BitChord Flutter desktop foundation — Phase 1
 
+Latest work: Phase 5 is authorized and **INCOMPLETE**. Native reference-tested
+DSP, EQ/spatial controls, native speed/silence clocks, sleep behavior and precise limits are recorded in
+[verification/phase5/README.md](verification/phase5/README.md). Full Automix,
+ONNX/loopmix and advanced two-deck transport integration remain unfinished.
+The continuation resolved earlier local socket, sanitizer, binding-generator
+and audio-server access restrictions through approved operations. Publication
+and exact-source CI evidence are tracked in the Phase 5 ledger. Earlier phase
+notes below are historical; Phase 6 has not started.
+
 The independently implemented Flutter shell lives here. Kotlin 1.9.2 at
 `348b613a0c3db1a54de56483ea6f8748d6465211` remains the behavioral reference;
 no previous Flutter rewrite is used. The shell has real navigation, appearance

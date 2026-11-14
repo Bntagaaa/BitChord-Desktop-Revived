@@ -74,6 +74,11 @@ def main():
                 trial = subprocess.run([str(dart), 'tool/phase3_sink.dart', str(library), str(longer), str(audio), *endpoint],
                                        capture_output=True, text=True, timeout=40, check=True)
                 report['sink_contract'] = json.loads(trial.stdout.strip().splitlines()[-1])
+                advanced = subprocess.run([str(dart), 'tool/phase5_check.dart', str(library), str(audio)],
+                                         capture_output=True, text=True, timeout=25, check=True)
+                report['phase5_dsp'] = json.loads(advanced.stdout.strip().splitlines()[-1])
+                if report['phase5_dsp']['played_frames'] != 24000:
+                    raise RuntimeError('EQ/spatial service trial did not present every real PCM frame')
 
         finally:
             if server:

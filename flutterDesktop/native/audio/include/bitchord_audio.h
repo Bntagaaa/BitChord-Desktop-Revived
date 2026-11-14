@@ -35,6 +35,22 @@ extern "C" {
 #define BC_NOMINATE 8
 #define BC_CLEAR_NEXT 9
 #define BC_DEVICE 10
+/* Atomic version-1 tuning: enabled mode x y focused balance spatial + 7 gains.
+ * UTF-8 ASCII fields separated by spaces in command.path; no native pointers.
+ * mode 0=manual, 1=dynamic. No silence/speed/Automix capability is implied. */
+#define BC_DSP 11
+#define BC_CAP_DSP 256
+/* Sleep is session state: 0 cancels, -1 stops after the current track,
+ * positive values are elapsed milliseconds (<= 12 hours). It never uses
+ * wall-clock time. After-track suppresses nomination/overlap and pauses at EOF.
+ * Expiry pauses and flushes queued sound on the native output owner. */
+#define BC_SLEEP 12
+#define BC_CAP_SLEEP 512
+/* Listener tempo (pitch-preserving WSOLA) and skip-silence. value is speed
+ * in millionths [.25,3]; path is exactly "0" or "1". BC_RATE retains its
+ * ABI 1 resampling/pitch meaning. */
+#define BC_LISTEN 13
+#define BC_CAP_LISTEN 1024
 #define BC_IDLE 0
 #define BC_BUFFERING 1
 #define BC_PLAYING 2
@@ -47,6 +63,7 @@ extern "C" {
 #define BC_COMMAND_FAILED 2
 #define BC_EVENT_COMMAND 0
 #define BC_EVENT_ADOPTED 1
+#define BC_EVENT_SLEEP 2
 #define BC_ERROR_DECODE 100
 #define BC_ERROR_DEVICE 101
 #define BC_ERROR_SEEK 102

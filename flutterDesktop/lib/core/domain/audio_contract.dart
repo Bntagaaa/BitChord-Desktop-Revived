@@ -10,6 +10,9 @@ enum AudioOperation {
   nominate,
   clearNext,
   device,
+  dsp,
+  sleep,
+  listen,
 }
 
 enum AudioPhase { idle, buffering, playing, paused, ended, failed, closing }
@@ -76,10 +79,12 @@ final class AudioEvent {
     required this.outcome,
     required this.error,
     required this.adopted,
+    this.sleepExpired = false,
   });
   final int sequence, commandId, selection, queueRevision, outcome, error;
   final String entryId;
   final bool adopted;
+  final bool sleepExpired;
 }
 
 enum Admission {
@@ -100,4 +105,13 @@ abstract interface class LocalAudioPort {
   Future<void> acknowledge(int sequence);
   Future<int> monotonicNs();
   Future<void> close();
+}
+
+abstract interface class DspAudioCapability {
+  bool get supportsEqualizer;
+}
+
+abstract interface class AdvancedAudioCapability {
+  bool get supportsTempo;
+  bool get supportsSleep;
 }

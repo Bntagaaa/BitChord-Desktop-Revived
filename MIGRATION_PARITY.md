@@ -1,5 +1,35 @@
 # Migration parity audit — Phase 0
 
+## P11/P12/P14–P16 — Phase 5 DSP increment, 2026-11-14
+
+**Phase 5 INCOMPLETE**, authorized on `codex/phase5-advanced-listening`.
+Pinned Kotlin remains `348b613a`; the complete per-source/status/gap table is in
+[verification/phase5/README.md](flutterDesktop/verification/phase5/README.md).
+P14 EQ/widening, speed/silence and P11/P12 composed clock behavior are locally
+FIXTURE_TESTED against **38 executed Kotlin PCM cases** and ten source-clock
+traces (exact sample counts, observed maximum absolute PCM difference 0 within
+1e-4 EQ/2e-6 other tolerances, predeclared 2-us clock tolerance). P15 echo remains
+a tested primitive only. Native `ListeningPipeline` retains surplus and partial
+writes, drains tempo at EOF and resets on timeline changes. ABI 1 layouts remain
+unchanged; generated constants negotiate DSP/listener/sleep independently.
+
+Advanced P10–P13 native sleep now owns monotonic deadline/cancel/after-track,
+nomination suppression, presented-position resume and EOF pause; expiry events
+carry their arming command ID. Flutter persisted speed/silence and session sleep
+controls are IMPLEMENTED/FIXTURE_TESTED, without native visual acceptance.
+All five native tests passed with address/undefined/leak instrumentation using
+approved process access. Actual Linux libpulse baseline and four tempo/after-
+track trials presented PCM and passed FFI/persistence. This scoped Linux output
+is PLATFORM_VERIFIED; physical audibility and Windows output remain unverified.
+
+The earlier socket/LeakSanitizer/ffigen/audio access restrictions were resolved
+through approved reruns. Full P15 planner/two-deck/filter/ride integration, P16
+ONNX/model/cache/worker/Loop & Mix/UI and the complete interruption, telemetry,
+allocation and physical two-OS acceptance matrix are still unfinished.
+Publication/new-source CI evidence is tracked in the ledger. **Phase 5 INCOMPLETE;
+no whole P-ID PARITY_ACCEPTED, RAM-reduction claim, merge or Phase 6 work.**
+
+
 ## P02/P04/P29/P30 — visual branch evidence, 2026-11-14
 
 See [VISUAL_PARITY_REPORT.md](VISUAL_PARITY_REPORT.md) for actual Linux Kotlin/

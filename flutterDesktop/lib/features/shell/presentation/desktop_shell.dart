@@ -10,6 +10,7 @@ import '../../../app/router.dart';
 import '../../online/application/catalog_controller.dart';
 import '../../online/presentation/catalog_surface.dart';
 import '../../online/presentation/account_session.dart';
+import '../../playback/presentation/listening_panel.dart';
 import '../../../l10n/shell_strings.dart';
 import '../../../design_system/palette.dart';
 import '../../../design_system/theme.dart';
@@ -1155,6 +1156,7 @@ class _AppearancePanel extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
+          const ListeningPanel(),
           Text('About BitChord', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(

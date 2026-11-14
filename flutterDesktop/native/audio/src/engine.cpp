@@ -1,6 +1,9 @@
 #include "bitchord_audio.h"
 #include "decoder.h"
 #include "sink.h"
+#include "dsp.h"
+#include "sleep.h"
+#include "listening.h"
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -29,7 +32,7 @@ struct Token {
  uint64_t selection=0, revision=0; char entry[128]{}, rendition[128]{};
  Token& operator=(const bc_command& c) { selection=c.selection; revision=c.revision; memcpy(entry,c.entry,128); memcpy(rendition,c.rendition,128); return *this; }
 };
-struct Segment { uint64_t first=0, last=0; double source=0, step=0; Token identity{}; };
+struct Segment { uint64_t first=0, last=0; double source=0, step=0; int64_t duration=0; Token identity{}; };
 class Engine {
 public:
  std::mutex gate;
@@ -51,7 +54,19 @@ private:
  std::string endpoint;
  uint32_t device_recoveries=0; uint64_t healthy_frames=0;
  bool play=false; double speed=1, volume=1, fraction=0, source_frame=0;
+ SleepTimer sleep;
+ bc_command sleep_request{};
+ bool sleep_at_end=false;
+ float listener_speed=1;
+ bool skip_silence=false;
+ std::unique_ptr<ListeningPipeline> listener;
  std::array<float,512*8> scratch{};
+ std::array<float,512*8> deck_scratch{};
+ dsp::Settings tuning;
+ dsp::Equalizer equalizer;
+ dsp::Spatial spatial;
+ uint32_t pending_frames=0, pending_offset=0;
+ double pending_source=0, pending_step=0;
  std::array<double,64> matrix{};
  std::array<Segment,4096> segments{}; size_t seg_begin=0,seg_size=0;
  std::array<bc_event,256> staging{}; size_t staged=0;
@@ -75,28 +90,34 @@ private:
  void fail(uint32_t code) {
   state.error=code; state.phase=BC_ERROR; state.awaiting_audio=1; play=false;
   // Sink/decoder resources are retired by this owner, never in an OS callback.
-  sink.reset(); current.reset(); upcoming.reset(); seg_size=0;
+  sink.reset(); current.reset(); upcoming.reset(); listener.reset(); pending_frames=pending_offset=0; seg_size=0;
  }
  void reset_timeline(int64_t origin) {
+  sleep_at_end=false;
+  pending_frames=pending_offset=0; equalizer.reset(); spatial.reset();
+  listener.reset();
   fraction=0; source_frame=0; seg_size=seg_begin=0;
   state.position_us=origin; state.submitted_frames=state.played_frames=0;
   ++state.discontinuity; state.awaiting_audio=1;
  }
  void process(const bc_command& c) {
-  if(c.selection!=admitted_selection || c.revision!=admitted_revision) { event(c,BC_CANCELLED); return; }
+  if(c.type!=BC_SLEEP && (c.selection!=admitted_selection || c.revision!=admitted_revision)) { event(c,BC_CANCELLED); return; }
   try {
    switch(c.type) {
     case BC_SELECT:
+     sleep_at_end=false;
      sink.reset(); current.reset(); upcoming.reset(); identity=c;
      state.selection=c.selection; state.revision=c.revision; state.error=0;
      memcpy(state.entry,c.entry,128); memcpy(state.rendition,c.rendition,128);
      current=std::make_unique<Decoder>(c.path); play=c.value!=0; state.phase=BC_BUFFERING;
      reset_timeline(0); break;
     case BC_NOMINATE:
+     if(sleep.after_track()) { event(c,BC_CANCELLED); return; }
      upcoming.reset(); nomination=c; upcoming=std::make_unique<Decoder>(c.path); break;
     case BC_CLEAR_NEXT: upcoming.reset(); break;
     case BC_PLAY:
-     if(state.phase==BC_ENDED && current) {
+     if((state.phase==BC_ENDED || sleep_at_end) && current) {
+      sleep_at_end=false;
       if(sink) sink->flush(); current.reset(); current=std::make_unique<Decoder>(identity.path);
       state.phase=BC_BUFFERING; reset_timeline(0);
      }
@@ -127,6 +148,20 @@ private:
       const auto at=state.position_us; sink.reset(); current.reset(); upcoming.reset();
       current=std::make_unique<Decoder>(identity.path,at); state.phase=BC_BUFFERING; reset_timeline(at);
      } break;
+    case BC_DSP: {
+     dsp::Settings next;
+     if(!dsp::parseSettings(c.path,next)) { event(c,BC_COMMAND_FAILED,BC_INVALID); return; }
+     tuning=next; equalizer.tune(tuning); break;
+    }
+    case BC_SLEEP:
+     sleep_request=c;
+     sleep.set(c.value,bc_monotonic_ns());
+     if(sleep.after_track()) upcoming.reset();
+     break;
+    case BC_LISTEN:
+     listener_speed=float(c.value)/1000000; skip_silence=c.path[0]=='1';
+     if(listener) listener->set(listener_speed,skip_silence);
+     break;
     default: event(c,BC_COMMAND_FAILED,BC_INVALID); return;
    }
    event(c,BC_APPLIED);
@@ -142,6 +177,8 @@ private:
    const auto& s=segments[seg_begin];
    const auto at=std::clamp(state.played_frames,s.first,s.last);
    state.position_us=int64_t(s.source+double(at-s.first)*s.step);
+   state.duration_us=s.duration;
+   if(s.duration>0) state.position_us=std::clamp<int64_t>(state.position_us,0,s.duration);
    if(std::strcmp(state.entry,s.identity.entry)!=0) {
     memcpy(state.entry,s.identity.entry,128); memcpy(state.rendition,s.identity.rendition,128);
     state.selection=s.identity.selection; state.revision=s.identity.revision;
@@ -149,6 +186,7 @@ private:
     event(adopted,BC_APPLIED,0,BC_EVENT_ADOPTED);
    }
   }
+  if((state.phase==BC_ENDED || sleep_at_end) && state.duration_us>0) state.position_us=state.duration_us;
   state.awaiting_audio=(state.submitted_frames==state.played_frames && state.phase!=BC_ENDED)?1:0;
  }
  void recover_device() {
@@ -173,6 +211,16 @@ private:
   if(result<0) throw std::runtime_error("channel matrix");
  }
  void render() {
+  if(sleep.expired(bc_monotonic_ns())) {
+   sleep.set(0,0);
+   if(sink) { clock(); sink->flush(); }
+   // Restart at the last presented source position; never resume queued-ahead
+   // sound after a timer. Decoder retirement happens on this push owner.
+   const auto at=state.position_us;
+   if(current) { current.reset(); current=std::make_unique<Decoder>(identity.path,at); }
+   upcoming.reset(); play=false; reset_timeline(at); state.phase=BC_PAUSED;
+   event(sleep_request,BC_APPLIED,0,BC_EVENT_SLEEP);
+  }
   if(!current) return;
   if(identity.selection!=admitted_selection || identity.revision!=admitted_revision) return;
   if(sink && sink->changed()) { recover_device(); return; }
@@ -185,17 +233,34 @@ private:
   }
   clock();
   if(!play) { if(state.phase!=BC_ENDED) state.phase=BC_PAUSED; return; }
+  if(!listener) {
+   listener=std::make_unique<ListeningPipeline>(current->channels,sink->rate,current->origin);
+   listener->set(listener_speed,skip_silence);
+  }
   state.phase=BC_PLAYING;
+  // Stateful DSP is evaluated exactly once per prepared block. A partial/zero
+  // device write retains its processed suffix; it never re-runs filter history
+  // against unaccepted source frames. Source time maps accepted frames only.
+  if(pending_frames) { write_pending(); return; }
+  if(!listener->empty()) { write_listener(); return; }
   const auto available=current->available();
   if(!available) {
    if(!current->eof) { ++state.underruns; state.phase=BC_BUFFERING; return; }
-   if(upcoming && upcoming->ready && !upcoming->error && upcoming->rate==current->rate && upcoming->channels==current->channels && seg_size<segments.size()-2) {
+   if(!listener->finished()) { listener->finish(); write_listener(); return; }
+   if(!sleep.after_track() && upcoming && upcoming->ready && !upcoming->error && upcoming->rate==current->rate && upcoming->channels==current->channels && seg_size<segments.size()-2) {
     // Prepared same-format handoff preserves the open sink and all queued frames.
     current=std::move(upcoming); identity=nomination; fraction=source_frame=0; state.duration_us=current->duration;
+    equalizer.reset(); spatial.reset();
+    listener.reset();
     return;
    }
    if(sink->drained()) {
     clock();
+    if(current->duration>0) state.position_us=current->duration;
+    if(sleep.after_track()) {
+     sleep.set(0,0); upcoming.reset(); play=false; sleep_at_end=true;
+     state.phase=BC_PAUSED; event(sleep_request,BC_APPLIED,0,BC_EVENT_SLEEP); return;
+    }
     if(upcoming) {
      if(upcoming->error) { fail(uint32_t(upcoming->error.load())); return; }
      if(!upcoming->ready) { state.phase=BC_BUFFERING; return; }
@@ -221,20 +286,39 @@ private:
    const double pos=fraction+double(f)*step;
    const auto a=std::min<uint64_t>(uint64_t(pos),available-1), b=std::min<uint64_t>(a+1,available-1);
    const double blend=pos-std::floor(pos);
-   for(uint32_t out=0;out<sink->channels;out++) {
-    double mixed=0; for(uint32_t c=0;c<channels;c++) mixed+=(current->sample(a,c)*(1-blend)+current->sample(b,c)*blend)*matrix[out*8+c];
-    scratch[size_t(f)*sink->channels+out]=float(mixed*volume);
-   }
+   for(uint32_t c=0;c<channels;c++) deck_scratch[size_t(f)*channels+c]=float(current->sample(a,c)*(1-blend)+current->sample(b,c)*blend);
   }
-  const auto first=sink->submitted; const auto written=sink->write(scratch.data(),frames);
+  spatial.configure(channels,sink->rate); equalizer.configure(channels,sink->rate);
+  spatial.process(deck_scratch.data(),frames,tuning.spatial); equalizer.process(deck_scratch.data(),frames);
+  const double old_fraction=fraction, consumed=fraction+frames*step;
+  const auto whole=std::min<uint64_t>(uint64_t(consumed),available);
+  fraction=consumed-double(whole);
+  double source_step=step*1000000/current->rate;
+  if(current->eof && whole==available) { source_step=(double(whole)-old_fraction)*1000000/current->rate/frames; fraction=0; }
+  source_frame+=double(whole);current->consume(whole);
+  listener->push(deck_scratch.data(),frames,skip_silence,source_step);write_listener();
+ }
+ void write_listener() {
+  const auto rendered=listener->take(512);
+  if(!rendered.frames) return;
+  const auto channels=current->channels;
+  for(size_t f=0;f<rendered.frames;f++) for(uint32_t out=0;out<sink->channels;out++) {
+   double mixed=0; for(uint32_t c=0;c<channels;c++) mixed+=rendered.data[f*channels+c]*matrix[out*8+c];
+   scratch[f*sink->channels+out]=float(mixed*volume);
+  }
+  pending_source=listener->source(); pending_step=listener->step();
+  pending_frames=uint32_t(rendered.frames);pending_offset=0;write_pending();
+ }
+ void write_pending() {
+  if(seg_size>=segments.size()-1) return;
+  const auto first=sink->submitted;
+  const auto written=sink->write(scratch.data()+size_t(pending_offset)*sink->channels,pending_frames);
   if(!written) return;
   healthy_frames+=written; if(healthy_frames>=sink->rate/2) device_recoveries=0;
   auto& segment=segments[(seg_begin+seg_size++)%segments.size()];
-  segment.first=first; segment.last=first+written; segment.source=double(current->origin)+(source_frame+fraction)*1000000/current->rate;
-  segment.step=step*1000000/current->rate; segment.identity=identity;
-  const double old_fraction=fraction; const double consumed=fraction+written*step; const auto whole=std::min<uint64_t>(uint64_t(consumed),available);
-  fraction=consumed-double(whole); if(current->eof && whole==available) { segment.step=(double(whole)-old_fraction)*1000000/current->rate/written; fraction=0; }
-  source_frame+=double(whole); current->consume(whole);
+  segment.first=first;segment.last=first+written;segment.source=pending_source+pending_offset*pending_step;
+  segment.step=pending_step;segment.duration=current->duration;segment.identity=identity;
+  pending_frames-=written;pending_offset+=written;
   clock();
  }
  void run() noexcept {
@@ -249,7 +333,7 @@ private:
     try { render(); } catch(const DeviceChanged&) { try { recover_device(); } catch(...) { fail(BC_ERROR_DEVICE); } } catch(const DeviceUnavailable&) { fail(BC_ERROR_NO_DEVICE); } catch(...) { fail(BC_ERROR_DEVICE); }
     publish(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
    }
-   current.reset(); upcoming.reset(); sink.reset(); state.phase=BC_CLOSING;
+   current.reset(); upcoming.reset(); sink.reset(); listener.reset(); state.phase=BC_CLOSING;
    // No deadline path remains. Account for every accepted command on shutdown.
    { std::lock_guard<std::mutex> lock(gate);
      while(!commands.empty()) { event(commands.front(),BC_CANCELLED); commands.pop_front(); }
@@ -258,7 +342,7 @@ private:
    // Final snapshot must be visible before destroy can succeed.
    while(staged) { publish(); std::this_thread::yield(); }
    publish();
-  } catch(...) { state.error=BC_ERROR_RESOURCE; current.reset(); upcoming.reset(); sink.reset(); state.phase=BC_CLOSING; quiescent=true; publish(); }
+  } catch(...) { state.error=BC_ERROR_RESOURCE; current.reset(); upcoming.reset(); sink.reset(); listener.reset(); state.phase=BC_CLOSING; quiescent=true; publish(); }
  }
 };
 static std::mutex registry_gate;
@@ -272,7 +356,7 @@ static std::shared_ptr<Engine> acquire(uint64_t handle) {
 extern "C" {
 int32_t bc_get_caps(bc_caps* out) {
  if(!out || out->struct_size!=sizeof(bc_caps)) return BC_INVALID;
- *out={sizeof(bc_caps),BC_ABI,128,256,2,8,192000,BC_CAP_LOCAL|BC_CAP_PAUSE|BC_CAP_SEEK|BC_CAP_RATE|BC_CAP_VOLUME|BC_CAP_NOMINATION|BC_CAP_DEVICE|BC_CAP_STORE,sizeof(bc_command),sizeof(bc_snapshot),sizeof(bc_event),LIBAVCODEC_VERSION_INT}; return BC_OK;
+ *out={sizeof(bc_caps),BC_ABI,128,256,2,8,192000,BC_CAP_LOCAL|BC_CAP_PAUSE|BC_CAP_SEEK|BC_CAP_RATE|BC_CAP_VOLUME|BC_CAP_NOMINATION|BC_CAP_DEVICE|BC_CAP_STORE|BC_CAP_DSP|BC_CAP_SLEEP|BC_CAP_LISTEN,sizeof(bc_command),sizeof(bc_snapshot),sizeof(bc_event),LIBAVCODEC_VERSION_INT}; return BC_OK;
 }
 int64_t bc_monotonic_ns() { return std::chrono::duration_cast<std::chrono::nanoseconds>(bc::Clock::now().time_since_epoch()).count(); }
 int32_t bc_create(uint64_t* handle) { try {
@@ -281,8 +365,11 @@ int32_t bc_create(uint64_t* handle) { try {
 } BC_CATCH }
 int32_t bc_submit(uint64_t handle,const bc_command* c) { try {
  auto e=bc::acquire(handle); if(!e) return BC_HANDLE;
- if(!c || c->struct_size!=sizeof(bc_command) || c->abi!=BC_ABI || c->reserved || c->id==0 || c->selection==0 ||
-    c->type<BC_SELECT || c->type>BC_DEVICE || !memchr(c->path,0,sizeof(c->path)) || !memchr(c->entry,0,128) || !memchr(c->rendition,0,128)) return BC_INVALID;
+ if(!c || c->struct_size!=sizeof(bc_command) || c->abi!=BC_ABI || c->reserved || c->id==0 || (c->selection==0 && c->type!=BC_SLEEP) ||
+    c->type<BC_SELECT || c->type>BC_LISTEN || !memchr(c->path,0,sizeof(c->path)) || !memchr(c->entry,0,128) || !memchr(c->rendition,0,128)) return BC_INVALID;
+ if(c->type==BC_LISTEN && (c->value<250000 || c->value>3000000 || (strcmp(c->path,"0") && strcmp(c->path,"1")))) return BC_INVALID;
+ if(c->type==BC_SLEEP && (c->value < -1 || c->value > 720LL*60000)) return BC_INVALID;
+ if(c->type==BC_DSP) { bc::dsp::Settings tuning; if(!bc::dsp::parseSettings(c->path,tuning)) return BC_INVALID; }
  if((c->type==BC_SELECT || c->type==BC_NOMINATE) && (!c->path[0] || !c->entry[0] || !c->rendition[0])) return BC_INVALID;
  if(c->type==BC_SEEK && c->value<0) return BC_INVALID;
  if(c->type==BC_RATE && (c->value<250000 || c->value>3000000)) return BC_INVALID;

@@ -18,11 +18,13 @@ final class NativeApi {
           caps.ref.event_size != sizeOf<bc_event>()) {
         throw StateError('Incompatible native audio ABI');
       }
+      capabilities = caps.ref.flags;
     } finally {
       free(caps);
     }
   }
   final BitchordBindings bindings;
+  late final int capabilities;
   static String get bundledLibrary {
     final root = File(Platform.resolvedExecutable).parent.path;
     return Platform.isWindows

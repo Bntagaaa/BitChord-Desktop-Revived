@@ -1,5 +1,44 @@
 # Migration progress and delivery backlog
 
+## Phase 5 authorized DSP increment — 2026-11-14
+
+**Phase 5 INCOMPLETE.** User authorized Phase 5 only on
+`codex/phase5-advanced-listening`, PR target `2.0.0-flutter`, never auto-merge.
+This supersedes historical NOT STARTED/authorization statements below, without
+changing the roadmap, declaring Phase 4 complete or starting Phase 6.
+
+Clean baseline `0475403f` includes merged Phase 4 auth/fast-playback/history and
+visual work. Connected GitHub confirmed exact-SHA Windows/Linux baseline
+[43599294138](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43599294138)
+SUCCESS. Prior physical audio, account/visual and intermittent Linux close gates
+remain open; baseline success is not evidence for new Phase 5 source.
+
+Continued the existing uncommitted EQ/manual/tone/preamp/balance, widening,
+DSP corpus and partial-write implementation. Native listener speed/silence now
+feeds the submitted-frame source clock with bounded surplus and EOF drain.
+Native monotonic sleep/cancel/after-track suppresses prefetch and pauses at EOF;
+Flutter has persisted speed/silence and session sleep controls. EQ fader/balance
+accessibility assertions, stale sleep polls and expiry-event fencing were fixed.
+Phase 4 auth/history/provider/download source behavior is preserved.
+
+[Phase 5 ledger](flutterDesktop/verification/phase5/README.md) records actual
+commands and limitations: **38 executed Kotlin PCM cases**, ten composed source
+clock comparisons, **5/5 native tests**, zero observed DSP processing allocations,
+passing sanitizer suite, regenerated ffigen constants, analyzer, Flutter suite,
+Linux debug build, Phase 3/4 regressions and actual Linux Pulse output. Approved
+reruns resolved prior socket, sanitizer, dependency and audio access restrictions.
+Local isolated GUI smoke needs Xvfb/Openbox; Windows release/runtime results must
+be inspected on the new source. Physical audio and intermittent Linux close
+acceptance remain open; a successful smoke does not establish a shutdown fix.
+
+**Full planner/Automix, ONNX worker/cache/model pipeline and Loop & Mix are still
+unfinished**, as are the advanced waveform/diagnostic surfaces, six real
+transitions/interruption matrix, callback/underrun telemetry and bounded model/
+decoder memory evidence on both OSs. These are implementation/acceptance gaps,
+not fabricated permission blockers. Phase 5 is not accepted. Publication and
+exact-source CI are recorded in the ledger; no auto-merge or Phase 6 work.
+
+
 ## Visual parity branch audit — 2026-11-14
 
 Latest caveat: after a complete Windows/Linux pass, a documentation-only rerun

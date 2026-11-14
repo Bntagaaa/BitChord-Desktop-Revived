@@ -1,6 +1,8 @@
 import '../../../core/domain/audio_contract.dart';
 import '../../local_data/domain/local_state.dart';
 import '../domain/local_queue.dart';
+import '../domain/listening_settings.dart';
+import '../domain/sleep_timer.dart';
 
 // Application use cases own queue semantics/persistence; native owns all PCM/time.
 final class LocalPlayback {
@@ -10,6 +12,45 @@ final class LocalPlayback {
   late LocalState state;
   var _command = 0, _selection = 0, _nativeRevision = 0;
   bool _closed = false;
+  bool get supportsListening =>
+      audio is DspAudioCapability &&
+      (audio as DspAudioCapability).supportsEqualizer;
+  ListeningSettings get listening =>
+      state.settings.listening ?? ListeningSettings();
+  bool get supportsTempo =>
+      audio is AdvancedAudioCapability &&
+      (audio as AdvancedAudioCapability).supportsTempo;
+  bool get supportsSleep =>
+      audio is AdvancedAudioCapability &&
+      (audio as AdvancedAudioCapability).supportsSleep;
+  int? _sleepDeadlineNs;
+  int _sleepCommand = 0;
+  bool _sleepAfterTrack = false;
+  Future<void> configureSleep(SleepRequest request) async {
+    if (!supportsSleep || _closed) throw StateError('Native sleep unavailable');
+    final now = await audio.monotonicNs();
+    await _send(AudioOperation.sleep, value: request.nativeValue);
+    _sleepCommand = _command;
+    _sleepAfterTrack = request.afterTrack;
+    _sleepDeadlineNs = request.minutes == null
+        ? null
+        : now + request.nativeValue * 1000000;
+  }
+
+  Future<SleepStatus> sleepStatus() async => SleepStatus(
+    afterTrack: _sleepAfterTrack,
+    remainingMs: _sleepDeadlineNs == null
+        ? null
+        : ((_sleepDeadlineNs! - await audio.monotonicNs()) ~/ 1000000).clamp(
+            0,
+            720 * 60000,
+          ),
+  );
+  Future<void> _sendTempo(ListeningSettings settings) => _send(
+    AudioOperation.listen,
+    value: (settings.speed * 1000000).round(),
+    transportPath: settings.skipSilence ? '1' : '0',
+  );
   Future<void> initialize() async {
     state = await repository.read();
   }
@@ -58,7 +99,7 @@ final class LocalPlayback {
     _nativeRevision = state.revision;
     await _send(
       AudioOperation.select,
-      value: 1,
+      value: supportsListening ? 0 : 1,
       entry: entry,
       transportPath: transportPath,
     );
@@ -66,16 +107,46 @@ final class LocalPlayback {
       AudioOperation.volume,
       value: (state.settings.volume * 1000000).round(),
     );
-    // Native rate is resampling rate. Pitch-preserving Kotlin speed is Phase 5.
+    if (supportsListening)
+      await _send(AudioOperation.dsp, transportPath: listening.nativePayload);
+    if (supportsTempo) await _sendTempo(listening);
+    if (supportsListening) await _send(AudioOperation.play);
   }
 
   Future<void> pause() => _send(AudioOperation.pause);
+  Future<void> configureListening(ListeningSettings settings) async {
+    if (_closed) throw StateError('Playback closed');
+    if (!supportsListening) throw StateError('Native DSP unavailable');
+    if (!supportsTempo && (settings.speed != 1 || settings.skipSilence))
+      throw StateError('Native tempo unavailable');
+    // Persist intent before submission, using the existing CAS document. The
+    // native revision remains the active selection's revision until next play.
+    final updated = LocalState(
+      queue: state.queue,
+      revision: state.revision + 1,
+      positionUs: state.positionUs,
+      settings: state.settings.withListening(settings),
+      importCheckpoint: state.importCheckpoint,
+      imported: state.imported,
+    );
+    await repository.write(updated, expectedRevision: state.revision);
+    state = updated;
+    if (_selection != 0) {
+      await _send(AudioOperation.dsp, transportPath: settings.nativePayload);
+      if (supportsTempo) await _sendTempo(settings);
+    }
+  }
+
   Future<void> resume() => _send(AudioOperation.play);
   Future<void> seek(int positionUs) =>
       _send(AudioOperation.seek, value: positionUs);
   Future<PlaybackSnapshot> refresh() async {
     final events = await audio.events();
     for (final event in events) {
+      if (event.sleepExpired && event.commandId == _sleepCommand) {
+        _sleepAfterTrack = false;
+        _sleepDeadlineNs = null;
+      }
       if (event.adopted &&
           event.selection == _selection &&
           event.queueRevision == _nativeRevision) {

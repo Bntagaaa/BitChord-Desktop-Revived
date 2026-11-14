@@ -1,0 +1,4 @@
+*.f32 -text
+*.clock -text
+*.json text eol=lf
+*.skipped text eol=lf

@@ -6,8 +6,16 @@ import '../../domain/audio_contract.dart';
 import 'bindings.g.dart';
 import 'native_api.dart';
 
-final class AudioService implements LocalAudioPort {
-  AudioService._(this._port, this._isolate);
+final class AudioService
+    implements LocalAudioPort, DspAudioCapability, AdvancedAudioCapability {
+  AudioService._(this._port, this._isolate, this._capabilities);
+  final int _capabilities;
+  @override
+  bool get supportsEqualizer => (_capabilities & BC_CAP_DSP) != 0;
+  @override
+  bool get supportsSleep => (_capabilities & BC_CAP_SLEEP) != 0;
+  @override
+  bool get supportsTempo => (_capabilities & BC_CAP_LISTEN) != 0;
   final SendPort _port;
   final Isolate _isolate;
   int _pending = 0;
@@ -21,11 +29,11 @@ final class AudioService implements LocalAudioPort {
     ]);
     final result = await ready.first;
     ready.close();
-    if (result is! SendPort) {
+    if (result is! List || result.length != 2 || result[0] is! SendPort) {
       isolate.kill(priority: Isolate.immediate);
       throw StateError('Native service initialization failed');
     }
-    return AudioService._(result, isolate);
+    return AudioService._(result[0] as SendPort, isolate, result[1] as int);
   }
 
   Future<Object?> _call(String operation, [Object? data]) async {
@@ -103,6 +111,7 @@ final class AudioService implements LocalAudioPort {
           outcome: e['outcome'] as int,
           error: e['error'] as int,
           adopted: e['adopted'] as bool,
+          sleepExpired: e['sleep'] as bool,
         ),
       )
       .toList();
@@ -141,7 +150,7 @@ Future<void> _worker(List<Object> arguments) async {
     return;
   }
   final requests = ReceivePort();
-  ready.send(requests.sendPort);
+  ready.send([requests.sendPort, api.capabilities]);
   final b = api.bindings;
   await for (final dynamic message in requests) {
     final reply = message[2] as SendPort;
@@ -221,6 +230,7 @@ Future<void> _worker(List<Object> arguments) async {
                   'outcome': events[i].outcome,
                   'error': events[i].error,
                   'adopted': events[i].kind == BC_EVENT_ADOPTED,
+                  'sleep': events[i].kind == BC_EVENT_SLEEP,
                 },
             ];
           } finally {

@@ -1,5 +1,34 @@
 # Flutter migration architecture
 
+## Phase 5 DSP increment contract
+
+ABI 1 layouts/functions remain unchanged. The additive `BC_CAP_DSP` bit and
+`BC_DSP` command carry a strictly validated versioned atomic tuning record in
+the existing copied command buffer (enable, manual/dynamic mode, tone steps,
+bandwidth, balance, widening, seven gains). Native code computes curve/preamp
+and coefficients; widgets submit typed intent through application/domain ports.
+`BC_CAP_LISTEN`/`BC_LISTEN` now add native listener tempo and silence skipping,
+with a bounded preparation stage and segment-based source time. `BC_RATE`
+retains its existing resampling/pitch meaning. `BC_CAP_SLEEP`/`BC_SLEEP` add a
+native monotonic session deadline or after-track stop. The timer suppresses
+upcoming nomination in after-track mode and pauses at EOF instead of emitting
+an ordinary auto-advance boundary. Deadline expiry flushes queued sound and
+reopens at the last presented source position. Expiry events carry the arming
+command ID so an old event cannot cancel a newer timer in Dart.
+
+The push-output owner prepares one bounded PCM block and retains its processed
+suffix on zero/partial device writes. DSP history advances once per prepared
+block, while clock segments advance only for accepted whole frames. Timeline
+resets discard that pending block and reset DSP history. SQLite/CAS stores
+listening settings without changing the existing local-document schema version;
+older documents lacking the optional field retain reference defaults. UI updates
+retain one active write and one coalesced pending intent. Full Phase 5 analysis,
+planner/two-deck and physical-output gates remain unchanged and incomplete.
+Listener surplus remains native-owned across partial writes. Kotlin's
+silence-edge and WSOLA drain behavior is preserved; the differential oracle
+also executes DesktopPlayhead to check the composed source-time mapping.
+Sleep UI polling displays session state; it never schedules audible output.
+
 ## Decision and boundaries
 
 Pinned Kotlin reference: `1.9.2` at `348b613a0c3db1a54de56483ea6f8748d6465211`. Target: Flutter Desktop for Windows x64 and Linux x64; keep the current Linux packaging compatibility baseline under review (`DESKTOP.md` documents Ubuntu 22.04). No mobile/macOS expansion. All new application code and native bridges belong under `flutterDesktop/`. Do not modify Kotlin, overwrite `flutterApp/`, merge previous Flutter rewrites or introduce a JVM sidecar as the final application architecture. Use reference source as a specification; independently implement Dart orchestration and UI. Existing native-library reuse is a separate documented provenance decision, never previous Flutter implementation reuse.

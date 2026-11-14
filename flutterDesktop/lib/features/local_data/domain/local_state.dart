@@ -1,4 +1,5 @@
 import '../../playback/domain/local_queue.dart';
+import '../../playback/domain/listening_settings.dart';
 
 final class LocalSettings {
   const LocalSettings({
@@ -7,11 +8,13 @@ final class LocalSettings {
     this.rate = 1,
     this.localFolder = '',
     this.shuffle = false,
+    this.listening,
   });
   final RepeatMode repeat;
   final double volume, rate;
   final String localFolder;
   final bool shuffle;
+  final ListeningSettings? listening;
   Map<String, Object?> toJson() => {
     'version': 1,
     'repeat': repeat.name,
@@ -19,6 +22,7 @@ final class LocalSettings {
     'rate': rate,
     'localFolder': localFolder,
     'shuffle': shuffle,
+    if (listening != null) 'listening': listening!.toJson(),
   };
   factory LocalSettings.fromJson(Map<String, Object?> j) {
     if (j['version'] != 1)
@@ -39,8 +43,21 @@ final class LocalSettings {
       rate: rate,
       localFolder: j['localFolder'] as String,
       shuffle: j['shuffle'] as bool,
+      listening: j['listening'] == null
+          ? null
+          : ListeningSettings.fromJson(
+              (j['listening'] as Map).cast<String, Object?>(),
+            ),
     );
   }
+  LocalSettings withListening(ListeningSettings value) => LocalSettings(
+    repeat: repeat,
+    volume: volume,
+    rate: rate,
+    localFolder: localFolder,
+    shuffle: shuffle,
+    listening: value,
+  );
 }
 
 final class LocalState {
