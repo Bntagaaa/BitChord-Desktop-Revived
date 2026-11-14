@@ -5,6 +5,11 @@ presentation correction, not complete migration acceptance. Work is on
 `codex/visual-parity`, targeting `2.0.0-flutter`; no direct target-branch push or
 merge is authorized. Phase 4 remains INCOMPLETE; Phase 5 is not started.
 
+**Additional observed blocker:** a later documentation-only CI run reached
+native Linux close and exited with SIGSEGV (`-11`). The earlier matrix passed
+both platforms, so Linux shutdown is **Needs revalidation**, not proven stable.
+See the shutdown diagnostic below; do not hide this behind a passing retry.
+
 ## Reference, scope and implementation plan
 
 The Kotlin worktree is clean at `348b613a0c3db1a54de56483ea6f8748d6465211`.
@@ -130,6 +135,7 @@ the entire feed/dock from both metrics and derivative views.
 | Album / artist / playlist detail | Not started | No matched detail ID/content state rendered on both apps in this pass. Existing Flutter detail widgets are not promoted by source inspection. |
 | Context menus / collection dialogs / loading/error variants | Needs revalidation | Native account and drawer states inspected; broader per-feature variants and pointer/focus/motion comparison remain open. |
 | Windows / display DPI 125–200% / other UI zooms | Needs revalidation | Existing tests/hosted evidence are not a new matched native comparison. This capture pass covers Linux 1× / UI 100% only. |
+| Linux native shutdown after fullscreen restoration | Needs revalidation | Run 43591352978 exited 0; later docs-only run 43592211458 attempt 1 exited -11 at close. Native cleanup diagnosis remains open. |
 
 Sidebar-only supporting metrics after correction:
 
@@ -260,6 +266,26 @@ its old probe was the red artwork pixel `(188,0,0)`. Native compositing differs
 by one red-channel value from the software widget capture, so each retains its
 measured exact expectation. Intermediate run 43591191652 was cancelled when
 superseded by the artifact-confirmed Windows value; it is not a passing result.
+
+### Later native shutdown diagnostic
+
+[Run 43592211458 attempt 1](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43592211458/attempts/1),
+documentation-only head `67a68ef3`, passed Windows and all Linux checks up to
+native close, then failed `Close failed: -11`. Runtime/test files were identical
+to the passing `85eb37a6` run. The failed job log records an invalid `FlTaskRunner`
+cast and `g_object_ref` failure during teardown. An implicit-view removal warning
+also exists in the passing log, so it is **not an established root cause**.
+No native backtrace/core is supplied by that artifact. A failed-job retry was
+requested for diagnosis. **Attempt 2 passed** on the same head with no runtime
+changes; this confirms the failure is intermittent, not that it was fixed.
+
+[Shutdown evidence](visual-parity/reports/linux-shutdown-diagnostic.json)
+retains exact run/job/source identifiers and the observed messages. A native
+backtrace plus repeated close/fullscreen trials is the next prerequisite before
+choosing a lifecycle fix. Coordinate host/engine/WebView cleanup work with the
+owners of the existing native integration; no speculative authentication/audio
+rewrite, assertion suppression, effect disabling or forced-success close was
+introduced here. The PR remains unmerged and full platform stability is open.
 
 Next concrete work: coordinate matching Home/Search landing and missing
 library/queue/settings capabilities with Antigravity; repeat equivalent settled

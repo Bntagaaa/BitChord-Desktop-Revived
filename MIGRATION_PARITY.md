@@ -20,6 +20,12 @@ bundles and native GUI smokes; both artifacts were inspected. This does not
 claim Windows native visual parity against Kotlin, pixel-
 perfect parity, performance improvement or complete Phase 4/next-phase acceptance.
 
+Later docs-only run 43592211458 attempt 1 failed Linux native close with SIGSEGV
+(-11), despite the earlier complete matrix pass. Keep native cleanup stability
+NEEDS REVALIDATION; the visual report records exact evidence and the missing
+native backtrace. Do not promote a retry into proof that this issue is fixed.
+Attempt 2 passed without source changes, so the intermittent issue remains open.
+
 ## Reference and evidence contract
 
 Reference: Kotlin branch `1.9.2`, commit `348b613a0c3db1a54de56483ea6f8748d6465211`. Migration branch: `2.0.0-flutter`, created directly from that commit. Date: 2026-11-11. No previous Flutter branch was checked out, merged, or used as implementation input. Neither `flutterApp/` nor `flutterDesktop/` exists in the reference tree. Phase 1 will create only `flutterDesktop/`; the Kotlin tree remains intact. No Flutter application is implemented in Phase 0.

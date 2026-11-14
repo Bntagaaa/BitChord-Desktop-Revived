@@ -2,6 +2,11 @@
 
 ## Visual parity branch audit — 2026-11-14
 
+Latest caveat: after a complete Windows/Linux pass, a documentation-only rerun
+43592211458 attempt 1 hit Linux SIGSEGV (-11) at native close. Windows passed;
+Linux cleanup remains NEEDS REVALIDATION. See the diagnostic in the visual report.
+Its unchanged-source attempt 2 passed; that retry is not evidence of a fix.
+
 User authorized a presentation-only audit on `codex/visual-parity`, PR target
 `2.0.0-flutter`, superseding direct target-branch delivery for this task.
 Actual pinned Kotlin and Flutter Linux clients were rendered on the same
@@ -34,6 +39,10 @@ release bundles, all native appearance/drawer/fullscreen/close smokes. Both
 artifacts were downloaded and fresh reports inspected; no failed/stale native
 report was used as a pass. Retention was correctly skipped for the PR. See
 VISUAL_PARITY_REPORT for artifact links and unchanged outstanding parity gates.
+
+The later close failure above is not superseded by the earlier successful run.
+The failed-job retry is diagnostic only; native backtrace/cleanup review is still
+needed before claiming stable Linux shutdown.
 
 Latest Phase 1 status: see the **latest verification and Linux comparison** at the end.
 Earlier dated records are historical evidence, not the current gate status.
