@@ -148,7 +148,7 @@ final class CatalogPlayback extends Notifier<CatalogPlaybackView> {
       // _play sets loading/awaiting synchronously before another native poll.
       unawaited(next());
     }
-    if (snapshot.phase == AudioPhase.error &&
+    if (snapshot.phase == AudioPhase.failed &&
         (_activeEntry == snapshot.entryId || _awaitingEntry)) {
       _awaitingEntry = false;
       state = CatalogPlaybackView(

@@ -1,8 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/core/domain/audio_contract.dart';
 import '../lib/features/online/data/provider_http.dart';
 import '../lib/features/online/data/youtube/extractor.dart';
 import '../lib/features/online/data/youtube/history_tracker.dart';
@@ -168,6 +165,7 @@ void main() {
       );
 
       expect(media.trackId, testTrack.id);
+      expect(directCalled, 1);
       expect(
         extractorCalled,
         1,

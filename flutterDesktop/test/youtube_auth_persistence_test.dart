@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -14,7 +13,6 @@ void main() {
     late Directory tempDir;
     late YouTubeSessionStore store;
     late HttpServer mockServer;
-    late Uri serverUri;
     var serverLoggedIn = true;
     var serverNetworkFailure = false;
 
@@ -48,9 +46,6 @@ ytcfg.set({
       serverNetworkFailure = false;
 
       mockServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      serverUri = Uri.parse(
-        'http://${mockServer.address.host}:${mockServer.port}',
-      );
 
       mockServer.listen((request) async {
         if (serverNetworkFailure) {
@@ -111,10 +106,6 @@ ytcfg.set({
     });
 
     test('2. Initial login verifies and securely persists session', () async {
-      final accounts = YouTubeAccounts(store);
-      final scope = RequestScope();
-      final http = const ProviderHttp();
-
       final shellSession = YouTubeSession.fromVerifiedShell(
         testCookie,
         htmlShell(true),
@@ -210,9 +201,6 @@ ytcfg.set({
       serverLoggedIn = false;
 
       final accounts = YouTubeAccounts(store);
-      final http = const ProviderHttp();
-      final scope = RequestScope();
-
       final data = await store.loadData();
       expect(data, isNotNull);
 
