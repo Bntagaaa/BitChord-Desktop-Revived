@@ -267,6 +267,6 @@ Linux users must have the WebKitGTK 4.1 runtime and libsoup3 installed (Ubuntu: 
 
 ### November 14 Phase 4 login build status
 
-The native in-app sign-in adapter is implemented with WebView2 on Windows and WebKitGTK 4.1 on Linux, but **live account login has not been accepted yet**. For exact validation, see [Flutter CI 43537781237](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43537781237) on source `3c426fc4`. It was still running when this note was written. The preceding Linux matrix `43536845151` failed in the Dart analyzer because of one unnecessary `!` in `embedded_sign_in.dart` at line 92; commit `3c426fc4` removes it. WebKitGTK installation itself succeeded. Recheck both OS jobs rather than treating the fix commit as a passing release.
+The native in-app sign-in adapter is implemented with WebView2 on Windows and WebKitGTK 4.1 on Linux. In GitHub Actions workflow [Flutter CI 43555816960](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43555816960) on source `43e53e84`, both Linux (ubuntu-22.04 in 4m53s) and Windows (windows-2022 in 17m47s) passed 100% of formatting, analysis, all 70 tests, release bundle builds, and release GUI launch smoke tests, followed by the trusted `retain-verified-generation` job (commit `9786aee2`).
 
 Google may refuse embedded WebView OAuth (`disallowed_useragent`); when that happens, the explicit installed-browser fallback is still necessary. No cookies or credentials should be shared in GitHub issues or logs. Phase 4 remains INCOMPLETE and Phase 5 is untouched.
