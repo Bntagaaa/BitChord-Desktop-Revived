@@ -18,7 +18,7 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
   final _cookie = TextEditingController();
   RequestScope? _scope;
   String? _error;
-  bool _busy = false, _browserBusy = false;
+  bool _busy = false, _browserBusy = false, _inAppBusy = false;
 
   @override
   void dispose() {
@@ -49,7 +49,11 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
     }
   }
 
-  Future<void> _connect(OnlineAccounts accounts, {bool browser = false}) async {
+  Future<void> _connect(
+    OnlineAccounts accounts, {
+    bool browser = false,
+    bool inApp = false,
+  }) async {
     if (_busy) return;
     _scope?.cancel();
     final scope = _scope = RequestScope();
@@ -58,19 +62,24 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
     setState(() {
       _busy = true;
       _browserBusy = browser;
+      _inAppBusy = inApp;
       _error = null;
     });
     _invalidateAccountState();
     try {
-      // Browser owns a fresh isolated profile; no user's ordinary Chrome data
-      // is inspected. The returned cookies are held in memory and verified by
-      // the existing authenticated YouTube shell before session adoption.
-      final cookie = browser
-          ? await (ref.read(browserSignInCaptureProvider)?.call(scope) ??
+      // Prefer BitChord's native WebView window. A standard-browser capture
+      // remains an explicit fallback for Google embedded-login restrictions.
+      final cookie = inApp
+          ? await (ref.read(embeddedSignInCaptureProvider)?.call(scope) ??
                 Future<String>.error(
-                  StateError('Browser sign-in is not available.'),
+                  StateError('Built-in sign-in is not available.'),
                 ))
-          : manualCookie;
+          : browser
+              ? await (ref.read(browserSignInCaptureProvider)?.call(scope) ??
+                    Future<String>.error(
+                      StateError('Browser sign-in is not available.'),
+                    ))
+              : manualCookie;
       scope.check();
       await accounts.signIn(cookie, scope);
       scope.check();
@@ -91,6 +100,7 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
         setState(() {
           _busy = false;
           _browserBusy = false;
+          _inAppBusy = false;
         });
       }
     }
@@ -133,20 +143,41 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
           const SizedBox(height: 8),
           if (!accounts.signedIn) ...[
             Text(
-              'Sign in using an isolated Chrome, Edge, Brave or Chromium window. '
-              'Complete Google sign-in, open YouTube Music, then close that '
-              'window. This app verifies your session without reading your '
-              'normal browser profile or saving a cookie file.',
+              'Use the BitChord sign-in window (Windows WebView2 / Linux '
+              'WebKitGTK). Finish Google sign-in, select your YouTube Music '
+              'profile, and close that window to connect your account.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
             FilledButton(
+              key: const Key('in-app-sign-in'),
+              onPressed: _busy ? null : () => _connect(accounts, inApp: true),
+              child: Text(
+                _inAppBusy
+                    ? 'Finish sign-in in the BitChord window…'
+                    : 'Sign in inside BitChord',
+              ),
+            ),
+            if (_inAppBusy)
+              TextButton(
+                key: const Key('cancel-in-app-sign-in'),
+                onPressed: () => _scope?.cancel(),
+                child: const Text('Cancel sign-in'),
+              ),
+            const SizedBox(height: 8),
+            Text(
+              'Google may block sign-in in embedded windows '
+              '(disallowed_useragent). If so, use an installed browser '
+              'instead; BitChord does not bypass Google security checks.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            TextButton(
               key: const Key('browser-sign-in'),
               onPressed: _busy ? null : () => _connect(accounts, browser: true),
               child: Text(
                 _browserBusy
                     ? 'Complete sign-in in browser…'
-                    : 'Sign in with browser',
+                    : 'Use installed browser instead',
               ),
             ),
             if (_browserBusy)

@@ -31,7 +31,8 @@ def main():
                         'openbox', 'imagemagick', 'dbus-x11', 'x11-utils',
                         'libavformat-dev', 'libavcodec-dev', 'libavutil-dev',
                         'libswresample-dev', 'libpulse-dev', 'libasound2-dev',
-                        'libsqlite3-dev', 'pulseaudio', 'pulseaudio-utils', 'ffmpeg'], check=True)
+                        'libsqlite3-dev', 'libwebkit2gtk-4.1-dev', 'libsoup-3.0-dev',
+                        'pulseaudio', 'pulseaudio-utils', 'ffmpeg'], check=True)
 
 
 if __name__ == '__main__':

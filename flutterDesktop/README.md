@@ -256,3 +256,11 @@ Phase 4 widget diagnostic PNGs, which are not Kotlin/native visual goldens.
 Browser/protected multi-account sign-in, Spotify/library mutations, custom
 modules, full source/download quality/manifest/cache and native visual/live
 account acceptance still require work. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
+
+## Phase 4 — built-in account sign-in window
+
+The account panel prefers **Sign in inside BitChord**, matching Kotlin DesktopWebSignIn.kt. This opens a native BitChord-owned sign-in window, not an installed Chrome/Edge/Chromium executable. On Windows it uses the OS WebView2 Runtime; on Linux it uses WebKitGTK 4.1. A dedicated temporary profile is used only for this sign-in and is deleted after closing; credentials are not logged or written to shared_preferences. Close the BitChord sign-in window only once YouTube Music has opened and the intended profile is selected. BitChord then validates the cookie using its existing authenticated YouTube shell.
+
+Linux users must have the WebKitGTK 4.1 runtime and libsoup3 installed (Ubuntu: libwebkit2gtk-4.1-0 and libsoup-3.0-0). Build machines additionally need libwebkit2gtk-4.1-dev and libsoup-3.0-dev. Windows users need WebView2 Runtime, normally present on Windows 11, but potentially missing on Windows 10. These are native WebView system runtimes, not additional full browsers.
+
+**Provider limitation:** Google can reject Google OAuth inside an embedded WebView with error disallowed_useragent. BitChord neither bypasses that restriction nor reports a false successful login. Select **Use installed browser instead** when the Google sign-in page refuses the built-in window. This is a secondary fallback rather than the default path. Real live login and cookie persistence are separate Phase 4 acceptance gates; compilation alone does not prove them.

@@ -17,6 +17,7 @@ import 'app/app.dart';
 import 'features/online/application/catalog_controller.dart';
 import 'features/online/application/account_sign_in.dart';
 import 'features/online/data/browser_sign_in.dart';
+import 'features/online/data/embedded_sign_in.dart';
 import 'features/online/data/online_runtime.dart';
 import 'core/platform/desktop_host.dart';
 import 'core/platform/diagnostics.dart';
@@ -92,6 +93,9 @@ Future<void> main(List<String> arguments) async {
   final container = ProviderContainer(
     overrides: [
       onlinePortProvider.overrideWithValue(online),
+      embeddedSignInCaptureProvider.overrideWithValue(
+        EmbeddedSignIn.captureYouTube,
+      ),
       browserSignInCaptureProvider.overrideWithValue(
         BrowserSignIn.captureYouTube,
       ),
