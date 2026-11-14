@@ -1355,3 +1355,24 @@ The follow-up exact-SHA [43537781237](https://github.com/Bntagaaa/BitChord-Deskt
 **Login UX:** `Sign in inside BitChord` is now the primary choice. Flutter opens an app-owned native WebView2 (Windows) / WebKitGTK 4.1 (Linux) sign-in window using a temporary isolated profile, with the previously implemented Chrome/Edge/Chromium external browser path shown only as a fallback. The app validates YouTube Music session cookies through the existing signed-in shell. Actual live Google sign-in, selection of the intended YouTube channel, signed-in library and cross-platform session acceptance are still **UNVERIFIED**; Google may reject embedded OAuth with `disallowed_useragent`. The app must not disguise provider refusal or claim guaranteed browser-free login. Playback, seek/scrub, download and offline code are unchanged in this fix.
 
 **Gate: Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** No whole P20/account or visual row is PARITY_ACCEPTED based on this patch.
+
+## Phase 4 embedded sign-in: Root cause diagnosis and test unblock — 2026-11-14
+
+### Root Cause Diagnosis: Stale Executable & CI Blocker
+
+1. **Why the running Linux desktop application displayed the OLD interface:**
+   - Previous commits (`d87406eb`, `62acb460`, `3c426fc4`, `f6e14e75`) implemented the Dart code for "Sign in inside BitChord", but **no release binary was ever built or published** from any of these commits.
+   - In GitHub Actions workflow `.github/workflows/flutter-desktop.yml`, Step 19 (`Run tests and capture rendered shell`) failed on both Ubuntu 22.04 and Windows 2022 runners (observed in run `43538137522`).
+   - The test failure was in `flutterDesktop/test/embedded_sign_in_test.dart:69:5`: `expect(() => EmbeddedSignIn.youtubeHeader([cookie('youtube.com', 'SAPISID', 'semicolon;injection')]), throwsA(isA<ProviderFailure>()))`. Because `BrowserSignIn.youtubeCookieHeader` skipped the injected cookie and had no signing secret, it threw `unauthorized`, which `EmbeddedSignIn.youtubeHeader` caught and converted to `null` instead of throwing.
+   - Because Step 19 failed with exit code 1, Step 20 (`Build release desktop bundle`), Step 23 (`Linux release launch smoke`), and the `retain-verified-generation` job were **skipped**.
+   - As a result, the latest available release artifact remained run `43373451431` from commit `a1ddef06f873c08d942d3326655f383d72f2feb3`, which predated the in-app login and still displayed the old browser login interface ("Sign in using an isolated Chrome, Edge, Brave or Chromium window.", "Sign in with browser", and manual cookie text field).
+   - Furthermore, the git-tracked Linux host files (`generated_plugin_registrant.cc` and `generated_plugins.cmake`) were still frozen at retention commit `6ca0c40c` without `desktop_webview_window` registered.
+
+### Fixes Applied:
+
+1. **Cookie Injection & Malformed Validation:** Updated `EmbeddedSignIn.youtubeHeader` in `flutterDesktop/lib/features/online/data/embedded_sign_in.dart` to validate cookie names and values for `youtube.com` domains before processing: delimiter injection, control characters, or invalid formats explicitly throw `const ProviderFailure(ProviderProblem.malformed)`, unblocking the test assertion while properly returning `null` when a signing session is not yet active.
+2. **Native Host Plugin Registration:** Registered `desktop_webview_window` in Linux and Windows host files (`linux/flutter/generated_plugin_registrant.cc`, `linux/flutter/generated_plugins.cmake`, `windows/flutter/generated_plugin_registrant.cc`, `windows/flutter/generated_plugins.cmake`, and `.flutter-plugins-dependencies`).
+3. **Build & Source Diagnostics:** Added visible version/diagnostics text to the Settings page (`_AppearancePanel` in `desktop_shell.dart`) displaying application version `2.0.0+1 (Flutter Desktop)` and Phase 4 runtime info so running builds can be diagnosed without repo inspection.
+4. **Behavioral Parity:** Preserved the pinned Kotlin `DesktopWebSignIn.kt` contract: primary "Sign in inside BitChord" action opens an application-owned WebKitGTK/WebView2 window with an isolated temporary profile, strictly filters cookies to youtube.com, verifies the session through `OnlineAccounts`, offers cancellation, and preserves external browser login as an explicit labeled fallback if Google enforces `disallowed_useragent`.
+
+**Gate: Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** Release matrix and platform verification will run on GitHub Actions upon push.

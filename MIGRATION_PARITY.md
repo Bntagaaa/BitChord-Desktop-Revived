@@ -1581,3 +1581,15 @@ Kotlin reference: `DesktopWebSignIn.kt` (built-in JavaFX WebView), with `Desktop
 **Failure evidence:** [Linux/Windows matrix 43536845151](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43536845151), source `62acb460`, Linux analyzer reported exactly one `unnecessary_non_null_assertion` warning at `embedded_sign_in.dart:92`; `--fatal-infos` made it a failed job. The WebKitGTK install step had passed. Corrected source [3c426fc4](https://github.com/Bntagaaa/BitChord-Desktop-Revived/commit/3c426fc4b7be7319760cb64f84c7e03cbf53f4bf) removes `!` from the local view reference without changing the native login transport. [Exact-SHA follow-up CI 43537781237](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43537781237) was **RUNNING when recorded**, not a verified pass. Retest analyzer, fixtures, real native Windows/Linux host/build and authenticated provider scenario.
 
 **Status: IMPLEMENTED, acceptance BLOCKED/UNVERIFIED.** Native sign-in must be tested against a real authorized Google account, including channel selection, cancellation/cleanup and Google `disallowed_useragent` handling. Embedded browser rejection is possible under Google policy; fallback is intentional, not proof of full 1:1 parity. Reference screenshot/interaction comparisons and complete signed-in library behavior remain open. Phase 4 INCOMPLETE, Phase 5 NOT STARTED.
+
+### P20 — in-app YouTube Music login test unblock and release build enablement (2026-11-14)
+
+**Root cause analysis for stale application binary:** The running Linux desktop application continued showing the older browser login interface ("Sign in with browser" and manual cookie text field) because workflow run `43538137522` failed at step 19 (`embedded_sign_in_test.dart:69:5`). The failure blocked step 20 (`flutter build linux --release`) and the retention job, preventing the production of any updated release bundles. The last executable available was built from commit `a1ddef06f873c08d942d3326655f383d72f2feb3`.
+
+**Resolution:**
+1. In `embedded_sign_in.dart`, added pre-validation for cookie names/values on `youtube.com` domains: delimiter injection and control characters throw `ProviderFailure(ProviderProblem.malformed)`, passing test 86 while returning `null` when no session is active.
+2. Registered `desktop_webview_window` plugin in Linux and Windows native host files (`linux/flutter/generated_plugin_registrant.cc`, `linux/flutter/generated_plugins.cmake`, `windows/flutter/generated_plugin_registrant.cc`, `windows/flutter/generated_plugins.cmake`, and `.flutter-plugins-dependencies`).
+3. Added visible build diagnostics in Settings (`desktop_shell.dart`) identifying BitChord Desktop 2.0.0+1 with in-app sign-in active.
+4. Maintained primary "Sign in inside BitChord" action with dedicated application-owned WebKitGTK/WebView2 window, isolated temporary profile, cookie filtering, and external browser fallback for Google `disallowed_useragent` policy.
+
+**Status: IMPLEMENTED; CI verification in progress upon push.** Phase 4 INCOMPLETE, Phase 5 NOT STARTED.

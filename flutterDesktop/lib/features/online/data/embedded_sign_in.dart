@@ -23,6 +23,17 @@ final class EmbeddedSignIn {
   /// signing cookies. No document JS access, page scripts, Google/Spotify
   /// cookies, browser-profile imports or secret logs are involved.
   static String? youtubeHeader(List<WebviewCookie> cookies) {
+    for (final cookie in cookies) {
+      final domain =
+          cookie.domain.toLowerCase().replaceFirst(RegExp(r'^\.'), '');
+      if (domain == 'youtube.com' || domain.endsWith('.youtube.com')) {
+        if (!RegExp(r'^[A-Za-z0-9_-]{1,80}$').hasMatch(cookie.name) ||
+            cookie.value.isEmpty ||
+            RegExp(r'[\x00-\x20;\x7f]').hasMatch(cookie.value)) {
+          throw const ProviderFailure(ProviderProblem.malformed);
+        }
+      }
+    }
     try {
       return BrowserSignIn.youtubeCookieHeader({
         'result': {

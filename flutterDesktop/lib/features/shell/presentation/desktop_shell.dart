@@ -1128,6 +1128,20 @@ class _AppearancePanel extends ConsumerWidget {
                 ),
             ],
           ),
+          const SizedBox(height: 24),
+          Text(
+            'About BitChord',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'BitChord Desktop 2.0.0+1 (Flutter Desktop)\n'
+            'Phase 4: In-App YouTube Music Sign-In (WebKitGTK 4.1 / WebView2)\n'
+            'Audio Engine: C++17 Native PCM Pipeline',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette['secondary'],
+            ),
+          ),
           const SizedBox(height: 12),
         ],
       ),
