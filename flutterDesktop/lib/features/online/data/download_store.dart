@@ -180,8 +180,9 @@ final class DownloadStore {
     final result = <OfflineTrack>[];
     await for (final file in root.list(followLinks: false)) {
       if (file is! File ||
-          !RegExp(r'^[a-f0-9]{64}(?:\.partial)?\.json$')
-              .hasMatch(file.uri.pathSegments.last))
+          !RegExp(
+            r'^[a-f0-9]{64}(?:\.partial)?\.json$',
+          ).hasMatch(file.uri.pathSegments.last))
         continue;
       final key = file.uri.pathSegments.last.split('.').first;
       if (_busy.contains(key)) {
