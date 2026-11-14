@@ -1,0 +1,20 @@
+{
+  "captured_utc": "2026-11-14T05:31:44.623156+00:00",
+  "method": "real visible X11/XWayland client; ImageMagick import -window",
+  "display": ":0",
+  "state": "settings; signed out; empty queue",
+  "source": "348b613a0c3db1a54de56483ea6f8748d6465211; reference CI 43225291641",
+  "theme": "Light",
+  "ui_scale_percent": 100,
+  "display_scale": "XWayland 1x; 96 DPI",
+  "font": "bundled SF Pro Display Default",
+  "geometry": {
+    "WINDOW": "18874375",
+    "X": "48",
+    "Y": "76",
+    "WIDTH": "1220",
+    "HEIGHT": "780",
+    "SCREEN": "0"
+  },
+  "sha256": "93d15f6ff35d97885e12b588a19e24e7e9e7b7d09a78ec484acadc19ceaff1f3"
+}

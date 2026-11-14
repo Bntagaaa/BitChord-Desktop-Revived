@@ -18,6 +18,9 @@ import '../lib/features/online/presentation/catalog_surface.dart';
 import '../lib/features/online/application/download_queue.dart';
 import '../lib/design_system/palette.dart';
 import '../lib/design_system/theme.dart';
+import '../lib/app/app.dart';
+import '../lib/features/shell/application/shell_controller.dart';
+import '../lib/features/shell/domain/shell_settings.dart';
 import 'download_queue_test.dart' show ControlledDownloads, track;
 import 'online_controller_test.dart' show ControlledCatalog;
 
@@ -32,6 +35,70 @@ class SuggestionPort extends ControlledCatalog implements OnlineSuggestions {
 }
 
 void main() {
+  testWidgets('Search has one reference header at both native client widths', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final boundary = GlobalKey();
+    final port = ControlledCatalog()..resolverConfigured = true;
+    final container = ProviderContainer(
+      overrides: [
+        onlinePortProvider.overrideWithValue(port),
+        initialSettingsProvider.overrideWithValue(
+          const ShellSettings(appearance: Appearance.light),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    tester.view.physicalSize = const Size(1220, 780);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: RepaintBoundary(key: boundary, child: const BitChordApp()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // DesktopFrame gives its page the full client height and puts the dock
+    // reserve inside scroll content, allowing real artwork beneath the glass.
+    expect(tester.getRect(find.byType(ListView).first).bottom, 780);
+    await tester.tap(find.byKey(const Key('nav-search')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('page-heading')), findsNothing);
+    expect(
+      tester.getRect(find.byKey(const Key('catalog-search-pill'))),
+      const Rect.fromLTWH(474, 18, 492, 42),
+    );
+    tester.view.physicalSize = const Size(900, 600);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.byKey(const Key('catalog-search-pill'))),
+      const Rect.fromLTWH(240, 18, 492, 42),
+    );
+    await tester.tap(find.byKey(const Key('sidebar-brand-toggle')));
+    await tester.pumpAndSettle();
+    final rendered =
+        boundary.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    await tester.runAsync(() async {
+      final image = await rendered.toImage(pixelRatio: 1);
+      final pixels = (await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!.buffer.asUint8List();
+      // The native smoke samples this gutter, never catalog artwork. Keep the
+      // exact 0.26 scrim over #F5F6FA contract as the viewport grows underneath.
+      final offset = (500 * 900 + 895) * 4;
+      // Software Skia blends the float alpha; native Linux Impeller rounds
+      // its alpha to 8 bits first and yields R=182 (verified in its PNG).
+      expect(pixels.sublist(offset, offset + 4), [181, 182, 185, 255]);
+      image.dispose();
+    });
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    container.dispose();
+    await tester.pump();
+  });
+
   testWidgets(
     'suggestions debounce, reject stale results, and dismiss on submit',
     (tester) async {

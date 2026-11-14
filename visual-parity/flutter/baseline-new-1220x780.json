@@ -1,0 +1,20 @@
+{
+  "captured_utc": "2026-11-14T05:31:47.823345+00:00",
+  "method": "real visible X11/XWayland client; ImageMagick import -window",
+  "display": ":0",
+  "state": "new; signed out; empty queue",
+  "source": "53b83330 baseline debug",
+  "theme": "Light",
+  "ui_scale_percent": 100,
+  "display_scale": "XWayland 1x; 96 DPI",
+  "font": "installed bitchord-sans",
+  "geometry": {
+    "WINDOW": "27262979",
+    "X": "350",
+    "Y": "155",
+    "WIDTH": "1220",
+    "HEIGHT": "780",
+    "SCREEN": "0"
+  },
+  "sha256": "cba4a10618d4e61db06dbf3cebf568f82b0f5421ec60cd01eeab5068d3a736d9"
+}
