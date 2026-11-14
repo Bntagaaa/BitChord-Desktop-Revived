@@ -179,9 +179,8 @@ final class BrowserSignIn {
       }
       for (var attempt = 0; attempt < 12; attempt++) {
         scope.check();
-        final socket = await WebSocket.connect(
-          endpoint,
-        ).timeout(const Duration(seconds: 8));
+        final socket = await WebSocket.connect(endpoint)
+            .timeout(const Duration(seconds: 8));
         try {
           socket.add(jsonEncode({'id': 1, 'method': 'Storage.getCookies'}));
           final response = await socket

@@ -43,9 +43,8 @@ final class YouTubeMediaProbe {
         response.bytes.length > end - start + 1) {
       throw const ProviderFailure(ProviderProblem.integrity);
     }
-    final range = RegExp(
-      r'^bytes (\d+)-(\d+)/(\d+)$',
-    ).firstMatch(response.headers['content-range'] ?? '');
+    final range = RegExp(r'^bytes (\d+)-(\d+)/(\d+)$')
+        .firstMatch(response.headers['content-range'] ?? '');
     if (response.status == 200 &&
         start == 0 &&
         response.headers['content-length'] == '${response.bytes.length}') {

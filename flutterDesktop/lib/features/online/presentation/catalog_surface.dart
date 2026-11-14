@@ -752,9 +752,9 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                           : widget.destination == 'library' &&
                                 ref.read(onlinePortProvider)
                                     is OnlineAccounts &&
-                                !(ref.read(onlinePortProvider)
-                                        as OnlineAccounts)
-                                    .signedIn
+                                !(ref.read(
+                                  onlinePortProvider,
+                                ) as OnlineAccounts).signedIn
                           ? 'Sign in from Accounts to view your library.'
                           : 'No catalog items available.',
                     ),

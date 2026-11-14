@@ -24,8 +24,10 @@ final class EmbeddedSignIn {
   /// cookies, browser-profile imports or secret logs are involved.
   static String? youtubeHeader(List<WebviewCookie> cookies) {
     for (final cookie in cookies) {
-      final domain =
-          cookie.domain.toLowerCase().replaceFirst(RegExp(r'^\.'), '');
+      final domain = cookie.domain.toLowerCase().replaceFirst(
+        RegExp(r'^\.'),
+        '',
+      );
       if (domain == 'youtube.com' || domain.endsWith('.youtube.com')) {
         if (!RegExp(r'^[A-Za-z0-9_-]{1,80}$').hasMatch(cookie.name) ||
             cookie.value.isEmpty ||

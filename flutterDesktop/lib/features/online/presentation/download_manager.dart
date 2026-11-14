@@ -112,9 +112,9 @@ class DownloadManager extends ConsumerWidget {
                                     task.entry.title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodyMedium,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium,
                                   ),
                                   Text(
                                     task.phase == DownloadPhase.queued
@@ -126,9 +126,9 @@ class DownloadManager extends ConsumerWidget {
                                         : 'Downloading',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
                                   ),
                                   if (task.phase == DownloadPhase.running) ...[
                                     const SizedBox(height: 4),

@@ -73,9 +73,9 @@ final class YouTubeCatalogClient {
       );
     final html = utf8.decode(response.bytes);
     if (session != null &&
-        RegExp(
-              r'"LOGGED_IN"\s*:\s*(true|false)\b',
-            ).firstMatch(html)?.group(1) !=
+        RegExp(r'"LOGGED_IN"\s*:\s*(true|false)\b')
+                .firstMatch(html)
+                ?.group(1) !=
             'true') {
       throw const ProviderFailure(ProviderProblem.unauthorized);
     }

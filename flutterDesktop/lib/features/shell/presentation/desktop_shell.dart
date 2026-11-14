@@ -649,9 +649,8 @@ class _AccountPanel extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 13, 16, 5),
               child: Text(
                 'Accounts',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w500),
               ),
             ),
             if (ref.watch(onlinePortProvider) != null)
@@ -664,9 +663,8 @@ class _AccountPanel extends ConsumerWidget {
                 ),
                 child: Text(
                   'Nobody is signed in. Your library, playlists and history need a YouTube Music account.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: palette['secondary']),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: palette['secondary']),
                 ),
               ),
               Padding(
@@ -831,9 +829,8 @@ class _UnconnectedPage extends StatelessWidget {
       const SizedBox(height: 24),
       Text(
         'Music services are not connected.',
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: palette['secondary']),
+        style: Theme.of(context).textTheme.bodyMedium
+            ?.copyWith(color: palette['secondary']),
       ),
     ],
   );
@@ -1129,18 +1126,14 @@ class _AppearancePanel extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-          Text(
-            'About BitChord',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text('About BitChord', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
             'BitChord Desktop 2.0.0+1 (Flutter Desktop)\n'
             'Phase 4: In-App YouTube Music Sign-In (WebKitGTK 4.1 / WebView2)\n'
             'Audio Engine: C++17 Native PCM Pipeline',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: palette['secondary'],
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: palette['secondary']),
           ),
           const SizedBox(height: 12),
         ],

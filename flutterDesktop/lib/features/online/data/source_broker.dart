@@ -186,9 +186,8 @@ final class SourceBroker {
           active++;
           try {
             final range = request.headers.value('range');
-            final match = RegExp(
-              r'^bytes=(\d+)-(\d*)$',
-            ).firstMatch(range ?? '');
+            final match = RegExp(r'^bytes=(\d+)-(\d*)$')
+                .firstMatch(range ?? '');
             if (range != null && match == null) {
               request.response.statusCode = 416;
               return;

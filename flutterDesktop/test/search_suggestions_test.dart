@@ -228,9 +228,8 @@ void main() {
               );
               final dir = Directory('verification/phase4-search-download');
               await dir.create(recursive: true);
-              await File(
-                '${dir.path}/${dark ? 'dark' : 'light'}-$name.png',
-              ).writeAsBytes(bytes!.buffer.asUint8List());
+              await File('${dir.path}/${dark ? 'dark' : 'light'}-$name.png')
+                  .writeAsBytes(bytes!.buffer.asUint8List());
             } finally {
               image.dispose();
             }

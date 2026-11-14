@@ -259,38 +259,32 @@ void main() {
     },
   );
 
-  test(
-    'Back restores Search and parent data; account cancellation evicts saved pages',
-    () async {
-      final port = ControlledCatalog();
-      final container = ProviderContainer(
-        overrides: [onlinePortProvider.overrideWithValue(port)],
-      );
-      addTearDown(container.dispose);
-      final controller = container.read(catalogProvider.notifier);
-      expect(controller.activate('search'), isFalse);
-      final search = controller.load(
-        query: 'album',
-        filter: SearchFilter.albums,
-      );
-      port.requests['album']!.complete(
-        CatalogPage([
-          const CatalogEntry(provider: 'youtube', id: 'MPRE1', title: 'Result'),
-        ], continuation: 'next'),
-      );
-      await search;
-      controller.activate('MPRE1');
-      await controller.load(browseId: 'MPRE1');
-      expect(controller.activate('search'), isTrue);
-      expect(container.read(catalogProvider).query, 'album');
-      expect(container.read(catalogProvider).filter, SearchFilter.albums);
-      expect(container.read(catalogProvider).continuation, 'next');
-      controller.cancel();
-      expect(container.read(catalogProvider).entries, isEmpty);
-      expect(container.read(catalogProvider).query, 'album');
-      expect(controller.activate('MPRE1'), isFalse);
-    },
-  );
+  test('Back restores Search and parent data; account cancellation evicts saved pages', () async {
+    final port = ControlledCatalog();
+    final container = ProviderContainer(
+      overrides: [onlinePortProvider.overrideWithValue(port)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(catalogProvider.notifier);
+    expect(controller.activate('search'), isFalse);
+    final search = controller.load(query: 'album', filter: SearchFilter.albums);
+    port.requests['album']!.complete(
+      CatalogPage([
+        const CatalogEntry(provider: 'youtube', id: 'MPRE1', title: 'Result'),
+      ], continuation: 'next'),
+    );
+    await search;
+    controller.activate('MPRE1');
+    await controller.load(browseId: 'MPRE1');
+    expect(controller.activate('search'), isTrue);
+    expect(container.read(catalogProvider).query, 'album');
+    expect(container.read(catalogProvider).filter, SearchFilter.albums);
+    expect(container.read(catalogProvider).continuation, 'next');
+    controller.cancel();
+    expect(container.read(catalogProvider).entries, isEmpty);
+    expect(container.read(catalogProvider).query, 'album');
+    expect(controller.activate('MPRE1'), isFalse);
+  });
 
   test('editing Search rejects the late committed query', () async {
     final port = ControlledCatalog();

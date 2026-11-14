@@ -147,18 +147,18 @@ final class OnlineRuntime
     RequestScope scope, {
     String? continuation,
     SearchFilter filter = SearchFilter.all,
-  }) => _provider(
-    provider,
-  ).search(query, scope, continuation: continuation, filter: filter);
+  }) =>
+      _provider(provider)
+          .search(query, scope, continuation: continuation, filter: filter);
   @override
   Future<CatalogPage> browse(
     String id,
     RequestScope scope, {
     String? continuation,
     String? params,
-  }) => _provider(
-    'youtube',
-  ).browse(id, scope, continuation: continuation, params: params);
+  }) =>
+      _provider('youtube')
+          .browse(id, scope, continuation: continuation, params: params);
   @override
   Future<void> play(
     CatalogEntry entry,
