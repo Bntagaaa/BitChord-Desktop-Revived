@@ -123,7 +123,7 @@ final class OnlineRuntime
   Future<void> _tail = Future.value();
   bool _closed = false;
   int _entry = 0;
-  // Playback/persistence has a single coordinator across polls, commands, close.
+  // Playback/persistence coordinator across polls, commands, close.
   Future<T> _ordered<T>(Future<T> Function() work) {
     final result = _tail.then((_) {
       if (_closed) throw const ProviderFailure(ProviderProblem.cancelled);

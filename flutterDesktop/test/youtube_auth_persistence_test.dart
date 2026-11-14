@@ -3,11 +3,11 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:bitchord_desktop/features/online/data/provider_http.dart';
-import 'package:bitchord_desktop/features/online/data/youtube/accounts.dart';
-import 'package:bitchord_desktop/features/online/data/youtube_session.dart';
-import 'package:bitchord_desktop/features/online/data/youtube_session_store.dart';
-import 'package:bitchord_desktop/features/online/domain/catalog.dart';
+import '../lib/features/online/data/provider_http.dart';
+import '../lib/features/online/data/youtube/accounts.dart';
+import '../lib/features/online/data/youtube_session.dart';
+import '../lib/features/online/data/youtube_session_store.dart';
+import '../lib/features/online/domain/catalog.dart';
 
 void main() {
   group('YouTube Authentication Persistence Lifecycle', () {
@@ -19,7 +19,8 @@ void main() {
     var serverNetworkFailure = false;
 
     const testCookie =
-        'SID=test-sid; SAPISID=test-sapisid-secret; __Secure-3PAPISID=test-3papisid';
+        'SID=test-sid; SAPISID=test-sapisid-secret; '
+        '__Secure-3PAPISID=test-3papisid';
 
     String htmlShell(bool loggedIn) => '''
 <!DOCTYPE html>
@@ -47,7 +48,9 @@ ytcfg.set({
       serverNetworkFailure = false;
 
       mockServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      serverUri = Uri.parse('http://${mockServer.address.host}:${mockServer.port}');
+      serverUri = Uri.parse(
+        'http://${mockServer.address.host}:${mockServer.port}',
+      );
 
       mockServer.listen((request) async {
         if (serverNetworkFailure) {
@@ -112,7 +115,6 @@ ytcfg.set({
       final scope = RequestScope();
       final http = const ProviderHttp();
 
-      // Use YouTubeSession with mock server via verified shell
       final shellSession = YouTubeSession.fromVerifiedShell(
         testCookie,
         htmlShell(true),
@@ -123,7 +125,6 @@ ytcfg.set({
       await store.save(shellSession);
       expect(store.exists(), isTrue);
 
-      // Verify that raw cookie is NOT stored in plaintext
       final vaultFile = File('${tempDir.path}/bitchord_session_vault.v1');
       expect(vaultFile.existsSync(), isTrue);
       final rawBytes = await vaultFile.readAsBytes();
@@ -132,7 +133,7 @@ ytcfg.set({
       expect(rawString.contains('test-sapisid-secret'), isFalse);
     });
 
-    test('3. Simulated shutdown preserves stored session and does not treat exit as logout', () async {
+    test('3. Simulated shutdown preserves stored session', () async {
       final accounts = YouTubeAccounts(store);
       final shellSession = YouTubeSession.fromVerifiedShell(
         testCookie,
@@ -140,9 +141,12 @@ ytcfg.set({
       );
       await store.save(shellSession);
 
-      // Normal application shutdown cancels active requests without signing out
       accounts.cancelActive();
-      expect(store.exists(), isTrue, reason: 'Session must survive normal application shutdown');
+      expect(
+        store.exists(),
+        isTrue,
+        reason: 'Session must survive normal application shutdown',
+      );
     });
 
     test('4. Restart restores verified session automatically', () async {
@@ -152,7 +156,6 @@ ytcfg.set({
       );
       await store.save(shellSession);
 
-      // Simulate new application launch
       final restartedAccounts = YouTubeAccounts(store);
       expect(restartedAccounts.signedIn, isFalse);
 
@@ -170,10 +173,13 @@ ytcfg.set({
       );
       expect(restored.cookie, testCookie);
       expect(restored.headers()['Cookie'], testCookie);
-      expect(restored.headers()['Authorization']!.startsWith('SAPISIDHASH '), isTrue);
+      expect(
+        restored.headers()['Authorization']!.startsWith('SAPISIDHASH '),
+        isTrue,
+      );
     });
 
-    test('5. Explicit logout clears in-memory state and deletes persisted file', () async {
+    test('5. Explicit logout clears state and stored file', () async {
       final shellSession = YouTubeSession.fromVerifiedShell(
         testCookie,
         htmlShell(true),
@@ -186,10 +192,14 @@ ytcfg.set({
 
       expect(accounts.signedIn, isFalse);
       expect(accounts.session, isNull);
-      expect(store.exists(), isFalse, reason: 'Explicit logout must delete persistent credentials');
+      expect(
+        store.exists(),
+        isFalse,
+        reason: 'Explicit logout must delete persistent credentials',
+      );
     });
 
-    test('6. Expired session is handled gracefully without retry loops', () async {
+    test('6. Expired session handled gracefully without retry loops', () async {
       final shellSession = YouTubeSession.fromVerifiedShell(
         testCookie,
         htmlShell(true),
@@ -197,24 +207,21 @@ ytcfg.set({
       await store.save(shellSession);
       expect(store.exists(), isTrue);
 
-      serverLoggedIn = false; // Simulate expired/revoked session
+      serverLoggedIn = false;
 
       final accounts = YouTubeAccounts(store);
-      // Attempting restore when server reports unauthorized must clear credentials
       final http = const ProviderHttp();
       final scope = RequestScope();
 
-      // Simulate restore handling 401
       final data = await store.loadData();
       expect(data, isNotNull);
 
-      // Verify that clearing occurs on unauthorized failure
       await store.clear();
       expect(store.exists(), isFalse);
       expect(accounts.signedIn, isFalse);
     });
 
-    test('7. Corrupted or tampered vault fails authentication tag check safely', () async {
+    test('7. Corrupted vault fails authentication tag check safely', () async {
       final shellSession = YouTubeSession.fromVerifiedShell(
         testCookie,
         htmlShell(true),
@@ -223,12 +230,15 @@ ytcfg.set({
 
       final vaultFile = File('${tempDir.path}/bitchord_session_vault.v1');
       final bytes = await vaultFile.readAsBytes();
-      // Corrupt a byte in the ciphertext
       bytes[bytes.length - 1] ^= 0xFF;
       await vaultFile.writeAsBytes(bytes);
 
       final loaded = await store.loadData();
-      expect(loaded, isNull, reason: 'Tampered vault must fail HMAC integrity verification');
+      expect(
+        loaded,
+        isNull,
+        reason: 'Tampered vault must fail HMAC integrity verification',
+      );
     });
   });
 }

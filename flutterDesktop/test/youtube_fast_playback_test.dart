@@ -2,28 +2,38 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:bitchord_desktop/core/domain/audio_contract.dart';
-import 'package:bitchord_desktop/features/online/data/provider_http.dart';
-import 'package:bitchord_desktop/features/online/data/youtube/extractor.dart';
-import 'package:bitchord_desktop/features/online/data/youtube/history_tracker.dart';
-import 'package:bitchord_desktop/features/online/data/youtube_music.dart';
-import 'package:bitchord_desktop/features/online/data/youtube_resolver.dart';
-import 'package:bitchord_desktop/features/online/data/youtube_session.dart';
-import 'package:bitchord_desktop/features/online/domain/catalog.dart';
+import '../lib/core/domain/audio_contract.dart';
+import '../lib/features/online/data/provider_http.dart';
+import '../lib/features/online/data/youtube/extractor.dart';
+import '../lib/features/online/data/youtube/history_tracker.dart';
+import '../lib/features/online/data/youtube_music.dart';
+import '../lib/features/online/data/youtube_resolver.dart';
+import '../lib/features/online/data/youtube_session.dart';
+import '../lib/features/online/domain/catalog.dart';
 
 final class MockExtractor implements YouTubeExtractor {
   MockExtractor(this.handler);
-  final Future<Map<String, dynamic>> Function(YouTubeExtraction request, RequestScope scope) handler;
+  final Future<Map<String, dynamic>> Function(
+    YouTubeExtraction request,
+    RequestScope scope,
+  )
+  handler;
   final calls = <YouTubeExtraction>[];
 
   @override
-  Future<Map<String, dynamic>> extract(YouTubeExtraction request, RequestScope scope) {
+  Future<Map<String, dynamic>> extract(
+    YouTubeExtraction request,
+    RequestScope scope,
+  ) {
     calls.add(request);
     return handler(request, scope);
   }
 }
 
-Map<String, dynamic> sampleMediaData({String format = '251', String videoId = 'testtrack123'}) => {
+Map<String, dynamic> sampleMediaData({
+  String format = '251',
+  String videoId = 'testtrack123',
+}) => {
   'videoDetails': {
     'videoId': videoId,
     'title': 'Test Song',
@@ -35,7 +45,8 @@ Map<String, dynamic> sampleMediaData({String format = '251', String videoId = 't
       {
         'itag': int.parse(format),
         'mimeType': 'audio/webm; codecs="opus"',
-        'url': 'https://rr1---sn-test.googlevideo.com/videoplayback?id=$videoId',
+        'url':
+            'https://rr1---sn-test.googlevideo.com/videoplayback?id=$videoId',
         'bitrate': 160000,
         'averageBitrate': 155000,
         'contentLength': '4000000',
@@ -59,7 +70,7 @@ void main() {
       '{"LOGGED_IN":true,"INNERTUBE_CLIENT_VERSION":"1.0","SESSION_INDEX":"0"}',
     );
 
-    test('1. Direct fast path resolves stream without invoking heavy extractor', () async {
+    test('1. Direct fast path resolves stream without extractor', () async {
       var directCalled = 0;
       var extractorCalled = 0;
 
@@ -88,11 +99,15 @@ void main() {
 
       expect(media.trackId, testTrack.id);
       expect(directCalled, 1);
-      expect(extractorCalled, 0, reason: 'Fast path should resolve without external extractor');
+      expect(
+        extractorCalled,
+        0,
+        reason: 'Fast path should resolve without external extractor',
+      );
       expect(resolver.lastReport['path'], 'direct');
     });
 
-    test('2. Authenticated user receives fast resolution when track is accessible', () async {
+    test('2. Authenticated user receives fast resolution', () async {
       var directCalled = 0;
       var extractorCalled = 0;
 
@@ -112,12 +127,8 @@ void main() {
         probe: (media, scope) async {},
       );
 
-      final music = YouTubeMusic(
-        const ProviderHttp(),
-        resolver: resolver,
-      );
+      final music = YouTubeMusic(const ProviderHttp(), resolver: resolver);
 
-      // Resolve track through YouTubeMusic
       final media = await music.resolve(
         testTrack,
         AudioQuality.high,
@@ -129,11 +140,10 @@ void main() {
       expect(extractorCalled, 0);
     });
 
-    test('3. Restricted tracks fall back cleanly to authenticated extractor', () async {
+    test('3. Restricted tracks fall back cleanly to extractor', () async {
       var directCalled = 0;
       var extractorCalled = 0;
 
-      // Direct fails (e.g. login required or format unavailable)
       final directMock = MockExtractor((request, scope) async {
         directCalled++;
         throw const ProviderFailure(ProviderProblem.formatUnavailable);
@@ -158,18 +168,21 @@ void main() {
       );
 
       expect(media.trackId, testTrack.id);
-      expect(extractorCalled, 1, reason: 'Fallback to extractor with cookie must succeed');
+      expect(
+        extractorCalled,
+        1,
+        reason: 'Fallback to extractor with cookie must succeed',
+      );
       expect(fallbackMock.calls.single.cookie, testCookie);
     });
 
-    test('4. YouTubeHistoryTracker generates valid CPN and operates non-blocking', () async {
+    test('4. YouTubeHistoryTracker operates non-blocking', () async {
       final cpn = YouTubeHistoryTracker.generateCpn();
       expect(cpn.length, 16);
       expect(RegExp(r'^[a-zA-Z0-9_-]{16}$').hasMatch(cpn), isTrue);
 
       final tracker = YouTubeHistoryTracker();
 
-      // Trigger playing, progress, and finished without throwing
       expect(
         () => tracker.onPlaying(
           videoId: testTrack.id,
@@ -198,8 +211,12 @@ void main() {
     });
 
     test('5. Renewal requires matching rendition and track identity', () async {
-      final directMock = MockExtractor((request, scope) async => sampleMediaData());
-      final fallbackMock = MockExtractor((request, scope) async => sampleMediaData());
+      final directMock = MockExtractor(
+        (request, scope) async => sampleMediaData(),
+      );
+      final fallbackMock = MockExtractor(
+        (request, scope) async => sampleMediaData(),
+      );
 
       final resolver = YouTubeResolver.testing(
         extractor: fallbackMock,
@@ -208,9 +225,12 @@ void main() {
       );
 
       final music = YouTubeMusic(const ProviderHttp(), resolver: resolver);
-      final initial = await music.resolve(testTrack, AudioQuality.high, RequestScope());
+      final initial = await music.resolve(
+        testTrack,
+        AudioQuality.high,
+        RequestScope(),
+      );
 
-      // Valid renewal
       final renewed = await music.renew(
         testTrack,
         AudioQuality.high,
@@ -221,7 +241,6 @@ void main() {
       expect(renewed.trackId, initial.trackId);
       expect(renewed.rendition, initial.rendition);
 
-      // Stale generation renewal fails
       expect(
         () => music.renew(
           testTrack,
