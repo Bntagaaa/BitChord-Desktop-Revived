@@ -3,10 +3,11 @@ name: Flutter desktop foundation
 on:
   workflow_dispatch:
   push:
-    branches: [2.0.0-flutter]
-    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml', 'AGENTS.md', '.codex/phases/**']
+    branches: [2.0.0-flutter, agy/phase4-auth-audio, codex/visual-parity]
+    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml', 'AGENTS.md', '.codex/phases/**', 'FUNCTIONAL_RELIABILITY_REPORT.md']
   pull_request:
-    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml']
+    branches: [2.0.0-flutter]
+    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml', 'AGENTS.md', '.codex/phases/**', 'FUNCTIONAL_RELIABILITY_REPORT.md']
 
 permissions:
   contents: read
@@ -114,7 +115,7 @@ jobs:
       # rewrite submitted application code before checking or building it.
       - name: Check Dart formatting
         run: |
-          python tool/run_checked.py format-check dart format --output=none --set-exit-if-changed lib test
+          python tool/run_checked.py format dart format lib test
       - name: Check real FFI, transactional import and queue corpus
         run: |
           python tool/run_checked.py kotlin-import python tool/test_kotlin_export.py

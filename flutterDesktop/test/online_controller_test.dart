@@ -153,6 +153,12 @@ class LibraryCatalog extends ControlledCatalog
   }
 
   @override
+  Future<CatalogPage> history(RequestScope scope) async {
+    scope.check();
+    return CatalogPage(const []);
+  }
+
+  @override
   Future<CatalogPage> library(RequestScope scope) async {
     scope.check();
     libraryCalls++;
