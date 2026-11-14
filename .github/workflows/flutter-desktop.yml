@@ -3,10 +3,11 @@ name: Flutter desktop foundation
 on:
   workflow_dispatch:
   push:
-    branches: [2.0.0-flutter]
-    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml', 'AGENTS.md', '.codex/phases/**']
+    branches: [2.0.0-flutter, agy/phase4-auth-audio, codex/visual-parity]
+    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml', 'AGENTS.md', '.codex/phases/**', 'FUNCTIONAL_RELIABILITY_REPORT.md']
   pull_request:
-    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml']
+    branches: [2.0.0-flutter]
+    paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml', 'AGENTS.md', '.codex/phases/**', 'FUNCTIONAL_RELIABILITY_REPORT.md']
 
 permissions:
   contents: read
