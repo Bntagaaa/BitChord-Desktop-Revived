@@ -31,25 +31,25 @@ Map<String, dynamic> sampleMediaData({
   String format = '251',
   String videoId = 'testtrack11',
 }) => {
-  'videoDetails': {
-    'videoId': videoId,
-    'title': 'Test Song',
-    'isLive': false,
-    'isLiveContent': false,
-  },
-  'streamingData': {
-    'adaptiveFormats': [
-      {
-        'itag': int.parse(format),
-        'mimeType': 'audio/webm; codecs="opus"',
-        'url':
-            'https://rr1---sn-test.googlevideo.com/videoplayback?id=$videoId',
-        'bitrate': 160000,
-        'averageBitrate': 155000,
-        'contentLength': '4000000',
-      },
-    ],
-  },
+  'id': videoId,
+  'is_live': false,
+  'protocol': 'https',
+  'format_id': format,
+  'url': 'https://r1.googlevideo.com/videoplayback?id=$videoId',
+  'acodec': 'opus',
+  'vcodec': 'none',
+  'abr': 160.0,
+  'http_headers': {'User-Agent': 'BitChord-Test'},
+  'formats': [
+    {
+      'format_id': format,
+      'url': 'https://r1.googlevideo.com/videoplayback?id=$videoId',
+      'protocol': 'https',
+      'vcodec': 'none',
+      'acodec': 'opus',
+      'abr': 160.0,
+    },
+  ],
 };
 
 void main() {
