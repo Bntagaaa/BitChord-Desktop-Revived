@@ -30,12 +30,9 @@ final class OnlineRuntime
         OnlineLibrary,
         OnlinePlaylistEditor,
         OnlinePlaybackIdentity {
-  OnlineRuntime(
-    this.playback,
-    Directory downloads, {
-    String? storageRoot,
-  }) : store = DownloadStore(downloads),
-       _historyTracker = YouTubeHistoryTracker() {
+  OnlineRuntime(this.playback, Directory downloads, {String? storageRoot})
+    : store = DownloadStore(downloads),
+      _historyTracker = YouTubeHistoryTracker() {
     final sessionStore = storageRoot != null
         ? YouTubeSessionStore(Directory(storageRoot))
         : null;

@@ -20,10 +20,7 @@ final class YouTubeHistoryTracker {
     return List.generate(16, (_) => chars[random.nextInt(chars.length)]).join();
   }
 
-  void onPlaying({
-    required String videoId,
-    required YouTubeSession session,
-  }) {
+  void onPlaying({required String videoId, required YouTubeSession session}) {
     if (!RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(videoId)) return;
     if (_active?.videoId == videoId || _pendingVideoId == videoId) return;
 
