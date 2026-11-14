@@ -1,0 +1,16 @@
+{
+  "reference_sha256": "6c56aecaada7ac28cd5ee31d57c4cb9f4d968c25584407f97276c3a32577b86e",
+  "flutter_sha256": "ef71f0645fa90ae797eb7d2b5e6cfaf67d4aec374371a84edb93c72b3b7454fd",
+  "size": [
+    1220,
+    780
+  ],
+  "excluded_rectangles_xywh": [],
+  "compared_pixels": 951600,
+  "excluded_pixels": 0,
+  "capture_metadata_checked": true,
+  "mean_absolute_rgb_error_0_255": 54.41381953201625,
+  "pixels_any_channel_difference_gt_8_percent": 42.57009247583018,
+  "pixels_any_channel_difference_gt_32_percent": 41.097309794031105,
+  "acceptance": "Supporting metrics only; requires human visual review and equivalent states"
+}

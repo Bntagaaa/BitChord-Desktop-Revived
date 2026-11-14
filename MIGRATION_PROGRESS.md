@@ -1,5 +1,49 @@
 # Migration progress and delivery backlog
 
+## Visual parity branch audit — 2026-11-14
+
+Latest caveat: after a complete Windows/Linux pass, a documentation-only rerun
+43592211458 attempt 1 hit Linux SIGSEGV (-11) at native close. Windows passed;
+Linux cleanup remains NEEDS REVALIDATION. See the diagnostic in the visual report.
+Its unchanged-source attempt 2 passed; that retry is not evidence of a fix.
+
+User authorized a presentation-only audit on `codex/visual-parity`, PR target
+`2.0.0-flutter`, superseding direct target-branch delivery for this task.
+Actual pinned Kotlin and Flutter Linux clients were rendered on the same
+XWayland desktop with disposable signed-out profiles. Eight destination pairs,
+Search, account/drawer and two-size shell evidence are recorded in
+[VISUAL_PARITY_REPORT.md](VISUAL_PARITY_REPORT.md) and `visual-parity/`.
+P02/P04/P29/P30 corrections address Light backdrop selection, the extra Search
+heading/inset, catalog content clipping above the glass dock and selected-marker
+corners. Reusable real-window capture/overlay/diff tooling was added.
+
+Local analyzer, **71 Flutter tests**, Linux debug build/native rendering,
+reference/layer/asset checks and **3 comparison-tool tests** passed. New-source
+Windows/Linux release CI 43591352978 is verified below; baseline 43557922499
+was not promoted. Full Home/Search/provider projections, missing library/player/
+settings surfaces, font distribution, matched content/materials and broader
+native DPI/motion checks remain open. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
+No functional services, Kotlin reference or other worktrees were changed.
+
+First PR #139 run 43584021965: Linux passed 71 tests and the release build,
+then failed the drawer smoke's stale `(880,500)` color probe. Actual CI PNG
+proves this point is now live artwork; the safe gutter is `(895,500)`, with
+the new Light-backdrop scrim value. Updated the visual smoke helpers and added
+an exact gutter-pixel widget regression, preserving strict appearance checks.
+Windows/new matrix results remain pending; no failed smoke is promoted.
+
+Final verified visual-branch source `85eb37a6` passed
+[43591352978](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43591352978)
+on Linux and Windows: 71 tests per OS, format/analyze, native/provider contracts,
+release bundles, all native appearance/drawer/fullscreen/close smokes. Both
+artifacts were downloaded and fresh reports inspected; no failed/stale native
+report was used as a pass. Retention was correctly skipped for the PR. See
+VISUAL_PARITY_REPORT for artifact links and unchanged outstanding parity gates.
+
+The later close failure above is not superseded by the earlier successful run.
+The failed-job retry is diagnostic only; native backtrace/cleanup review is still
+needed before claiming stable Linux shutdown.
+
 Latest Phase 1 status: see the **latest verification and Linux comparison** at the end.
 Earlier dated records are historical evidence, not the current gate status.
 

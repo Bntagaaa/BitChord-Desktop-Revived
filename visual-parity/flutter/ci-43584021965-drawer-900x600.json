@@ -1,0 +1,34 @@
+{
+  "method": "GitHub Actions Linux release launch smoke; original artifact PNG",
+  "source": "3ffb3ac5a34c7ed05b7fa40eafa9fa71190b11fd",
+  "workflow_run": 43584021965,
+  "artifact_id": 14109905697,
+  "state": "drawer over Home; signed out; guest media refusal visible",
+  "theme": "Light",
+  "display_scale": "Xvfb 96 DPI",
+  "ui_scale_percent": 100,
+  "font": "desktop fallback; bitchord-sans not bundled",
+  "size": [
+    900,
+    600
+  ],
+  "sha256": "25eec2ebfbb54068836ae6e4e83d6f17c029386e88337ab3947b9a6a111cafdf",
+  "failed_probe_xy": [
+    880,
+    500
+  ],
+  "failed_probe_rgb": [
+    87,
+    86,
+    136
+  ],
+  "gutter_xy": [
+    895,
+    500
+  ],
+  "gutter_rgb": [
+    182,
+    182,
+    185
+  ]
+}

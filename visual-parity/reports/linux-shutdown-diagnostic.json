@@ -1,0 +1,24 @@
+{
+  "run_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43592211458/attempts/1",
+  "job_id": 132439143710,
+  "head_sha": "67a68ef3035633e0be5a33d38a046a3e32c383ef",
+  "change_scope": "documentation/evidence only; runtime/test files identical to passing 85eb37a6",
+  "platform": "Linux ubuntu-22.04 / Xvfb Openbox / software GL",
+  "failure": "Close failed: -11 (SIGSEGV)",
+  "stage": "Alt+F4 after resize/appearance/fullscreen restoration checks",
+  "log_context": [
+    "FlutterEngineRemoveView returned kInvalidArguments: implicit view cannot be removed (also present in passing run)",
+    "invalid uninstantiatable type (null) in cast to FlTaskRunner",
+    "g_object_ref: assertion G_IS_OBJECT (object) failed"
+  ],
+  "root_cause": "undetermined; artifact contains no native backtrace/core",
+  "known_passing_matrix": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43591352978",
+  "status": "Needs revalidation; retry is diagnostic and cannot establish a fix",
+  "required_next_evidence": "Native backtrace and repeated matching close/fullscreen trials before selecting host/engine cleanup changes",
+  "diagnostic_retry": {
+    "attempt": 2,
+    "conclusion": "success",
+    "runtime_changes": false,
+    "interpretation": "Intermittent failure; successful retry does not establish a fix"
+  }
+}

@@ -136,6 +136,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(shellProvider);
+    final hasCatalog = ref.watch(onlinePortProvider) != null;
     final palette = BitChordPalette.resolve(
       settings,
       MediaQuery.platformBrightnessOf(context),
@@ -183,6 +184,11 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
         focusNode: _rootFocus,
         autofocus: true,
         child: Scaffold(
+          // DesktopApp.kt:DesktopPageBackdrop uses replaySurface as the
+          // Light fallback behind pages. The background token is different.
+          backgroundColor: Theme.of(context).brightness == Brightness.light
+              ? palette['replaySurface']
+              : palette['background'],
           body: LayoutBuilder(
             builder: (context, constraints) {
               final narrow = constraints.maxWidth < ShellMetrics.railBreakpoint;
@@ -246,7 +252,13 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                       child: Padding(
                                         padding: EdgeInsets.fromLTRB(
                                           16,
-                                          widget.destination == Destination.home
+                                          widget.destination ==
+                                                  Destination.search
+                                              // Search owns its 18 px top inset;
+                                              // the reference has no page title.
+                                              ? 0
+                                              : widget.destination ==
+                                                    Destination.home
                                               // Fallback font ink metrics differ by
                                               // desktop OS; these settle HomeTitle's
                                               // first visible baseline to Kotlin.
@@ -255,7 +267,15 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                                 )
                                               : 16,
                                           16,
-                                          ShellMetrics.contentBottomReserve,
+                                          // Catalog lists own their bottom
+                                          // content padding, so artwork can
+                                          // continue beneath the glass dock.
+                                          hasCatalog &&
+                                                  widget.destination !=
+                                                      Destination.settings
+                                              ? 0
+                                              : ShellMetrics
+                                                    .contentBottomReserve,
                                         ),
                                         child: Align(
                                           alignment: Alignment.topLeft,
@@ -265,8 +285,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                               ? _AppearancePanel(
                                                   palette: palette,
                                                 )
-                                              : ref.watch(onlinePortProvider) !=
-                                                    null
+                                              : hasCatalog
                                               ? CatalogSurface(
                                                   key: ValueKey(
                                                     '${widget.destination.id}:${widget.browseId}',
@@ -803,7 +822,14 @@ class _NavigationItem extends StatelessWidget {
                       top: (height - 18) / 2,
                       width: 3,
                       height: 18,
-                      child: ColoredBox(color: palette['navAccent']),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: palette['navAccent'],
+                          borderRadius: collapsed
+                              ? BorderRadius.zero
+                              : BorderRadius.circular(3),
+                        ),
+                      ),
                     ),
                 ],
               ),
