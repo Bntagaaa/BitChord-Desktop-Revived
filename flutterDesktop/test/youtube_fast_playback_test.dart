@@ -29,7 +29,7 @@ final class MockExtractor implements YouTubeExtractor {
 
 Map<String, dynamic> sampleMediaData({
   String format = '251',
-  String videoId = 'testtrack123',
+  String videoId = 'testtrack11',
 }) => {
   'videoDetails': {
     'videoId': videoId,
@@ -56,7 +56,7 @@ void main() {
   group('YouTube Fast Playback & Reliability', () {
     const testTrack = CatalogEntry(
       provider: 'youtube',
-      id: 'testtrack123',
+      id: 'testtrack11',
       title: 'Fast Song',
       kind: CatalogKind.track,
     );
