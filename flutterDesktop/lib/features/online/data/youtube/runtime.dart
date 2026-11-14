@@ -79,9 +79,12 @@ final class YouTubeRuntime {
     }
   }
 
+  static final _preparedPaths = <String>{};
+
   Future<void> prepare() async {
     validatePaths();
     if (!bundled || Platform.isWindows) return;
+    if (_preparedPaths.contains(executable)) return;
     for (final path in [executable, if (node != null) node!]) {
       final stat = await File(path).stat();
       if (stat.type != FileSystemEntityType.file) {
@@ -96,6 +99,7 @@ final class YouTubeRuntime {
         }
       }
     }
+    _preparedPaths.add(executable);
   }
 
   List<String> arguments(String videoId, String client) {

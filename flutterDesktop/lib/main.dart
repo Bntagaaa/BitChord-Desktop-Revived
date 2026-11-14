@@ -89,7 +89,13 @@ Future<void> main(List<String> arguments) async {
   final online = OnlineRuntime(
     playback,
     Directory('${root.path}/downloads-v1'),
+    storageRoot: root.path,
   );
+  try {
+    await online.restoreSession();
+  } catch (error) {
+    diagnostics.failure('restore session', error);
+  }
   final container = ProviderContainer(
     overrides: [
       onlinePortProvider.overrideWithValue(online),

@@ -13,6 +13,8 @@ import 'provider_http.dart';
 import 'range_source.dart';
 import 'source_broker.dart';
 import 'youtube_music.dart';
+import 'youtube_session_store.dart';
+import 'youtube/history_tracker.dart';
 import 'jiosaavn.dart';
 import 'youtube_resolver.dart';
 import 'artwork_loader.dart';
@@ -28,12 +30,20 @@ final class OnlineRuntime
         OnlineLibrary,
         OnlinePlaylistEditor,
         OnlinePlaybackIdentity {
-  OnlineRuntime(this.playback, Directory downloads)
-    : store = DownloadStore(downloads) {
+  OnlineRuntime(
+    this.playback,
+    Directory downloads, {
+    String? storageRoot,
+  }) : store = DownloadStore(downloads),
+       _historyTracker = YouTubeHistoryTracker() {
+    final sessionStore = storageRoot != null
+        ? YouTubeSessionStore(Directory(storageRoot))
+        : null;
     _providers['youtube'] = YouTubeMusic(
       const ProviderHttp(),
       resolver:
           YouTubeResolver.fromEnvironment() ?? YouTubeResolver.directOnly(),
+      sessionStore: sessionStore,
     );
     _providers['jiosaavn'] = JioSaavn(
       const ProviderHttp(),
@@ -43,6 +53,7 @@ final class OnlineRuntime
   final LocalPlayback playback;
   final DownloadStore store;
   final _artwork = ArtworkLoader();
+  final YouTubeHistoryTracker _historyTracker;
   YouTubeMusic get _youtube => _providers['youtube']! as YouTubeMusic;
   @override
   bool get youtubeAudioConfigured => _youtube.resolver != null;
@@ -56,12 +67,18 @@ final class OnlineRuntime
     _youtube.signOut();
   }
 
+  Future<void> restoreSession({RequestScope? scope}) =>
+      _youtube.restoreSession(scope ?? RequestScope());
+
   @override
   Future<List<String>> suggestions(String query, RequestScope scope) =>
       _youtube.suggestions(query, scope);
 
   @override
   Future<CatalogPage> library(RequestScope scope) => _youtube.library(scope);
+
+  @override
+  Future<CatalogPage> history(RequestScope scope) => _youtube.history(scope);
 
   @override
   Future<String> createPlaylist(
@@ -106,7 +123,7 @@ final class OnlineRuntime
   Future<void> _tail = Future.value();
   bool _closed = false;
   int _entry = 0;
-  // Playback/persistence has a single coordinator across polls, commands, close.
+  // Playback/persistence coordinator across polls, commands, close.
   Future<T> _ordered<T>(Future<T> Function() work) {
     final result = _tail.then((_) {
       if (_closed) throw const ProviderFailure(ProviderProblem.cancelled);
@@ -207,6 +224,10 @@ final class OnlineRuntime
                 startup.elapsedMilliseconds - resolveMs - brokerMs,
             'first_audible_audio': 'NOT_MEASURED',
           };
+          final session = _youtube.session;
+          if (session != null) {
+            _historyTracker.onPlaying(videoId: entry.id, session: session);
+          }
         }
         await old?.close();
       });
@@ -285,7 +306,7 @@ final class OnlineRuntime
   Future<void> close() async {
     await _tail;
     _closed = true;
-    _youtube.signOut();
+    _youtube.cancelActive();
     try {
       await playback.close();
     } finally {

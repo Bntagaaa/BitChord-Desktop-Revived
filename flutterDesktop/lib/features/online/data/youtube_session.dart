@@ -89,6 +89,28 @@ final class YouTubeSession {
     );
   }
 
+  String get cookie => _cookie;
+
+  static YouTubeSession restore({
+    required String cookie,
+    required String authUser,
+    required String version,
+    String? pageId,
+    String? dataSyncId,
+    String? visitorData,
+  }) {
+    final secret = signingSecret(cookie);
+    return YouTubeSession._(
+      cookie,
+      secret,
+      authUser,
+      pageId,
+      dataSyncId,
+      visitorData,
+      version,
+    );
+  }
+
   Map<String, String> headers() => {
     'Cookie': _cookie,
     'Authorization': signature(_secret),

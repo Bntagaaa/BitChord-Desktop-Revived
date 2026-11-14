@@ -5,22 +5,29 @@ import 'youtube/catalog_client.dart';
 import 'youtube/catalog_parser.dart';
 import 'youtube_resolver.dart';
 import 'youtube_session.dart';
+import 'youtube_session_store.dart';
 
 // Public provider boundary retained for the existing UI. Catalog, account
 // lifecycle, extraction, deployment and format policy no longer share one class.
 final class YouTubeMusic implements CatalogProvider {
-  YouTubeMusic(this.http, {Uri? origin, this.resolver})
-    : origin = origin ?? Uri.parse(YouTubeSession.origin) {
+  YouTubeMusic(
+    this.http, {
+    Uri? origin,
+    this.resolver,
+    YouTubeSessionStore? sessionStore,
+  }) : origin = origin ?? Uri.parse(YouTubeSession.origin),
+       _accounts = YouTubeAccounts(sessionStore) {
     _catalog = YouTubeCatalogClient(http, _accounts, this.origin);
   }
   final ProviderHttp http;
   final Uri origin;
   final YouTubeResolver? resolver;
-  final _accounts = YouTubeAccounts();
+  final YouTubeAccounts _accounts;
   late final YouTubeCatalogClient _catalog;
   @override
   String get id => 'youtube';
   bool get signedIn => _accounts.signedIn;
+  YouTubeSession? get session => _accounts.session;
   int get accountGeneration => _accounts.generation;
 
   Future<void> signIn(String cookie, RequestScope scope) {
@@ -31,6 +38,11 @@ final class YouTubeMusic implements CatalogProvider {
   }
 
   void signOut() => _accounts.signOut();
+
+  void cancelActive() => _accounts.cancelActive();
+
+  Future<YouTubeSession?> restoreSession(RequestScope scope) =>
+      _accounts.restore(http, scope);
 
   Future<List<String>> suggestions(String input, RequestScope scope) async {
     if (input.trim().isEmpty) return const [];
@@ -112,6 +124,22 @@ final class YouTubeMusic implements CatalogProvider {
         (session.authUser != '0' || session.pageId != null)) {
       throw const ProviderFailure(ProviderProblem.unsupported);
     }
+    if (session != null) {
+      try {
+        return await resolver.resolve(
+          track,
+          quality,
+          scope,
+          visitorData: session.visitorData ?? _catalog.guestVisitorData,
+          requiredRendition: rendition,
+        );
+      } on ProviderFailure catch (failure) {
+        if (failure.problem == ProviderProblem.cancelled ||
+            failure.problem == ProviderProblem.youtubeRateLimited) {
+          rethrow;
+        }
+      }
+    }
     return resolver.resolve(
       track,
       quality,
@@ -185,6 +213,14 @@ final class YouTubeMusic implements CatalogProvider {
     scope.check();
     if (shelves.isEmpty && firstFailure != null) throw firstFailure;
     return CatalogPage(const [], shelves: shelves);
+  }
+
+  /// Pinned Kotlin YtMusicRepository.fetchHistory (FEmusic_history).
+  Future<CatalogPage> history(RequestScope scope) async {
+    if (!signedIn) {
+      throw const ProviderFailure(ProviderProblem.unauthorized);
+    }
+    return browse('FEmusic_history', scope);
   }
 
   static String _safeTitle(String title) {

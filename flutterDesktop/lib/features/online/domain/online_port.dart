@@ -20,6 +20,7 @@ abstract interface class OnlineSuggestions {
 /// An authenticated account's real library, not a local placeholder.
 abstract interface class OnlineLibrary {
   Future<CatalogPage> library(RequestScope scope);
+  Future<CatalogPage> history(RequestScope scope);
 }
 
 /// Mutations always use a verified YouTube account; no optimistic fake writes.
