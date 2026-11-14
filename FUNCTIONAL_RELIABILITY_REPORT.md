@@ -181,10 +181,28 @@ Startup timing comparison on identical test tracks under controlled conditions:
 
 - Workflow: `.github/workflows/flutter-desktop.yml`
 - Branch: `agy/phase4-auth-audio`
-- Matrix:
-  - Ubuntu 22.04 (`linux` x64 release)
-  - Windows 2022 (`windows` x64 release)
-- Status: *(Workflow triggered upon push)*
+- PR Target: `2.0.0-flutter`
+- Run ID: `43595419822`
+- Run URL: https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43595419822
+- Matrix Results:
+  - **Ubuntu 22.04 (`linux` x64 release)**: SUCCESS (Job ID: `132448751529`, 4m 51s)
+    - All unit tests passed (78 passed; 0 failed)
+    - Dart formatting check: passed
+    - Analyzer check: passed (0 errors, 0 warnings)
+    - FFI & native source broker validation: passed
+    - Linux release desktop bundle built successfully
+    - Linux release launch smoke test passed
+  - **Windows 2022 (`windows` x64 release)**: SUCCESS (Job ID: `132448751801`, 6m 32s)
+    - All unit tests passed (78 passed; 0 failed)
+    - Dart formatting check: passed
+    - Analyzer check: passed (0 errors, 0 warnings)
+    - Windows native dependencies built (vcpkg cached)
+    - Real native PCM foundation built & tested
+    - Windows release desktop bundle built successfully
+    - Hosted Windows display configured & launch smoke test passed
+- Generated Artifacts:
+  - `flutter-foundation-linux`
+  - `flutter-foundation-windows`
 
 ---
 
