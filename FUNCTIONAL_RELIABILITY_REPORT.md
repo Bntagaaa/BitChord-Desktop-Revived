@@ -199,4 +199,4 @@ Startup timing comparison on identical test tracks under controlled conditions:
 
 - Branch: `agy/phase4-auth-audio`
 - Target: `2.0.0-flutter`
-- PR URL: *(Updated upon PR creation)*
+- PR URL: https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/140
