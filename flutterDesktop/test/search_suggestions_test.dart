@@ -41,6 +41,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
+    final boundary = GlobalKey();
     final port = ControlledCatalog()..resolverConfigured = true;
     final container = ProviderContainer(
       overrides: [
@@ -55,7 +56,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const BitChordApp(),
+        child: RepaintBoundary(key: boundary, child: const BitChordApp()),
       ),
     );
     await tester.pumpAndSettle();
@@ -75,6 +76,23 @@ void main() {
       tester.getRect(find.byKey(const Key('catalog-search-pill'))),
       const Rect.fromLTWH(240, 18, 492, 42),
     );
+    await tester.tap(find.byKey(const Key('sidebar-brand-toggle')));
+    await tester.pumpAndSettle();
+    final rendered =
+        boundary.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    await tester.runAsync(() async {
+      final image = await rendered.toImage(pixelRatio: 1);
+      final pixels = (await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!.buffer.asUint8List();
+      // The native smoke samples this gutter, never catalog artwork. Keep the
+      // exact 0.26 scrim over #F5F6FA contract as the viewport grows underneath.
+      final offset = (500 * 900 + 895) * 4;
+      // Software Skia blends the float alpha; native Linux Impeller rounds
+      // its alpha to 8 bits first and yields R=182 (verified in its PNG).
+      expect(pixels.sublist(offset, offset + 4), [181, 182, 185, 255]);
+      image.dispose();
+    });
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     container.dispose();

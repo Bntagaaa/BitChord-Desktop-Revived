@@ -75,7 +75,7 @@ The user's installed five-cut `bitchord-sans` family was inspected with
 is isolated. An earlier fallback-font trial was excluded from committed paired
 evidence. Results on machines without the installed family need revalidation.
 
-Each capture has a timestamp/hash/source/state/geometry sidecar. Final Flutter
+Each local capture has a timestamp/hash/source/state/geometry sidecar. Final Flutter
 sidecars identify the starting commit plus the SHA-256 of the actual `lib/`
 diff used for its debug build. Baseline captures use the initial source.
 [Capture and comparison commands](visual-parity/README.md) are reusable.
@@ -220,11 +220,29 @@ physical audio, RAM/CPU improvement or full migration acceptance is claimed.
 
 ## CI / PR delivery
 
-New-source PR and Windows/Linux matrix: **pending publication**. The existing
+Published as [PR #139](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/139),
+source `3ffb3ac5a34c7ed05b7fa40eafa9fa71190b11fd`.
+[Windows/Linux matrix 43584021965](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43584021965)
+**failed the native drawer smoke probes on both platforms**; no complete
+new-source CI pass is claimed yet. The existing
 `.github/workflows/flutter-desktop.yml` handles pull requests; its shared
-configuration is unchanged. Exact run, result and artifact links will be
+configuration is unchanged. Result and artifact links will be
 recorded after observing the actual run. The successful baseline above is
 not new-source verification.
+
+First PR attempt: both platforms passed format/analyze, **71 tests**, native/
+provider contracts and release bundle builds, then failed their drawer probes.
+The fresh [CI PNG](visual-parity/flutter/ci-43584021965-drawer-900x600.png)
+shows that `(880,500)` is now artwork, as intended after the viewport fix:
+the log observed `(87,86,136)`. The safe right gutter `(895,500)` is
+`(182,182,185)` under native Linux Impeller's scrim. The smoke previously
+expected the old backdrop's `(183,184,186)`. Both native helpers now sample
+the page gutter and retain exact renderer-specific RGB assertions; the local
+software-Skia widget regression verifies `(181,182,185)`. The Linux outside
+click also uses the gutter so dismissing a flyout cannot start a guest track.
+No test was disabled and no workflow configuration was changed. The corrected
+Windows native value still requires its real CI capture; corrected matrix
+acceptance remains pending.
 
 Next concrete work: coordinate matching Home/Search landing and missing
 library/queue/settings capabilities with Antigravity; repeat equivalent settled

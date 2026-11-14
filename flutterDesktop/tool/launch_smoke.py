@@ -33,14 +33,15 @@ def capture_state(evidence, window, name, theme='any'):
     deadline = time.monotonic() + 8
     while True:
         subprocess.run(['import', '-screen', '-window', window, '-depth', '8', str(capture)], check=True, timeout=10)
-        # Empty right margin below the catalog viewport and above the dock.
-        # y=400 now contains live artwork with catalog-dependent scrim colors.
-        value = subprocess.check_output(['convert', str(capture), '-format', '%[pixel:p{880,500}]', 'info:'], text=True, timeout=10)
+        # The final 16 px are page gutter, outside both live artwork and dock.
+        # The catalog now correctly extends beneath the dock, including y=500.
+        value = subprocess.check_output(['convert', str(capture), '-format', '%[pixel:p{895,500}]', 'info:'], text=True, timeout=10)
         match = re.search(r'\((\d+),(\d+),(\d+)', value)
         if not match:
             raise RuntimeError('Unexpected native pixel format: ' + value)
         rgb = list(map(int, match.groups()))
-        if (theme == 'any' or (theme == 'drawer' and rgb == [183, 184, 186]) or (theme == 'light' and min(rgb) >= 230) or
+        # Flutter's 0.26 black scrim over the measured #F5F6FA page fallback.
+        if (theme == 'any' or (theme == 'drawer' and rgb == [182, 182, 185]) or (theme == 'light' and min(rgb) >= 230) or
                 (theme == 'dark' and rgb == [32, 32, 32]) or (theme == 'black' and max(rgb) <= 2)):
             return {'state': name, 'expected_theme': theme, 'background_rgb': rgb}
         if time.monotonic() > deadline:
@@ -123,7 +124,7 @@ def main():
             # Account flyouts can retain a transient desktop tooltip/focus.
             # Dismiss via the real outside-click scrim before requesting the
             # drawer, rather than letting the brand click only close Accounts.
-            click_client(window, 500, 300)
+            click_client(window, 895, 300)
             click_client(window, 36, 34)
             states.append(capture_state(evidence, window, 'drawer', 'drawer'))
             subprocess.run(['xdotool', 'key', 'Escape'], check=True, timeout=5)

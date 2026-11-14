@@ -488,7 +488,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('account-panel')), findsNothing);
-      await tester.tapAt(const Offset(500, 300));
+      await tester.tapAt(const Offset(895, 300));
       await tester.tapAt(const Offset(36, 34));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('drawer-scrim')), findsOneWidget);

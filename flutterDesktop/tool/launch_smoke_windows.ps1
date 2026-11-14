@@ -188,11 +188,12 @@ try {
       $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
       try {
         $graphics.CopyFromScreen($origin.X,$origin.Y,0,0,$bitmap.Size)
-        # Empty right margin below the catalog viewport and above the dock.
-        # y=400 is now live Home artwork; its scrim color varies by catalog.
-        $pixel = $bitmap.GetPixel(880,500)
+        # The final 16 px are page gutter, outside both live artwork and dock.
+        # The catalog now correctly extends beneath the dock, including y=500.
+        $pixel = $bitmap.GetPixel(895,500)
         $rgb = @([int]$pixel.R,[int]$pixel.G,[int]$pixel.B)
-        $valid = $theme -eq 'any' -or ($theme -eq 'drawer' -and $pixel.R -eq 183 -and $pixel.G -eq 184 -and $pixel.B -eq 186) -or ($theme -eq 'light' -and ($rgb | Measure-Object -Minimum).Minimum -ge 230) -or ($theme -eq 'dark' -and $pixel.R -eq 32 -and $pixel.G -eq 32 -and $pixel.B -eq 32) -or ($theme -eq 'black' -and ($rgb | Measure-Object -Maximum).Maximum -le 2)
+        # Skia's 0.26 black scrim over the measured #F5F6FA page fallback.
+        $valid = $theme -eq 'any' -or ($theme -eq 'drawer' -and $pixel.R -eq 181 -and $pixel.G -eq 182 -and $pixel.B -eq 185) -or ($theme -eq 'light' -and ($rgb | Measure-Object -Minimum).Minimum -ge 230) -or ($theme -eq 'dark' -and $pixel.R -eq 32 -and $pixel.G -eq 32 -and $pixel.B -eq 32) -or ($theme -eq 'black' -and ($rgb | Measure-Object -Maximum).Maximum -le 2)
         $bitmap.Save("$evidence/$OutputPrefix-$name-900x600.png",[System.Drawing.Imaging.ImageFormat]::Png)
       } finally { $graphics.Dispose(); $bitmap.Dispose() }
       if ($valid) { return @{state=$name; expected_theme=$theme; background_rgb=$rgb} }

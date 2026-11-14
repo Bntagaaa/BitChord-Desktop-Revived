@@ -20,6 +20,13 @@ settings surfaces, font distribution, matched content/materials and broader
 native DPI/motion checks remain open. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
 No functional services, Kotlin reference or other worktrees were changed.
 
+First PR #139 run 43584021965: Linux passed 71 tests and the release build,
+then failed the drawer smoke's stale `(880,500)` color probe. Actual CI PNG
+proves this point is now live artwork; the safe gutter is `(895,500)`, with
+the new Light-backdrop scrim value. Updated the visual smoke helpers and added
+an exact gutter-pixel widget regression, preserving strict appearance checks.
+Windows/new matrix results remain pending; no failed smoke is promoted.
+
 Latest Phase 1 status: see the **latest verification and Linux comparison** at the end.
 Earlier dated records are historical evidence, not the current gate status.
 
