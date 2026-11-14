@@ -14,8 +14,8 @@ corners. Reusable real-window capture/overlay/diff tooling was added.
 
 Local analyzer, **71 Flutter tests**, Linux debug build/native rendering,
 reference/layer/asset checks and **3 comparison-tool tests** passed. New-source
-Windows/Linux release CI remains pending the PR; baseline success 43557922499
-is not promoted. Full Home/Search/provider projections, missing library/player/
+Windows/Linux release CI 43591352978 is verified below; baseline 43557922499
+was not promoted. Full Home/Search/provider projections, missing library/player/
 settings surfaces, font distribution, matched content/materials and broader
 native DPI/motion checks remain open. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
 No functional services, Kotlin reference or other worktrees were changed.
@@ -26,6 +26,14 @@ proves this point is now live artwork; the safe gutter is `(895,500)`, with
 the new Light-backdrop scrim value. Updated the visual smoke helpers and added
 an exact gutter-pixel widget regression, preserving strict appearance checks.
 Windows/new matrix results remain pending; no failed smoke is promoted.
+
+Final verified visual-branch source `85eb37a6` passed
+[43591352978](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43591352978)
+on Linux and Windows: 71 tests per OS, format/analyze, native/provider contracts,
+release bundles, all native appearance/drawer/fullscreen/close smokes. Both
+artifacts were downloaded and fresh reports inspected; no failed/stale native
+report was used as a pass. Retention was correctly skipped for the PR. See
+VISUAL_PARITY_REPORT for artifact links and unchanged outstanding parity gates.
 
 Latest Phase 1 status: see the **latest verification and Linux comparison** at the end.
 Earlier dated records are historical evidence, not the current gate status.

@@ -14,8 +14,10 @@ P-IDs to PARITY_ACCEPTED: live content differs and other variants are unverified
 
 Audit gaps in P03/P05/P06/P08/P09/P20/P24/P27/P31 are explicitly retained in the
 report. No authentication, audio, provider, network or persistence implementation
-was changed; missing capabilities require coordination with Antigravity. PR CI
-is pending, and this work does not claim Windows native visual parity, pixel-
+was changed; missing capabilities require coordination with Antigravity. Source
+`85eb37a6` passed Windows/Linux matrix 43591352978 with 71 tests each, release
+bundles and native GUI smokes; both artifacts were inspected. This does not
+claim Windows native visual parity against Kotlin, pixel-
 perfect parity, performance improvement or complete Phase 4/next-phase acceptance.
 
 ## Reference and evidence contract

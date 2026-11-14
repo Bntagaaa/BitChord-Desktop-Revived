@@ -221,16 +221,30 @@ physical audio, RAM/CPU improvement or full migration acceptance is claimed.
 ## CI / PR delivery
 
 Published as [PR #139](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/139),
-source `3ffb3ac5a34c7ed05b7fa40eafa9fa71190b11fd`.
-[Windows/Linux matrix 43584021965](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43584021965)
-**failed the native drawer smoke probes on both platforms**; no complete
-new-source CI pass is claimed yet. The existing
-`.github/workflows/flutter-desktop.yml` handles pull requests; its shared
-configuration is unchanged. Result and artifact links will be
-recorded after observing the actual run. The successful baseline above is
-not new-source verification.
+with verified source `85eb37a67ba7afc402d9ca56f86d460a76039b53`.
+[Windows/Linux matrix 43591352978](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43591352978)
+completed **SUCCESS on both platforms**. Both artifacts were downloaded and
+their fresh test summaries and native smoke reports inspected: **71 passed,
+0 failed, 0 skipped per OS**, release bundles built, Accounts/drawer/Light/Dark/
+Pitch-black captures passed, F11/Escape restored 900×600 and native close exited
+0. Format/analyze, native/provider/FFI contracts and reference checks passed.
+The guarded retention job was **skipped**, as expected for a PR; it was not
+modified or bypassed. Shared workflow configuration is unchanged.
 
-First PR attempt: both platforms passed format/analyze, **71 tests**, native/
+- [Linux release bundle and verification artifact](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43591352978/artifacts/14112208878).
+- [Windows release bundle and verification artifact](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43591352978/artifacts/14112572992).
+- [Inspected CI evidence summary](visual-parity/reports/ci-43591352978.json).
+
+Actions rendered its synthetic PR merge `91e49191`, whose tree matches head
+`85eb37a6`; the PR remains unmerged. These are hosted Flutter lifecycle/build
+checks, not a matched Windows Kotlin visual comparison or physical audio
+acceptance. Production `lib/` is unchanged from captured commit `3ffb3ac5`;
+later source commits correct smoke helpers and strengthen the widget regression.
+The final documentation commit records this verified source and does not
+modify runtime/test code.
+
+First [PR attempt 43584021965](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43584021965):
+both platforms passed format/analyze, **71 tests**, native/
 provider contracts and release bundle builds, then failed their drawer probes.
 The fresh [CI PNG](visual-parity/flutter/ci-43584021965-drawer-900x600.png)
 shows that `(880,500)` is now artwork, as intended after the viewport fix:
@@ -240,11 +254,12 @@ expected the old backdrop's `(183,184,186)`. Both native helpers now sample
 the page gutter and retain exact renderer-specific RGB assertions; the local
 software-Skia widget regression verifies `(181,182,185)`. The Linux outside
 click also uses the gutter so dismissing a flyout cannot start a guest track.
-No test was disabled and no workflow configuration was changed. The corrected
+No test was disabled and no workflow configuration was changed.
 The Windows artifact subsequently confirmed native gutter `(182,182,185)` too;
 its old probe was the red artwork pixel `(188,0,0)`. Native compositing differs
 by one red-channel value from the software widget capture, so each retains its
-measured exact expectation. Corrected matrix acceptance remains pending.
+measured exact expectation. Intermediate run 43591191652 was cancelled when
+superseded by the artifact-confirmed Windows value; it is not a passing result.
 
 Next concrete work: coordinate matching Home/Search landing and missing
 library/queue/settings capabilities with Antigravity; repeat equivalent settled

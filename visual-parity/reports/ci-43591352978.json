@@ -1,0 +1,188 @@
+{
+  "verified_utc": "2026-11-14T11:53:55.143648+00:00",
+  "run_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43591352978",
+  "head_sha": "85eb37a67ba7afc402d9ca56f86d460a76039b53",
+  "checkout_merge_sha": "91e49191dac4f079753129b065386d40f7833cb5",
+  "identical_tree_sha": "6da22f097bcac3b7700312b24a05c5c9c922e92d",
+  "conclusion": "success",
+  "retention": "skipped: pull request",
+  "parity_limit": "Hosted Flutter build/lifecycle only; not matched Kotlin visual or physical audio acceptance",
+  "platforms": {
+    "linux": {
+      "artifact_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43591352978/artifacts/14112208878",
+      "tests": {
+        "passed": 71,
+        "failed": 0,
+        "skipped": 0,
+        "exit_code": 0
+      },
+      "native_smoke": {
+        "display": "Xvfb 1600x1000x24, 96 DPI / Openbox / software GL",
+        "captures": [
+          {
+            "width": 1220,
+            "height": 780,
+            "colors": 688,
+            "geometry": "WINDOW=4194307\nX=42\nY=100\nWIDTH=1220\nHEIGHT=780\nSCREEN=0\n"
+          },
+          {
+            "width": 900,
+            "height": 600,
+            "colors": 53899,
+            "geometry": "WINDOW=4194307\nX=42\nY=100\nWIDTH=900\nHEIGHT=600\nSCREEN=0\n"
+          }
+        ],
+        "exit_code": 0,
+        "appearance_captures": [
+          {
+            "state": "accounts",
+            "expected_theme": "any",
+            "background_rgb": [
+              245,
+              246,
+              250
+            ]
+          },
+          {
+            "state": "drawer",
+            "expected_theme": "drawer",
+            "background_rgb": [
+              182,
+              182,
+              185
+            ]
+          },
+          {
+            "state": "settings",
+            "expected_theme": "light",
+            "background_rgb": [
+              245,
+              246,
+              250
+            ]
+          },
+          {
+            "state": "dark",
+            "expected_theme": "dark",
+            "background_rgb": [
+              32,
+              32,
+              32
+            ]
+          },
+          {
+            "state": "pitch-black",
+            "expected_theme": "black",
+            "background_rgb": [
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "state": "light",
+            "expected_theme": "light",
+            "background_rgb": [
+              245,
+              246,
+              250
+            ]
+          }
+        ],
+        "fullscreen": "F11 entered; Escape restored 900x600"
+      },
+      "binary": "build/linux/x64/release/bundle/bitchord_desktop",
+      "binary_bytes": 24640,
+      "binary_sha256": "6945dc0a07661ae38bf473ee1a797fca544433484a7d50b56ba0e18d527dc74c"
+    },
+    "windows": {
+      "artifact_url": "https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43591352978/artifacts/14112572992",
+      "tests": {
+        "passed": 71,
+        "failed": 0,
+        "skipped": 0,
+        "exit_code": 0
+      },
+      "native_smoke": {
+        "captures": [
+          {
+            "width": 1220,
+            "height": 780,
+            "sampled_colors": 5197,
+            "logo_contrast": 0.39607843137254906
+          },
+          {
+            "width": 900,
+            "height": 600,
+            "sampled_colors": 4655,
+            "logo_contrast": 0.3294117647058824
+          }
+        ],
+        "dpi": 96,
+        "appearance_captures": [
+          {
+            "state": "accounts",
+            "background_rgb": [
+              245,
+              246,
+              250
+            ],
+            "expected_theme": "any"
+          },
+          {
+            "state": "drawer",
+            "background_rgb": [
+              182,
+              182,
+              185
+            ],
+            "expected_theme": "drawer"
+          },
+          {
+            "state": "settings",
+            "background_rgb": [
+              245,
+              246,
+              250
+            ],
+            "expected_theme": "light"
+          },
+          {
+            "state": "dark",
+            "background_rgb": [
+              32,
+              32,
+              32
+            ],
+            "expected_theme": "dark"
+          },
+          {
+            "state": "pitch-black",
+            "background_rgb": [
+              0,
+              0,
+              0
+            ],
+            "expected_theme": "black"
+          },
+          {
+            "state": "light",
+            "background_rgb": [
+              245,
+              246,
+              250
+            ],
+            "expected_theme": "light"
+          }
+        ],
+        "source_commit": "91e49191dac4f079753129b065386d40f7833cb5",
+        "exit_code": 0,
+        "display": "GitHub Windows hosted desktop",
+        "fullscreen": "F11 entered; Escape restored 900x600"
+      },
+      "binary": "build/windows/x64/runner/Release/bitchord_desktop.exe",
+      "binary_bytes": 92672,
+      "binary_sha256": "43c9378b86f3f08101d8c92ec3050114a42f95aa0af6e63db2144883d5c0fd5b"
+    }
+  }
+}
