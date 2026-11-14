@@ -1376,3 +1376,7 @@ The follow-up exact-SHA [43537781237](https://github.com/Bntagaaa/BitChord-Deskt
 4. **Behavioral Parity:** Preserved the pinned Kotlin `DesktopWebSignIn.kt` contract: primary "Sign in inside BitChord" action opens an application-owned WebKitGTK/WebView2 window with an isolated temporary profile, strictly filters cookies to youtube.com, verifies the session through `OnlineAccounts`, offers cancellation, and preserves external browser login as an explicit labeled fallback if Google enforces `disallowed_useragent`.
 
 **Gate: Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** Release matrix and platform verification will run on GitHub Actions upon push.
+
+### Phase 4 official Dart formatting alignment — 2026-11-14
+
+Formatted all Dart files with the official Dart 3.11 formatter (`dart format lib test`) in commit `901b399d`. Verified boundary checks and asset XML/tokens pass. Pushing to trigger the full Windows and Linux test and release build matrix on GitHub Actions.
