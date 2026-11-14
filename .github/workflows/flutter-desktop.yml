@@ -109,6 +109,7 @@ jobs:
           else
             python tool/run_checked.py dependencies flutter pub get
           fi
+          python tool/run_checked.py patch-deps python tool/patch_dependencies.py
       # Verified source must already be formatted; CI must not silently
       # rewrite submitted application code before checking or building it.
       - name: Check Dart formatting

@@ -1380,3 +1380,29 @@ The follow-up exact-SHA [43537781237](https://github.com/Bntagaaa/BitChord-Deskt
 ### Phase 4 official Dart formatting alignment — 2026-11-14
 
 Formatted all Dart files with the official Dart 3.11 formatter (`dart format lib test`) in commit `901b399d`. Verified boundary checks and asset XML/tokens pass. Pushing to trigger the full Windows and Linux test and release build matrix on GitHub Actions.
+
+### Phase 4 verification matrix results & Windows exit crash fix — 2026-11-14
+
+**Matrix run 43553529366 (commit `7a54a08c`):**
+1. **Linux Runner (ubuntu-22.04): 100% SUCCESS across all 27 workflow steps.**
+   - Step 15: Dart format check passed (0 files changed).
+   - Step 18: `flutter analyze --fatal-infos` passed with zero errors or warnings.
+   - Step 19: All 70 unit and widget tests passed (`tests.json` captured).
+   - Step 20: Built Linux release bundle (`build/linux/x64/release/bundle/bitchord_desktop`).
+   - Step 21: Built YouTube PO Token self-contained runtime.
+   - Step 23: Executed release launch smoke test `launch_smoke.py`: initialized window, resized to 1220x780 and 900x600, clicked Accounts ("Sign in inside BitChord"), verified light/dark/pitch-black appearance states, clean exit 0.
+   - Release bundle verified to contain `libdesktop_webview_window_plugin.so` (96 KB) alongside `libbitchord_audio.so` and `bitchord_desktop`.
+2. **Windows Runner (windows-2022):**
+   - Passed formatting check, analyzer, all 70 tests, and release build (`bitchord_desktop.exe`).
+   - Step 25 `Windows release launch smoke` successfully painted the window, resized, tested appearance states, and verified F11 fullscreen / Escape restore.
+   - On line 250 (`PostMessage($handle, 0x0010)` / `WM_CLOSE`), the process exited with code `-1073740771` (`0xC000041D` / `STATUS_FATAL_USER_CALLBACK_EXCEPTION`).
+3. **Upstream Root Cause Diagnosis:**
+   - In `desktop_webview_window: 0.4.2`, the Windows native plugin destructor `WebviewWindowPlugin::~WebviewWindowPlugin()` called `channel_->SetMethodCallHandler(nullptr);`.
+   - When the Flutter engine shuts down, `~FlutterWindowsEngine` detaches the messenger from the engine *before* invoking plugin destructors. Calling `SetMethodCallHandler(nullptr)` dereferences the null engine in `flutter_windows.dll`, crashing on exit with an access violation callback exception.
+   - This was identified and fixed in upstream `MixinNetwork/flutter-plugins` PR #557 (commit `b2c41d0959347b9c05ced87df552ec9600c9b0b4`), but has not yet been tagged into a pub release.
+4. **Resolution:**
+   - Implemented `flutterDesktop/tool/patch_dependencies.py`, which patches `channel_->SetMethodCallHandler(nullptr);` out of `desktop_webview_window` in the pub cache immediately following `flutter pub get`.
+   - Updated `.github/workflows/flutter-desktop.yml` to run `python tool/run_checked.py patch-deps python tool/patch_dependencies.py`.
+   - Updated Linux release artifacts in `flutterDesktop/verification/` and local release bundle.
+
+**Gate: Phase 4 INCOMPLETE; Phase 5 NOT STARTED.** Release matrix and retention will re-run on GitHub Actions upon push.

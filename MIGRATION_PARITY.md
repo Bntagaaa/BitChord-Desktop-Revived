@@ -1593,3 +1593,11 @@ Kotlin reference: `DesktopWebSignIn.kt` (built-in JavaFX WebView), with `Desktop
 4. Maintained primary "Sign in inside BitChord" action with dedicated application-owned WebKitGTK/WebView2 window, isolated temporary profile, cookie filtering, and external browser fallback for Google `disallowed_useragent` policy.
 
 **Status: IMPLEMENTED; CI verification in progress upon push.** Phase 4 INCOMPLETE, Phase 5 NOT STARTED.
+
+### P20 — CI matrix verification results and Windows exit crash mitigation (2026-11-14)
+
+**Linux verification:** Workflow run 43553529366 (commit `7a54a08c`) achieved 100% pass across all 27 steps on Ubuntu 22.04: Dart formatting, analysis, 70/70 tests, Linux release bundle build (`bitchord_desktop`, `libdesktop_webview_window_plugin.so`, `libbitchord_audio.so`), YouTube PO token runtime packaging, and native launch smoke (`launch_smoke.py`) testing window painting, 1220x780 and 900x600 resizing, Accounts page "Sign in inside BitChord", and appearance themes with clean exit code 0.
+
+**Windows exit crash mitigation:** Windows runner passed formatting, analyzer, all 70 tests, and release build, but exited with `0xC000041D` (`STATUS_FATAL_USER_CALLBACK_EXCEPTION`) on `WM_CLOSE` in `launch_smoke_windows.ps1:250`. Root cause identified as upstream `desktop_webview_window 0.4.2` bug (PR #557, commit `b2c41d09`) where plugin destructor calls `channel_->SetMethodCallHandler(nullptr)` after engine detachment, causing a null pointer dereference in `flutter_windows.dll`. Mitigated via `flutterDesktop/tool/patch_dependencies.py` applying the upstream fix to cached pub dependencies after `flutter pub get`.
+
+**Status: IMPLEMENTED, CI verification in progress.** Phase 4 INCOMPLETE, Phase 5 NOT STARTED.
