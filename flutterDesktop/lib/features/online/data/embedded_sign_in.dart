@@ -89,7 +89,7 @@ final class EmbeddedSignIn {
         );
       }
       scope.check();
-      final window = view!;
+      final window = view;
       await window.launch(signInUrl);
       var closed = false;
       unawaited(
