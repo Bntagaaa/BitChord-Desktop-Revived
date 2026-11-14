@@ -264,3 +264,9 @@ The account panel prefers **Sign in inside BitChord**, matching Kotlin DesktopWe
 Linux users must have the WebKitGTK 4.1 runtime and libsoup3 installed (Ubuntu: libwebkit2gtk-4.1-0 and libsoup-3.0-0). Build machines additionally need libwebkit2gtk-4.1-dev and libsoup-3.0-dev. Windows users need WebView2 Runtime, normally present on Windows 11, but potentially missing on Windows 10. These are native WebView system runtimes, not additional full browsers.
 
 **Provider limitation:** Google can reject Google OAuth inside an embedded WebView with error disallowed_useragent. BitChord neither bypasses that restriction nor reports a false successful login. Select **Use installed browser instead** when the Google sign-in page refuses the built-in window. This is a secondary fallback rather than the default path. Real live login and cookie persistence are separate Phase 4 acceptance gates; compilation alone does not prove them.
+
+### November 14 Phase 4 login build status
+
+The native in-app sign-in adapter is implemented with WebView2 on Windows and WebKitGTK 4.1 on Linux, but **live account login has not been accepted yet**. For exact validation, see [Flutter CI 43537781237](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43537781237) on source `3c426fc4`. It was still running when this note was written. The preceding Linux matrix `43536845151` failed in the Dart analyzer because of one unnecessary `!` in `embedded_sign_in.dart` at line 92; commit `3c426fc4` removes it. WebKitGTK installation itself succeeded. Recheck both OS jobs rather than treating the fix commit as a passing release.
+
+Google may refuse embedded WebView OAuth (`disallowed_useragent`); when that happens, the explicit installed-browser fallback is still necessary. No cookies or credentials should be shared in GitHub issues or logs. Phase 4 remains INCOMPLETE and Phase 5 is untouched.
