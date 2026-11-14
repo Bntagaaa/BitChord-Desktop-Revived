@@ -92,17 +92,19 @@ final class EmbeddedSignIn {
       final window = view!;
       await window.launch(signInUrl);
       var closed = false;
-      unawaited(window.onClose.then((_) {
-        closed = true;
-      }));
+      unawaited(
+        window.onClose.then((_) {
+          closed = true;
+        }),
+      );
       final end = DateTime.now().add(_timeout);
       String? candidate;
       while (!closed && DateTime.now().isBefore(end)) {
         scope.check();
         try {
-          final cookies = await window
-              .getAllCookies()
-              .timeout(const Duration(seconds: 4));
+          final cookies = await window.getAllCookies().timeout(
+            const Duration(seconds: 4),
+          );
           scope.check();
           candidate = youtubeHeader(cookies) ?? candidate;
         } on ProviderFailure {
@@ -112,10 +114,7 @@ final class EmbeddedSignIn {
           // WebView error is not an authenticated session or a fatal crash.
         }
         if (closed) break;
-        await Future.any<void>([
-          window.onClose,
-          Future<void>.delayed(_poll),
-        ]);
+        await Future.any<void>([window.onClose, Future<void>.delayed(_poll)]);
       }
       scope.check();
       if (!closed) {

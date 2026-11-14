@@ -75,11 +75,11 @@ class _AccountSessionState extends ConsumerState<AccountSession> {
                   StateError('Built-in sign-in is not available.'),
                 ))
           : browser
-              ? await (ref.read(browserSignInCaptureProvider)?.call(scope) ??
-                    Future<String>.error(
-                      StateError('Browser sign-in is not available.'),
-                    ))
-              : manualCookie;
+          ? await (ref.read(browserSignInCaptureProvider)?.call(scope) ??
+                Future<String>.error(
+                  StateError('Browser sign-in is not available.'),
+                ))
+          : manualCookie;
       scope.check();
       await accounts.signIn(cookie, scope);
       scope.check();

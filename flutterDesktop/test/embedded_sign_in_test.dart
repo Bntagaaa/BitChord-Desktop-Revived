@@ -11,17 +11,16 @@ import '../lib/features/online/domain/online_port.dart';
 import '../lib/features/online/presentation/account_session.dart';
 import 'online_controller_test.dart' show ControlledCatalog;
 
-WebviewCookie cookie(String domain, String name, String value) =>
-    WebviewCookie(
-      name: name,
-      value: value,
-      domain: domain,
-      path: '/',
-      expires: null,
-      secure: true,
-      httpOnly: true,
-      sessionOnly: true,
-    );
+WebviewCookie cookie(String domain, String name, String value) => WebviewCookie(
+  name: name,
+  value: value,
+  domain: domain,
+  path: '/',
+  expires: null,
+  secure: true,
+  httpOnly: true,
+  sessionOnly: true,
+);
 
 class AccountCatalog extends ControlledCatalog implements OnlineAccounts {
   @override
@@ -41,21 +40,23 @@ class AccountCatalog extends ControlledCatalog implements OnlineAccounts {
 }
 
 void main() {
-  test('embedded cookie jar filters unrelated Google and third-party hosts',
-      () {
-    final header = EmbeddedSignIn.youtubeHeader([
-      cookie('.youtube.com', 'SAPISID', 'session-key'),
-      cookie('music.youtube.com', 'LOGIN_INFO', 'selected-channel'),
-      cookie('accounts.google.com', 'SID', 'do-not-export'),
-      cookie('youtube.com.attacker.test', 'LEAK', 'do-not-export'),
-      cookie('spotify.com', 'sp_dc', 'do-not-export'),
-    ]);
-    expect(header, contains('SAPISID=session-key'));
-    expect(header, contains('LOGIN_INFO=selected-channel'));
-    expect(header, isNot(contains('do-not-export')));
-    expect(header, isNot(contains('LEAK')));
-    expect(header, isNot(contains('sp_dc')));
-  });
+  test(
+    'embedded cookie jar filters unrelated Google and third-party hosts',
+    () {
+      final header = EmbeddedSignIn.youtubeHeader([
+        cookie('.youtube.com', 'SAPISID', 'session-key'),
+        cookie('music.youtube.com', 'LOGIN_INFO', 'selected-channel'),
+        cookie('accounts.google.com', 'SID', 'do-not-export'),
+        cookie('youtube.com.attacker.test', 'LEAK', 'do-not-export'),
+        cookie('spotify.com', 'sp_dc', 'do-not-export'),
+      ]);
+      expect(header, contains('SAPISID=session-key'));
+      expect(header, contains('LOGIN_INFO=selected-channel'));
+      expect(header, isNot(contains('do-not-export')));
+      expect(header, isNot(contains('LEAK')));
+      expect(header, isNot(contains('sp_dc')));
+    },
+  );
 
   test('embedded cookie jar does not fabricate an authenticated session', () {
     expect(
@@ -73,8 +74,9 @@ void main() {
     );
   });
 
-  testWidgets('account panel chooses the in-app sign-in port by default',
-      (tester) async {
+  testWidgets('account panel chooses the in-app sign-in port by default', (
+    tester,
+  ) async {
     final port = AccountCatalog();
     var embeddedCalls = 0;
     var externalCalls = 0;
@@ -93,9 +95,7 @@ void main() {
           }),
         ],
         child: const MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(child: AccountSession()),
-          ),
+          home: Scaffold(body: SingleChildScrollView(child: AccountSession())),
         ),
       ),
     );
@@ -107,14 +107,12 @@ void main() {
     expect(externalCalls, 0);
     expect(port.lastCookie, 'SAPISID=signed-in-test');
     expect(port.signedIn, true);
-    expect(
-      find.text('YouTube Music session verified'),
-      findsOneWidget,
-    );
+    expect(find.text('YouTube Music session verified'), findsOneWidget);
   });
 
-  testWidgets('explicit browser fallback never silently runs in-app sign-in',
-      (tester) async {
+  testWidgets('explicit browser fallback never silently runs in-app sign-in', (
+    tester,
+  ) async {
     final port = AccountCatalog();
     var externalCalls = 0;
     await tester.pumpWidget(
@@ -130,9 +128,7 @@ void main() {
           }),
         ],
         child: const MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(child: AccountSession()),
-          ),
+          home: Scaffold(body: SingleChildScrollView(child: AccountSession())),
         ),
       ),
     );
