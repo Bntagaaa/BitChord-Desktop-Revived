@@ -562,7 +562,7 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!_collection)
+        if (!_collection && !search)
           Text(
             widget.title,
             key: const Key('page-heading'),
@@ -760,6 +760,9 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                     ),
                   )
                 : ListView(
+                    padding: const EdgeInsets.only(
+                      bottom: ShellMetrics.contentBottomReserve,
+                    ),
                     children: [
                       if (_collection && state.header != null)
                         CollectionHeader(
@@ -935,6 +938,9 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                       )
                     : null;
                 return ListView.builder(
+                  padding: const EdgeInsets.only(
+                    bottom: ShellMetrics.contentBottomReserve,
+                  ),
                   itemCount: rows.length,
                   itemBuilder: (_, index) => _row(
                     rows[index].entry,

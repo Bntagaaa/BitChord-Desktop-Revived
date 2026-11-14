@@ -1,5 +1,23 @@
 # Migration parity audit — Phase 0
 
+## P02/P04/P29/P30 — visual branch evidence, 2026-11-14
+
+See [VISUAL_PARITY_REPORT.md](VISUAL_PARITY_REPORT.md) for actual Linux Kotlin/
+Flutter window pairs, before/after images, masks, measured bounds and gaps.
+Presentation-only fixes restore the reference Light backdrop, Search y=18 field
+without a duplicate heading, full-height catalog viewports beneath the dock and
+rounded expanded-nav markers. Local analyzer/71 widget-domain tests/debug native
+rendering and 3 screenshot-comparison contracts passed. Scoped Light sidebar and
+Search-field geometry were visually reviewed at 1220×780 / 900×600, 1× display,
+100% UI scale with the installed font. These observations do not promote full
+P-IDs to PARITY_ACCEPTED: live content differs and other variants are unverified.
+
+Audit gaps in P03/P05/P06/P08/P09/P20/P24/P27/P31 are explicitly retained in the
+report. No authentication, audio, provider, network or persistence implementation
+was changed; missing capabilities require coordination with Antigravity. PR CI
+is pending, and this work does not claim Windows native visual parity, pixel-
+perfect parity, performance improvement or complete Phase 4/next-phase acceptance.
+
 ## Reference and evidence contract
 
 Reference: Kotlin branch `1.9.2`, commit `348b613a0c3db1a54de56483ea6f8748d6465211`. Migration branch: `2.0.0-flutter`, created directly from that commit. Date: 2026-11-11. No previous Flutter branch was checked out, merged, or used as implementation input. Neither `flutterApp/` nor `flutterDesktop/` exists in the reference tree. Phase 1 will create only `flutterDesktop/`; the Kotlin tree remains intact. No Flutter application is implemented in Phase 0.

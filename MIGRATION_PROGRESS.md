@@ -1,5 +1,25 @@
 # Migration progress and delivery backlog
 
+## Visual parity branch audit — 2026-11-14
+
+User authorized a presentation-only audit on `codex/visual-parity`, PR target
+`2.0.0-flutter`, superseding direct target-branch delivery for this task.
+Actual pinned Kotlin and Flutter Linux clients were rendered on the same
+XWayland desktop with disposable signed-out profiles. Eight destination pairs,
+Search, account/drawer and two-size shell evidence are recorded in
+[VISUAL_PARITY_REPORT.md](VISUAL_PARITY_REPORT.md) and `visual-parity/`.
+P02/P04/P29/P30 corrections address Light backdrop selection, the extra Search
+heading/inset, catalog content clipping above the glass dock and selected-marker
+corners. Reusable real-window capture/overlay/diff tooling was added.
+
+Local analyzer, **71 Flutter tests**, Linux debug build/native rendering,
+reference/layer/asset checks and **3 comparison-tool tests** passed. New-source
+Windows/Linux release CI remains pending the PR; baseline success 43557922499
+is not promoted. Full Home/Search/provider projections, missing library/player/
+settings surfaces, font distribution, matched content/materials and broader
+native DPI/motion checks remain open. **Phase 4 INCOMPLETE; Phase 5 NOT STARTED.**
+No functional services, Kotlin reference or other worktrees were changed.
+
 Latest Phase 1 status: see the **latest verification and Linux comparison** at the end.
 Earlier dated records are historical evidence, not the current gate status.
 

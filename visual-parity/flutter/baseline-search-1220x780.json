@@ -1,0 +1,15 @@
+{
+  "captured_utc": "2026-11-14T05:28:52.115747+00:00",
+  "method": "manual ImageMagick import -window; metadata reconstructed from actual capture commands and file mtime",
+  "state": "search; signed out; empty queue",
+  "source": "53b83330 baseline debug",
+  "theme": "Light",
+  "ui_scale_percent": 100,
+  "display_scale": "XWayland 1x; 96 DPI",
+  "font": "installed bitchord-sans",
+  "sha256": "c6a50a779f9f9206978852ef27998b6d87b6f2b525c200b024694853df819e62",
+  "size": [
+    1220,
+    780
+  ]
+}
