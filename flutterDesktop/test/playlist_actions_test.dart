@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:bitchord_desktop/features/online/application/catalog_controller.dart';
-import 'package:bitchord_desktop/features/online/data/youtube_music.dart';
-import 'package:bitchord_desktop/features/online/domain/catalog.dart';
-import 'package:bitchord_desktop/features/online/domain/online_port.dart';
+import '../lib/features/online/application/catalog_controller.dart';
+import '../lib/features/online/data/youtube_music.dart';
+import '../lib/features/online/domain/catalog.dart';
+import '../lib/features/online/domain/online_port.dart';
 
 import 'online_controller_test.dart' show ControlledCatalog;
 
