@@ -241,8 +241,10 @@ the page gutter and retain exact renderer-specific RGB assertions; the local
 software-Skia widget regression verifies `(181,182,185)`. The Linux outside
 click also uses the gutter so dismissing a flyout cannot start a guest track.
 No test was disabled and no workflow configuration was changed. The corrected
-Windows native value still requires its real CI capture; corrected matrix
-acceptance remains pending.
+The Windows artifact subsequently confirmed native gutter `(182,182,185)` too;
+its old probe was the red artwork pixel `(188,0,0)`. Native compositing differs
+by one red-channel value from the software widget capture, so each retains its
+measured exact expectation. Corrected matrix acceptance remains pending.
 
 Next concrete work: coordinate matching Home/Search landing and missing
 library/queue/settings capabilities with Antigravity; repeat equivalent settled
