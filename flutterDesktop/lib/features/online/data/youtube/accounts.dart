@@ -4,7 +4,7 @@ import '../youtube_session.dart';
 import '../youtube_session_store.dart';
 
 // One account generation owns all catalog and resolver operations. Switching
-// account/signing out cancels old work instead of merely hiding late UI results.
+// account/signing out cancels old work instead of hiding late UI results.
 final class YouTubeAccounts {
   YouTubeAccounts([this._store]);
   final YouTubeSessionStore? _store;
@@ -22,7 +22,7 @@ final class YouTubeAccounts {
       operation.cancel();
     }
     _active.clear();
-    _store?.clear();
+    _store?.clearSync();
   }
 
   void cancelActive() {
@@ -86,7 +86,8 @@ final class YouTubeAccounts {
         signOut();
         return null;
       }
-      // Temporary network failure: tentatively restore fallback so offline/cached library works
+      // Temporary network failure: tentatively restore fallback so offline or
+      // cached library works.
       if (failure.problem == ProviderProblem.network ||
           failure.problem == ProviderProblem.timeout) {
         _session = fallback;

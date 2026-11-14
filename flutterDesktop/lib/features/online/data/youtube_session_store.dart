@@ -181,16 +181,20 @@ final class YouTubeSessionStore {
     }
   }
 
-  Future<void> clear() async {
+  void clearSync() {
     try {
       final file = _vaultFile;
       if (file.existsSync()) {
-        await file.delete();
+        file.deleteSync();
       }
       final tmp = File('${file.path}.tmp');
       if (tmp.existsSync()) {
-        await tmp.delete();
+        tmp.deleteSync();
       }
     } catch (_) {}
+  }
+
+  Future<void> clear() async {
+    clearSync();
   }
 }

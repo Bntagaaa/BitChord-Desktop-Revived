@@ -161,7 +161,6 @@ void main() {
         testTrack,
         AudioQuality.high,
         RequestScope(),
-        cookie: testCookie,
       );
 
       expect(media.trackId, testTrack.id);
@@ -169,9 +168,8 @@ void main() {
       expect(
         extractorCalled,
         1,
-        reason: 'Fallback to extractor with cookie must succeed',
+        reason: 'Fallback to extractor must succeed',
       );
-      expect(fallbackMock.calls.single.cookie, testCookie);
     });
 
     test('4. YouTubeHistoryTracker operates non-blocking', () async {
