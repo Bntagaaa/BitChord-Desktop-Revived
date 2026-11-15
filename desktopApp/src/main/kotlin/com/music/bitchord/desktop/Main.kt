@@ -119,7 +119,10 @@ private fun desktopMain(
     }
     LaunchedEffect(visible, state.isMinimized) {
         if (!visible || state.isMinimized) {
-            DesktopMemoryOptimizer.onWindowHidden()
+            // Wait one AWT turn after removal so Skiko releases the main window's
+            // native surfaces before malloc_trim / GC. A fast restore cancels this.
+            if (!visible) delay(100L)
+            if (!visible || state.isMinimized) DesktopMemoryOptimizer.onWindowHidden()
         } else {
             DesktopMemoryOptimizer.onWindowShown()
         }
