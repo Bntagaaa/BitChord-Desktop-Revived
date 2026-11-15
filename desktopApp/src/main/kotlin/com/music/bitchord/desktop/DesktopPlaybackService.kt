@@ -34,6 +34,7 @@ internal class DesktopPlaybackService(
         val onLoopStatusChanged: (String) -> Unit,
         val onRateChanged: (Double) -> Unit,
         val onVolumeChanged: (Double) -> Unit,
+        val onPartyAutoplay: () -> Unit = {},
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -74,6 +75,47 @@ internal class DesktopPlaybackService(
         },
     )
 
+    private var personalQueueStash: DesktopQueue? = null
+    private var personalPositionStash = 0L
+    private var personalPlayingStash = false
+
+    /** Listener-group clock/queue reconciliation is background work, not a screen effect. */
+    val partySync = DesktopPartySync(
+        scope = scope,
+        engine = engine,
+        playTrack = { shared, at ->
+            val songs = DesktopQueue.adopt(liveQueue.value.songs, shared.map { it.toDesktopSong() })
+            liveQueue.value = DesktopQueue(songs, at.coerceIn(songs.indices)).trimmed()
+            liveQueue.value.current?.let { song ->
+                selectedSong.value = song
+                engine.load(song, playWhenReady = false)
+            }
+        },
+        localQueue = { liveQueue.value.songs to liveQueue.value.index },
+        applyPartyUpcoming = { upcoming ->
+            liveQueue.value = liveQueue.value.withPartyUpcoming(upcoming.map { it.toDesktopSong() })
+        },
+        applyPartyAutoplay = { activeUi?.onPartyAutoplay?.invoke() },
+        onEnteredParty = {
+            if (personalQueueStash == null) {
+                personalQueueStash = liveQueue.value
+                personalPositionStash = engine.state.value.positionMs
+                personalPlayingStash = engine.state.value.isPlaying
+            }
+        },
+        onLeftParty = {
+            personalQueueStash?.let { original ->
+                liveQueue.value = original
+                selectedSong.value = original.current
+                original.current?.let { engine.load(it, personalPlayingStash, personalPositionStash) }
+                persistQueue()
+            }
+            personalQueueStash = null
+        },
+    )
+
+    init { partySync.start() }
+
     fun attach(callbacks: UiCallbacks) { activeUi = callbacks }
     fun detach(callbacks: UiCallbacks) {
         if (activeUi === callbacks) activeUi = null
@@ -113,6 +155,7 @@ internal class DesktopPlaybackService(
         persistQueue()
         persistence.saveHistory(history.value)
         scope.launch { DesktopScrobbling.updateNowPlaying(song) }
+        partySync.onLocalIntent()
     }
 
     private fun nextHeadless() {
@@ -214,6 +257,7 @@ internal class DesktopPlaybackService(
     fun close() {
         if (!closed.compareAndSet(false, true)) return
         activeUi = null
+        partySync.stop()
         scope.cancel()
         engine.shutdown()
     }
