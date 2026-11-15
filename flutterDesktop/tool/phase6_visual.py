@@ -147,9 +147,27 @@ class Client:
             self.screenshot('drawer-900x600')
             self.input('key', 'Escape')
             self.input('key', 'alt+F4')
-            self.process.wait(timeout=15)
-            if self.process.returncode != 0:
-                raise RuntimeError(f'{self.kind} native close exited {self.process.returncode}')
+            if self.kind == 'reference':
+                # Reference defaults explicitly keep running after close-to-tray.
+                # Observe disappearance; termination below is harness cleanup,
+                # never a claim that reference native shutdown passed.
+                deadline = time.monotonic() + 15
+                while time.monotonic() < deadline:
+                    visible = subprocess.run(['xdotool', 'search', '--onlyvisible', '--name', '^BitChord$'],
+                                             capture_output=True, text=True, timeout=5)
+                    if visible.returncode == 1 and not visible.stdout.strip():
+                        break
+                    time.sleep(.25)
+                else:
+                    raise RuntimeError('Reference close-to-tray did not hide its window')
+                write_json(self.output / 'reference-close.json', {
+                    'window': 'hidden after Alt+F4', 'default': 'tray_icon=true; close_to_tray=true',
+                    'process_exit_before_cleanup': self.process.poll(),
+                    'cleanup': 'harness termination; native quit/physical tray behavior NOT VERIFIED'})
+            else:
+                self.process.wait(timeout=15)
+                if self.process.returncode != 0:
+                    raise RuntimeError(f'{self.kind} native close exited {self.process.returncode}')
         finally:
             stop(self.process)
             log.close()

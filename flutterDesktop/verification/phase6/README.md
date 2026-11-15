@@ -23,7 +23,11 @@ never auto-merge. Automix/ONNX/Loop & Mix remain deferred.
 `phase6-visual-linux` includes per-client action logs, PNGs/metadata/OCR,
 1220×780 and 900×600 clients, side-by-side sheets, overlays, heatmaps,
 unmasked pixel metrics, `coverage.json`, and `summary.md`. Launch/capture/close
-failures fail the check and preserve partial reports. Numeric mismatch is
+failures fail the check and preserve partial reports. Kotlin's default
+close-to-tray must hide the window; its remaining process is then terminated
+as harness cleanup, not accepted as verified native quit or physical tray
+behavior. Flutter must exit zero through its existing native close path.
+Numeric mismatch is
 diagnostic, since signed-out live feeds can return different content and
 known migration gaps are not golden regressions.
 
