@@ -86,7 +86,9 @@ internal class DesktopTrackAnalyzer(
     /** Analyses kept between runs, so a track measured yesterday is not measured again today. */
     private val store = AnalysisStore { DesktopAnalysisRuntime.analysisHome().resolve("upstream-b690dc14-v2").also { it.mkdirs() } }
 
-    private val results = ConcurrentHashMap<String, TrackAnalysis>()
+    // Analyses are persisted to disk. Retain only a small access-order working set in RAM;
+    // current/upcoming tracks are read most often and naturally remain hot.
+    private val results = synchronizedBoundedMap<String, TrackAnalysis>(MAX_CACHED_ANALYSES)
     private val running = ConcurrentHashMap.newKeySet<String>()
     /** Only one drain is scheduled; only current and next are eligible for queued work. */
     private data class AnalysisJob(val song: Song, val stream: DesktopStream?, val seconds: Double)
@@ -96,10 +98,12 @@ internal class DesktopTrackAnalyzer(
     private val activeTaskId = ThreadLocal<String?>()
 
     /** Tracks the analyser could not measure. */
-    private val failed = ConcurrentHashMap.newKeySet<String>()
+    private val failed = java.util.Collections.newSetFromMap(
+        synchronizedBoundedMap<String, Boolean>(MAX_CACHED_FAILURES),
+    )
 
-    /** When each of [failed] last failed, so it is retried on a cooldown rather than every tick. */
-    private val failedAt = ConcurrentHashMap<String, Long>()
+    /** Failed IDs also have a bounded memory lifetime. Retry-after still applies to recent IDs. */
+    private val failedAt = synchronizedBoundedMap<String, Long>(MAX_CACHED_FAILURES)
 
     /** Said once, not once a tick. */
     private val warnedNoAnalyser = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -545,6 +549,8 @@ internal class DesktopTrackAnalyzer(
 
         /** How long a track that failed to be measured waits before it is tried again. */
         const val RETRY_AFTER_MS = 60_000L
+        private const val MAX_CACHED_ANALYSES = 64
+        private const val MAX_CACHED_FAILURES = 256
         private const val NEUTRAL_VOCAL = 0.2
         private const val WINDOW_OVERLAP_SECONDS = 1.0
 
