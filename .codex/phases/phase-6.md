@@ -4,6 +4,51 @@
 
 **Delivery automation for this phase:** implement in reviewable increments; run available focused formatting, analysis, tests and platform checks; update P-ID evidence and progress; commit only your task-related changes; `git push origin 2.0.0-flutter` (normal non-force push) after checks pass or are explicitly documented as environment-blocked. Pushing triggers the Flutter Desktop GitHub Actions Windows/Linux matrix. Wait for the triggered run's terminal outcome and inspect both jobs and evidence artifacts when tooling/access allows. Fix code/CI failures in scope, then push a new commit and recheck. A blocked CI or missing platform evidence means **INCOMPLETE**, never silently green. Do not amend/force-push, publish releases, or delete unrelated work. If network or runner access prevents checking the final run, report its URL/status as unverified instead of asserting success. Do not begin the next phase automatically.
 
+## Comprehensive exploratory parity — entire application, not screenshot-driven (2026-11-15)
+
+**The user screenshots and the named floating-player/Accounts/Settings defects are
+examples, NOT the audit boundary, an exhaustive checklist or a prioritization
+ceiling.** Codex must independently discover, exercise and compare **every
+reachable user-facing surface and meaningful state** of the pinned Kotlin
+reference against Flutter, even if the user never mentioned it and no PNG
+exists. Do not optimize only for the four screenshots, only for Home, or
+only for the Phase 6 player page. Think like a full-product exploratory
+QA engineer, not a screenshot imitation task.
+
+Before editing UI, inventory the Kotlin app's navigation graph and all
+reachable routes, nested subpages, modal sheets, drawers, popovers, context
+menus, dialogs, tabs, panels, tooltips, empty/loading/error/signed-in/out
+states, scroll/hover/keyboard interactions, window sizes and themes.
+Explore Home, Search, Library, playlists/albums/artists, history, downloads,
+queue, player (idle/playing/fullscreen/lyrics), account management,
+Settings and every other visible destination. The inventory is **discovered
+from the running reference**, not assumed complete from this list.
+Exercise real navigation, playback and representative user actions in
+both apps; discover secondary screens through clicks, right-clicks,
+keyboard shortcuts, menus and scrolling. Compare visual hierarchy and
+behavior with identical content/state. Where an action is dangerous or
+would mutate remote data, use safe non-destructive inspection or explicitly
+record BLOCKED.
+
+For every discovered route/state, record Kotlin entry path, actions to
+reproduce, expected visual/interaction contract, matching Flutter state,
+reference and Flutter screenshots, defects, severity and PASS/FAIL/BLOCKED.
+Maintain a coverage matrix distinguishing **inspected, implemented,
+matched, unimplemented-disabled, inaccessible and not-yet-inspected**.
+Never call a state PASS without actually visiting it in both apps.
+A screenshot can illustrate a defect but cannot substitute for exploring
+the rest of the application. Fix regressions and meaningful UI mismatches
+across the entire app within the approved visual parity scope, prioritizing
+shared components and high-frequency interactions; preserve working
+features and do not expand backend feature scope. If time/tools are
+insufficient, list all uninspected routes as NOT VERIFIED and leave Phase 6
+visual parity INCOMPLETE rather than claiming global 1:1.
+
+**Special requirement remains:** reconstruct the full Kotlin Settings
+information architecture (every menu and nested screen), with unsupported
+items clearly disabled/greyed out and inaccessible to click/keyboard.
+These examples are minimum regression gates, not the maximum audit scope.
+
 ## Mandatory interactive visual parity protocol (user instruction, 2026-11-15)
 
 **This is an acceptance gate, not an optional polish pass.** Prior agents

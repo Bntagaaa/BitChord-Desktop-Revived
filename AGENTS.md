@@ -26,6 +26,20 @@ These instructions apply to this repository when working on the clean Flutter De
 - Match original assets, iconography, layout metrics, motion, themes, keyboard behavior, and responsive states. Do not invent music catalogs, mock successful playback, fake network responses in production, or substitute generic Material controls where the reference differs.
 - Memory efficiency is an explicit objective, **not** permission to remove features or disable effects silently. Benchmark matched release workloads and track image/cache/decoder/resource lifetimes.
 
+## Whole-application exploratory UI parity is mandatory in Phase 6
+
+The user-provided Home/player, Accounts and Settings screenshots are
+**illustrative failures, not a scope restriction**. Codex must discover
+the full Kotlin navigation graph and exercise all reachable Flutter
+surfaces and states, including nested menus/dialogs, playback,
+library/search/history/downloads, queue, Settings, accounts, overlays,
+window sizes and themes. Never stop after fixing the three examples or
+the first Home screenshot. Capture matched post-interaction evidence and
+record every visited, mismatched, blocked and uninspected route. Do not
+claim full parity with incomplete coverage. Visual/UI behavior fixes are
+authorized; backend feature additions are not. See the comprehensive
+exploratory protocol in `.codex/phases/phase-6.md`.
+
 ## Interactive UI parity is mandatory in Phase 6
 
 Do **not** use the initial Home screenshot as the sole visual check. Run both

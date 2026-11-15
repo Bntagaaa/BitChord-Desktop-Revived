@@ -1,5 +1,20 @@
 # Migration progress and delivery backlog
 
+## Phase 6 expanded audit scope — entire application (2026-11-15)
+
+User clarification: the four comparison screenshots and player, account
+and Settings differences are **examples only**. The required audit is
+whole-application exploratory parity. Codex must independently navigate
+every discoverable Kotlin screen and interaction state (including nested
+menus, overlays, Search, Library, history, downloads, queue, playback,
+accounts, Settings, resize, theme and error/empty/loading states) and
+compare the same states in Flutter. Maintain a complete navigation and
+state coverage matrix, per-state paired screenshots, reproducible steps
+and PASS/FAIL/BLOCKED/NOT VERIFIED outcomes. Missing coverage is not
+parity acceptance. Correct visual differences without expanding the
+approved backend scope. Full Kotlin Settings menu visuals remain a
+mandatory minimum, with unsupported controls visibly disabled.
+
 ## Phase 6 user-directed visual parity re-audit — 2026-11-15
 
 Phase 5 **limited checkpoint** PR #141 was merged as
