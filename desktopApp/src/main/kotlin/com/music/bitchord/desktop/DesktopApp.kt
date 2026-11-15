@@ -1785,14 +1785,42 @@ internal fun BitChordDesktopApp(
         playbackEngine.pause()
         partySync.onLocalIntent()
     }
-    val mprisController = remember(playbackEngine) {
-        DesktopMprisController(
-            onRaise = DesktopWindowVisibility::raise,
+    // The main UI contributes richer queue/party actions only while it is mounted. On tray/PiP
+    // the process playback service owns the callbacks and does not retain this composition.
+    DisposableEffect(playbackService, partySync) {
+        val callbacks = DesktopPlaybackService.UiCallbacks(
+            onEnded = {
+                selectedSong?.let(DesktopScrobbling::onPlaybackEnded)
+                if (DesktopSleepTimer.afterTrack.value) {
+                    DesktopSleepTimer.cancel()
+                } else if (repeatMode == DesktopRepeatMode.ONE) {
+                    val song = selectedSong
+                    if (song != null && liveQueue.current?.videoId == song.videoId) playCurrent()
+                    else song?.let { startSong(it, true) }
+                } else playNext()
+            },
+            onCrossfaded = { song ->
+                scope.launch {
+                    liveQueue = liveQueue.afterHandoffTo(song.videoId)
+                    saveQueue()
+                    selectedSong = song
+                    history = (listOf(song) + history.filterNot { it.videoId == song.videoId }).take(50)
+                    persistence.saveHistory(history)
+                    DesktopScrobbling.updateNowPlaying(song)
+                    partySyncHolder[0]?.onLocalIntent()
+                }
+            },
             onPlay = ::playFromUser,
             onPause = ::pauseFromUser,
             onPlayPause = ::togglePlayPauseFromUser,
             onNext = ::playNext,
             onPrevious = ::playPrevious,
+            onSeek = { positionMs ->
+                if (!DesktopListenTogether.state.value.controlsLocked) {
+                    playbackEngine.seekTo(positionMs)
+                    partySync.onLocalIntent()
+                }
+            },
             onShuffleChanged = { enabled ->
                 shuffle = enabled
                 persistence.saveBoolean("shuffle", enabled)
@@ -1813,31 +1841,9 @@ internal fun BitChordDesktopApp(
                 volume = value.toFloat().coerceIn(0.0f, 1.0f)
                 persistence.saveString("volume", volume.toString())
             },
-            onSeek = { positionMs ->
-                if (!DesktopListenTogether.state.value.controlsLocked) {
-                    playbackEngine.seekTo(positionMs)
-                    partySync.onLocalIntent()
-                }
-            },
         )
-    }
-    DisposableEffect(mprisController) {
-        mprisController.start()
-        onDispose { mprisController.stop() }
-    }
-    // The Windows half of the same idea. Linux has MPRIS above; on Windows this
-    // is what the media keys and the volume flyout's card talk to.
-    DisposableEffect(playbackEngine) {
-        DesktopWindowsMedia.start(
-            DesktopWindowsMedia.Controller(
-                onPlay = ::playFromUser,
-                onPause = ::pauseFromUser,
-                onNext = ::playNext,
-                onPrevious = ::playPrevious,
-                onStop = ::pauseFromUser,
-            ),
-        )
-        onDispose { DesktopWindowsMedia.stop() }
+        playbackService.attach(callbacks)
+        onDispose { playbackService.detach(callbacks) }
     }
 
     LaunchedEffect(playbackSpeed) { playbackEngine.setPlaybackSpeed(playbackSpeed) }
@@ -1956,24 +1962,14 @@ internal fun BitChordDesktopApp(
 
     // The shared player reads the playhead off this one object, and only where it
     // draws it — see PlaybackPosition — so a tick never recomposes the player.
-    val playerPosition = remember { PlaybackPosition() }
-    LaunchedEffect(playbackEngine) {
-        playbackEngine.state.collect {
-            // The audio thread's own timestamp, not this collector's: it runs on the UI thread and
-            // gets to a reading as late as the UI is busy.
-            playerPosition.report(it.positionMs, it.positionSampledAtNanos)
-            playerPosition.seeks = it.seeks
-            playerPosition.advancing = !it.awaitingAudio
-            DesktopPlayerHost.videoClock.value = it
-        }
-    }
+    val playerPosition = playbackService.position
 
     // Lyrics and motion artwork follow whatever is *playing*, not whatever page happens to be open.
     // This is where Android keeps it — `MainActivity`, keyed on the player's own track — so the
     // lookup starts the moment a track does and the panel is already populated by the time anyone
     // opens the player. Run from the player page instead, nothing was fetched until it was opened,
     // and a track half a minute in then showed a skeleton and arrived mid-song.
-    val lyricsSession = remember { DesktopLyricsSession() }
+    val lyricsSession = playbackService.lyricsSession
     val lyricsSnapshot = lyricsSession.state
     val lyrics = lyricsSnapshot.result
     // The provider picked for this track in the player's lyrics drawer, if any.
@@ -1983,17 +1979,14 @@ internal fun BitChordDesktopApp(
     val lyricsError = lyricsSnapshot.error
     var canvas by remember { mutableStateOf<DesktopCanvasArtwork?>(null) }
 
-    // snapshotFlow reacts to live state even while the hidden main Window cannot render frames.
-    // One collector owns all lookups for main/fullscreen/PiP and cancels the previous track.
-    LaunchedEffect(playbackEngine) {
-        lyricsSession.follow(snapshotFlow {
-            val current = selectedSong
-            DesktopLyricsRequest(current,
-                playback.durationMs.takeIf { playback.song?.videoId == current?.videoId } ?: 0L,
-                syncedLyrics, videoBetaEnabled, prioritizeSyllables, lyricsOn, lyricsOrder,
-                lyricsOnly?.takeIf { it.first == current?.videoId }?.second)
-        }, currentTrack = { selectedSong?.videoId },
-            onLoaded = { id, result -> playbackEngine.setLoopLyrics(id, result.lines) })
+    // Keep the request settings live; the actual lyrics collector is process-owned, so the
+    // PiP and future tracks still receive lyrics after the main composition has been removed.
+    SideEffect {
+        playbackService.lyricsSettings.value = DesktopLyricsRequest(
+            selectedSong, playback.durationMs, syncedLyrics, videoBetaEnabled,
+            prioritizeSyllables, lyricsOn, lyricsOrder,
+            lyricsOnly?.takeIf { it.first == selectedSong?.videoId }?.second,
+        )
     }
 
     LaunchedEffect(selectedSong?.videoId, selectedSong?.isVideo, animatedCanvas) {
@@ -2008,27 +2001,7 @@ internal fun BitChordDesktopApp(
         canvas = withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(current) }
     }
 
-    LaunchedEffect(
-        playback.song?.videoId,
-        playback.isPlaying,
-        playback.durationMs,
-        playback.volume,
-        playback.error,
-        shuffle,
-        repeatMode,
-        playbackSpeed,
-    ) {
-        mprisController.update(
-            playback = playbackEngine.state.value,
-            shuffle = shuffle,
-            loopStatus = when (repeatMode) {
-                DesktopRepeatMode.OFF -> "None"
-                DesktopRepeatMode.ALL -> "Playlist"
-                DesktopRepeatMode.ONE -> "Track"
-            },
-            rate = playbackSpeed.toDouble(),
-        )
-    }
+
     LaunchedEffect(playback.song?.videoId, playback.isPlaying, playback.durationMs) {
         val snapshot = playbackEngine.state.value
         DesktopScrobbling.onPlaybackStateChanged(snapshot)
