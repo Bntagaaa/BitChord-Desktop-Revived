@@ -4,9 +4,35 @@
 
 **Delivery automation for this phase:** implement in reviewable increments; run available focused formatting, analysis, tests and platform checks; update P-ID evidence and progress; commit only your task-related changes; `git push origin 2.0.0-flutter` (normal non-force push) after checks pass or are explicitly documented as environment-blocked. Pushing triggers the Flutter Desktop GitHub Actions Windows/Linux matrix. Wait for the triggered run's terminal outcome and inspect both jobs and evidence artifacts when tooling/access allows. Fix code/CI failures in scope, then push a new commit and recheck. A blocked CI or missing platform evidence means **INCOMPLETE**, never silently green. Do not amend/force-push, publish releases, or delete unrelated work. If network or runner access prevents checking the final run, report its URL/status as unverified instead of asserting success. Do not begin the next phase automatically.
 
+## User-approved Phase 6 entry and branch workflow (2026-11-15)
+
+The user authorized Phase 6 **after** merging the verified **limited Phase 5
+checkpoint** (PR #141). The original full Phase 5 remains INCOMPLETE because
+advanced Automix/planner/ONNX/Loop & Mix were explicitly DEFERRED. Phase 6
+must not depend on those absent capabilities, advertise them, or erase their
+P10–P16 acceptance backlog. Phase 4 and physical-audio/close reliability
+limitations are still open; do not promote them via a successful UI build.
+
+Once PR #141's Windows/Linux jobs pass and it is merged, base Phase 6 on the
+latest `origin/2.0.0-flutter` commit and work on
+`codex/phase6-player-lyrics`; do not reuse the Phase 5 worktree branch as
+the PR head. Open a PR targeting `2.0.0-flutter`, verify both OS CI results
+and native GUI/lyrics evidence, and **do not auto-merge**. This branch/PR rule
+supersedes the generic direct-push instructions above. Do not start Phase 7.
+
+Priority: faithful Kotlin Fullscreen Player, dock/expanded/queue surfaces and
+synced Lyrics, then Canvas/video/PiP with real capabilities and lifecycle
+proof. Use the existing authoritative native source-time clock; on seek,
+silence skip, playback speed, pause, buffering, source change or UI stall
+handle discontinuities before showing synchronized text/frames. Persist
+source/provider choice and offsets; avoid mock playback or invented lyric
+results.
+
 ## Prerequisites
 
-Phase 2 visual contracts and Phases 3–5 audio/source behavior
+Phase 2 visual contracts and verified native Phase 3/4 audio/source contracts,
+plus the merged **scoped Phase 5** EQ/speed/sleep checkpoint; advanced
+Automix/ONNX/Loop & Mix are deferred, not entry blockers.
 
 ## Implementation tasks
 

@@ -6,6 +6,7 @@ import 'core/platform/audio/native_api.dart';
 import 'features/local_data/data/sqlite_repository.dart';
 import 'features/local_music/data/local_files.dart';
 import 'features/playback/application/local_playback.dart';
+import 'features/playback/application/listening_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' as foundation;
@@ -19,6 +20,7 @@ import 'features/online/application/account_sign_in.dart';
 import 'features/online/data/browser_sign_in.dart';
 import 'features/online/data/embedded_sign_in.dart';
 import 'features/online/data/online_runtime.dart';
+import 'features/playback/application/sleep_controller.dart';
 import 'core/platform/desktop_host.dart';
 import 'core/platform/diagnostics.dart';
 import 'features/shell/application/shell_controller.dart';
@@ -99,6 +101,8 @@ Future<void> main(List<String> arguments) async {
   final container = ProviderContainer(
     overrides: [
       onlinePortProvider.overrideWithValue(online),
+      listeningPortProvider.overrideWithValue(online),
+      sleepPortProvider.overrideWithValue(online),
       embeddedSignInCaptureProvider.overrideWithValue(
         EmbeddedSignIn.captureYouTube,
       ),
@@ -113,6 +117,7 @@ Future<void> main(List<String> arguments) async {
   );
   host.beforeClose = () async {
     await container.read(shellProvider.notifier).flush();
+    await container.read(listeningProvider.notifier).flush();
     container.read(catalogProvider.notifier).cancel();
     await online.close();
     container.dispose();

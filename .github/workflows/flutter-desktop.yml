@@ -3,7 +3,7 @@ name: Flutter desktop foundation
 on:
   workflow_dispatch:
   push:
-    branches: [2.0.0-flutter, agy/phase4-auth-audio, codex/visual-parity]
+    branches: [2.0.0-flutter, agy/phase4-auth-audio, codex/visual-parity, codex/phase5-advanced-listening]
     paths: ['flutterDesktop/**', '.github/workflows/flutter-desktop.yml', 'AGENTS.md', '.codex/phases/**', 'FUNCTIONAL_RELIABILITY_REPORT.md']
   pull_request:
     branches: [2.0.0-flutter]
@@ -94,6 +94,7 @@ jobs:
           python tool/run_checked.py native-tests ctest --test-dir build/native -C Release --output-on-failure
           python tool/run_checked.py native-platform python tool/phase3_platform.py
       - name: Generate official platform hosts and record SDK provenance
+        # Phase 5 reference corpus is checked after fetching the pinned Git object.
         run: |
           mkdir -p verification
           python tool/run_checked.py doctor flutter doctor -v
@@ -103,6 +104,13 @@ jobs:
           python tool/run_checked.py reference python tool/verify_reference_tokens.py
           git fetch --no-tags --depth=1 origin 348b613a0c3db1a54de56483ea6f8748d6465211
           python tool/run_checked.py phase2-reference python tool/phase2_reference.py --check
+          python tool/run_checked.py phase5-reference python tool/phase5_reference.py --check
+      - name: Check native address, undefined behavior and leak instrumentation
+        if: runner.os == 'Linux'
+        run: |
+          python tool/run_checked.py native-sanitize-configure cmake -S native/audio -B build/native-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DBC_SANITIZE=ON
+          python tool/run_checked.py native-sanitize-build cmake --build build/native-asan --parallel 2
+          python tool/run_checked.py native-sanitize-tests ctest --test-dir build/native-asan --output-on-failure
       - name: Resolve dependencies
         run: |
           if [ -f pubspec.lock ]; then
@@ -120,6 +128,11 @@ jobs:
         run: |
           python tool/run_checked.py kotlin-import python tool/test_kotlin_export.py
           python tool/run_checked.py phase3-ffi dart run tool/phase3_check.dart
+          if [ "$RUNNER_OS" = Windows ]; then
+            python tool/run_checked.py phase5-ffi dart run tool/phase5_check.dart build/native/Release/bitchord_audio.dll native/audio/test/fixtures/tone.wav
+          else
+            python tool/run_checked.py phase5-ffi dart run tool/phase5_check.dart build/native/libbitchord_audio.so native/audio/test/fixtures/tone.wav
+          fi
       - name: Check real provider HTTP, offline integrity and native source broker
         timeout-minutes: 3
         run: python tool/run_checked.py phase4-http python tool/phase4_platform.py

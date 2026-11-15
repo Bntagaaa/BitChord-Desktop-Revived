@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import '../../../core/domain/audio_contract.dart';
 import '../../playback/application/local_playback.dart';
 import '../../playback/domain/local_queue.dart';
+import '../../playback/domain/listening_settings.dart';
+import '../../playback/domain/sleep_timer.dart';
 import '../domain/catalog.dart';
 import '../domain/online_port.dart';
 import 'addon_provider.dart';
@@ -29,7 +31,10 @@ final class OnlineRuntime
         OnlineSuggestions,
         OnlineLibrary,
         OnlinePlaylistEditor,
-        OnlinePlaybackIdentity {
+        OnlinePlaybackIdentity,
+        ListeningPort,
+        SleepPort,
+        TempoPort {
   OnlineRuntime(this.playback, Directory downloads, {String? storageRoot})
     : store = DownloadStore(downloads),
       _historyTracker = YouTubeHistoryTracker() {
@@ -48,6 +53,22 @@ final class OnlineRuntime
     );
   }
   final LocalPlayback playback;
+  @override
+  bool get supportsTempo => playback.supportsTempo;
+  @override
+  bool get supportsSleep => playback.supportsSleep;
+  @override
+  Future<void> configureSleep(SleepRequest request) =>
+      _ordered(() => playback.configureSleep(request));
+  @override
+  Future<SleepStatus> sleepStatus() => _ordered(playback.sleepStatus);
+  @override
+  bool get supportsListening => playback.supportsListening;
+  @override
+  ListeningSettings get listening => playback.listening;
+  @override
+  Future<void> configureListening(ListeningSettings settings) =>
+      _ordered(() => playback.configureListening(settings));
   final DownloadStore store;
   final _artwork = ArtworkLoader();
   final YouTubeHistoryTracker _historyTracker;

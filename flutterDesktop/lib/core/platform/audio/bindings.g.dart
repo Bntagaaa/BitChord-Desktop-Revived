@@ -500,6 +500,18 @@ const int BC_CLEAR_NEXT = 9;
 
 const int BC_DEVICE = 10;
 
+const int BC_DSP = 11;
+
+const int BC_CAP_DSP = 256;
+
+const int BC_SLEEP = 12;
+
+const int BC_CAP_SLEEP = 512;
+
+const int BC_LISTEN = 13;
+
+const int BC_CAP_LISTEN = 1024;
+
 const int BC_IDLE = 0;
 
 const int BC_BUFFERING = 1;
@@ -523,6 +535,8 @@ const int BC_COMMAND_FAILED = 2;
 const int BC_EVENT_COMMAND = 0;
 
 const int BC_EVENT_ADOPTED = 1;
+
+const int BC_EVENT_SLEEP = 2;
 
 const int BC_ERROR_DECODE = 100;
 

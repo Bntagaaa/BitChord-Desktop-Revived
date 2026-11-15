@@ -1,5 +1,61 @@
 # Migration parity audit — Phase 0
 
+## Active authorization — scoped Phase 5 checkpoint and Phase 6 (2026-11-15)
+
+The user explicitly deferred **advanced Automix, ONNX beat/vocal analysis and
+Loop & Mix** to a future backlog and authorized proceeding to **Phase 6** after
+the verified Phase 5 checkpoint is reconciled and merged. This is a **scope
+exception, not full Phase 5 parity acceptance**. Keep P10–P16 original contracts,
+full planner/two-deck overlap/transition fixtures, ordinary crossfade if not
+independently proved, memory/physical-listening evidence and all missing
+requirements visible as DEFERRED or NOT VERIFIED. Never label them COMPLETE,
+remove them silently, or offer controls whose native capability is absent.
+
+The checkpoint includes implemented EQ/spatial, speed/silence source clocks and
+sleep controls subject to verification. Resolve PR #141's Windows tests, preserve
+the auto-retained baseline and auth/history behavior from `2.0.0-flutter`,
+require the current PR-head Windows/Linux CI, and merge only after successful
+checks. Outstanding earlier Phase 4 and Linux shutdown/physical parity gates
+remain tracked; passing the scoped checkpoint does not close them.
+
+For Phase 6, create `codex/phase6-player-lyrics` from the **merged latest**
+`origin/2.0.0-flutter`. Implement P22–P27 (lyrics and every player surface)
+using the existing native source clock and one audio engine; do not couple
+lyrics/player rendering to absent Automix/ONNX components. Keep any unavailable
+video/Canvas/PiP or source capabilities explicitly gated; no placeholder parity
+claim. Make a reviewed PR into `2.0.0-flutter`, verify both platform jobs, and
+**never auto-merge**. The user has authorized Phase 6, not Phase 7.
+
+## P11/P12/P14–P16 — Phase 5 DSP increment, 2026-11-14
+
+**Phase 5 INCOMPLETE**, authorized on `codex/phase5-advanced-listening`.
+Pinned Kotlin remains `348b613a`; the complete per-source/status/gap table is in
+[verification/phase5/README.md](flutterDesktop/verification/phase5/README.md).
+P14 EQ/widening, speed/silence and P11/P12 composed clock behavior are locally
+FIXTURE_TESTED against **38 executed Kotlin PCM cases** and ten source-clock
+traces (exact sample counts, observed maximum absolute PCM difference 0 within
+1e-4 EQ/2e-6 other tolerances, predeclared 2-us clock tolerance). P15 echo remains
+a tested primitive only. Native `ListeningPipeline` retains surplus and partial
+writes, drains tempo at EOF and resets on timeline changes. ABI 1 layouts remain
+unchanged; generated constants negotiate DSP/listener/sleep independently.
+
+Advanced P10–P13 native sleep now owns monotonic deadline/cancel/after-track,
+nomination suppression, presented-position resume and EOF pause; expiry events
+carry their arming command ID. Flutter persisted speed/silence and session sleep
+controls are IMPLEMENTED/FIXTURE_TESTED, without native visual acceptance.
+All five native tests passed with address/undefined/leak instrumentation using
+approved process access. Actual Linux libpulse baseline and four tempo/after-
+track trials presented PCM and passed FFI/persistence. This scoped Linux output
+is PLATFORM_VERIFIED; physical audibility and Windows output remain unverified.
+
+The earlier socket/LeakSanitizer/ffigen/audio access restrictions were resolved
+through approved reruns. Full P15 planner/two-deck/filter/ride integration, P16
+ONNX/model/cache/worker/Loop & Mix/UI and the complete interruption, telemetry,
+allocation and physical two-OS acceptance matrix are still unfinished.
+Publication/new-source CI evidence is tracked in the ledger. **Phase 5 INCOMPLETE;
+no whole P-ID PARITY_ACCEPTED, RAM-reduction claim, merge or Phase 6 work.**
+
+
 ## P02/P04/P29/P30 — visual branch evidence, 2026-11-14
 
 See [VISUAL_PARITY_REPORT.md](VISUAL_PARITY_REPORT.md) for actual Linux Kotlin/

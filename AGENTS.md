@@ -28,6 +28,22 @@ These instructions apply to this repository when working on the clean Flutter De
 
 ## Current phase discipline
 
+### User-authorized Phase 5 checkpoint → Phase 6 handoff (2026-11-15)
+
+Phase 5 advanced Automix/full transition planner, ONNX beat/vocal analysis
+and Loop & Mix are **deferred** by user decision, not parity-complete. Preserve
+their P10–P16 backlog and all incomplete acceptance gates. A verified, limited
+EQ/spatial/speed/silence/sleep checkpoint can be merged into `2.0.0-flutter`
+without claiming full Phase 5 completion. Windows/Linux current-source CI
+must pass; do not merge a red or conflicted PR.
+
+The user explicitly authorized Phase 6 after that merge. Start a fresh
+`codex/phase6-player-lyrics` branch from the current `origin/2.0.0-flutter`,
+read `.codex/phases/phase-6.md`, implement real player/lyrics P22–P27, and
+open a PR to `2.0.0-flutter`. Do not auto-merge Phase 6 or start Phase 7.
+These dated user-approved instructions supersede older generic "push directly
+to 2.0.0-flutter" language for Phase 6; preserve historical evidence.
+
 - Phase 0 and Phase 0.5 are documentation/architecture work already recorded in the migration files.
 - Phase 1 created a Flutter foundation/shell, but **its acceptance is not automatically complete**: the documented Windows CI passed while Linux dependency installation failed in run `43041242897`; Linux native launch, Kotlin-vs-Flutter visual comparison, and other Phase 1 gates remain unverified as of that run.
 - Before any Phase 2 work, recheck current branch and CI status, then address or explicitly report outstanding Phase 1 gates. Do not infer a later result from this historical note.

@@ -4,6 +4,27 @@
 
 **Delivery automation for this phase:** implement in reviewable increments; run available focused formatting, analysis, tests and platform checks; update P-ID evidence and progress; commit only your task-related changes; `git push origin 2.0.0-flutter` (normal non-force push) after checks pass or are explicitly documented as environment-blocked. Pushing triggers the Flutter Desktop GitHub Actions Windows/Linux matrix. Wait for the triggered run's terminal outcome and inspect both jobs and evidence artifacts when tooling/access allows. Fix code/CI failures in scope, then push a new commit and recheck. A blocked CI or missing platform evidence means **INCOMPLETE**, never silently green. Do not amend/force-push, publish releases, or delete unrelated work. If network or runner access prevents checking the final run, report its URL/status as unverified instead of asserting success. Do not begin the next phase automatically.
 
+## User-approved reduced-scope checkpoint (2026-11-15)
+
+User deferred advanced Automix/full transition planner, ONNX model processing
+and Loop & Mix. Maintain their original tasks and acceptance as an explicit
+DEFERRED backlog; do not mark any related parity ID accepted or remove the
+native C++17 ownership plan. Crossfade and full two-deck transitions also
+remain unverified unless separately implemented and measured.
+
+For the current PR #141, reconcile trusted generated-host/auth changes from
+`2.0.0-flutter`, fix Windows native deadline regressions with no disabled tests,
+then check exact-head Linux **and** Windows release CI. The already-implemented
+EQ, spatial, speed/silence and sleep capability can then be merged as a
+**Phase 5 limited checkpoint**, not as full Phase 5 completion. Earlier Phase 4,
+Linux close stability, physical audio, performance and full parity blockers
+stay recorded. Only begin Phase 6 after this checkpoint is merged and the user
+has authorized it (authorization recorded in MIGRATION_PROGRESS).
+
+**Branch delivery for this checkpoint supersedes generic push instructions
+above:** work on `codex/phase5-advanced-listening`, PR into `2.0.0-flutter`;
+no direct target-branch changes, force-push or merge before successful CI.
+
 ## Prerequisites
 
 Phase 3 engine + Phase 4 playable sources
