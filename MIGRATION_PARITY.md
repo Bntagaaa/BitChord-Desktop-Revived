@@ -1,5 +1,61 @@
 # Migration parity audit — Phase 0
 
+## P02/P20/P24/P29–P30 — production visual implementation, 2026-11-15
+
+Actual Flutter widgets now changed in `features/online/presentation/` (Home and
+account picker), `features/shell/presentation/settings_page.dart` and
+`desktop_shell.dart` (18-section searchable Settings and panel hosting), and
+`features/playback/presentation/player_surfaces.dart`/`listening_panel.dart`
+(active dock, expanded player, real context Queue/Details and Phase 5 controls).
+Reference: pinned `348b613a` DesktopApp/DesktopAccountUi/DesktopOverlays/
+DesktopSidePanel/DesktopSurfaces, shared HomeScreen/LandscapePlayer/LyricsSource.
+Four user screenshots inspected; their personal data is not copied into UI.
+
+Status **IMPLEMENTED; exact-source CI pending**, not PARITY_ACCEPTED. Tests added
+for Home list/grid, disabled Settings/search/back, native appearance keyboard
+sequence, playing dock/expanded player/Queue/Escape at both target sizes. Existing
+release-only seek and superseded-selection tests retained after moving transport.
+
+P20: single existing account shown; identity metadata and multi-account switching
+remain missing and second Add is disabled. P22/P23: unavailable lyric panel and
+source settings structure only, no provider or timing completion. P24: visual
+transport/expanded/Queue subset; shuffle/repeat/volume/device remain disabled.
+P25/P26: no video/Canvas addition. P27: independent Mini Player/PiP window remains
+unimplemented. Settings unsupported controls are disabled, secondary content is
+partial; full navigation/state/motion/DPI/platform exploration is NOT VERIFIED.
+Phase 6 **INCOMPLETE**. P10–P16 deferred backlog remains unchanged.
+
+## Phase 6 hosted visual verification — 2026-11-15
+
+P02/P20/P24/P29/P30: CI now has a paired real-client Linux capture/comparison
+pipeline using the pinned Kotlin `DesktopApp.kt`, `DesktopOverlays.kt`,
+`DesktopAccountUi.kt` and `DesktopSettingsSection`/`DesktopSettingsPage`
+inventory. Flutter source remains `desktop_shell.dart`, `account_session.dart`
+and existing catalog/player components; no production behavior changed.
+Inputs, geometry, capture hashes, OCR, numeric differences and a coverage
+matrix are emitted to `phase6-visual-linux`. The matrix preserves all
+source-inventoried routes, overlays, 18 Settings sections and ten Settings
+pages, plus explicit playback/fullscreen/lyrics/media/account gaps.
+
+These are automation capabilities pending exact-source CI verification, not
+parity acceptance. Captures require visual/semantic review and cannot prove
+matched live content, disabled semantics, scroll coverage or full interaction.
+P22–P27 remain INCOMPLETE; no player/lyrics/video/Canvas/PiP feature is promoted.
+Physical audio, authenticated persistence, paired Windows exploration and
+remaining Phase 5 gates are unchanged. See
+[Phase 6 evidence](flutterDesktop/verification/phase6/README.md).
+
+Pipeline verification update: source `aae31037` passed
+[43674208415](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43674208415)
+on Linux/Windows with 94 Flutter tests each, six comparison/reporting tests,
+857 pinned-reference tests and release/native capture jobs. Paired evidence
+contains 40 real-client captures and 16 diffs with checked metadata/hashes.
+Reviewed Settings/Accounts/Home/drawer pairs confirm usable CI capture and
+unresolved visible defects; all 79 coverage entries remain unaccepted.
+This verifies the **capture infrastructure**, not whole P02/P20/P22–P30 parity.
+No local production builds/tests, authenticated playback, real playing/
+Fullscreen Player/lyrics or complete Settings navigation was verified.
+
 ## Active authorization — scoped Phase 5 checkpoint and Phase 6 (2026-11-15)
 
 The user explicitly deferred **advanced Automix, ONNX beat/vocal analysis and

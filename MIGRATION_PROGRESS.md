@@ -1,5 +1,113 @@
 # Migration progress and delivery backlog
 
+## Phase 6 actual presentation implementation — 2026-11-15
+
+This increment modifies production `flutterDesktop/lib/` (the preceding CI-only
+increment did not address the user-reported UI defects). Pinned source audited:
+`DesktopApp.kt:DesktopMiniPlayer/DesktopSettingsScreen`, `DesktopAccountUi.kt`,
+`DesktopOverlays.kt`, `DesktopSidePanel.kt`, `DesktopSurfaces.kt`, shared
+`HomeScreen.kt`, `LandscapePlayer.kt` and `LyricsSource.kt` at `348b613a`.
+All four original user screenshots were inspected. No reference source changed.
+
+Implemented: Home compact Listen again/Quick picks/Recents shelves, row menus and
+list/grid switching; the active 58-dp dock with original transport SVGs, artwork,
+metadata and preview/release seek; account picker rows/Add/Manage and a separate
+sign-in dialog; all 18 Settings section headings in source order, search and
+secondary page navigation, disabled unsupported controls, and relocated existing
+Phase 5 effects/speed/sleep; two-column expanded player and shared Queue/Lyrics/
+Details panels. Queue selects actual loaded context occurrences; expanding creates
+no second audio engine or timer. Real sign-in and session storage remain intact.
+
+Limitations: account metadata and multiple saved accounts are not exposed by the
+current adapter (generic connected row, second Add disabled); Settings secondary
+pages are scaffolds with unavailable capabilities disabled, not full feature
+parity. EQ now opens as a Settings subpage using the existing controls. Lyrics reports unavailable;
+no provider/timing implementation is claimed. Shuffle/repeat/volume/device/PiP
+controls remain disabled, video/Canvas and independent Mini Player window absent.
+Full-product interactive matched playing/DPI/theme and persistent-account
+regressions remain NOT VERIFIED. Phase 6 remains **INCOMPLETE**; no Phase 7.
+
+Local checks: checksum-verified standalone Dart 3.13.7 formatting at language
+3.11, layer/assets, pinned Phase 2 inventory/catalogues and 50 Phase 5 hashes,
+Python smoke syntax, diff whitespace. No local production build or automated
+Flutter tests. CI must validate analyzer, interaction/regression tests, Linux and
+Windows release bundles/native GUI smokes and current paired reference captures.
+Exact-source CI result is pending this implementation push to PR #144.
+
+## Phase 6 CI-first verification increment — 2026-11-15
+
+User requires GitHub Actions for automated tests, Linux/Windows release builds
+and hosted capture/comparison; no full local Kotlin/Flutter production builds.
+Work stays on `codex/phase6-player-lyrics`, PR target `2.0.0-flutter`, no merge.
+Baseline exact-source desktop run `43671240501` at merged `bb60cc6c` succeeded;
+that evidence does not validate the new increment. Pinned reference run
+`43599294154` succeeded on both platforms; Phase 6 independently rebuilds/tests
+the immutable Kotlin commit in CI and checks its source diff.
+
+`flutter-desktop.yml` now triggers branch pushes and adds a hosted paired
+Linux visual job. `phase6_visual.py` records real sidebar/account/drawer and
+Settings-scroll inputs, both client sizes, capture hashes, OCR, diffs and a
+coverage report seeded from the pinned source inventory. No production route
+hooks, fake playback or provider fixtures are introduced. Screenshot metrics
+never promote a state to PASS. Player/fullscreen/lyrics, signed-in accounts,
+Settings subpage completeness, other overlays/themes and physical-output
+acceptance remain NOT VERIFIED. CI results for this increment are recorded in
+[Phase 6 evidence](flutterDesktop/verification/phase6/README.md).
+**Phase 6 INCOMPLETE.** No Phase 7 work or new backend features.
+
+Verified first pipeline source `aae31037` passed
+[43674208415](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43674208415):
+94 Flutter tests per OS, six screenshot/report tests, native/sanitizer suites,
+Linux/Windows release/native-smoke jobs, 857 pinned-reference tests/package,
+and paired Linux visual capture. Downloaded reports and selected paired PNGs
+were inspected: 24 Kotlin/16 Flutter captures, 16 comparisons, 79 explicitly
+unaccepted coverage entries. Settings/Accounts/content/typography gaps are
+visible; playing/fullscreen/lyrics and whole-app exploration remain open.
+No local builds or automated tests ran. Draft
+[PR #144](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/144) is not
+merged. Subsequent report/artifact-filter changes require their own head checks.
+
+## Phase 6 expanded audit scope — entire application (2026-11-15)
+
+User clarification: the four comparison screenshots and player, account
+and Settings differences are **examples only**. The required audit is
+whole-application exploratory parity. Codex must independently navigate
+every discoverable Kotlin screen and interaction state (including nested
+menus, overlays, Search, Library, history, downloads, queue, playback,
+accounts, Settings, resize, theme and error/empty/loading states) and
+compare the same states in Flutter. Maintain a complete navigation and
+state coverage matrix, per-state paired screenshots, reproducible steps
+and PASS/FAIL/BLOCKED/NOT VERIFIED outcomes. Missing coverage is not
+parity acceptance. Correct visual differences without expanding the
+approved backend scope. Full Kotlin Settings menu visuals remain a
+mandatory minimum, with unsupported controls visibly disabled.
+
+## Phase 6 user-directed visual parity re-audit — 2026-11-15
+
+Phase 5 **limited checkpoint** PR #141 was merged as
+`bb60cc6c133299c62d01baaee28c8c597879614b` after Windows/Linux
+matrix run `43670599723` reported success on both platform jobs. This is
+not full Phase 5 parity: Automix, ONNX and Loop & Mix remain deferred and
+physical audio/remaining gates stay unverified.
+
+The user supplied four side-by-side reference screenshots showing three
+visual regression classes that must be fixed in Phase 6: (1) floating
+player's **actively playing** menus/layout diverge despite close idle
+parity, (2) account avatar/popover/selection diverge, (3) Settings content
+and navigation diverge. User explicitly requires Kotlin's **complete
+Settings menu hierarchy**, with unavailable items rendered disabled/greyed
+out rather than omitted or falsely functional. No new backend features
+are authorized beyond the existing phase plan.
+
+Codex must perform **interactive visual parity**, actually play a track,
+open Fullscreen Player, exercise controls, accounts and Settings submenus,
+and compare matched Kotlin/Flutter screenshots for each state. Startup-only
+screenshots, widget goldens and static code inspection are insufficient.
+Detailed click-state matrix and evidence gates are now in
+`.codex/phases/phase-6.md`; user reference inventory is in
+`flutterDesktop/verification/phase6/user-references/README.md`.
+Phase 6 status: **AUTHORIZED / NOT YET VERIFIED**.
+
 ## Active authorization — scoped Phase 5 checkpoint and Phase 6 (2026-11-15)
 
 The user explicitly deferred **advanced Automix, ONNX beat/vocal analysis and

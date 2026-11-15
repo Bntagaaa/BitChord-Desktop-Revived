@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
-import '../../../core/domain/audio_contract.dart';
-import '../../../design_system/palette.dart';
 import '../../../design_system/theme.dart';
 import '../application/catalog_controller.dart';
 import '../domain/catalog.dart';
@@ -14,7 +12,6 @@ import 'catalog_components.dart';
 import 'catalog_search_field.dart';
 import '../application/search_suggestions.dart';
 import '../application/download_queue.dart';
-import '../application/catalog_playback.dart';
 import 'download_manager.dart';
 
 class CatalogSurface extends ConsumerStatefulWidget {
@@ -882,6 +879,27 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                             ),
                             shelf: state.shelves[index],
                             onSelect: _select,
+                            onSelectAt: (occurrence) {
+                              final shelf = state.shelves[index];
+                              final entry = shelf.entries[occurrence];
+                              final tracks = shelf.entries
+                                  .where((e) => e.kind == CatalogKind.track)
+                                  .toList();
+                              if (entry.kind == CatalogKind.track &&
+                                  tracks.length <= 800) {
+                                _play(
+                                  entry,
+                                  context: tracks,
+                                  index: shelf.entries
+                                      .take(occurrence)
+                                      .where((e) => e.kind == CatalogKind.track)
+                                      .length,
+                                );
+                              } else {
+                                _select(entry);
+                              }
+                            },
+                            onDownload: _download,
                             onOpen: _openShelf,
                             hero:
                                 widget.destination == 'listen-now' &&
@@ -960,166 +978,6 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
             ),
           ),
       ],
-    );
-  }
-}
-
-class OnlineTransport extends ConsumerStatefulWidget {
-  const OnlineTransport({
-    super.key,
-    required this.empty,
-    required this.palette,
-    required this.reduceBlur,
-  });
-  final Widget empty;
-  final BitChordPalette palette;
-  final bool reduceBlur;
-
-  @override
-  ConsumerState<OnlineTransport> createState() => _OnlineTransportState();
-}
-
-class _OnlineTransportState extends ConsumerState<OnlineTransport> {
-  double? _scrubPreview;
-  int? _scrubSelection, _scrubRevision;
-  String? _scrubEntry;
-
-  bool _isCurrentScrub(PlaybackSnapshot snapshot) =>
-      _scrubPreview != null &&
-      _scrubEntry == snapshot.entryId &&
-      _scrubSelection == snapshot.selection &&
-      _scrubRevision == snapshot.queueRevision;
-
-  @override
-  Widget build(BuildContext context) {
-    final snapshot = ref.watch(transportProvider);
-    if (snapshot == null ||
-        snapshot.entryId.isEmpty ||
-        snapshot.phase == AudioPhase.idle) {
-      return widget.empty;
-    }
-    final port = ref.read(onlinePortProvider);
-    final playback = ref.watch(catalogPlaybackProvider);
-    final contextPlayback = ref.read(catalogPlaybackProvider.notifier);
-    final displayUs = _isCurrentScrub(snapshot)
-        ? _scrubPreview!
-        : snapshot.positionUs.toDouble();
-    final position = displayUs ~/ 1000000;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760),
-      child: GlassSurface(
-        palette: widget.palette,
-        reduceBlur: widget.reduceBlur,
-        child: SizedBox(
-          height: 58,
-          child: Row(
-            children: [
-              const SizedBox(width: 12),
-              if (playback.entries.length > 1)
-                IconButton(
-                  tooltip: 'Previous',
-                  onPressed: playback.hasPrevious
-                      ? () => contextPlayback.previous()
-                      : null,
-                  icon: const Icon(Icons.skip_previous),
-                ),
-              IconButton(
-                tooltip: snapshot.phase == AudioPhase.playing
-                    ? 'Pause'
-                    : 'Play',
-                onPressed: () async {
-                  try {
-                    await ref.read(transportProvider.notifier).toggle();
-                  } catch (_) {}
-                },
-                icon: Icon(
-                  snapshot.phase == AudioPhase.playing
-                      ? Icons.pause
-                      : Icons.play_arrow,
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (playback.entries.length > 1)
-                IconButton(
-                  tooltip: 'Next',
-                  onPressed: playback.hasNext
-                      ? () => contextPlayback.next()
-                      : null,
-                  icon: const Icon(Icons.skip_next),
-                ),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      port?.currentTitle ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      playback.error ??
-                          (snapshot.phase == AudioPhase.failed
-                              ? 'Playback failed (${snapshot.error})'
-                              : '${snapshot.phase.name} · ${position ~/ 60}:${(position % 60).toString().padLeft(2, '0')} · ${port?.currentSubtitle ?? ''}'),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              if (snapshot.durationUs > 0)
-                SizedBox(
-                  width: 110,
-                  child: Slider(
-                    value: displayUs.clamp(0, snapshot.durationUs).toDouble(),
-                    max: snapshot.durationUs.toDouble(),
-                    // Dragging is only a visual preview. Restarting FFmpeg for
-                    // every pointer movement can exhaust live broker requests
-                    // and fail playback, especially immediately after play.
-                    onChangeStart: (value) => setState(() {
-                      _scrubPreview = value;
-                      _scrubSelection = snapshot.selection;
-                      _scrubRevision = snapshot.queueRevision;
-                      _scrubEntry = snapshot.entryId;
-                    }),
-                    onChanged: (value) {
-                      if (_isCurrentScrub(snapshot)) {
-                        setState(() => _scrubPreview = value);
-                      }
-                    },
-                    onChangeEnd: (value) async {
-                      final latest = ref.read(transportProvider);
-                      final valid =
-                          latest != null &&
-                          _isCurrentScrub(latest) &&
-                          latest.phase != AudioPhase.failed &&
-                          latest.durationUs > 0;
-                      if (!mounted) return;
-                      setState(() {
-                        _scrubPreview = null;
-                        _scrubSelection = null;
-                        _scrubRevision = null;
-                        _scrubEntry = null;
-                      });
-                      if (!valid) return;
-                      // The nominal end can be beyond the last seekable audio
-                      // packet. Leave a small tail rather than seeking to EOF.
-                      final maxSeek = latest.durationUs > 250000
-                          ? latest.durationUs - 250000
-                          : latest.durationUs - 1;
-                      try {
-                        await port?.seek(
-                          value.round().clamp(0, maxSeek).toInt(),
-                        );
-                      } catch (_) {}
-                    },
-                  ),
-                ),
-              const SizedBox(width: 8),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

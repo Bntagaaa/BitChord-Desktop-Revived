@@ -45,7 +45,7 @@ def capture(args):
     if (int(geometry['WIDTH']), int(geometry['HEIGHT'])) != (args.width, args.height):
         raise ValueError('Client resize failed: ' + raw)
     # Hex IDs work with ImageMagick 6 and 7. Capture only this app, never the desktop.
-    subprocess.run(['import', '-window', hex(int(window)), '-depth', '8', str(output)],
+    subprocess.run(['import', '-screen', '-window', hex(int(window)), '-depth', '8', str(output)],
                    check=True, timeout=15)
     with Image.open(output) as frame:
         if frame.size != (args.width, args.height):
@@ -54,7 +54,7 @@ def capture(args):
             raise ValueError('Black framebuffer; capture is invalid')
     write_json(output.with_suffix('.json'), {
         'captured_utc': datetime.now(timezone.utc).isoformat(),
-        'method': 'real visible X11/XWayland client; ImageMagick import -window',
+        'method': 'real visible X11/XWayland client; ImageMagick import -screen -window',
         'display': os.environ.get('DISPLAY'), 'state': args.state,
         'window_pid': pid,
         'source': args.source, 'theme': args.theme, 'ui_scale_percent': args.scale,

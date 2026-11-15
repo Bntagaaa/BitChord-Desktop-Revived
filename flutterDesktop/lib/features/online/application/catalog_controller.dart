@@ -390,10 +390,34 @@ final class TransportController extends Notifier<PlaybackSnapshot?> {
   Future<void> toggle() async {
     final port = ref.read(onlinePortProvider);
     if (port == null) return;
-    if (state?.phase == AudioPhase.playing) {
-      await port.pause();
-    } else {
-      await port.resume();
+    try {
+      if (state?.phase == AudioPhase.playing) {
+        await port.pause();
+      } else {
+        await port.resume();
+      }
+    } catch (_) {
+      // Preserve the previous dock's command-failure behavior. The native
+      // snapshot, never an optimistic button state, reports playback failure.
+    }
+  }
+
+  Future<void> seek(int positionUs, PlaybackSnapshot started) async {
+    final latest = state;
+    if (latest == null ||
+        latest.entryId != started.entryId ||
+        latest.selection != started.selection ||
+        latest.queueRevision != started.queueRevision ||
+        latest.phase == AudioPhase.failed ||
+        latest.durationUs <= 0)
+      return;
+    final maxSeek = latest.durationUs > 250000
+        ? latest.durationUs - 250000
+        : latest.durationUs - 1;
+    try {
+      await ref.read(onlinePortProvider)?.seek(positionUs.clamp(0, maxSeek));
+    } catch (_) {
+      // The next authoritative snapshot displays any native playback failure.
     }
   }
 }

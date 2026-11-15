@@ -11,6 +11,7 @@ import '../lib/features/online/domain/catalog.dart';
 import '../lib/features/online/domain/online_port.dart';
 import '../lib/features/online/presentation/catalog_surface.dart';
 import '../lib/features/online/presentation/catalog_components.dart';
+import '../lib/features/playback/presentation/player_surfaces.dart';
 
 // Test-only ports. Production bootstrap always injects OnlineRuntime.
 class ControlledCatalog implements OnlinePort, OnlineCapabilities {
@@ -506,7 +507,7 @@ void main() {
       ),
     );
     expect(
-      tester.getSize(find.byKey(const ValueKey('card-youtube:MPRE0'))).width,
+      tester.getSize(find.byKey(const ValueKey('card-0-youtube:MPRE0'))).width,
       150,
     );
     await tester.tap(find.text('Album 0'));
