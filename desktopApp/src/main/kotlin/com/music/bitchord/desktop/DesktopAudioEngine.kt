@@ -597,64 +597,80 @@ class DesktopPlaybackEngine internal constructor(
             "upgrading '${song.title}' to ${better.format.summary.ifBlank { "another rendition" }}" +
                 " from ${DesktopMusicSources.sourceNameFor(better)}",
         )
-        swapStream(song, better, current.positionMs)
-        return true
+        // The search is not complete until the replacement has produced PCM. Previously this
+        // returned true as soon as an asynchronous open was *scheduled*, so a broken FLAC stream
+        // stopped all follow-up searches even though the old rendition kept playing.
+        return swapStream(song, better, current.positionMs)
     }
 
-    /** Re-opens the current track on a different stream, carrying the playhead over. */
-    private fun swapStream(song: Song, stream: DesktopStream, positionMs: Long) {
+    /**
+     * Prepares a replacement without interrupting the existing deck.
+     *
+     * Returns true only when decoded PCM is ready and the replacement has been queued for the
+     * audio thread. A failed FLAC header/seek/PCM read returns false, allowing the upgrade search
+     * to try the next source rather than silently declaring a failed switch successful.
+     */
+    private suspend fun swapStream(song: Song, stream: DesktopStream, positionMs: Long): Boolean {
         val generation = loadGeneration.get()
-        scope.launch {
-            openTrack(song, stream, positionMs).fold(
-                onSuccess = { track ->
-                    val latest = _state.value
-                    if (latest.song?.videoId != song.videoId) {
-                        track.decoder.close()
-                        return@fold
-                    }
-                    // Resolving and opening the better rendition can take a few seconds. Hand it
-                    // over at the live playhead rather than jumping back to the position at which
-                    // the upgrade was first offered.
-                    if (kotlin.math.abs(latest.positionMs - positionMs) >= UPGRADE_RESEEK_THRESHOLD_MS) {
-                        if (!track.decoder.seek(latest.positionMs * 1_000)) {
-                            DesktopTrackLog.log("quality upgrade rejected: replacement seek failed")
-                            track.decoder.close()
-                            return@fold
-                        }
-                        track.startUs = latest.positionMs * 1_000
-                    }
-                    // Never flush the audible stream until the upgrade has actually decoded PCM.
-                    // A successful FLAC HTTP/open probe can still stall at its first media read.
-                    if (!track.decoder.awaitBuffered(UPGRADE_PRIME_SAMPLES, UPGRADE_PRIME_TIMEOUT_MS)) {
-                        DesktopTrackLog.log(
-                            "quality upgrade rejected: ${DesktopMusicSources.sourceNameFor(stream)} " +
-                                "did not supply PCM; continuing the current rendition",
-                        )
-                        track.decoder.close()
-                        if (stream.format.isLossless) {
-                            stream.sourceId?.let { refusedSources[song.videoId] = it }
-                        }
-                        return@fold
-                    }
-                    val ready = _state.value
-                    if (!running.get() || loadGeneration.get() != generation ||
-                        ready.song?.videoId != song.videoId
-                    ) {
-                        track.decoder.close()
-                        return@fold
-                    }
-                    commands += Command.ReplaceCurrent(track, playWhenReady = ready.isPlaying, generation = generation)
-                    java.util.concurrent.locks.LockSupport.unpark(thread)
-                },
-                onFailure = { failure ->
-                    DesktopTrackLog.log(
-                        "could not open the copy of '${song.title}' from " +
-                            "${DesktopMusicSources.sourceNameFor(stream)}: ${failure.message}; " +
-                            "continuing the current rendition",
-                    )
-                },
-            )
+        fun refuseBrokenLossless() {
+            if (stream.format.isLossless) {
+                stream.sourceId?.let { refusedSources[song.videoId] = it }
+            }
         }
+        return openTrack(song, stream, positionMs).fold(
+            onSuccess = { track ->
+                val latest = _state.value
+                if (!running.get() || loadGeneration.get() != generation ||
+                    latest.song?.videoId != song.videoId
+                ) {
+                    track.decoder.close()
+                    return@fold false
+                }
+                // Resolving and opening a better rendition can take seconds. Hand it over at the
+                // live playhead rather than jumping back to where the request began.
+                if (kotlin.math.abs(latest.positionMs - positionMs) >= UPGRADE_RESEEK_THRESHOLD_MS) {
+                    if (!track.decoder.seek(latest.positionMs * 1_000)) {
+                        DesktopTrackLog.log("quality upgrade rejected: replacement seek failed")
+                        track.decoder.close()
+                        refuseBrokenLossless()
+                        return@fold false
+                    }
+                    track.startUs = latest.positionMs * 1_000
+                }
+                // FFmpeg successfully opening a FLAC URL is not proof it can deliver media bytes.
+                // Never close the audible decoder until real PCM is already buffered.
+                if (!track.decoder.awaitBuffered(UPGRADE_PRIME_SAMPLES, UPGRADE_PRIME_TIMEOUT_MS)) {
+                    DesktopTrackLog.log(
+                        "quality upgrade rejected: ${DesktopMusicSources.sourceNameFor(stream)} " +
+                            "did not supply PCM; continuing the current rendition",
+                    )
+                    track.decoder.close()
+                    refuseBrokenLossless()
+                    return@fold false
+                }
+                val ready = _state.value
+                if (!running.get() || loadGeneration.get() != generation ||
+                    ready.song?.videoId != song.videoId
+                ) {
+                    track.decoder.close()
+                    return@fold false
+                }
+                commands += Command.ReplaceCurrent(
+                    track, playWhenReady = ready.isPlaying, generation = generation,
+                )
+                java.util.concurrent.locks.LockSupport.unpark(thread)
+                true
+            },
+            onFailure = { failure ->
+                DesktopTrackLog.log(
+                    "could not open the copy of '${song.title}' from " +
+                        "${DesktopMusicSources.sourceNameFor(stream)}: ${failure.message}; " +
+                        "continuing the current rendition",
+                )
+                refuseBrokenLossless()
+                false
+            },
+        )
     }
 
     /** Re-opens the current track, keeping the playhead. */
