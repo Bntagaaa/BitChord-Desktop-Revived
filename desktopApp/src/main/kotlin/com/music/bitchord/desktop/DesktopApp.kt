@@ -604,8 +604,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     // Recently Played has its own request and its own skeleton at the head of the page, as on the
     // phone; it is only asked for with an account to have played on.
     var homeRecentsLoading by remember { mutableStateOf(false) }
-    // Held out here so a page keeps its place when another is visited and it is come back to.
-    val homeListState = rememberLazyListState()
+    // A new visit starts at the top. Never retain Home scroll/layout state once Home is left.
+    var homeVisit by remember { mutableStateOf(0) }
+    val homeListState = remember(homeVisit) { LazyListState() }
     val newListState = rememberLazyListState()
     val exploreListState = rememberLazyListState()
     val moodGenreListState = rememberLazyListState()
@@ -2678,6 +2679,25 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         } finally { topPicksLoading = false }
     }
 
+    /** Release the complete Home feed on navigation, irrespective of current RSS. */
+    fun discardHome() {
+        if (homeEvicted) return
+        homeJob?.cancel()
+        homeJob = null
+        homeGeneration++ // Late network responses from a departed Home may never refill it.
+        homeState = UiState.Loading
+        homeContinuation = null
+        homeSeenTitles.clear()
+        homeLoadingMore = false
+        homeRecentsLoading = false
+        topPicks = null
+        topPicksLoading = false
+        homeIdentity = null
+        homeRenderedLogged = false
+        homeEvicted = true
+        homeVisit++ // Dispose the previous LazyListState and its scroll position.
+    }
+
     fun loadHome() {
         topPicks = null
         if (!youtubeSourceEnabled) {
@@ -2746,9 +2766,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     // A page with nothing new is the feed looping back on itself, not running dry.
                     homeContinuation = feed.continuation.takeIf { homeSeenTitles.size > before }
                 },
-                onFailure = { homeContinuation = null },
+                onFailure = { if (generation == homeGeneration) homeContinuation = null },
             )
-            homeLoadingMore = false
+            if (generation == homeGeneration) homeLoadingMore = false
         }
     }
 
@@ -2840,11 +2860,27 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         loadHome()
     }
 
-    // A trimmed Home feed must be fetched again on the next visit, while preserving Back history.
-    LaunchedEffect(destination) {
-        if (destination == DesktopDestination.LISTEN_NOW && homeEvicted) {
+    // No inactive Home cache, even below 650 MiB. This also covers artist/album/playlist
+    // detail pages, settings, and the expanded player which keep the destination unchanged.
+    val homeVisible = isHomeFeedVisible(
+        destination = destination,
+        nestedPageOpen = openedArtist != null || openedCollection != null ||
+            openedBrowse != null || selectedMoodGenre != null,
+        settingsOpen = overlays.settingsPage != null,
+        replayOpen = overlays.replay,
+        moodGridOpen = showMoodGrid,
+        nowPlayingOpen = overlays.nowPlaying,
+    )
+    LaunchedEffect(homeVisible) {
+        if (!homeVisible) {
+            if (!homeEvicted) {
+                discardHome()
+                DesktopImageLoader.trimMemory()
+                DesktopTrackLog.log("memory: discarded Home feed after leaving the page")
+            }
+        } else if (homeEvicted) {
             homeEvicted = false
-            loadHome()
+            loadHome() // Refresh from page one, not the old continuation token.
         }
     }
 
@@ -2852,7 +2888,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     // and Recently Played only exists with an account behind it.
     LaunchedEffect(youtubeSignedIn, activeAccountId) {
         val identity = "${DesktopYouTubeAuth.isSignedIn}/${DesktopAccounts.activeAccountId()}"
-        if (homeIdentity != null && identity != homeIdentity) loadHome()
+        if (homeVisible && homeIdentity != null && identity != homeIdentity) loadHome()
     }
 
     // The mark on a downloaded row, for the shared pages.
@@ -2970,19 +3006,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
             if (rss == null || rss < DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES) continue
             val evict = DesktopPageMemoryPolicy.oldestEvictable(recentPageUsage, destination) ?: continue
             when (evict) {
-                DesktopDestination.LISTEN_NOW -> {
-                    homeJob?.cancel()
-                    homeJob = null
-                    homeState = UiState.Loading
-                    homeContinuation = null
-                    homeSeenTitles.clear()
-                    topPicks = null
-                    topPicksLoading = false
-                    homeIdentity = null
-                    homeEvicted = true
-                    homeGeneration++ // Ignore any in-flight Home responses from before eviction.
-                    homeRenderedLogged = false
-                }
+                DesktopDestination.LISTEN_NOW -> discardHome()
                 DesktopDestination.NEW -> newState = UiState.Loading
                 DesktopDestination.SEARCH, DesktopDestination.EXPLORE -> {
                     searchJob?.cancel()
