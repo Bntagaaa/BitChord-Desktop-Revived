@@ -7,6 +7,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Process-owned playback session, deliberately independent of the main Compose window.
@@ -63,6 +65,7 @@ internal class DesktopPlaybackService(
     )
 
     @Volatile private var activeUi: UiCallbacks? = null
+    private val closed = AtomicBoolean(false)
 
     val engine = DesktopPlaybackEngine(
         onEnded = { activeUi?.onEnded?.invoke() ?: afterEndedHeadless() },
@@ -209,7 +212,9 @@ internal class DesktopPlaybackService(
     }
 
     fun close() {
+        if (!closed.compareAndSet(false, true)) return
         activeUi = null
+        scope.cancel()
         engine.shutdown()
     }
 }
