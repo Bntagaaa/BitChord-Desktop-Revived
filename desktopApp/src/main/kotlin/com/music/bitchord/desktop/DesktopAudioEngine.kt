@@ -560,7 +560,9 @@ class DesktopPlaybackEngine internal constructor(
                     if (current.streamFormat?.isDolbyAtmos == true) return@launch
                     if (DesktopMusicSources.ceiling(null) != DesktopAudioQuality.LOSSLESS) return@launch
                     val playing = DesktopStream(url = "", format = current.streamFormat ?: DesktopStreamFormat(), sourceId = current.streamSourceId)
-                    if (take(song, DesktopMusicSources.upgradeFor(song, playing))) return@launch
+                    if (take(song, DesktopMusicSources.upgradeFor(
+                        song, playing, excludedSourceId = refusedSources[song.videoId],
+                    ))) return@launch
                 }
                 DesktopTrackLog.log("no better copy of '${song.title}' was found")
             } finally {
@@ -577,6 +579,11 @@ class DesktopPlaybackEngine internal constructor(
     /** Swaps [better] in when it is worth the break, and says whether the question is settled. */
     private suspend fun take(song: Song, better: DesktopStream?): Boolean {
         if (better == null) return false
+        // A rejected lossless source must not be reintroduced by a pending first-race result.
+        if (better.sourceId != null && refusedSources[song.videoId] == better.sourceId) {
+            DesktopTrackLog.log("skipping previously stalled source for '${song.title}'")
+            return false
+        }
         val current = _state.value
         if (current.song?.videoId != song.videoId) return true
         if (!DesktopMusicSources.worthSwapping(better.format, current.streamFormat)) {
@@ -624,6 +631,9 @@ class DesktopPlaybackEngine internal constructor(
                                 "did not supply PCM; continuing the current rendition",
                         )
                         track.decoder.close()
+                        if (stream.format.isLossless) {
+                            stream.sourceId?.let { refusedSources[song.videoId] = it }
+                        }
                         return@fold
                     }
                     val ready = _state.value
@@ -1494,7 +1504,16 @@ class DesktopPlaybackEngine internal constructor(
                             recoveryAttempt = attempt,
                         ).fold(
                             onSuccess = { replacement ->
-                                commands += Command.RecoverCurrent(track, replacement, live.pendingSubstitute)
+                                // Opening an FFmpeg context does not guarantee its first PCM frame.
+                                // Reject an unresponsive replacement before touching the audible deck.
+                                if (replacement.decoder.awaitBuffered(UPGRADE_PRIME_SAMPLES, UPGRADE_PRIME_TIMEOUT_MS)) {
+                                    commands += Command.RecoverCurrent(track, replacement, live.pendingSubstitute)
+                                } else {
+                                    replacement.decoder.close()
+                                    live.pendingSubstitute?.cancel()
+                                    replacement.stream.sourceId?.let { refusedSources[track.song.videoId] = it }
+                                    commands += Command.RecoveryFailed(track, "replacement provided no decoded audio")
+                                }
                             },
                             onFailure = { failure ->
                                 live.pendingSubstitute?.cancel()
