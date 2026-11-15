@@ -1,0 +1,204 @@
+package com.music.bitchord.desktop
+
+import androidx.compose.runtime.mutableStateOf
+import com.music.bitchord.data.model.Song
+import com.music.bitchord.playback.PlaybackPosition
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+/**
+ * Process-owned playback session, deliberately independent of the main Compose window.
+ *
+ * The main Window can be REMOVED from composition in the tray or PiP. Only this service,
+ * platform media controls and (if open) the PiP Window remain alive until explicit Quit.
+ * A visible UI temporarily attaches its richer queue/navigation handlers; when it is gone,
+ * the service advances the persisted queue directly without retaining the UI's closures.
+ */
+internal class DesktopPlaybackService(
+    private val persistence: DesktopPersistence = DesktopPersistence(),
+) {
+    data class UiCallbacks(
+        val onEnded: () -> Unit,
+        val onCrossfaded: (Song) -> Unit,
+        val onPlay: () -> Unit,
+        val onPause: () -> Unit,
+        val onPlayPause: () -> Unit,
+        val onNext: () -> Unit,
+        val onPrevious: () -> Unit,
+        val onSeek: (Long) -> Unit,
+        val onShuffleChanged: (Boolean) -> Unit,
+        val onLoopStatusChanged: (String) -> Unit,
+        val onRateChanged: (Double) -> Unit,
+        val onVolumeChanged: (Double) -> Unit,
+    )
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val selectedSong = mutableStateOf<Song?>(null)
+    val liveQueue = mutableStateOf(
+        DesktopQueue.restored(
+            persistence.queue(),
+            persistence.string("queue_index", "0").toIntOrNull() ?: 0,
+        ),
+    )
+    val history = mutableStateOf(persistence.history())
+    val position = PlaybackPosition()
+    val lyricsSession = DesktopLyricsSession()
+    val lyricsSettings = mutableStateOf(
+        DesktopLyricsRequest(
+            song = null,
+            durationMs = 0L,
+            enabled = persistence.boolean(DesktopLyricsClient.KEY_SYNCED_LYRICS, true),
+            videoBeta = DesktopVideoBeta.enabled.value,
+            prioritizeSyllables = persistence.boolean(DesktopLyricsClient.KEY_PRIORITIZE_SYLLABLES, false),
+            sources = persistence.lyricsEnabledSources(),
+            order = persistence.lyricsSourceOrder(),
+            only = null,
+        ),
+    )
+
+    @Volatile private var activeUi: UiCallbacks? = null
+
+    val engine = DesktopPlaybackEngine(
+        onEnded = { activeUi?.onEnded?.invoke() ?: afterEndedHeadless() },
+        onCrossfaded = { song ->
+            activeUi?.onCrossfaded?.invoke(song) ?: afterCrossfadeHeadless(song)
+        },
+    )
+
+    fun attach(callbacks: UiCallbacks) { activeUi = callbacks }
+    fun detach(callbacks: UiCallbacks) {
+        if (activeUi === callbacks) activeUi = null
+    }
+
+    private fun persistQueue() {
+        if (DesktopListenTogether.state.value.inParty) return
+        persistence.saveQueue(liveQueue.value.songs, liveQueue.value.index)
+    }
+
+    private fun adopt(song: Song, playWhenReady: Boolean = true) {
+        selectedSong.value = song
+        history.value = (listOf(song) + history.value.filterNot { it.videoId == song.videoId }).take(50)
+        persistQueue()
+        persistence.saveHistory(history.value)
+        engine.load(song, playWhenReady)
+        scope.launch { DesktopScrobbling.updateNowPlaying(song) }
+    }
+
+    private fun afterEndedHeadless() {
+        selectedSong.value?.let(DesktopScrobbling::onPlaybackEnded)
+        if (DesktopSleepTimer.afterTrack.value) {
+            DesktopSleepTimer.cancel()
+            return
+        }
+        if (persistence.string("repeat_mode", "OFF") == "ONE") {
+            liveQueue.value.current?.let(::adopt)
+        } else {
+            nextHeadless()
+        }
+    }
+
+    private fun afterCrossfadeHeadless(song: Song) {
+        liveQueue.value = liveQueue.value.afterHandoffTo(song.videoId)
+        selectedSong.value = song
+        history.value = (listOf(song) + history.value.filterNot { it.videoId == song.videoId }).take(50)
+        persistQueue()
+        persistence.saveHistory(history.value)
+        scope.launch { DesktopScrobbling.updateNowPlaying(song) }
+    }
+
+    private fun nextHeadless() {
+        if (DesktopListenTogether.state.value.controlsLocked) return
+        val current = liveQueue.value
+        when {
+            current.hasNext -> {
+                liveQueue.value = current.next()
+                liveQueue.value.current?.let(::adopt)
+            }
+            persistence.string("repeat_mode", "OFF") == "ALL" && current.songs.isNotEmpty() -> {
+                liveQueue.value = current.copy(index = 0)
+                liveQueue.value.current?.let(::adopt)
+            }
+            // AutoPlay is a UI-level network queue-builder; do not run it off a disposed screen.
+            // Existing queued songs continue, and the player never spontaneously stops mid-song.
+        }
+    }
+
+    private fun previousHeadless() {
+        if (DesktopListenTogether.state.value.controlsLocked) return
+        if (engine.state.value.positionMs > 10_000L) {
+            engine.seekTo(0L)
+            return
+        }
+        val current = liveQueue.value
+        if (current.hasPrevious) {
+            liveQueue.value = current.previous()
+            liveQueue.value.current?.let(::adopt)
+        }
+    }
+
+    fun play() {
+        if (DesktopListenTogether.state.value.controlsLocked) return
+        activeUi?.onPlay?.invoke() ?: engine.play()
+    }
+
+    fun pause() {
+        if (DesktopListenTogether.state.value.controlsLocked) return
+        activeUi?.onPause?.invoke() ?: engine.pause()
+    }
+
+    fun togglePlayPause() {
+        if (DesktopListenTogether.state.value.controlsLocked) return
+        activeUi?.onPlayPause?.invoke() ?: engine.togglePlayPause()
+    }
+
+    fun next() { activeUi?.onNext?.invoke() ?: nextHeadless() }
+    fun previous() { activeUi?.onPrevious?.invoke() ?: previousHeadless() }
+
+    fun seek(positionMs: Long) {
+        if (DesktopListenTogether.state.value.controlsLocked) return
+        activeUi?.onSeek?.invoke(positionMs) ?: engine.seekTo(positionMs.coerceAtLeast(0L))
+    }
+
+    fun shuffle(enabled: Boolean) {
+        val cb = activeUi
+        if (cb != null) cb.onShuffleChanged(enabled)
+        else persistence.saveBoolean("shuffle", enabled)
+    }
+
+    fun loopStatus(status: String) {
+        val cb = activeUi
+        if (cb != null) cb.onLoopStatusChanged(status)
+        else persistence.saveString("repeat_mode", when (status) {
+            "Track" -> "ONE"
+            "Playlist" -> "ALL"
+            else -> "OFF"
+        })
+    }
+
+    fun rate(value: Double) {
+        val cb = activeUi
+        if (cb != null) cb.onRateChanged(value)
+        else {
+            val rate = value.toFloat().coerceIn(0.25f, 3f)
+            persistence.saveString("playback_speed", rate.toString())
+            engine.setPlaybackSpeed(rate)
+        }
+    }
+
+    fun volume(value: Double) {
+        val cb = activeUi
+        if (cb != null) cb.onVolumeChanged(value)
+        else {
+            val volume = value.toFloat().coerceIn(0f, 1f)
+            persistence.saveString("volume", volume.toString())
+            engine.setVolume(volume)
+        }
+    }
+
+    fun close() {
+        activeUi = null
+        engine.shutdown()
+    }
+}
