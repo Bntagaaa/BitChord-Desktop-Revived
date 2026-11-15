@@ -21,7 +21,7 @@ no second audio engine or timer. Real sign-in and session storage remain intact.
 Limitations: account metadata and multiple saved accounts are not exposed by the
 current adapter (generic connected row, second Add disabled); Settings secondary
 pages are scaffolds with unavailable capabilities disabled, not full feature
-parity. EQ still opens its existing working dialog. Lyrics reports unavailable;
+parity. EQ now opens as a Settings subpage using the existing controls. Lyrics reports unavailable;
 no provider/timing implementation is claimed. Shuffle/repeat/volume/device/PiP
 controls remain disabled, video/Canvas and independent Mini Player window absent.
 Full-product interactive matched playing/DPI/theme and persistent-account

@@ -507,7 +507,7 @@ void main() {
       ),
     );
     expect(
-      tester.getSize(find.byKey(const ValueKey('card-youtube:MPRE0'))).width,
+      tester.getSize(find.byKey(const ValueKey('card-0-youtube:MPRE0'))).width,
       150,
     );
     await tester.tap(find.text('Album 0'));

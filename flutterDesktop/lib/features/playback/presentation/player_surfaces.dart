@@ -594,6 +594,7 @@ class ExpandedPlayer extends ConsumerWidget {
         : ref.watch(artworkProvider(entry!.artwork!)).asData?.value;
     return Semantics(
       scopesRoute: true,
+      explicitChildNodes: true,
       namesRoute: true,
       label: 'Fullscreen Player',
       child: Material(

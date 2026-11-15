@@ -280,6 +280,7 @@ void main() {
         await tester.tap(find.byTooltip('Queue').last);
         await tester.pump();
         expect(find.text('Next song'), findsOneWidget);
+        await tester.ensureVisible(find.text('Next song'));
         await tester.tap(find.text('Next song'));
         await tester.pump();
         expect(port.played, ['first', 'second']);
