@@ -76,8 +76,9 @@ internal object DesktopWindowVisibility {
         // A window put away full-screen comes back full-screen with nothing on it, which reads as
         // the app having broken rather than as it having been hidden.
         DesktopWindowMode.exit()
+        // The app-level visibility collector trims *after* Window leaves the composition.
+        // Collecting before native Skia/AWT surfaces are disposed releases far less RAM.
         _visible.value = false
-        DesktopMemoryOptimizer.onWindowHidden()
         runCatching { onClosedToTray() }.onFailure { DesktopTrackLog.log("PiP activation failed; remaining in tray") }
         DesktopTrackLog.log("window closed to the tray; playback continues")
         return false
