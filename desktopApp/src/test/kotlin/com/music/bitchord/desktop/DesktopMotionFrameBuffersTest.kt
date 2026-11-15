@@ -16,8 +16,10 @@ class DesktopMotionFrameBuffersTest {
         assertNotSame(second, third)
         assertNotSame(first, third)
         first[0] = 42
-        assertSame(first, buffers.next())
-        assertEquals(42, buffers.next()[0].let { first[0].toInt() })
+        val wrapped = buffers.next()
+        assertSame(first, wrapped)
+        assertEquals(42, wrapped[0].toInt())
+        assertSame(second, buffers.next())
         assertEquals(48, third.size)
     }
 
