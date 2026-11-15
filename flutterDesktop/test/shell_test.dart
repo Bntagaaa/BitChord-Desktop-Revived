@@ -225,7 +225,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('settings-search')), 'Theme');
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ChoiceChip, 'dark'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Dark'));
       await tester.pumpAndSettle();
       expect(container.read(shellProvider).appearance, Appearance.dark);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);

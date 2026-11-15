@@ -11,7 +11,7 @@ import 'package:bitchord_desktop/features/shell/presentation/settings_page.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart' hide TestWindow;
 
 import 'catalog_playback_test.dart' show ContextPort;
 import 'online_controller_test.dart' show transportFixture;
@@ -59,7 +59,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.getSize(find.byType(CatalogArtwork).first),
-        const Size(150, 150),
+        const Size(320, 320),
       );
       await tester.tap(find.byTooltip('Show as list'));
       await tester.pumpAndSettle();

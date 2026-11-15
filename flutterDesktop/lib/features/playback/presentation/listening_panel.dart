@@ -11,8 +11,13 @@ import 'sleep_panel.dart';
 enum ListeningSection { all, effects, transport }
 
 class ListeningPanel extends ConsumerWidget {
-  const ListeningPanel({super.key, this.section = ListeningSection.all});
+  const ListeningPanel({
+    super.key,
+    this.section = ListeningSection.all,
+    this.onOpenEqualizer,
+  });
   final ListeningSection section;
+  final VoidCallback? onOpenEqualizer;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final view = ref.watch(listeningProvider);
@@ -90,10 +95,12 @@ class ListeningPanel extends ConsumerWidget {
             ),
           ),
           InkWell(
-            onTap: () => showDialog<void>(
-              context: context,
-              builder: (_) => const _EqualizerDialog(),
-            ),
+            onTap:
+                onOpenEqualizer ??
+                () => showDialog<void>(
+                  context: context,
+                  builder: (_) => const EqualizerPanel(),
+                ),
             child: setting(
               'Equalizer',
               view.settings.enabled ? 'Tone, seven bands and balance' : 'Off',
@@ -134,224 +141,228 @@ class ListeningPanel extends ConsumerWidget {
   }
 }
 
-class _EqualizerDialog extends ConsumerWidget {
-  const _EqualizerDialog();
+class EqualizerPanel extends ConsumerWidget {
+  const EqualizerPanel({super.key, this.onDone});
+  final VoidCallback? onDone;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final view = ref.watch(listeningProvider), settings = view.settings;
     void update(ListeningSettings next) =>
         ref.read(listeningProvider.notifier).update(next);
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Equalizer',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const Text(
-                            'Shapes the sound inside BitChord, before it reaches the system.',
-                          ),
-                        ],
-                      ),
+    final body = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 560),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Equalizer',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const Text(
+                          'Shapes the sound inside BitChord, before it reaches the system.',
+                        ),
+                      ],
                     ),
-                    _Toggle(
-                      label: 'Enable equalizer',
-                      value: settings.enabled,
-                      onChanged: (value) =>
-                          update(settings.copyWith(enabled: value)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                AnimatedOpacity(
-                  opacity: settings.enabled ? 1 : .38,
-                  duration: const Duration(milliseconds: 150),
-                  child: IgnorePointer(
-                    ignoring: !settings.enabled,
-                    child: ExcludeFocus(
-                      excluding: !settings.enabled,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                  ),
+                  _Toggle(
+                    label: 'Enable equalizer',
+                    value: settings.enabled,
+                    onChanged: (value) =>
+                        update(settings.copyWith(enabled: value)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              AnimatedOpacity(
+                opacity: settings.enabled ? 1 : .38,
+                duration: const Duration(milliseconds: 150),
+                child: IgnorePointer(
+                  ignoring: !settings.enabled,
+                  child: ExcludeFocus(
+                    excluding: !settings.enabled,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            for (final mode in [
+                              EqualizerMode.dynamic,
+                              EqualizerMode.manual,
+                            ])
+                              Expanded(
+                                child: _Choice(
+                                  label: mode == EqualizerMode.dynamic
+                                      ? 'Dynamic'
+                                      : 'Manual',
+                                  selected: settings.mode == mode,
+                                  onTap: () =>
+                                      update(settings.copyWith(mode: mode)),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        if (settings.mode == EqualizerMode.dynamic) ...[
+                          const Text('TONE'),
+                          _TonePad(
+                            x: settings.toneX,
+                            y: settings.toneY,
+                            onChanged: (x, y) =>
+                                update(settings.copyWith(toneX: x, toneY: y)),
+                          ),
+                          Center(
+                            child: Text(
+                              'Tilt ${settings.toneX}       Contour ${settings.toneY}',
+                            ),
+                          ),
                           Row(
                             children: [
-                              for (final mode in [
-                                EqualizerMode.dynamic,
-                                EqualizerMode.manual,
-                              ])
-                                Expanded(
-                                  child: _Choice(
-                                    label: mode == EqualizerMode.dynamic
-                                        ? 'Dynamic'
-                                        : 'Manual',
-                                    selected: settings.mode == mode,
-                                    onTap: () =>
-                                        update(settings.copyWith(mode: mode)),
+                              for (final focused in [false, true])
+                                _Choice(
+                                  label: focused ? 'Focused' : 'Broad',
+                                  selected: settings.focused == focused,
+                                  onTap: () => update(
+                                    settings.copyWith(focused: focused),
                                   ),
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 18),
-                          if (settings.mode == EqualizerMode.dynamic) ...[
-                            const Text('TONE'),
-                            _TonePad(
-                              x: settings.toneX,
-                              y: settings.toneY,
-                              onChanged: (x, y) =>
-                                  update(settings.copyWith(toneX: x, toneY: y)),
-                            ),
-                            Center(
-                              child: Text(
-                                'Tilt ${settings.toneX}       Contour ${settings.toneY}',
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                for (final focused in [false, true])
-                                  _Choice(
-                                    label: focused ? 'Focused' : 'Broad',
-                                    selected: settings.focused == focused,
-                                    onTap: () => update(
-                                      settings.copyWith(focused: focused),
+                          const Text(
+                            'Drag left for a warmer sound and right for a brighter one; down scoops the middle, up brings it forward.',
+                          ),
+                        ] else ...[
+                          const Text('BANDS'),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final faders = Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  for (var i = 0; i < 7; i++)
+                                    Column(
+                                      children: [
+                                        Text(
+                                          settings.bands[i].toStringAsFixed(1),
+                                        ),
+                                        _Fader(
+                                          label: '${_frequencies[i]} Hz',
+                                          value: settings.bands[i],
+                                          onChanged: (value) {
+                                            final bands = settings.bands
+                                                .toList();
+                                            bands[i] = value;
+                                            update(
+                                              settings.copyWith(bands: bands),
+                                            );
+                                          },
+                                        ),
+                                        Text(
+                                          _frequencies[i],
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                              ],
-                            ),
-                            const Text(
-                              'Drag left for a warmer sound and right for a brighter one; down scoops the middle, up brings it forward.',
-                            ),
-                          ] else ...[
-                            const Text('BANDS'),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final faders = Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                ],
+                              );
+                              final presets = SizedBox(
+                                width: 168,
+                                height: 186,
+                                child: ListView(
                                   children: [
-                                    for (var i = 0; i < 7; i++)
-                                      Column(
-                                        children: [
-                                          Text(
-                                            settings.bands[i].toStringAsFixed(
-                                              1,
-                                            ),
-                                          ),
-                                          _Fader(
-                                            label: '${_frequencies[i]} Hz',
-                                            value: settings.bands[i],
-                                            onChanged: (value) {
-                                              final bands = settings.bands
-                                                  .toList();
-                                              bands[i] = value;
-                                              update(
-                                                settings.copyWith(bands: bands),
-                                              );
-                                            },
-                                          ),
-                                          Text(
-                                            _frequencies[i],
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.bodySmall,
-                                          ),
-                                        ],
-                                      ),
-                                  ],
-                                );
-                                final presets = SizedBox(
-                                  width: 168,
-                                  height: 186,
-                                  child: ListView(
-                                    children: [
-                                      for (final preset in _presets.entries)
-                                        _Choice(
-                                          label: preset.key,
-                                          selected: List.generate(
-                                            7,
-                                            (i) =>
-                                                (settings.bands[i] -
-                                                        preset.value[i])
-                                                    .abs() <
-                                                .05,
-                                          ).every((v) => v),
-                                          onTap: () => update(
-                                            settings.copyWith(
-                                              bands: preset.value,
-                                            ),
+                                    for (final preset in _presets.entries)
+                                      _Choice(
+                                        label: preset.key,
+                                        selected: List.generate(
+                                          7,
+                                          (i) =>
+                                              (settings.bands[i] -
+                                                      preset.value[i])
+                                                  .abs() <
+                                              .05,
+                                        ).every((v) => v),
+                                        onTap: () => update(
+                                          settings.copyWith(
+                                            bands: preset.value,
                                           ),
                                         ),
-                                    ],
-                                  ),
-                                );
-                                return constraints.maxWidth >= 450
-                                    ? Row(
-                                        children: [
-                                          Expanded(child: faders),
-                                          const SizedBox(width: 14),
-                                          presets,
-                                        ],
-                                      )
-                                    : Column(children: [faders, presets]);
-                              },
-                            ),
-                            TextButton(
-                              onPressed: () => update(
-                                settings.copyWith(bands: List.filled(7, 0)),
-                              ),
-                              child: const Text('Reset all bands'),
-                            ),
-                          ],
-                          const SizedBox(height: 18),
-                          const Text('BALANCE'),
-                          Row(
-                            children: [
-                              const Text('L'),
-                              Expanded(
-                                child: _Balance(
-                                  value: settings.balance,
-                                  onChanged: (value) =>
-                                      update(settings.copyWith(balance: value)),
+                                      ),
+                                  ],
                                 ),
-                              ),
-                              const Text('R'),
-                            ],
+                              );
+                              return constraints.maxWidth >= 450
+                                  ? Row(
+                                      children: [
+                                        Expanded(child: faders),
+                                        const SizedBox(width: 14),
+                                        presets,
+                                      ],
+                                    )
+                                  : Column(children: [faders, presets]);
+                            },
                           ),
-                          const Text(
-                            'Shifts the sound towards one ear by quietening the other.',
+                          TextButton(
+                            onPressed: () => update(
+                              settings.copyWith(bands: List.filled(7, 0)),
+                            ),
+                            child: const Text('Reset all bands'),
                           ),
                         ],
-                      ),
+                        const SizedBox(height: 18),
+                        const Text('BALANCE'),
+                        Row(
+                          children: [
+                            const Text('L'),
+                            Expanded(
+                              child: _Balance(
+                                value: settings.balance,
+                                onChanged: (value) =>
+                                    update(settings.copyWith(balance: value)),
+                              ),
+                            ),
+                            const Text('R'),
+                          ],
+                        ),
+                        const Text(
+                          'Shifts the sound towards one ear by quietening the other.',
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                if (view.error != null) Text(view.error!),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Done'),
-                  ),
+              ),
+              if (view.error != null) Text(view.error!),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: onDone ?? () => Navigator.of(context).pop(),
+                  child: const Text('Done'),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
+    return onDone != null
+        ? body
+        : Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: body,
+          );
   }
 }
 

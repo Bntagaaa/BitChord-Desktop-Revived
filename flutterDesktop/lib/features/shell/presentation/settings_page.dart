@@ -216,7 +216,10 @@ class SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           // Phase 5 controls keep their production controller/capability gates.
           if (_matches('Playback', 'Skip silence Spatial audio Equalizer'))
-            const ListeningPanel(section: ListeningSection.effects),
+            ListeningPanel(
+              section: ListeningSection.effects,
+              onOpenEqualizer: () => _open('Equalizer'),
+            ),
           _row(
             'Dolby Atmos',
             'Immersive mix playback is unavailable',
@@ -255,7 +258,9 @@ class SettingsPageState extends ConsumerState<SettingsPage> {
               children: [
                 for (final mode in Appearance.values)
                   ChoiceChip(
-                    label: Text(mode.name),
+                    label: Text(
+                      '${mode.name[0].toUpperCase()}${mode.name.substring(1)}',
+                    ),
                     selected: settings.appearance == mode,
                     onSelected: (_) =>
                         update(settings.copyWith(appearance: mode)),
@@ -668,7 +673,9 @@ class SettingsPageState extends ConsumerState<SettingsPage> {
       key: ValueKey(_page),
       padding: const EdgeInsets.only(top: 12, bottom: 28),
       children: [
-        if (_page == 'Account & integrations') ...[
+        if (_page == 'Equalizer') ...[
+          EqualizerPanel(onDone: _back),
+        ] else if (_page == 'Account & integrations') ...[
           _group('YouTube Music', [const AccountSession()]),
           for (final name in ['Spotify', 'Discord', 'Last.fm', 'ListenBrainz'])
             _row(name, 'Not connected', page: name),

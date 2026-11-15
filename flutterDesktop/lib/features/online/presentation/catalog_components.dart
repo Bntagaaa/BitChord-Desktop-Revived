@@ -445,7 +445,7 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
   );
 
   Widget _card(CatalogEntry entry, double width) {
-    final hero = widget.hero && !_listShelf;
+    final hero = (widget.hero && !_listShelf) || (_listShelf && _grid);
     final artHeight = hero
         ? width / .92
         : entry.isVideo
@@ -631,7 +631,8 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
           LayoutBuilder(
             builder: (context, constraints) {
               final tracks = _listShelf && !_grid;
-              final hero = widget.hero && !_listShelf;
+              final hero =
+                  (widget.hero && !_listShelf) || (_listShelf && _grid);
               final width = tracks
                   ? math.min(constraints.maxWidth * .88, 400.0)
                   : hero
