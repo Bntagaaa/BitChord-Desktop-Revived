@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,9 +37,10 @@ fun DesktopContinuedArtistMotionView(
     publishBackdrop: Boolean = true,
 ) {
     var frame by remember(url) { mutableStateOf<ImageBitmap?>(null) }
+    val windowVisible by DesktopWindowVisibility.visible.collectAsState()
 
-    LaunchedEffect(url, fallbackUrl, isPlaying, maxEdge, publishBackdrop) {
-        if (!isPlaying) return@LaunchedEffect
+    LaunchedEffect(url, fallbackUrl, isPlaying, windowVisible, maxEdge, publishBackdrop) {
+        if (!isPlaying || !windowVisible) return@LaunchedEffect
         // Round and round until the track ends or the player is closed. A canvas is a few seconds
         // long, so one pass through it is not the feature — and the decoder cannot be relied on to
         // rewind itself: its own seek does not take on an HLS manifest, which is what Apple serves,
@@ -86,7 +88,13 @@ fun DesktopContinuedArtistMotionView(
                     // The backdrop reads the first frame and holds it: re-meshing every frame would
                     // be a full resample twenty-five times a second for a wash nobody is watching
                     // closely, and the clip's palette does not change much across it anyway.
-                    if (shown == 1 && publishBackdrop) DesktopCanvasBackdrop.publish(url, next)
+                    if (shown == 1 && publishBackdrop) {
+                        // The backdrop outlives the ring-buffer rotation.
+                        DesktopCanvasBackdrop.publish(
+                            url,
+                            Image.makeRaster(info, currentBuffer.copyOf(), decoder.width * 4).toComposeImageBitmap(),
+                        )
+                    }
                     val spent = System.currentTimeMillis() - started
                     delay((decoder.frameIntervalMillis - spent).coerceAtLeast(0L))
                 }
