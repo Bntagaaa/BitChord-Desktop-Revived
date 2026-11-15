@@ -381,17 +381,28 @@ class CatalogShelfView extends StatefulWidget {
     required this.onSelect,
     required this.onOpen,
     this.hero = false,
+    this.onDownload,
   });
   final CatalogShelf shelf;
   final ValueChanged<CatalogEntry> onSelect;
   final void Function(String, String, String?) onOpen;
   final bool hero;
+  final ValueChanged<CatalogEntry>? onDownload;
   @override
   State<CatalogShelfView> createState() => _CatalogShelfViewState();
 }
 
 class _CatalogShelfViewState extends State<CatalogShelfView> {
   final _scroll = ScrollController();
+  bool _grid = false;
+  bool get _listShelf =>
+      widget.shelf.layout == ShelfLayout.tracks ||
+      [
+        'recents',
+        'recently played',
+        'listen again',
+        'quick picks',
+      ].contains(widget.shelf.title.trim().toLowerCase());
   @override
   void dispose() {
     _scroll.dispose();
@@ -434,7 +445,7 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
   );
 
   Widget _card(CatalogEntry entry, double width) {
-    final hero = widget.hero;
+    final hero = widget.hero && !_listShelf;
     final artHeight = hero
         ? width / .92
         : entry.isVideo
@@ -519,6 +530,28 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
             CatalogArtwork(url: entry.artwork, size: 48, radius: 7),
             const SizedBox(width: 12),
             Expanded(child: _caption(entry)),
+            SizedBox(
+              width: 28,
+              height: 32,
+              child: PopupMenuButton<String>(
+                tooltip: 'Options for ${entry.title}',
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.more_vert, size: 18),
+                onSelected: (action) {
+                  if (action == 'play') widget.onSelect(entry);
+                  if (action == 'download') widget.onDownload?.call(entry);
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'play', child: Text('Play')),
+                  if (widget.onDownload != null &&
+                      entry.kind == CatalogKind.track)
+                    const PopupMenuItem(
+                      value: 'download',
+                      child: Text('Download'),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -565,37 +598,49 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
                   ),
                 ),
               ),
-              if (shelf.moreId != null)
+              if (_listShelf)
                 IconButton(
-                  tooltip: 'Open ${shelf.title}',
-                  onPressed: () =>
-                      widget.onOpen(shelf.moreId!, shelf.title, shelf.params),
+                  tooltip: _grid ? 'Show as list' : 'Show as grid',
+                  onPressed: () => setState(() => _grid = !_grid),
+                  icon: Icon(
+                    _grid ? Icons.view_list_rounded : Icons.grid_view_rounded,
+                    size: 18,
+                  ),
+                )
+              else ...[
+                if (shelf.moreId != null)
+                  IconButton(
+                    tooltip: 'Open ${shelf.title}',
+                    onPressed: () =>
+                        widget.onOpen(shelf.moreId!, shelf.title, shelf.params),
+                    icon: const Icon(Icons.chevron_right, size: 20),
+                  ),
+                IconButton(
+                  tooltip: 'Previous in ${shelf.title}',
+                  onPressed: () => _page(-1),
+                  icon: const Icon(Icons.chevron_left, size: 20),
+                ),
+                IconButton(
+                  tooltip: 'Next in ${shelf.title}',
+                  onPressed: () => _page(1),
                   icon: const Icon(Icons.chevron_right, size: 20),
                 ),
-              IconButton(
-                tooltip: 'Previous in ${shelf.title}',
-                onPressed: () => _page(-1),
-                icon: const Icon(Icons.chevron_left, size: 20),
-              ),
-              IconButton(
-                tooltip: 'Next in ${shelf.title}',
-                onPressed: () => _page(1),
-                icon: const Icon(Icons.chevron_right, size: 20),
-              ),
+              ],
             ],
           ),
           LayoutBuilder(
             builder: (context, constraints) {
-              final tracks = shelf.layout == ShelfLayout.tracks;
+              final tracks = _listShelf && !_grid;
+              final hero = widget.hero && !_listShelf;
               final width = tracks
                   ? math.min(constraints.maxWidth * .88, 400.0)
-                  : widget.hero
+                  : hero
                   ? math.min(constraints.maxWidth * .70, 320.0)
                   : 150.0;
               final hasVideos = shelf.entries.any((e) => e.isVideo);
               final height = tracks
                   ? 224.0
-                  : widget.hero
+                  : hero
                   ? width / .92
                   : 150.0 + 64;
               return SizedBox(
@@ -642,9 +687,7 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
                             )
                           : _card(
                               shelf.entries[index],
-                              !widget.hero &&
-                                      hasVideos &&
-                                      shelf.entries[index].isVideo
+                              !hero && hasVideos && shelf.entries[index].isVideo
                                   ? 248
                                   : width,
                             ),

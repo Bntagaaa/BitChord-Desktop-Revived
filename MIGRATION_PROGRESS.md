@@ -1,5 +1,39 @@
 # Migration progress and delivery backlog
 
+## Phase 6 actual presentation implementation — 2026-11-15
+
+This increment modifies production `flutterDesktop/lib/` (the preceding CI-only
+increment did not address the user-reported UI defects). Pinned source audited:
+`DesktopApp.kt:DesktopMiniPlayer/DesktopSettingsScreen`, `DesktopAccountUi.kt`,
+`DesktopOverlays.kt`, `DesktopSidePanel.kt`, `DesktopSurfaces.kt`, shared
+`HomeScreen.kt`, `LandscapePlayer.kt` and `LyricsSource.kt` at `348b613a`.
+All four original user screenshots were inspected. No reference source changed.
+
+Implemented: Home compact Listen again/Quick picks/Recents shelves, row menus and
+list/grid switching; the active 58-dp dock with original transport SVGs, artwork,
+metadata and preview/release seek; account picker rows/Add/Manage and a separate
+sign-in dialog; all 18 Settings section headings in source order, search and
+secondary page navigation, disabled unsupported controls, and relocated existing
+Phase 5 effects/speed/sleep; two-column expanded player and shared Queue/Lyrics/
+Details panels. Queue selects actual loaded context occurrences; expanding creates
+no second audio engine or timer. Real sign-in and session storage remain intact.
+
+Limitations: account metadata and multiple saved accounts are not exposed by the
+current adapter (generic connected row, second Add disabled); Settings secondary
+pages are scaffolds with unavailable capabilities disabled, not full feature
+parity. EQ still opens its existing working dialog. Lyrics reports unavailable;
+no provider/timing implementation is claimed. Shuffle/repeat/volume/device/PiP
+controls remain disabled, video/Canvas and independent Mini Player window absent.
+Full-product interactive matched playing/DPI/theme and persistent-account
+regressions remain NOT VERIFIED. Phase 6 remains **INCOMPLETE**; no Phase 7.
+
+Local checks: checksum-verified standalone Dart 3.13.7 formatting at language
+3.11, layer/assets, pinned Phase 2 inventory/catalogues and 50 Phase 5 hashes,
+Python smoke syntax, diff whitespace. No local production build or automated
+Flutter tests. CI must validate analyzer, interaction/regression tests, Linux and
+Windows release bundles/native GUI smokes and current paired reference captures.
+Exact-source CI result is pending this implementation push to PR #144.
+
 ## Phase 6 CI-first verification increment — 2026-11-15
 
 User requires GitHub Actions for automated tests, Linux/Windows release builds

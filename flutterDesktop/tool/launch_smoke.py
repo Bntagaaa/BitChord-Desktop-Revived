@@ -131,13 +131,22 @@ def main():
             time.sleep(.5)
             click_client(window, 36, 563)
             states.append(capture_state(evidence, window, 'settings', 'light'))
-            click_client(window, 120, 127)
-            click_client(window, 300, 127)
+            def appearance_search(query, tabs):
+                click_client(window, 700, 38)
+                subprocess.run(['xdotool', 'key', 'ctrl+a'], check=True, timeout=5)
+                subprocess.run(['xdotool', 'type', '--clearmodifiers', query], check=True, timeout=5)
+                time.sleep(.5)
+                for _ in range(tabs):
+                    subprocess.run(['xdotool', 'key', 'Tab'], check=True, timeout=5)
+                subprocess.run(['xdotool', 'key', 'space'], check=True, timeout=5)
+                time.sleep(.5)
+            # The source-matched hierarchy is searchable; use its real keyboard
+            # traversal instead of coordinates from the removed flat page.
+            appearance_search('Theme', 4)
             states.append(capture_state(evidence, window, 'dark', 'dark'))
-            click_client(window, 170, 170)
+            appearance_search('Pitch black', 2)
             states.append(capture_state(evidence, window, 'pitch-black', 'black'))
-            click_client(window, 120, 127)
-            click_client(window, 230, 127)
+            appearance_search('Theme', 3)
             states.append(capture_state(evidence, window, 'light', 'light'))
             subprocess.run(['xdotool', 'key', 'alt+Left', 'mousemove', '--window', window, '500', '400'], check=True, timeout=5)
             subprocess.run(['xdotool', 'windowactivate', '--sync', window, 'key', 'F11'], check=True, timeout=10)

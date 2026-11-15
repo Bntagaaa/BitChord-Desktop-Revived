@@ -8,28 +8,79 @@ import 'sleep_panel.dart';
 // Measured from DesktopEqualizerUi.kt at 348b613a: 560-dp dialog,
 // 22-dp body inset, 200-dp 11x11 tone pad and 30x150-dp signed faders.
 // Native-window/motion/DPI parity remains a separate acceptance gate.
+enum ListeningSection { all, effects, transport }
+
 class ListeningPanel extends ConsumerWidget {
-  const ListeningPanel({super.key});
+  const ListeningPanel({super.key, this.section = ListeningSection.all});
+  final ListeningSection section;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final view = ref.watch(listeningProvider);
-    if (!view.available) return const SizedBox.shrink();
+    if (!view.available && section == ListeningSection.all)
+      return const SizedBox.shrink();
+    Widget unavailable(String title) => Opacity(
+      opacity: .38,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        enabled: false,
+        title: Text(title),
+        subtitle: const Text('Unavailable'),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+      ),
+    );
+    if (!view.available)
+      return Column(
+        children: [
+          for (final title
+              in section == ListeningSection.transport
+                  ? ['Playback speed', 'Sleep timer']
+                  : ['Skip silence', 'Spatial audio', 'Equalizer'])
+            unavailable(title),
+        ],
+      );
+    Widget setting(String title, String subtitle, Widget control) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title),
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          const SizedBox(width: 18),
+          control,
+        ],
+      ),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 24),
-        Text('Audio', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: () => showDialog<void>(
-            context: context,
-            builder: (_) => const _EqualizerDialog(),
-          ),
-          child: const Text('Equalizer'),
-        ),
-        Row(
-          children: [
-            const Expanded(child: Text('Stereo widening')),
+        if (section == ListeningSection.all) ...[
+          const SizedBox(height: 24),
+          Text('Audio', style: Theme.of(context).textTheme.titleLarge),
+        ],
+        if (section != ListeningSection.transport) ...[
+          if (view.tempoAvailable)
+            setting(
+              'Skip silence',
+              'Shorten long gaps rather than playing them out',
+              _Toggle(
+                label: 'Skip silence',
+                value: view.settings.skipSilence,
+                onChanged: (skip) => ref
+                    .read(listeningProvider.notifier)
+                    .update(view.settings.copyWith(skipSilence: skip)),
+              ),
+            ),
+          setting(
+            section == ListeningSection.all
+                ? 'Stereo widening'
+                : 'Spatial audio',
+            'Widens stereo tracks for a more immersive feel',
             _Toggle(
               label: 'Stereo widening',
               value: view.settings.spatial,
@@ -37,15 +88,24 @@ class ListeningPanel extends ConsumerWidget {
                   .read(listeningProvider.notifier)
                   .update(view.settings.copyWith(spatial: value)),
             ),
-          ],
-        ),
-        if (view.error != null) Text(view.error!),
-        if (view.tempoAvailable) ...[
-          const SizedBox(height: 12),
-          // DesktopApp.kt's settings row cycles through these exact speeds.
-          Row(
-            children: [
-              const Expanded(child: Text('Playback speed')),
+          ),
+          InkWell(
+            onTap: () => showDialog<void>(
+              context: context,
+              builder: (_) => const _EqualizerDialog(),
+            ),
+            child: setting(
+              'Equalizer',
+              view.settings.enabled ? 'Tone, seven bands and balance' : 'Off',
+              const Icon(Icons.chevron_right, size: 20),
+            ),
+          ),
+        ],
+        if (section != ListeningSection.effects) ...[
+          if (view.tempoAvailable)
+            setting(
+              'Playback speed',
+              'Tap to change',
               _Choice(
                 label: '${view.settings.speed.toStringAsFixed(2)}×',
                 selected: false,
@@ -65,22 +125,10 @@ class ListeningPanel extends ConsumerWidget {
                       .update(view.settings.copyWith(speed: next));
                 },
               ),
-            ],
-          ),
-          Row(
-            children: [
-              const Expanded(child: Text('Skip silence')),
-              _Toggle(
-                label: 'Skip silence',
-                value: view.settings.skipSilence,
-                onChanged: (skip) => ref
-                    .read(listeningProvider.notifier)
-                    .update(view.settings.copyWith(skipSilence: skip)),
-              ),
-            ],
-          ),
+            ),
+          const SleepPanel(),
         ],
-        const SleepPanel(),
+        if (view.error != null) Text(view.error!),
       ],
     );
   }

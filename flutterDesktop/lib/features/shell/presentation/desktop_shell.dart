@@ -10,7 +10,8 @@ import '../../../app/router.dart';
 import '../../online/application/catalog_controller.dart';
 import '../../online/presentation/catalog_surface.dart';
 import '../../online/presentation/account_session.dart';
-import '../../playback/presentation/listening_panel.dart';
+import 'settings_page.dart';
+import '../../playback/presentation/player_surfaces.dart';
 import '../../../l10n/shell_strings.dart';
 import '../../../design_system/palette.dart';
 import '../../../design_system/theme.dart';
@@ -80,6 +81,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
   bool _accountsOpen = false;
   bool _narrow = false;
   final _rootFocus = FocusNode(debugLabel: 'Desktop shell');
+  final _settingsKey = GlobalKey<SettingsPageState>();
   @override
   void dispose() {
     _rootFocus.dispose();
@@ -112,6 +114,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
       _dismissOverlays();
       return;
     }
+    if (ref.read(playerLayoutProvider.notifier).back()) return;
+    if (widget.destination == Destination.settings &&
+        (_settingsKey.currentState?.back() ?? false))
+      return;
     final path = ref.read(historyProvider.notifier).back();
     if (path != null) context.go(path);
   }
@@ -137,6 +143,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(shellProvider);
+    final playerLayout = ref.watch(playerLayoutProvider);
     final hasCatalog = ref.watch(onlinePortProvider) != null;
     final palette = BitChordPalette.resolve(
       settings,
@@ -162,6 +169,11 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
             _dismissOverlays();
           } else if (_drawerRequested) {
             _dismissOverlays();
+          } else if (ref.read(playerLayoutProvider.notifier).back()) {
+            return;
+          } else if (widget.destination == Destination.settings &&
+              (_settingsKey.currentState?.back() ?? false)) {
+            return;
           } else {
             _windowAction((host) => host.exitFullscreen());
           }
@@ -218,9 +230,15 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
               return Stack(
                 children: [
                   ExcludeFocus(
-                    excluding: _accountsOpen || (narrow && _drawerRequested),
+                    excluding:
+                        playerLayout.expanded ||
+                        _accountsOpen ||
+                        (narrow && _drawerRequested),
                     child: ExcludeSemantics(
-                      excluding: _accountsOpen || (narrow && _drawerRequested),
+                      excluding:
+                          playerLayout.expanded ||
+                          _accountsOpen ||
+                          (narrow && _drawerRequested),
                       child: Row(
                         children: [
                           AnimatedContainer(
@@ -252,7 +270,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                     Expanded(
                                       child: Padding(
                                         padding: EdgeInsets.fromLTRB(
-                                          16,
+                                          widget.destination ==
+                                                  Destination.settings
+                                              ? 0
+                                              : 16,
                                           widget.destination ==
                                                   Destination.search
                                               // Search owns its 18 px top inset;
@@ -266,13 +287,19 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                               ? desktopHomeHeadingTopPadding(
                                                   Theme.of(context).platform,
                                                 )
+                                              : widget.destination ==
+                                                    Destination.settings
+                                              ? 0
                                               : 16,
-                                          16,
+                                          widget.destination ==
+                                                  Destination.settings
+                                              ? 0
+                                              : 16,
                                           // Catalog lists own their bottom
                                           // content padding, so artwork can
                                           // continue beneath the glass dock.
-                                          hasCatalog &&
-                                                  widget.destination !=
+                                          hasCatalog ||
+                                                  widget.destination ==
                                                       Destination.settings
                                               ? 0
                                               : ShellMetrics
@@ -283,7 +310,8 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                                           child:
                                               widget.destination ==
                                                   Destination.settings
-                                              ? _AppearancePanel(
+                                              ? SettingsPage(
+                                                  key: _settingsKey,
                                                   palette: palette,
                                                 )
                                               : hasCatalog
@@ -330,10 +358,34 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                               ],
                             ),
                           ),
+                          if (playerLayout.pane != null &&
+                              !playerLayout.expanded &&
+                              constraints.maxWidth >= 900)
+                            SizedBox(
+                              width: constraints.maxWidth < 700 ? 260 : 360,
+                              child: PlayerSidePanel(pane: playerLayout.pane!),
+                            ),
                         ],
                       ),
                     ),
                   ),
+                  if (playerLayout.pane != null &&
+                      !playerLayout.expanded &&
+                      constraints.maxWidth < 900)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      bottom: 90,
+                      width: 300,
+                      child: PlayerSidePanel(pane: playerLayout.pane!),
+                    ),
+                  if (playerLayout.expanded)
+                    Positioned.fill(
+                      child: FocusScope(
+                        autofocus: true,
+                        child: const ExpandedPlayer(),
+                      ),
+                    ),
                   if (narrow && _drawerRequested) ...[
                     Positioned.fill(
                       child: GestureDetector(
@@ -660,74 +712,7 @@ class _AccountPanel extends ConsumerWidget {
       tintAlpha: .47,
       blurRadius: 35,
       solidToken: 'barGlass',
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 13, 16, 5),
-              child: Text(
-                'Accounts',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
-              ),
-            ),
-            if (ref.watch(onlinePortProvider) != null)
-              const AccountSession()
-            else ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: Text(
-                  'Nobody is signed in. Your library, playlists and history need a YouTube Music account.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: palette['secondary']),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                child: Divider(
-                  height: .5,
-                  thickness: .5,
-                  color: palette['cardEdge'],
-                ),
-              ),
-              Tooltip(
-                message: 'Sign-in is unavailable.',
-                child: Semantics(
-                  enabled: false,
-                  button: true,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.add, size: 18, color: palette['secondary']),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Add account',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: palette['secondary']),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+      child: const AccountPicker(),
     ),
   );
 }
@@ -1077,101 +1062,6 @@ class _DockButton extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _AppearancePanel extends ConsumerWidget {
-  const _AppearancePanel({required this.palette});
-  final BitChordPalette palette;
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(shellProvider);
-    void update(ShellSettings next) =>
-        ref.read(shellProvider.notifier).update(next);
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            shellString(context, 'settings', 'Settings'),
-            key: const Key('page-heading'),
-            style: Theme.of(context).textTheme.headlineLarge,
-          ),
-          const SizedBox(height: 24),
-          Text(
-            shellString(context, 'appearance', 'Appearance'),
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final mode in Appearance.values)
-                ChoiceChip(
-                  label: Text(mode.name),
-                  selected: mode == settings.appearance,
-                  onSelected: (_) =>
-                      update(settings.copyWith(appearance: mode)),
-                ),
-            ],
-          ),
-          if (settings.appearance == Appearance.dark)
-            SwitchListTile(
-              title: const Text('Pitch black'),
-              value: settings.pitchBlack,
-              onChanged: (value) =>
-                  update(settings.copyWith(pitchBlack: value)),
-            ),
-          SwitchListTile(
-            title: Text(
-              shellString(
-                context,
-                'reduce_dynamic_blur',
-                'Reduce dynamic blur',
-              ),
-            ),
-            value: settings.reduceBlur,
-            onChanged: (value) => update(settings.copyWith(reduceBlur: value)),
-          ),
-          SwitchListTile(
-            title: Text(
-              shellString(context, 'reduce_animation', 'Reduce animation'),
-            ),
-            value: settings.reduceMotion,
-            onChanged: (value) =>
-                update(settings.copyWith(reduceMotion: value)),
-          ),
-          Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              const Text('UI Scale'),
-              for (final percent in uiScaleOptions)
-                ChoiceChip(
-                  key: Key('ui-scale-$percent'),
-                  label: Text('$percent%'),
-                  selected: settings.uiScalePercent == percent,
-                  onSelected: (_) =>
-                      update(settings.copyWith(uiScalePercent: percent)),
-                ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const ListeningPanel(),
-          Text('About BitChord', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(
-            'BitChord Desktop 2.0.0+1 (Flutter Desktop)\n'
-            'Phase 4: In-App YouTube Music Sign-In (WebKitGTK 4.1 / WebView2)\n'
-            'Audio Engine: C++17 Native PCM Pipeline',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: palette['secondary']),
-          ),
-          const SizedBox(height: 12),
-        ],
-      ),
-    );
-  }
 }
 
 double desktopHomeHeadingTopPadding(TargetPlatform platform) =>

@@ -210,13 +210,22 @@ try {
   Send-Key 0x1B
   Click-Client 36 563
   $states += Save-State 'settings' 'light'
-  Click-Client 120 127
-  Click-Client 300 127
+  function Appearance-Search([string]$query, [int]$tabs) {
+    Click-Client 700 38
+    [SmokeWindow]::keybd_event(0x11,0,0,[UIntPtr]::Zero)
+    Send-Key 0x41
+    [SmokeWindow]::keybd_event(0x11,0,2,[UIntPtr]::Zero)
+    foreach ($letter in $query.ToUpper().ToCharArray()) {
+      Send-Key ([byte][char]$letter)
+    }
+    for ($i = 0; $i -lt $tabs; $i++) { Send-Key 0x09 }
+    Send-Key 0x20
+  }
+  Appearance-Search 'Theme' 4
   $states += Save-State 'dark' 'dark'
-  Click-Client 170 170
+  Appearance-Search 'Pitch black' 2
   $states += Save-State 'pitch-black' 'black'
-  Click-Client 120 127
-  Click-Client 230 127
+  Appearance-Search 'Theme' 3
   $states += Save-State 'light' 'light'
   [SmokeWindow]::keybd_event(0x12,0,0,[UIntPtr]::Zero)
   Send-Key 0x25

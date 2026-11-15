@@ -1,5 +1,30 @@
 # Migration parity audit — Phase 0
 
+## P02/P20/P24/P29–P30 — production visual implementation, 2026-11-15
+
+Actual Flutter widgets now changed in `features/online/presentation/` (Home and
+account picker), `features/shell/presentation/settings_page.dart` and
+`desktop_shell.dart` (18-section searchable Settings and panel hosting), and
+`features/playback/presentation/player_surfaces.dart`/`listening_panel.dart`
+(active dock, expanded player, real context Queue/Details and Phase 5 controls).
+Reference: pinned `348b613a` DesktopApp/DesktopAccountUi/DesktopOverlays/
+DesktopSidePanel/DesktopSurfaces, shared HomeScreen/LandscapePlayer/LyricsSource.
+Four user screenshots inspected; their personal data is not copied into UI.
+
+Status **IMPLEMENTED; exact-source CI pending**, not PARITY_ACCEPTED. Tests added
+for Home list/grid, disabled Settings/search/back, native appearance keyboard
+sequence, playing dock/expanded player/Queue/Escape at both target sizes. Existing
+release-only seek and superseded-selection tests retained after moving transport.
+
+P20: single existing account shown; identity metadata and multi-account switching
+remain missing and second Add is disabled. P22/P23: unavailable lyric panel and
+source settings structure only, no provider or timing completion. P24: visual
+transport/expanded/Queue subset; shuffle/repeat/volume/device remain disabled.
+P25/P26: no video/Canvas addition. P27: independent Mini Player/PiP window remains
+unimplemented. Settings unsupported controls are disabled, secondary content is
+partial; full navigation/state/motion/DPI/platform exploration is NOT VERIFIED.
+Phase 6 **INCOMPLETE**. P10–P16 deferred backlog remains unchanged.
+
 ## Phase 6 hosted visual verification — 2026-11-15
 
 P02/P20/P24/P29/P30: CI now has a paired real-client Linux capture/comparison

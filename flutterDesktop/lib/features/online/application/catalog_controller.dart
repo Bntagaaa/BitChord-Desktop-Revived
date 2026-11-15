@@ -396,4 +396,23 @@ final class TransportController extends Notifier<PlaybackSnapshot?> {
       await port.resume();
     }
   }
+
+  Future<void> seek(int positionUs, PlaybackSnapshot started) async {
+    final latest = state;
+    if (latest == null ||
+        latest.entryId != started.entryId ||
+        latest.selection != started.selection ||
+        latest.queueRevision != started.queueRevision ||
+        latest.phase == AudioPhase.failed ||
+        latest.durationUs <= 0)
+      return;
+    final maxSeek = latest.durationUs > 250000
+        ? latest.durationUs - 250000
+        : latest.durationUs - 1;
+    try {
+      await ref.read(onlinePortProvider)?.seek(positionUs.clamp(0, maxSeek));
+    } catch (_) {
+      // The next authoritative snapshot displays any native playback failure.
+    }
+  }
 }

@@ -223,6 +223,8 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('nav-settings')));
       await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('settings-search')), 'Theme');
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(ChoiceChip, 'dark'));
       await tester.pumpAndSettle();
       expect(container.read(shellProvider).appearance, Appearance.dark);
@@ -397,6 +399,11 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('nav-settings')));
       await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('settings-search')),
+        'UI scale',
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('ui-scale-110')));
       await tester.pumpAndSettle();
       final sidebar = tester.getRect(find.byKey(const Key('inline-sidebar')));
@@ -438,6 +445,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('account-panel')), findsNothing);
     await tester.tap(find.byKey(const Key('nav-settings')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('settings-search')),
+      'UI scale',
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('ui-scale-100')), findsOneWidget);
     expect(tester.takeException(), isNull);
