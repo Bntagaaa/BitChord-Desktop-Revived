@@ -21,6 +21,23 @@ internal object DesktopWindowVisibility {
      */
     val raiseRequest: StateFlow<Long> = _raiseRequest
 
+    private val _settingsRequest = MutableStateFlow(0L)
+    val settingsRequest: StateFlow<Long> = _settingsRequest
+
+    private val _trayEnabled = MutableStateFlow(true)
+    val trayEnabled: StateFlow<Boolean> = _trayEnabled
+
+    /** Persistently configure the background tray. Never clear this when the main UI unmounts. */
+    fun configureTray(enabled: Boolean, closeToTray: Boolean) {
+        _trayEnabled.value = enabled
+        keepRunningWhenClosed = enabled && closeToTray
+    }
+
+    fun showSettings() {
+        show()
+        _settingsRequest.value = _settingsRequest.value + 1L
+    }
+
     /** Whether a close should hide rather than quit. */
     @Volatile
     var keepRunningWhenClosed: Boolean = false
