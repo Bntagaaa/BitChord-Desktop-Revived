@@ -12,6 +12,12 @@ import java.nio.file.Path
 /** Process resident memory, including native audio, images, and renderer allocations. */
 internal object DesktopPageMemoryPolicy {
     const val TRIM_THRESHOLD_BYTES = 650L * 1_024L * 1_024L
+    // The active page may have no inactive sibling to evict. Throttle full native/heap
+    // trimming to avoid oscillating frame textures or forcing GC every 5-second poll.
+    const val ACTIVE_PAGE_TRIM_COOLDOWN_NS = 2L * 60L * 1_000_000_000L
+
+    fun shouldTrimActivePage(rssBytes: Long, elapsedSinceTrimNs: Long): Boolean =
+        rssBytes >= TRIM_THRESHOLD_BYTES && elapsedSinceTrimNs >= ACTIVE_PAGE_TRIM_COOLDOWN_NS
 
     fun <T> oldestInactive(usageOldestFirst: List<T>, active: T, evictable: Set<T>): T? =
         usageOldestFirst.firstOrNull { it != active && it in evictable }
