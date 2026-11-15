@@ -247,7 +247,14 @@ void main() {
             desktopWindowProvider.overrideWithValue(TestWindow()),
           ],
         );
-        addTearDown(container.dispose);
+        var disposed = false;
+        void disposeContainer() {
+          if (disposed) return;
+          disposed = true;
+          container.dispose();
+        }
+
+        addTearDown(disposeContainer);
         const first = CatalogEntry(
           provider: 'youtube',
           id: 'first',
@@ -293,6 +300,7 @@ void main() {
         expect(find.byType(ExpandedPlayer), findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
+        disposeContainer();
       },
     );
   }

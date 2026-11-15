@@ -323,46 +323,51 @@ class _PlayerProgressState extends ConsumerState<PlayerProgress> {
       children: [
         SizedBox(
           height: widget.thin ? 10 : 24,
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: widget.thin ? 2 : 4,
-              thumbShape: RoundSliderThumbShape(
-                enabledThumbRadius: widget.thin ? 0 : 5,
+          // Keep the interactive strip ten pixels tall while painting the
+          // source's two-pixel progress line against the dock's bottom edge.
+          child: Transform.translate(
+            offset: Offset(0, widget.thin ? 4 : 0),
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: widget.thin ? 2 : 4,
+                thumbShape: RoundSliderThumbShape(
+                  enabledThumbRadius: widget.thin ? 0 : 5,
+                ),
+                overlayShape: SliderComponentShape.noOverlay,
+                trackShape: const RectangularSliderTrackShape(),
+                padding: EdgeInsets.zero,
               ),
-              overlayShape: SliderComponentShape.noOverlay,
-              trackShape: const RectangularSliderTrackShape(),
-              padding: EdgeInsets.zero,
-            ),
-            child: Slider(
-              key: Key(widget.thin ? 'dock-seek' : 'player-seek'),
-              semanticFormatterCallback: (value) => _time(value.round()),
-              value: position.clamp(0, duration),
-              max: duration,
-              onChangeStart: snapshot.durationUs <= 0
-                  ? null
-                  : (value) => setState(() {
-                      _preview = value;
-                      _start = snapshot;
-                    }),
-              onChanged: snapshot.durationUs <= 0
-                  ? null
-                  : (value) {
-                      if (_same(widget.snapshot))
-                        setState(() => _preview = value);
-                    },
-              onChangeEnd: snapshot.durationUs <= 0
-                  ? null
-                  : (value) {
-                      final start = _start;
-                      setState(() {
-                        _preview = null;
-                        _start = null;
-                      });
-                      if (start != null)
-                        ref
-                            .read(transportProvider.notifier)
-                            .seek(value.round(), start);
-                    },
+              child: Slider(
+                key: Key(widget.thin ? 'dock-seek' : 'player-seek'),
+                semanticFormatterCallback: (value) => _time(value.round()),
+                value: position.clamp(0, duration),
+                max: duration,
+                onChangeStart: snapshot.durationUs <= 0
+                    ? null
+                    : (value) => setState(() {
+                        _preview = value;
+                        _start = snapshot;
+                      }),
+                onChanged: snapshot.durationUs <= 0
+                    ? null
+                    : (value) {
+                        if (_same(widget.snapshot))
+                          setState(() => _preview = value);
+                      },
+                onChangeEnd: snapshot.durationUs <= 0
+                    ? null
+                    : (value) {
+                        final start = _start;
+                        setState(() {
+                          _preview = null;
+                          _start = null;
+                        });
+                        if (start != null)
+                          ref
+                              .read(transportProvider.notifier)
+                              .seek(value.round(), start);
+                      },
+              ),
             ),
           ),
         ),
