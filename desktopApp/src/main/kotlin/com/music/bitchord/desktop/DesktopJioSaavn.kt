@@ -214,8 +214,13 @@ internal object DesktopMusicSources {
         } else DesktopSourceRegistry.resolveLive(song, qualityOverride, excludedSourceId)
 
     /** A second look, asked from scratch once the first one settled for nothing better. */
-    suspend fun upgradeFor(song: Song, playing: DesktopStream?): DesktopStream? =
-        if (DesktopDirectSource.active(song)) null else DesktopSourceRegistry.upgradeFor(song, playing)
+    suspend fun upgradeFor(
+        song: Song,
+        playing: DesktopStream?,
+        excludedSourceId: String? = null,
+    ): DesktopStream? =
+        if (DesktopDirectSource.active(song)) null
+        else DesktopSourceRegistry.upgradeFor(song, playing, excludedSourceId = excludedSourceId)
 
     /** The quality rung in force. */
     fun ceiling(qualityOverride: String? = null): DesktopAudioQuality =
