@@ -71,10 +71,23 @@ fun main() {
     )
     // The public "apps open right now" count; see Presence.
     DesktopPresence.install(DesktopApplicationResources.owner)
-    try { desktopMain(welcomeLaunch) } finally { DesktopApplicationResources.close() }
+    val preferences = DesktopPersistence()
+    DesktopWindowVisibility.configureTray(
+        preferences.boolean("tray_icon", true),
+        preferences.boolean("close_to_tray", true),
+    )
+    // Unlike the main Window, this service survives tray/PiP transitions.
+    val playbackService = DesktopPlaybackService()
+    try { desktopMain(welcomeLaunch, playbackService) } finally {
+        playbackService.close()
+        DesktopApplicationResources.close()
+    }
 }
 
-private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = application {
+private fun desktopMain(
+    welcomeLaunch: DesktopWelcomeOnboarding.Launch,
+    playbackService: DesktopPlaybackService,
+) = application {
     DisposableEffect(Unit) { onDispose { DesktopApplicationResources.close() } }
     // Closing puts the window away rather than ending the process, while there is a tray icon to
     // bring it back from — see [DesktopWindowVisibility].
@@ -111,9 +124,12 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
             DesktopMemoryOptimizer.onWindowShown()
         }
     }
-    // Keep the floating host outside the main Window's visibility-paused composition.
+    // Background transport services and PiP live outside the main window's composition.
+    DesktopBackgroundPlaybackHost(playbackService, pipHost)
     DesktopPipHostWindow(pipHost)
-    Window(
+    // Removing Window (rather than Window(visible=false)) destroys the page composition,
+    // its Compose/Skia layers and native AWT peer. The engine is process-owned above.
+    if (visible) Window(
         onCloseRequest = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },
         visible = visible,
         title = "BitChord",
@@ -338,7 +354,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         ) {
             ProvideDesktopPresentationLifecycle(visible && !state.isMinimized) {
                 DesktopFlyoutHost {
-                    BitChordDesktopApp(welcomeLaunch, pipHost)
+                    BitChordDesktopApp(welcomeLaunch, pipHost, playbackService)
                 }
             }
         }
