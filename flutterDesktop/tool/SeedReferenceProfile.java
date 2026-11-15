@@ -1,4 +1,4 @@
-// Visual fixture setup ONLY for the disposable GitHub-hosted Windows account.
+// Visual fixture setup ONLY for a disposable GitHub-hosted account.
 // Never run this against a listener's installed Kotlin Preferences/profile.
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,7 +16,8 @@ class SeedReferenceProfile {
         }
         var path = Path.of(args[0]).toAbsolutePath().normalize();
         var attributes = Files.readAttributes(path, BasicFileAttributes.class);
-        var normalized = path.toString().toLowerCase(Locale.ROOT);
+        var normalized = System.getProperty("os.name").startsWith("Windows")
+            ? path.toString().toLowerCase(Locale.ROOT) : path.toString();
         var identity = normalized + "|" + attributes.size() + "|" +
             attributes.creationTime().toMillis() + "|" + attributes.lastModifiedTime().toMillis();
         var digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

@@ -1,5 +1,25 @@
 # Migration parity audit — Phase 0
 
+## Phase 6 hosted visual verification — 2026-11-15
+
+P02/P20/P24/P29/P30: CI now has a paired real-client Linux capture/comparison
+pipeline using the pinned Kotlin `DesktopApp.kt`, `DesktopOverlays.kt`,
+`DesktopAccountUi.kt` and `DesktopSettingsSection`/`DesktopSettingsPage`
+inventory. Flutter source remains `desktop_shell.dart`, `account_session.dart`
+and existing catalog/player components; no production behavior changed.
+Inputs, geometry, capture hashes, OCR, numeric differences and a coverage
+matrix are emitted to `phase6-visual-linux`. The matrix preserves all
+source-inventoried routes, overlays, 18 Settings sections and ten Settings
+pages, plus explicit playback/fullscreen/lyrics/media/account gaps.
+
+These are automation capabilities pending exact-source CI verification, not
+parity acceptance. Captures require visual/semantic review and cannot prove
+matched live content, disabled semantics, scroll coverage or full interaction.
+P22–P27 remain INCOMPLETE; no player/lyrics/video/Canvas/PiP feature is promoted.
+Physical audio, authenticated persistence, paired Windows exploration and
+remaining Phase 5 gates are unchanged. See
+[Phase 6 evidence](flutterDesktop/verification/phase6/README.md).
+
 ## Active authorization — scoped Phase 5 checkpoint and Phase 6 (2026-11-15)
 
 The user explicitly deferred **advanced Automix, ONNX beat/vocal analysis and

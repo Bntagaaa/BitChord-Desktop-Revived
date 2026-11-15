@@ -1,5 +1,15 @@
 # BitChord Flutter desktop foundation — Phase 1
 
+Current Phase 6 execution policy (2026-11-15): GitHub Actions is the primary
+build/test/verification environment. Do not run full Kotlin or Flutter
+production builds on the local Linux workstation. Automated tests, Windows/
+Linux release bundles and hosted screenshots run in `flutter-desktop.yml`.
+Phase 6 pushes go to `codex/phase6-player-lyrics`, with a PR targeting
+`2.0.0-flutter`; never auto-merge. See
+[Phase 6 CI evidence](verification/phase6/README.md) for capture coverage and
+limitations. Commands and phase descriptions below are historical protocols,
+not authorization to run local production builds. Phase 6 remains INCOMPLETE.
+
 Latest work: Phase 5 is authorized and **INCOMPLETE**. Native reference-tested
 DSP, EQ/spatial controls, native speed/silence clocks, sleep behavior and precise limits are recorded in
 [verification/phase5/README.md](verification/phase5/README.md). Full Automix,

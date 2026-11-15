@@ -1,5 +1,26 @@
 # Migration progress and delivery backlog
 
+## Phase 6 CI-first verification increment — 2026-11-15
+
+User requires GitHub Actions for automated tests, Linux/Windows release builds
+and hosted capture/comparison; no full local Kotlin/Flutter production builds.
+Work stays on `codex/phase6-player-lyrics`, PR target `2.0.0-flutter`, no merge.
+Baseline exact-source desktop run `43671240501` at merged `bb60cc6c` succeeded;
+that evidence does not validate the new increment. Pinned reference run
+`43599294154` succeeded on both platforms; Phase 6 independently rebuilds/tests
+the immutable Kotlin commit in CI and checks its source diff.
+
+`flutter-desktop.yml` now triggers branch pushes and adds a hosted paired
+Linux visual job. `phase6_visual.py` records real sidebar/account/drawer and
+Settings-scroll inputs, both client sizes, capture hashes, OCR, diffs and a
+coverage report seeded from the pinned source inventory. No production route
+hooks, fake playback or provider fixtures are introduced. Screenshot metrics
+never promote a state to PASS. Player/fullscreen/lyrics, signed-in accounts,
+Settings subpage completeness, other overlays/themes and physical-output
+acceptance remain NOT VERIFIED. CI results for this increment are recorded in
+[Phase 6 evidence](flutterDesktop/verification/phase6/README.md).
+**Phase 6 INCOMPLETE.** No Phase 7 work or new backend features.
+
 ## Phase 6 expanded audit scope — entire application (2026-11-15)
 
 User clarification: the four comparison screenshots and player, account

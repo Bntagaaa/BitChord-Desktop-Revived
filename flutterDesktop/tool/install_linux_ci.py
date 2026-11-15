@@ -32,7 +32,7 @@ def main():
                         'libavformat-dev', 'libavcodec-dev', 'libavutil-dev',
                         'libswresample-dev', 'libpulse-dev', 'libasound2-dev',
                         'libsqlite3-dev', 'libwebkit2gtk-4.1-dev', 'libsoup-3.0-dev',
-                        'pulseaudio', 'pulseaudio-utils', 'ffmpeg'], check=True)
+                        'pulseaudio', 'pulseaudio-utils', 'ffmpeg', 'tesseract-ocr'], check=True)
 
 
 if __name__ == '__main__':
