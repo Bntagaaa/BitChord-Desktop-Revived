@@ -521,7 +521,11 @@ private enum class DesktopRepeatMode {
 }
 
 @Composable
-internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, pipHost: DesktopPipHost) {
+internal fun BitChordDesktopApp(
+    welcomeLaunch: DesktopWelcomeOnboarding.Launch,
+    pipHost: DesktopPipHost,
+    playbackService: DesktopPlaybackService,
+) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val shortcutRootFocusRequester = remember { FocusRequester() }
@@ -638,16 +642,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var exploreReloads by remember { mutableStateOf(0) }
     var moodGenreReloads by remember { mutableStateOf(0) }
     var moodGenreShelves by remember { mutableStateOf<UiState<List<HomeShelf>>>(UiState.Loading) }
-    var selectedSong by remember { mutableStateOf<Song?>(null) }
-    // The live queue: what is playing, what played before it, what is next.
-    var liveQueue by remember {
-        mutableStateOf(
-            DesktopQueue.restored(
-                persistence.queue(),
-                persistence.string("queue_index", "0").toIntOrNull() ?: 0,
-            ),
-        )
-    }
+    // Playback is process-owned: unmounting the entire main Window cannot replace its
+    // decoder, queue or current track. These state holders outlive this UI composition.
+    var selectedSong by playbackService.selectedSong
+    var liveQueue by playbackService.liveQueue
     // The order the queue was in before shuffle rearranged it, so the toggle can be undone.
     var preShuffleOrder by remember { mutableStateOf<List<String>>(emptyList()) }
     // One party AutoPlay top-up at a time; see topUpPartyAutoplay.
@@ -656,7 +654,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     // What was played on this computer. The account's own history replaces it
     // while signed in — see [remoteHistory] — because that is what Android's
     // History screen is and what makes a phone and a desktop agree.
-    var history by remember { mutableStateOf(persistence.history()) }
+    var history by playbackService.history
     var remoteHistory by remember { mutableStateOf<List<Song>>(emptyList()) }
     var likedIds by remember { mutableStateOf(persistence.likedIds()) }
     // In-flight tail of the Liked Music chain; replaced whenever the library is fetched again.
@@ -1710,41 +1708,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         }
     }
 
-    playbackEngine = remember {
-        DesktopPlaybackEngine(
-            onEnded = {
-                selectedSong?.let(DesktopScrobbling::onPlaybackEnded)
-                if (DesktopSleepTimer.afterTrack.value) {
-                    DesktopSleepTimer.cancel()
-                } else if (repeatMode == DesktopRepeatMode.ONE) {
-                    // Replayed in place. [startSong] makes the track a queue of one, which threw
-                    // the rest of the queue away the first time it repeated.
-                    val song = selectedSong
-                    if (song != null && liveQueue.current?.videoId == song.videoId) {
-                        playCurrent()
-                    } else {
-                        song?.let { startSong(it, true) }
-                    }
-                } else {
-                    playNext()
-                }
-            },
-            onCrossfaded = { song ->
-                scope.launch {
-                    // The queue moves with the audio. Only the selection used to, which left the
-                    // queue on the track that had just finished — so Next "advanced" onto the song
-                    // already playing, and every later skip landed one behind.
-                    liveQueue = liveQueue.afterHandoffTo(song.videoId)
-                    saveQueue()
-                    selectedSong = song
-                    history = (listOf(song) + history.filterNot { it.videoId == song.videoId }).take(50)
-                    persistence.saveHistory(history)
-                    DesktopScrobbling.updateNowPlaying(song)
-                    partySyncHolder[0]?.onLocalIntent()
-                }
-            },
-        )
-    }
+    playbackEngine = playbackService.engine
     val partySync = remember(playbackEngine) {
         DesktopPartySync(
             scope = scope,
@@ -2136,7 +2100,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         replaySummary = withContext(Dispatchers.IO) { DesktopListeningStats.summary(replayPeriod) }
     }
     DisposableEffect(playbackEngine) {
-        onDispose { DesktopMusicVideo.stop(); playbackEngine.release() }
+        // Media video belongs to the window; audio and the native sink belong to the process.
+        onDispose { DesktopMusicVideo.stop() }
     }
     /** Opens an artist's page, from a card, a search row or the player's credit. */
     fun openArtist(browseId: String, name: String) {
