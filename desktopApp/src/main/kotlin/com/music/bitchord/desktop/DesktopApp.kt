@@ -2861,7 +2861,8 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     }
 
     // No inactive Home cache, even below 650 MiB. This also covers artist/album/playlist
-    // detail pages, settings, and the expanded player which keep the destination unchanged.
+    // detail pages and settings that keep the destination unchanged. Fullscreen Now Playing
+    // is only an overlay: keep Home's feed and scroll ready underneath it.
     val homeVisible = isHomeFeedVisible(
         destination = destination,
         nestedPageOpen = openedArtist != null || openedCollection != null ||
