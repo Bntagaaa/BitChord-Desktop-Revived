@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -287,9 +288,11 @@ fun DesktopCanvasView(
     publishBackdrop: Boolean = true,
 ) {
     var frame by remember(url) { mutableStateOf<ImageBitmap?>(null) }
+    val windowVisible by DesktopWindowVisibility.visible.collectAsState()
 
-    LaunchedEffect(url, fallbackUrl, isPlaying, maxEdge, publishBackdrop) {
-        if (!isPlaying) return@LaunchedEffect
+    LaunchedEffect(url, fallbackUrl, isPlaying, windowVisible, maxEdge, publishBackdrop) {
+        // Album-page artwork must not keep reopening native FFmpeg decoders in the tray.
+        if (!isPlaying || !windowVisible) return@LaunchedEffect
         var retryDelayMs = 1_000L
         // Round and round until the track ends or the player is closed. A canvas is a few seconds
         // long, so one pass through it is not the feature — and the decoder cannot be relied on to
