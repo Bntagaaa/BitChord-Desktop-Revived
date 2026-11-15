@@ -4,13 +4,13 @@
     {
       "width": 1220,
       "height": 780,
-      "colors": 1828,
+      "colors": 2286,
       "geometry": "WINDOW=4194307\nX=42\nY=100\nWIDTH=1220\nHEIGHT=780\nSCREEN=0\n"
     },
     {
       "width": 900,
       "height": 600,
-      "colors": 33286,
+      "colors": 74822,
       "geometry": "WINDOW=4194307\nX=42\nY=100\nWIDTH=900\nHEIGHT=600\nSCREEN=0\n"
     }
   ],
@@ -20,27 +20,27 @@
       "state": "accounts",
       "expected_theme": "any",
       "background_rgb": [
-        247,
-        248,
-        251
+        245,
+        246,
+        250
       ]
     },
     {
       "state": "drawer",
       "expected_theme": "drawer",
       "background_rgb": [
-        183,
-        184,
-        186
+        182,
+        182,
+        185
       ]
     },
     {
       "state": "settings",
       "expected_theme": "light",
       "background_rgb": [
-        247,
-        248,
-        251
+        245,
+        246,
+        250
       ]
     },
     {
@@ -65,9 +65,9 @@
       "state": "light",
       "expected_theme": "light",
       "background_rgb": [
-        247,
-        248,
-        251
+        245,
+        246,
+        250
       ]
     }
   ],

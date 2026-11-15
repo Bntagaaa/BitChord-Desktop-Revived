@@ -165,11 +165,7 @@ void main() {
 
       expect(media.trackId, testTrack.id);
       expect(directCalled, 1);
-      expect(
-        extractorCalled,
-        1,
-        reason: 'Fallback to extractor must succeed',
-      );
+      expect(extractorCalled, 1, reason: 'Fallback to extractor must succeed');
     });
 
     test('4. YouTubeHistoryTracker operates non-blocking', () async {
@@ -180,10 +176,8 @@ void main() {
       final tracker = YouTubeHistoryTracker();
 
       expect(
-        () => tracker.onPlaying(
-          videoId: testTrack.id,
-          session: verifiedSession,
-        ),
+        () =>
+            tracker.onPlaying(videoId: testTrack.id, session: verifiedSession),
         returnsNormally,
       );
 

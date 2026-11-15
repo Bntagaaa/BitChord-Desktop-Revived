@@ -1,5 +1,37 @@
 # Phase 5 advanced listening evidence
 
+## Scope disposition and Windows remediation — 2026-11-15
+
+User-approved scope adjustment: native Automix/full transition planning,
+ONNX beat/vocal model, analysis cache and Loop & Mix are **DEFERRED** to the
+migration backlog. No deferred feature is implemented or parity-accepted by this
+checkpoint; ordinary crossfade remains unverified. The original full Phase 5
+acceptance remains **INCOMPLETE**, while verified EQ, spatial, speed, silence
+and sleep changes are candidates for a **limited checkpoint** for Phase 6.
+Outstanding physical listening, A/V and intermittent shutdown risks are not
+waived.
+
+PR #141 previously failed Windows native CTests `native_dsp_engine` (10.85 s)
+and `native_listening` (15.16 s), both reporting `engine deadline`.
+Compilation succeeded, Linux passed. Because the engine unconditionally slept
+2 ms after *every* write, small successful 17/73-frame partial writes can incur
+large repeated Windows scheduler quantization. The checkpoint changes the
+owner loop to yield after **accepted PCM progress** while retaining a bounded
+sleep on zero-progress/backpressure. This is a scheduling hypothesis until
+verified by a fresh **Windows/Linux** run; do not label the fix verified in
+advance. Neither tests nor timeout assertions were disabled/relaxed.
+
+Baseline `2.0.0-flutter` moved after PR creation via trusted retention commit
+`635b3731`. The checkpoint reconciles latest baseline auth/formatting and
+verified generated host/capture blobs without overwriting Phase 5 playback
+adaptations. The old retained evidence belongs to the pre-Phase-5 source; it
+must not be misrepresented as new-source CI. PR head and run IDs must be
+recorded once verified.
+
+Phase 6 may start from the **merged** checkpoint only after its current Windows
+and Linux CI are successful. The deferred advanced-audio requirements remain
+in `MIGRATION_PARITY.md`, `MIGRATION_PROGRESS.md` and the Phase 5 playbook.
+
 **Phase 5 INCOMPLETE. This continues the existing implementation; it does not
 complete the authorized phase.** The roadmap and acceptance gates are unchanged. No Phase 6 work or
 pinned Kotlin/reference modification is included. Delivery is on

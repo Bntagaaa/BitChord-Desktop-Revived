@@ -68,9 +68,10 @@ final class YouTubeSessionStore {
     for (var offset = 0; offset < input.length; offset += 32) {
       final counterBytes = ByteData(4)..setUint32(0, blockIndex++, Endian.big);
       final blockHmac = Hmac(sha256, key);
-      final keystream = blockHmac
-          .convert([...nonce, ...counterBytes.buffer.asUint8List()])
-          .bytes;
+      final keystream = blockHmac.convert([
+        ...nonce,
+        ...counterBytes.buffer.asUint8List(),
+      ]).bytes;
       final chunkSize = min(32, input.length - offset);
       for (var i = 0; i < chunkSize; i++) {
         output[offset + i] = input[offset + i] ^ keystream[i];

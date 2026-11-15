@@ -1,5 +1,31 @@
 # Migration progress and delivery backlog
 
+## Active authorization — scoped Phase 5 checkpoint and Phase 6 (2026-11-15)
+
+The user explicitly deferred **advanced Automix, ONNX beat/vocal analysis and
+Loop & Mix** to a future backlog and authorized proceeding to **Phase 6** after
+the verified Phase 5 checkpoint is reconciled and merged. This is a **scope
+exception, not full Phase 5 parity acceptance**. Keep P10–P16 original contracts,
+full planner/two-deck overlap/transition fixtures, ordinary crossfade if not
+independently proved, memory/physical-listening evidence and all missing
+requirements visible as DEFERRED or NOT VERIFIED. Never label them COMPLETE,
+remove them silently, or offer controls whose native capability is absent.
+
+The checkpoint includes implemented EQ/spatial, speed/silence source clocks and
+sleep controls subject to verification. Resolve PR #141's Windows tests, preserve
+the auto-retained baseline and auth/history behavior from `2.0.0-flutter`,
+require the current PR-head Windows/Linux CI, and merge only after successful
+checks. Outstanding earlier Phase 4 and Linux shutdown/physical parity gates
+remain tracked; passing the scoped checkpoint does not close them.
+
+For Phase 6, create `codex/phase6-player-lyrics` from the **merged latest**
+`origin/2.0.0-flutter`. Implement P22–P27 (lyrics and every player surface)
+using the existing native source clock and one audio engine; do not couple
+lyrics/player rendering to absent Automix/ONNX components. Keep any unavailable
+video/Canvas/PiP or source capabilities explicitly gated; no placeholder parity
+claim. Make a reviewed PR into `2.0.0-flutter`, verify both platform jobs, and
+**never auto-merge**. The user has authorized Phase 6, not Phase 7.
+
 ## Phase 5 authorized DSP increment — 2026-11-14
 
 **Phase 5 INCOMPLETE.** User authorized Phase 5 only on

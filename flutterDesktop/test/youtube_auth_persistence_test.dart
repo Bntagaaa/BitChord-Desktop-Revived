@@ -20,7 +20,8 @@ void main() {
         'SID=test-sid; SAPISID=test-sapisid-secret; '
         '__Secure-3PAPISID=test-3papisid';
 
-    String htmlShell(bool loggedIn) => '''
+    String htmlShell(bool loggedIn) =>
+        '''
 <!DOCTYPE html>
 <html>
 <head>

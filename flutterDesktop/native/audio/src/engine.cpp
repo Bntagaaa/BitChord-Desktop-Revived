@@ -330,8 +330,15 @@ private:
       if(lock) while(n<batch.size() && !commands.empty()) { batch[n++]=commands.front(); commands.pop_front(); }
     }
     for(size_t i=0;i<n;i++) process(batch[i]);
+    const uint64_t before_submitted = state.submitted_frames;
     try { render(); } catch(const DeviceChanged&) { try { recover_device(); } catch(...) { fail(BC_ERROR_DEVICE); } } catch(const DeviceUnavailable&) { fail(BC_ERROR_NO_DEVICE); } catch(...) { fail(BC_ERROR_DEVICE); }
-    publish(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    publish();
+    // Back off on an empty/full sink, but do not incur Windows' coarse timer
+    // quantum for every successful tiny partial write (17/73-frame tests).
+    // The sink still owns bounded backpressure; this only avoids needless
+    // sleeps after forward progress and does not spin when writes return zero.
+    if (play && sink && state.submitted_frames > before_submitted) std::this_thread::yield();
+    else std::this_thread::sleep_for(std::chrono::milliseconds(2));
    }
    current.reset(); upcoming.reset(); sink.reset(); listener.reset(); state.phase=BC_CLOSING;
    // No deadline path remains. Account for every accepted command on shutdown.
