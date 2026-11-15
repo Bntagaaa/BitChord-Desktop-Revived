@@ -1,9 +1,11 @@
 # User-supplied visual comparison references — Phase 6
 
 The user provided four PNG comparison screenshots on 2026-11-15.
-The **PNG binaries are not yet committed** to this repository. They are
-distributed separately as `phase6_visual_references.zip` in the ChatGPT
-conversation and must be copied into this directory before running Codex.
+The four original PNG binaries were committed in `5f8e9a77` and are present
+in this directory. They are user-supplied defect examples, not CI goldens.
+Automated CI artifacts exclude this directory because the originals include
+personal account metadata and provider configuration. Hosted paired captures
+use separate disposable signed-out profiles.
 
 | Expected filename | Reference content | Required interactive audit |
 | --- | --- | --- |
@@ -32,9 +34,8 @@ four files, commits them, and pushes to `codex/phase6-player-lyrics`.
 It rejects the wrong branch and pre-existing staged changes, and never
 auto-merges. You can also pass a different ZIP location as its argument.
 
-**File-transfer status:** the GitHub connector cannot receive binary bytes
-straight from the chat ZIP in this session. The helper is committed, but the
-four PNG files are **not** uploaded until the helper runs successfully.
+**File-transfer status:** installed and committed in `5f8e9a77`. The helper
+remains available for checksum verification or recovery in another clone.
 
 If the archive is unavailable, report the four images as **NOT PRESENT**
 and ask for the user-provided attachment rather than pretending to have

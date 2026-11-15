@@ -21,6 +21,18 @@ acceptance remain NOT VERIFIED. CI results for this increment are recorded in
 [Phase 6 evidence](flutterDesktop/verification/phase6/README.md).
 **Phase 6 INCOMPLETE.** No Phase 7 work or new backend features.
 
+Verified first pipeline source `aae31037` passed
+[43674208415](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43674208415):
+94 Flutter tests per OS, six screenshot/report tests, native/sanitizer suites,
+Linux/Windows release/native-smoke jobs, 857 pinned-reference tests/package,
+and paired Linux visual capture. Downloaded reports and selected paired PNGs
+were inspected: 24 Kotlin/16 Flutter captures, 16 comparisons, 79 explicitly
+unaccepted coverage entries. Settings/Accounts/content/typography gaps are
+visible; playing/fullscreen/lyrics and whole-app exploration remain open.
+No local builds or automated tests ran. Draft
+[PR #144](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/144) is not
+merged. Subsequent report/artifact-filter changes require their own head checks.
+
 ## Phase 6 expanded audit scope — entire application (2026-11-15)
 
 User clarification: the four comparison screenshots and player, account

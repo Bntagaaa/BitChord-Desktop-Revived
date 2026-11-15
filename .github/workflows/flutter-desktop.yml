@@ -226,6 +226,7 @@ jobs:
             flutter-source-${{ matrix.target }}.zip
             flutterDesktop/build/linux/x64/release/bundle/
             flutterDesktop/build/windows/x64/runner/Release/
+            !flutterDesktop/verification/phase6/user-references/**
           if-no-files-found: warn
 
   phase6-reference:

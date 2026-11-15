@@ -20,6 +20,17 @@ Physical audio, authenticated persistence, paired Windows exploration and
 remaining Phase 5 gates are unchanged. See
 [Phase 6 evidence](flutterDesktop/verification/phase6/README.md).
 
+Pipeline verification update: source `aae31037` passed
+[43674208415](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43674208415)
+on Linux/Windows with 94 Flutter tests each, six comparison/reporting tests,
+857 pinned-reference tests and release/native capture jobs. Paired evidence
+contains 40 real-client captures and 16 diffs with checked metadata/hashes.
+Reviewed Settings/Accounts/Home/drawer pairs confirm usable CI capture and
+unresolved visible defects; all 79 coverage entries remain unaccepted.
+This verifies the **capture infrastructure**, not whole P02/P20/P22–P30 parity.
+No local production builds/tests, authenticated playback, real playing/
+Fullscreen Player/lyrics or complete Settings navigation was verified.
+
 ## Active authorization — scoped Phase 5 checkpoint and Phase 6 (2026-11-15)
 
 The user explicitly deferred **advanced Automix, ONNX beat/vocal analysis and

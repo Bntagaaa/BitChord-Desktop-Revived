@@ -60,4 +60,37 @@ Baseline desktop: [43671240501](https://github.com/Bntagaaa/BitChord-Desktop-Rev
 merged `bb60cc6c`, Windows/Linux success. Historical reference:
 [43599294154](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43599294154),
 Windows/Linux success. Neither establishes results for this increment.
-Current-source run and PR will be recorded after publication and inspection.
+
+First verified pipeline source: `aae31037e60b73995c4fe3f0d990580ac11c816e`
+(PR test merge `5ddfdae797315262106e422ba55cb8c58de18d40`).
+[Run 43674208415](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43674208415)
+passed Linux, Windows, pinned reference and paired visual jobs. Downloaded
+artifacts were inspected without executing either application locally:
+
+- 94 Flutter tests per OS, zero failures/skips; format/analyze, both release
+  builds, native/provider/FFI contracts and native GUI smokes passed.
+- Five native tests per OS and five Linux sanitizer tests passed; six Linux
+  screenshot/reporting contracts passed.
+- Kotlin reference: 147 suites / 857 tests, zero failures/errors/skips,
+  distributable built, immutable SHA checked and source diff clean.
+- 24 reference and 16 Flutter real-client PNGs; 16 diagnostic pairs,
+  matching dimensions/state metadata and verified capture hashes. All 79
+  coverage entries remain unaccepted; the report says Phase 6 INCOMPLETE.
+- The reference hid on Alt+F4 with its default close-to-tray, then received
+  harness-only termination. Flutter exited zero through native close.
+
+The separate [repository checks 43674208390](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/43674208390)
+also passed Linux/Windows Kotlin, Android and Go jobs.
+
+Review of paired Settings, Accounts, narrow Home and drawer images confirms
+usable post-input captures and visible migration defects: missing Settings
+hierarchy/search, different signed-out account popover, font/spacing differences,
+and different anonymous feed projections. Route OCR also records missing
+History/Local Music/Spotify surfaces. These are **FAIL / implementation gaps**,
+not resolved by green infrastructure checks. No playing/fullscreen/lyrics
+evidence was captured and no interactive parity is claimed. Full runtime
+discovery, nested Settings/menus and the remaining matrix still need work.
+
+[PR #144](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/144) remains
+draft, targets `2.0.0-flutter` and must not auto-merge. Its latest-head check
+results are the delivery authority; the run above proves the recorded source.
