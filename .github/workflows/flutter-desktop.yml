@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: flutter-foundation-${{ github.ref }}
+  group: flutter-foundation-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
