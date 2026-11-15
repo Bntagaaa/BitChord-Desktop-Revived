@@ -2997,14 +2997,25 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         }
     }
 
-    // Page composables are already disposed on navigation; under RSS pressure trim
-    // their retained feed data. History, playback and the active page are untouched.
+    // Page composables are disposed on navigation. Under pressure, also trim native
+    // image caches even when only one page was visited, but never every five seconds.
+    // Home itself is discarded separately on every departure, regardless of RSS.
     LaunchedEffect(Unit) {
+        var lastActiveTrimNanos = System.nanoTime()
         while (isActive) {
             delay(5_000L)
             val rss = withContext(Dispatchers.IO) { DesktopPageMemoryPolicy.processResidentBytes() }
             if (rss == null || rss < DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES) continue
-            val evict = DesktopPageMemoryPolicy.oldestEvictable(recentPageUsage, destination) ?: continue
+            val evict = DesktopPageMemoryPolicy.oldestEvictable(recentPageUsage, destination)
+            if (evict == null) {
+                val now = System.nanoTime()
+                if (DesktopPageMemoryPolicy.shouldTrimActivePage(rss, now - lastActiveTrimNanos)) {
+                    withContext(Dispatchers.IO) { DesktopPageMemoryPolicy.trimProcessMemory() }
+                    lastActiveTrimNanos = System.nanoTime()
+                    DesktopTrackLog.log("memory: trimmed caches on the active page at ${rss / 1_048_576L} MiB RSS")
+                }
+                continue
+            }
             when (evict) {
                 DesktopDestination.LISTEN_NOW -> discardHome()
                 DesktopDestination.NEW -> newState = UiState.Loading
