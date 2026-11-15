@@ -532,11 +532,8 @@ internal fun BitChordDesktopApp(
     LaunchedEffect(Unit) { shortcutRootFocusRequester.requestFocus() }
     // Filled once the audio engine exists. Local playback helpers use this single hook so every
     // transport and queue gesture reaches Listen Together without duplicating protocol logic.
-    val partySyncHolder = remember { arrayOfNulls<DesktopPartySync>(1) }
+    val partySyncHolder = remember(playbackService) { arrayOf<DesktopPartySync?>(playbackService.partySync) }
     val partyState by DesktopListenTogether.state.collectAsState()
-    var personalQueueStash by remember { mutableStateOf<DesktopQueue?>(null) }
-    var personalPositionStash by remember { mutableStateOf(0L) }
-    var personalPlayingStash by remember { mutableStateOf(false) }
     var showFirstLaunchWelcome by remember(welcomeLaunch.markerKey) {
         mutableStateOf(welcomeLaunch.showWelcome)
     }
@@ -1709,61 +1706,8 @@ internal fun BitChordDesktopApp(
     }
 
     playbackEngine = playbackService.engine
-    val partySync = remember(playbackEngine) {
-        DesktopPartySync(
-            scope = scope,
-            engine = playbackEngine,
-            playTrack = { shared, at ->
-                // The phone's PartySync.load: the party's running order, standing on its track —
-                // so the queue on screen moves with the song rather than keeping the old one as
-                // "now playing" and the new one as the first thing still to come.
-                val songs = DesktopQueue.adopt(liveQueue.songs, shared.map { it.toDesktopSong() })
-                liveQueue = DesktopQueue(songs, at.coerceIn(songs.indices)).trimmed()
-                liveQueue.current?.let { song ->
-                    selectedSong = song
-                    playbackEngine.load(song, playWhenReady = false)
-                }
-            },
-            localQueue = { liveQueue.songs to liveQueue.index },
-            applyPartyUpcoming = { upcoming ->
-                val aligned = liveQueue.withPartyUpcoming(upcoming.map { it.toDesktopSong() })
-                if (aligned !== liveQueue) liveQueue = aligned
-            },
-            applyPartyAutoplay = { _ ->
-                // The party setting overrides the personal preference only while connected. The
-                // phone deliberately does not persist it or delete queue rows on this device.
-                autoplayJob?.cancel()
-                autoplayJob = null
-                autoplaySeed = null
-            },
-            onEnteredParty = {
-                if (personalQueueStash == null) {
-                    personalQueueStash = liveQueue
-                    personalPositionStash = playbackEngine.state.value.positionMs
-                    personalPlayingStash = playbackEngine.state.value.isPlaying
-                }
-            },
-            onLeftParty = {
-                personalQueueStash?.let { stashed ->
-                    liveQueue = stashed
-                    selectedSong = stashed.current
-                    stashed.current?.let {
-                        playbackEngine.load(it, personalPlayingStash, personalPositionStash)
-                    }
-                    saveQueue()
-                }
-                personalQueueStash = null
-            },
-        )
-    }
-    DisposableEffect(partySync) {
-        partySyncHolder[0] = partySync
-        partySync.start()
-        onDispose {
-            partySync.stop()
-            if (partySyncHolder[0] === partySync) partySyncHolder[0] = null
-        }
-    }
+    // Party reconciliation stays alive in tray/PiP; there is never a second PartySync on restore.
+    val partySync = playbackService.partySync
     fun togglePlayPauseFromUser() {
         if (partySync.handleLockedPlayPause()) return
         playbackEngine.togglePlayPause()
@@ -1845,6 +1789,11 @@ internal fun BitChordDesktopApp(
             onVolumeChanged = { value ->
                 volume = value.toFloat().coerceIn(0.0f, 1.0f)
                 persistence.saveString("volume", volume.toString())
+            },
+            onPartyAutoplay = {
+                autoplayJob?.cancel()
+                autoplayJob = null
+                autoplaySeed = null
             },
         )
         playbackService.attach(callbacks)
