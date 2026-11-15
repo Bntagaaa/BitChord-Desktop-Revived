@@ -663,6 +663,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var dislikedIds by remember { mutableStateOf(persistence.dislikedIds()) }
     val overlays = remember { DesktopOverlays() }
     var downloads by remember { mutableStateOf(persistence.downloads()) }
+    var downloadedPlaylists by remember { mutableStateOf(persistence.downloadedPlaylists()) }
     var localSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var localMusicLoaded by remember { mutableStateOf(false) }
     var localMusicLoading by remember { mutableStateOf(false) }
@@ -1396,7 +1397,19 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     }
 
     /** Everything on a page, in the order it is listed. */
-    fun downloadAll(songs: List<Song>) {
+    fun downloadAll(songs: List<Song>, collection: DesktopCollection? = null) {
+        // Offline playlist identity is separate from individual saved files. Keep the original
+        // order and metadata, then resolve each track to its verified local copy in Downloads.
+        if (collection?.type == BrowseType.PLAYLIST && collection.browseId.isNotBlank() && songs.isNotEmpty()) {
+            val record = DesktopPlaylist(
+                id = collection.browseId,
+                title = collection.title,
+                songs = songs.distinctBy(Song::videoId),
+            )
+            downloadedPlaylists = listOf(record) +
+                downloadedPlaylists.filterNot { it.id == record.id }
+            persistence.saveDownloadedPlaylists(downloadedPlaylists)
+        }
         val have = downloads.map(Song::videoId).toSet()
         DesktopDownloadQueue.enqueueAll(
             songs.filterNot { it.videoId in have || it.localPath != null },
@@ -5012,7 +5025,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             onShuffle = { songs ->
                                 playSpotifyOrYoutubeSongs(songs.shuffled(), 0, openedCollection?.let { collectionSource(it) })
                             },
-                            onDownloadAll = ::downloadAll,
+                            onDownloadAll = { songs -> downloadAll(songs, openedCollection) },
                             signedIn = youtubeSignedIn,
                             onLibraryChanged = ::reloadLibrary,
                             onStartMix = ::startRadio,
@@ -5363,6 +5376,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                         destination == DesktopDestination.DOWNLOADS -> Box(Modifier.fillMaxSize()) {
                             DesktopDownloadsPage(
                                 downloads = downloads,
+                                playlists = downloadedPlaylists,
                                 onSongClick = { playSong(it, source = DesktopQueueSource(DesktopStrings["downloads", "Downloads"], PlaybackSourceType.BROWSE)) },
                                 contentPadding = contentPadding,
                                 menu = { song -> songMenu(song) },
@@ -7283,12 +7297,14 @@ private fun DesktopHistoryPage(
 @Composable
 private fun DesktopDownloadsPage(
     downloads: List<Song>,
+    playlists: List<DesktopPlaylist>,
     onSongClick: (Song) -> Unit,
     contentPadding: PaddingValues,
     menu: (@Composable (Song) -> Unit)? = null,
 ) {
     DesktopLocalMusicPage(
         songs = downloads,
+        downloadedPlaylists = playlists,
         onSongClick = onSongClick,
         contentPadding = contentPadding,
         menu = menu,
@@ -7304,6 +7320,7 @@ private fun DesktopDownloadsPage(
 @Composable
 private fun DesktopLocalMusicPage(
     songs: List<Song>,
+    downloadedPlaylists: List<DesktopPlaylist>? = null,
     onSongClick: (Song) -> Unit,
     contentPadding: PaddingValues,
     loading: Boolean = false,
@@ -7349,6 +7366,16 @@ private fun DesktopLocalMusicPage(
         filteredSongs.groupBy { it.albumName?.takeIf(String::isNotBlank) ?: "Unknown Album" }
             .entries.sortedBy { it.key.lowercase() }
     }
+    val offlinePlaylists = remember(downloadedPlaylists, songs, searchQuery) {
+        downloadedPlaylists.orEmpty().mapNotNull { playlist ->
+            val saved = playlist.availableDownloads(songs)
+            if (saved.isEmpty()) return@mapNotNull null
+            if (searchQuery.isNotBlank() && !playlist.title.contains(searchQuery, ignoreCase = true) &&
+                saved.none { it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.artist.contains(searchQuery, ignoreCase = true) }) return@mapNotNull null
+            java.util.AbstractMap.SimpleImmutableEntry(playlist.title, saved)
+        }
+    }
     DesktopPageScaffold(contentPadding) {
         Column(
             Modifier.fillMaxSize().padding(horizontal = DesktopPageGutter),
@@ -7388,7 +7415,8 @@ private fun DesktopLocalMusicPage(
             }
             Spacer(Modifier.height(10.dp))
             TabRow(selectedTabIndex = selectedTab, containerColor = Color.Transparent) {
-                listOf("Songs", "Artists", "Albums").forEachIndexed { index, label ->
+                (if (downloadedPlaylists != null) listOf("Songs", "Artists", "Albums", "Playlists")
+                 else listOf("Songs", "Artists", "Albums")).forEachIndexed { index, label ->
                     Tab(selected = selectedTab == index, onClick = { selectedTab = index }, text = { Text(label) })
                 }
             }
@@ -7407,7 +7435,8 @@ private fun DesktopLocalMusicPage(
             } else when (selectedTab) {
                 0 -> DesktopLibrarySongContent(filteredSongs, view, onSongClick, menu)
                 1 -> DesktopLibraryGroupingContent(artists, view, onGroupClick = { drillDown = it })
-                else -> DesktopLibraryGroupingContent(albums, view, onGroupClick = { drillDown = it })
+                2 -> DesktopLibraryGroupingContent(albums, view, onGroupClick = { drillDown = it })
+                else -> DesktopLibraryGroupingContent(offlinePlaylists, view, onGroupClick = { drillDown = it })
             }
         }
     }
