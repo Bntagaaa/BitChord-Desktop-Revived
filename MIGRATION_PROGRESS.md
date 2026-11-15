@@ -1,5 +1,31 @@
 # Migration progress and delivery backlog
 
+## Phase 6 user-directed visual parity re-audit — 2026-11-15
+
+Phase 5 **limited checkpoint** PR #141 was merged as
+`bb60cc6c133299c62d01baaee28c8c597879614b` after Windows/Linux
+matrix run `43670599723` reported success on both platform jobs. This is
+not full Phase 5 parity: Automix, ONNX and Loop & Mix remain deferred and
+physical audio/remaining gates stay unverified.
+
+The user supplied four side-by-side reference screenshots showing three
+visual regression classes that must be fixed in Phase 6: (1) floating
+player's **actively playing** menus/layout diverge despite close idle
+parity, (2) account avatar/popover/selection diverge, (3) Settings content
+and navigation diverge. User explicitly requires Kotlin's **complete
+Settings menu hierarchy**, with unavailable items rendered disabled/greyed
+out rather than omitted or falsely functional. No new backend features
+are authorized beyond the existing phase plan.
+
+Codex must perform **interactive visual parity**, actually play a track,
+open Fullscreen Player, exercise controls, accounts and Settings submenus,
+and compare matched Kotlin/Flutter screenshots for each state. Startup-only
+screenshots, widget goldens and static code inspection are insufficient.
+Detailed click-state matrix and evidence gates are now in
+`.codex/phases/phase-6.md`; user reference inventory is in
+`flutterDesktop/verification/phase6/user-references/README.md`.
+Phase 6 status: **AUTHORIZED / NOT YET VERIFIED**.
+
 ## Active authorization — scoped Phase 5 checkpoint and Phase 6 (2026-11-15)
 
 The user explicitly deferred **advanced Automix, ONNX beat/vocal analysis and

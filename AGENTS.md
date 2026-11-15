@@ -26,6 +26,21 @@ These instructions apply to this repository when working on the clean Flutter De
 - Match original assets, iconography, layout metrics, motion, themes, keyboard behavior, and responsive states. Do not invent music catalogs, mock successful playback, fake network responses in production, or substitute generic Material controls where the reference differs.
 - Memory efficiency is an explicit objective, **not** permission to remove features or disable effects silently. Benchmark matched release workloads and track image/cache/decoder/resource lifetimes.
 
+## Interactive UI parity is mandatory in Phase 6
+
+Do **not** use the initial Home screenshot as the sole visual check. Run both
+Kotlin and Flutter, play a real track, inspect the *playing* floating player
+and fullscreen/lyrics, navigate the account popup and **every** Settings
+category/subpage. Match window/DPI/theme/content and record per-state
+screenshots, interaction steps and failures. Kotlin Settings must show its
+entire original menu structure; unsupported features are visible but
+disabled/greyed out, not omitted. Preserve working Phase 5 controls and
+YouTube session. The detailed mandatory protocol is in
+`.codex/phases/phase-6.md` and the user reference inventory in
+`flutterDesktop/verification/phase6/user-references/README.md`.
+No new Automix/ONNX/Loop & Mix features. Do not call Phase 6 parity complete
+without a tested playing/fullscreen state, account and Settings inventory.
+
 ## Current phase discipline
 
 ### User-authorized Phase 5 checkpoint → Phase 6 handoff (2026-11-15)
