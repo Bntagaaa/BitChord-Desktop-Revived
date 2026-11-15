@@ -2710,69 +2710,8 @@ internal fun BitChordDesktopApp(
         }
     }
 
-    // The tray icon speaks StatusNotifierItem rather than going through AWT, which only implements
-    // the XEmbed tray a Wayland session does not have.
-    val tray = remember {
-        DesktopStatusNotifierController(
-            // Clicking the icon is how the window comes back once it has been closed to the tray,
-            // so it has to raise the window before it does anything inside it.
-            onActivate = {
-                DesktopWindowVisibility.show()
-                releaseShortcutTextFocus()
-            },
-            onPlayPause = { if (selectedSong != null) togglePlayPauseFromUser() },
-        )
-    }
-    DisposableEffect(tray, trayIconEnabled) {
-        if (trayIconEnabled) tray.start()
-        onDispose { tray.stop() }
-    }
-    // Deliberately not a key on the effect above.
-    DisposableEffect(trayIconEnabled, closeToTray) {
-        // The listener's choice, with the tray as its precondition: hiding with no tray to come
-        // back from leaves an audible process and no window.
-        DesktopWindowVisibility.keepRunningWhenClosed = trayIconEnabled && closeToTray
-        onDispose { DesktopWindowVisibility.keepRunningWhenClosed = false }
-    }
-    val appIcon by DesktopAppIconSettings.selected.collectAsState()
-    LaunchedEffect(tray, trayIconEnabled, appIcon) {
-        if (!trayIconEnabled) return@LaunchedEffect
-        // The logo travels to the tray as pixels: a themed icon name would be whatever the user's
-        // theme draws for a generic music player.
-        withContext(Dispatchers.IO) {
-            runCatching { Res.readBytes(appIcon.svgPath) }.onSuccess(tray::setIcon)
-        }
-    }
-    LaunchedEffect(tray) {
-        DesktopTrayMenu.bind(
-            onPlayPause = { if (selectedSong != null) togglePlayPauseFromUser() },
-            onNext = ::playNext,
-            onPrevious = ::playPrevious,
-            onOpenPlayer = {
-                DesktopWindowVisibility.show()
-                releaseShortcutTextFocus()
-            },
-            onOpenSettings = {
-                DesktopWindowVisibility.show()
-                openSettings()
-            },
-            onQuit = {
-                // Native work first: the audio thread and the media controls are inside FFmpeg,
-                // WASAPI and WinRT, and exitProcess would unload those libraries under them.
-                scope.launch(Dispatchers.IO) {
-                    DesktopPlaybackWrites.flush()
-                    playbackEngine.shutdown()
-                    DesktopWindowsMedia.stop()
-                    exitProcess(0)
-                }
-            },
-        )
-    }
-    LaunchedEffect(selectedSong, playback.isPlaying) {
-        val title = selectedSong?.let { "${it.title} — ${it.artist}" }
-        tray.update(title = title, isPlaying = playback.isPlaying)
-        DesktopTrayMenu.publish(title = title, playing = playback.isPlaying)
-    }
+    // Preferences update the process-owned tray, which remains alive while this Window is gone.
+    SideEffect { DesktopWindowVisibility.configureTray(trayIconEnabled, closeToTray) }
 
     LaunchedEffect(Unit) {
         // Unpacks the analyser and its models on first run in background scope
@@ -3692,32 +3631,10 @@ internal fun BitChordDesktopApp(
     }
 
     val pipController = pipHost.controller
-    val pipCloseFlow = remember { DesktopPipSettings.state.map { it.onClose }.distinctUntilChanged() }
-    val pipCloseEnabled by pipCloseFlow.collectAsState(initial = DesktopPipSettings.state.value.onClose)
     fun openPip() {
         if (pipController.show()) {
             dismissExpandedPlayerForNavigation()
         } else DesktopPlayerHost.showMessage("Picture in picture is unavailable; playback continues")
-    }
-    DisposableEffect(pipController, trayIconEnabled, closeToTray, pipCloseEnabled) {
-        DesktopWindowVisibility.onClosedToTray = {
-            if (trayIconEnabled && closeToTray && DesktopPipSettings.state.value.onClose) openPip()
-        }
-        onDispose { DesktopWindowVisibility.onClosedToTray = {} }
-    }
-    DisposableEffect(pipController) {
-        DesktopWindowVisibility.onMainShown = pipController::mainShown
-        onDispose { DesktopWindowVisibility.onMainShown = {}; pipController.dispose() }
-    }
-    DisposableEffect(pipHost, playbackEngine) {
-        val session = DesktopPipSession(presentation = {
-            val currentLyrics = lyricsSession.state
-            DesktopPipState(selectedSong, playback.isPlaying, playback.isLoading, playback.awaitingAudio,
-                playback.durationMs, liveQueue.hasPrevious, selectedSong != null, partyState.controlsLocked,
-                currentLyrics.trackId, currentLyrics.result?.lines, currentLyrics.loading, currentLyrics.error)
-        }, playerPosition, ::togglePlayPauseFromUser, ::playPrevious, ::playNext, ::seekPlayer)
-        pipHost.session = session
-        onDispose { if (pipHost.session === session) pipHost.session = null }
     }
 
     MaterialTheme(
