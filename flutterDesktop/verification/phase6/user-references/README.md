@@ -19,11 +19,23 @@ Screenshots may contain personal profile names and account metadata;
 do not log tokens, cookies, passwords, signed URLs or sensitive account
 data in CI artifacts. Do not blindly commit raw new authenticated captures.
 
-**Installation (from repo root):**
+**One-command, checksum-verified installation and GitHub upload:** download
+`phase6_visual_references.zip` from the ChatGPT conversation to
+`~/Downloads/`, then run from the repository root:
+
 ```bash
-mkdir -p flutterDesktop/verification/phase6/user-references
-unzip -j /path/to/phase6_visual_references.zip 'phase6_visual_references/*.png' -d flutterDesktop/verification/phase6/user-references
+bash flutterDesktop/verification/phase6/import_user_references.sh
 ```
+
+The helper verifies SHA-256 hashes of all **original** PNGs, stages only those
+four files, commits them, and pushes to `codex/phase6-player-lyrics`.
+It rejects the wrong branch and pre-existing staged changes, and never
+auto-merges. You can also pass a different ZIP location as its argument.
+
+**File-transfer status:** the GitHub connector cannot receive binary bytes
+straight from the chat ZIP in this session. The helper is committed, but the
+four PNG files are **not** uploaded until the helper runs successfully.
+
 If the archive is unavailable, report the four images as **NOT PRESENT**
 and ask for the user-provided attachment rather than pretending to have
 inspected them. Once installed, preserve filenames and add them to the
