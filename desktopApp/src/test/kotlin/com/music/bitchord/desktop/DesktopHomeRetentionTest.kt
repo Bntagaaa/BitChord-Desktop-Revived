@@ -18,6 +18,12 @@ class DesktopHomeRetentionTest {
         assertFalse(isHomeFeedVisible(DesktopDestination.LISTEN_NOW, settingsOpen = true))
         assertFalse(isHomeFeedVisible(DesktopDestination.LISTEN_NOW, replayOpen = true))
         assertFalse(isHomeFeedVisible(DesktopDestination.LISTEN_NOW, moodGridOpen = true))
-        assertFalse(isHomeFeedVisible(DesktopDestination.LISTEN_NOW, nowPlayingOpen = true))
+    }
+
+    @Test fun fullscreenNowPlayingRetainsHomeUntilActualNavigation() {
+        // The overlay must not discard the feed or reset the retained LazyListState.
+        assertTrue(isHomeFeedVisible(DesktopDestination.LISTEN_NOW, nowPlayingOpen = true))
+        assertFalse(isHomeFeedVisible(DesktopDestination.NEW, nowPlayingOpen = true))
+        assertFalse(isHomeFeedVisible(DesktopDestination.LISTEN_NOW, settingsOpen = true, nowPlayingOpen = true))
     }
 }
