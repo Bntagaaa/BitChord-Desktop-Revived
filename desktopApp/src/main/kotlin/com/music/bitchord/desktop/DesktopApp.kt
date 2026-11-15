@@ -1785,6 +1785,11 @@ internal fun BitChordDesktopApp(
         playbackEngine.pause()
         partySync.onLocalIntent()
     }
+    SideEffect {
+        playbackService.shuffleState.value = shuffle
+        playbackService.repeatState.value = repeatMode.name
+        playbackService.rateState.value = playbackSpeed
+    }
     // The main UI contributes richer queue/party actions only while it is mounted. On tray/PiP
     // the process playback service owns the callbacks and does not retain this composition.
     DisposableEffect(playbackService, partySync) {
@@ -2073,8 +2078,12 @@ internal fun BitChordDesktopApp(
         replaySummary = withContext(Dispatchers.IO) { DesktopListeningStats.summary(replayPeriod) }
     }
     DisposableEffect(playbackEngine) {
-        // Media video belongs to the window; audio and the native sink belong to the process.
-        onDispose { DesktopMusicVideo.stop() }
+        // Drop screen callbacks eagerly. Global platform hosts must not hold this composition.
+        onDispose {
+            DesktopMusicVideo.stop()
+            DesktopPlayerHost.onVolumeChange = {}
+            DesktopPlayerHost.pipelineDialog = null
+        }
     }
     /** Opens an artist's page, from a card, a search row or the player's credit. */
     fun openArtist(browseId: String, name: String) {
@@ -2474,6 +2483,11 @@ internal fun BitChordDesktopApp(
         overlays.nowPlaying = false
         if (overlays.settingsPage == null) settingsSession++
         overlays.settingsPage = DesktopSettingsPage.MAIN
+    }
+    // A tray Settings request remounts the main Window first, then opens a fresh settings page.
+    val openSettingsRequest by DesktopWindowVisibility.settingsRequest.collectAsState()
+    LaunchedEffect(openSettingsRequest) {
+        if (openSettingsRequest != 0L) openSettings()
     }
 
     /** Folder shortcuts match the default sidebar order; Spotify uses its brand icon. */
