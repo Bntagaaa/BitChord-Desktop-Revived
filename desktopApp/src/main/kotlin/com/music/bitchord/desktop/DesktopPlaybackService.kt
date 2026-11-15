@@ -44,6 +44,10 @@ internal class DesktopPlaybackService(
     )
     val history = mutableStateOf(persistence.history())
     val position = PlaybackPosition()
+    val pipPlayback = mutableStateOf(DesktopPlaybackState())
+    val shuffleState = mutableStateOf(persistence.boolean("shuffle", false))
+    val repeatState = mutableStateOf(persistence.string("repeat_mode", "OFF"))
+    val rateState = mutableStateOf(persistence.string("playback_speed", "1.0").toFloatOrNull() ?: 1f)
     val lyricsSession = DesktopLyricsSession()
     val lyricsSettings = mutableStateOf(
         DesktopLyricsRequest(
@@ -164,17 +168,23 @@ internal class DesktopPlaybackService(
     fun shuffle(enabled: Boolean) {
         val cb = activeUi
         if (cb != null) cb.onShuffleChanged(enabled)
-        else persistence.saveBoolean("shuffle", enabled)
+        else {
+            persistence.saveBoolean("shuffle", enabled)
+            shuffleState.value = enabled
+        }
     }
 
     fun loopStatus(status: String) {
         val cb = activeUi
         if (cb != null) cb.onLoopStatusChanged(status)
-        else persistence.saveString("repeat_mode", when (status) {
-            "Track" -> "ONE"
-            "Playlist" -> "ALL"
-            else -> "OFF"
-        })
+        else {
+            repeatState.value = when (status) {
+                "Track" -> "ONE"
+                "Playlist" -> "ALL"
+                else -> "OFF"
+            }
+            persistence.saveString("repeat_mode", repeatState.value)
+        }
     }
 
     fun rate(value: Double) {
@@ -182,6 +192,7 @@ internal class DesktopPlaybackService(
         if (cb != null) cb.onRateChanged(value)
         else {
             val rate = value.toFloat().coerceIn(0.25f, 3f)
+            rateState.value = rate
             persistence.saveString("playback_speed", rate.toString())
             engine.setPlaybackSpeed(rate)
         }
