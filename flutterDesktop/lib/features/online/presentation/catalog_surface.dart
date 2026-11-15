@@ -878,8 +878,11 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                               'shelf-$index-${state.shelves[index].title}',
                             ),
                             shelf: state.shelves[index],
-                            onSelect: (entry) {
-                              final tracks = state.shelves[index].entries
+                            onSelect: _select,
+                            onSelectAt: (occurrence) {
+                              final shelf = state.shelves[index];
+                              final entry = shelf.entries[occurrence];
+                              final tracks = shelf.entries
                                   .where((e) => e.kind == CatalogKind.track)
                                   .toList();
                               if (entry.kind == CatalogKind.track &&
@@ -887,7 +890,10 @@ class _CatalogSurfaceState extends ConsumerState<CatalogSurface> {
                                 _play(
                                   entry,
                                   context: tracks,
-                                  index: tracks.indexOf(entry),
+                                  index: shelf.entries
+                                      .take(occurrence)
+                                      .where((e) => e.kind == CatalogKind.track)
+                                      .length,
                                 );
                               } else {
                                 _select(entry);

@@ -390,10 +390,15 @@ final class TransportController extends Notifier<PlaybackSnapshot?> {
   Future<void> toggle() async {
     final port = ref.read(onlinePortProvider);
     if (port == null) return;
-    if (state?.phase == AudioPhase.playing) {
-      await port.pause();
-    } else {
-      await port.resume();
+    try {
+      if (state?.phase == AudioPhase.playing) {
+        await port.pause();
+      } else {
+        await port.resume();
+      }
+    } catch (_) {
+      // Preserve the previous dock's command-failure behavior. The native
+      // snapshot, never an optimistic button state, reports playback failure.
     }
   }
 

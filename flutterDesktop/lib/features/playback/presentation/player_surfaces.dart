@@ -758,6 +758,21 @@ class ExpandedPlayer extends ConsumerWidget {
                                     Text(playback.error!),
                                 ],
                               );
+                        if (constraints.maxWidth < 650) {
+                          return ListView(
+                            children: [
+                              SizedBox(height: artSize + 64, child: art),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                height: math.max(
+                                  350.0,
+                                  constraints.maxHeight - artSize - 88,
+                                ),
+                                child: controls,
+                              ),
+                            ],
+                          );
+                        }
                         return Row(
                           children: [
                             Expanded(child: art),
@@ -792,8 +807,17 @@ class ExpandedPlayer extends ConsumerWidget {
                   ),
                   IconButton(
                     tooltip: 'Toggle fullscreen',
-                    onPressed: () =>
-                        ref.read(desktopWindowProvider).toggleFullscreen(),
+                    onPressed: () async {
+                      try {
+                        await ref
+                            .read(desktopWindowProvider)
+                            .toggleFullscreen();
+                      } catch (error) {
+                        ref
+                            .read(diagnosticsProvider)
+                            .failure('window action', error);
+                      }
+                    },
                     icon: const Icon(Icons.fullscreen, size: 20),
                   ),
                 ],

@@ -15,9 +15,13 @@ class ListeningPanel extends ConsumerWidget {
     super.key,
     this.section = ListeningSection.all,
     this.onOpenEqualizer,
+    this.query = '',
   });
   final ListeningSection section;
   final VoidCallback? onOpenEqualizer;
+  final String query;
+  bool _matches(String text) =>
+      text.toLowerCase().contains(query.trim().toLowerCase());
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final view = ref.watch(listeningProvider);
@@ -40,27 +44,33 @@ class ListeningPanel extends ConsumerWidget {
               in section == ListeningSection.transport
                   ? ['Playback speed', 'Sleep timer']
                   : ['Skip silence', 'Spatial audio', 'Equalizer'])
-            unavailable(title),
+            if (_matches(title)) unavailable(title),
         ],
       );
-    Widget setting(String title, String subtitle, Widget control) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 13),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    Widget setting(String title, String subtitle, Widget control) =>
+        !_matches('$title $subtitle')
+        ? const SizedBox.shrink()
+        : Padding(
+            padding: const EdgeInsets.symmetric(vertical: 13),
+            child: Row(
               children: [
-                Text(title),
-                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 18),
+                control,
               ],
             ),
-          ),
-          const SizedBox(width: 18),
-          control,
-        ],
-      ),
-    );
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -133,7 +143,8 @@ class ListeningPanel extends ConsumerWidget {
                 },
               ),
             ),
-          const SleepPanel(),
+          if (_matches('Sleep timer Pause playback after a while'))
+            const SleepPanel(),
         ],
         if (view.error != null) Text(view.error!),
       ],

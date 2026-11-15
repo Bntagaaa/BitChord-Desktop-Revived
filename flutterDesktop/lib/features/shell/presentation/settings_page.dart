@@ -218,6 +218,9 @@ class SettingsPageState extends ConsumerState<SettingsPage> {
           if (_matches('Playback', 'Skip silence Spatial audio Equalizer'))
             ListeningPanel(
               section: ListeningSection.effects,
+              query: 'playback'.contains(_search.text.trim().toLowerCase())
+                  ? ''
+                  : _search.text,
               onOpenEqualizer: () => _open('Equalizer'),
             ),
           _row(
@@ -242,7 +245,13 @@ class SettingsPageState extends ConsumerState<SettingsPage> {
           _row('Shuffle', 'Mix the order of the current queue', toggle: false),
           _row('Repeat', 'Off', icon: Icons.repeat_rounded),
           if (_matches('Desktop playback', 'Playback speed Sleep timer'))
-            const ListeningPanel(section: ListeningSection.transport),
+            ListeningPanel(
+              section: ListeningSection.transport,
+              query:
+                  'desktop playback'.contains(_search.text.trim().toLowerCase())
+                  ? ''
+                  : _search.text,
+            ),
           _row(
             'Direct source stream',
             'Start on a higher priority source; YouTube remains the fallback.',

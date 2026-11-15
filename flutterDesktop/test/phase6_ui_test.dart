@@ -1,13 +1,14 @@
-import 'package:bitchord_desktop/app/app.dart';
-import 'package:bitchord_desktop/design_system/palette.dart';
-import 'package:bitchord_desktop/features/online/application/catalog_controller.dart';
-import 'package:bitchord_desktop/features/online/application/catalog_playback.dart';
-import 'package:bitchord_desktop/features/online/domain/catalog.dart';
-import 'package:bitchord_desktop/features/online/presentation/catalog_components.dart';
-import 'package:bitchord_desktop/features/playback/presentation/player_surfaces.dart';
-import 'package:bitchord_desktop/features/shell/application/shell_controller.dart';
-import 'package:bitchord_desktop/features/shell/domain/shell_settings.dart';
-import 'package:bitchord_desktop/features/shell/presentation/settings_page.dart';
+import '../lib/app/app.dart';
+import '../lib/design_system/palette.dart';
+import '../lib/features/online/application/catalog_controller.dart';
+import '../lib/features/online/application/catalog_playback.dart';
+import '../lib/features/online/domain/catalog.dart';
+import '../lib/features/online/presentation/catalog_components.dart';
+import '../lib/features/online/presentation/catalog_surface.dart';
+import '../lib/features/playback/presentation/player_surfaces.dart';
+import '../lib/features/shell/application/shell_controller.dart';
+import '../lib/features/shell/domain/shell_settings.dart';
+import '../lib/features/shell/presentation/settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,9 +16,79 @@ import 'package:flutter_test/flutter_test.dart' hide TestWindow;
 
 import 'catalog_playback_test.dart' show ContextPort;
 import 'online_controller_test.dart' show transportFixture;
-import 'shell_test.dart' show MemorySettings, TestDiagnostics, TestWindow;
+import '../lib/core/domain/failure_reporter.dart';
+
+class MemorySettings implements ShellSettingsStore {
+  @override
+  Future<ShellSettings> read() async => const ShellSettings();
+  @override
+  Future<void> write(ShellSettings settings) async {}
+}
+
+class TestDiagnostics implements FailureReporter {
+  @override
+  void failure(String operation, Object error) {}
+}
+
+class TestWindow implements DesktopWindow {
+  @override
+  Future<void> toggleFullscreen() async {}
+  @override
+  Future<void> exitFullscreen() async {}
+  @override
+  Future<void> close() async {}
+}
 
 void main() {
+  testWidgets(
+    'Home selects the tapped duplicate occurrence in its shelf context',
+    (tester) async {
+      const same = CatalogEntry(
+        provider: 'youtube',
+        id: 'same',
+        title: 'Repeated song',
+      );
+      final port = ContextPort()
+        ..browsePage = CatalogPage(
+          [],
+          shelves: [
+            CatalogShelf(
+              title: 'Listen again',
+              entries: [
+                same,
+                const CatalogEntry(
+                  provider: 'youtube',
+                  id: 'other',
+                  title: 'Other song',
+                ),
+                same,
+              ],
+            ),
+          ],
+        );
+      final container = ProviderContainer(
+        overrides: [onlinePortProvider.overrideWithValue(port)],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: Scaffold(
+              body: CatalogSurface(destination: 'listen-now', title: 'Home'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Repeated song').last);
+      await tester.pump();
+      expect(container.read(catalogPlaybackProvider).index, 2);
+      expect(container.read(catalogPlaybackProvider).entries.length, 3);
+      expect(port.played, ['same']);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets(
     'Home Listen again uses four compact rows and a real grid switch',
     (tester) async {

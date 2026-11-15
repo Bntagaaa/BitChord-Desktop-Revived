@@ -382,12 +382,14 @@ class CatalogShelfView extends StatefulWidget {
     required this.onOpen,
     this.hero = false,
     this.onDownload,
+    this.onSelectAt,
   });
   final CatalogShelf shelf;
   final ValueChanged<CatalogEntry> onSelect;
   final void Function(String, String, String?) onOpen;
   final bool hero;
   final ValueChanged<CatalogEntry>? onDownload;
+  final ValueChanged<int>? onSelectAt;
   @override
   State<CatalogShelfView> createState() => _CatalogShelfViewState();
 }
@@ -403,6 +405,14 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
         'listen again',
         'quick picks',
       ].contains(widget.shelf.title.trim().toLowerCase());
+  void _select(CatalogEntry entry, int index) {
+    if (widget.onSelectAt != null) {
+      widget.onSelectAt!(index);
+    } else {
+      widget.onSelect(entry);
+    }
+  }
+
   @override
   void dispose() {
     _scroll.dispose();
@@ -444,7 +454,7 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
     ],
   );
 
-  Widget _card(CatalogEntry entry, double width) {
+  Widget _card(CatalogEntry entry, double width, int index) {
     final hero = (widget.hero && !_listShelf) || (_listShelf && _grid);
     final artHeight = hero
         ? width / .92
@@ -456,9 +466,9 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          key: ValueKey('card-${entry.key}'),
+          key: ValueKey('card-$index-${entry.key}'),
           borderRadius: BorderRadius.circular(hero ? 18 : 12),
-          onTap: () => widget.onSelect(entry),
+          onTap: () => _select(entry, index),
           child: hero
               ? ClipRRect(
                   borderRadius: BorderRadius.circular(18),
@@ -518,12 +528,12 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
     );
   }
 
-  Widget _track(CatalogEntry entry) => SizedBox(
+  Widget _track(CatalogEntry entry, int index) => SizedBox(
     height: 56,
     child: Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => widget.onSelect(entry),
+        onTap: () => _select(entry, index),
         borderRadius: BorderRadius.circular(7),
         child: Row(
           children: [
@@ -538,7 +548,7 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
                 padding: EdgeInsets.zero,
                 icon: const Icon(Icons.more_vert, size: 18),
                 onSelected: (action) {
-                  if (action == 'play') widget.onSelect(entry);
+                  if (action == 'play') _select(entry, index);
                   if (action == 'download') widget.onDownload?.call(entry);
                 },
                 itemBuilder: (_) => [
@@ -680,9 +690,16 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
                               width: width,
                               child: Column(
                                 children: [
-                                  for (final entry
-                                      in shelf.entries.skip(index * 4).take(4))
-                                    _track(entry),
+                                  for (
+                                    var i = index * 4;
+                                    i <
+                                        math.min(
+                                          index * 4 + 4,
+                                          shelf.entries.length,
+                                        );
+                                    i++
+                                  )
+                                    _track(shelf.entries[i], i),
                                 ],
                               ),
                             )
@@ -691,6 +708,7 @@ class _CatalogShelfViewState extends State<CatalogShelfView> {
                               !hero && hasVideos && shelf.entries[index].isVideo
                                   ? 248
                                   : width,
+                              index,
                             ),
                     ),
                   ),
