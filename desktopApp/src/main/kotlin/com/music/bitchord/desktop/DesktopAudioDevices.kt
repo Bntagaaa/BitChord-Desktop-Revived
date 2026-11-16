@@ -30,9 +30,7 @@ internal object DesktopAudioDevices {
     fun select(id: String) {
         DesktopPersistence().saveString(KEY_DEVICE, id)
         _selected.value = id
-        if (DesktopPlatform.isLinux) {
-            Thread({ DesktopLinuxPulseAudio.route(id) }, "BitChord-Audio-Route").apply { isDaemon = true; start() }
-        }
+        if (DesktopPlatform.isLinux) DesktopLinuxPulseAudio.requestRoute()
     }
 
     private val _changes = MutableStateFlow(0)
