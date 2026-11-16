@@ -7339,29 +7339,25 @@ private fun DesktopDownloadsPage(
         emptyTitle = DesktopStrings["d_no_downloads", "No downloads"],
         emptyDescription = DesktopStrings["d_downloaded_songs_will_appear_here", "Downloaded songs will appear here."],
         persistenceKey = "downloaded",
-        header = if (playlistRecords.isNotEmpty()) {
-            {
-                DesktopPlaylistDownloadsSection(
-                    records = playlistRecords,
-                    downloadedIds = downloadedIds,
-                    downloadInProgress = downloadInProgress,
-                    staleIds = playlistStaleIds,
-                    onOpen = onOpenPlaylist,
-                    onUpdate = onUpdatePlaylist,
-                    onRemove = onRemovePlaylist,
-                )
-            }
-        } else {
-            null
+        playlistsTab = {
+            DesktopPlaylistDownloadsContent(
+                records = playlistRecords,
+                downloadedIds = downloadedIds,
+                downloadInProgress = downloadInProgress,
+                staleIds = playlistStaleIds,
+                onOpen = onOpenPlaylist,
+                onUpdate = onUpdatePlaylist,
+                onRemove = onRemovePlaylist,
+            )
         },
         songsEmptyTitle = "No downloaded songs",
         songsEmptyDescription = "Downloaded songs will appear here.",
     )
 }
 
-/** The Playlists section of Downloads — whole collections asked for as a whole. */
+/** The Playlists tab of Downloads — whole collections asked for as a whole. */
 @Composable
-private fun DesktopPlaylistDownloadsSection(
+private fun DesktopPlaylistDownloadsContent(
     records: List<DesktopPlaylistDownload>,
     downloadedIds: Set<String>,
     downloadInProgress: Set<String>,
@@ -7370,15 +7366,22 @@ private fun DesktopPlaylistDownloadsSection(
     onUpdate: (DesktopPlaylistDownload) -> Unit,
     onRemove: (DesktopPlaylistDownload) -> Unit,
 ) {
-    Text(
-        "Playlists",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = DesktopForeground,
-    )
-    Spacer(Modifier.height(8.dp))
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        records.forEach { record ->
+    if (records.isEmpty()) {
+        DesktopEmptyPage(
+            BitChordIcons.Download,
+            "No playlist downloads",
+            "Download a playlist or album from its menu, and it will stand here.",
+        )
+        return
+    }
+    val listState = rememberLazyListState()
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().desktopTopScrollFade(listState),
+        contentPadding = pagePadding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        items(records, key = DesktopPlaylistDownload::id) { record ->
             DesktopPlaylistDownloadRow(
                 record = record,
                 progress = offlineProgress(record.songs, downloadedIds, downloadInProgress),
@@ -7389,7 +7392,6 @@ private fun DesktopPlaylistDownloadsSection(
             )
         }
     }
-    Spacer(Modifier.height(10.dp))
 }
 
 /** The row a downloaded collection lives in on the Downloads page. */
@@ -7472,6 +7474,14 @@ private fun playlistDownloadLine(
     }
 }
 
+/** The tabs a local-music page can carry — the Downloads page inserts Playlists between Songs and Artists. */
+private enum class DownloadsTab(val label: String) {
+    SONGS("Songs"),
+    PLAYLISTS("Playlists"),
+    ARTISTS("Artists"),
+    ALBUMS("Albums"),
+}
+
 @Composable
 private fun DesktopLocalMusicPage(
     songs: List<Song>,
@@ -7485,9 +7495,9 @@ private fun DesktopLocalMusicPage(
     emptyDescription: String = "Put audio files in your Music folder and reopen this page.",
     persistenceKey: String = "local",
     menu: (@Composable (Song) -> Unit)? = null,
-    /** An optional section between the tabs and the songs — the Downloads page's playlists. */
-    header: (@Composable () -> Unit)? = null,
-    /** Copy for the songs list's own empty state, for a page that has a header to show instead. */
+    /** A Playlists tab between Songs and Artists — the Downloads page's downloaded collections. */
+    playlistsTab: (@Composable () -> Unit)? = null,
+    /** Copy for the songs list's own empty state, for a page that has a playlists tab to show instead. */
     songsEmptyTitle: String = "No matching music",
     songsEmptyDescription: String = "Try a different search.",
 ) {
@@ -7524,6 +7534,13 @@ private fun DesktopLocalMusicPage(
     val albums = remember(filteredSongs) {
         filteredSongs.groupBy { it.albumName?.takeIf(String::isNotBlank) ?: "Unknown Album" }
             .entries.sortedBy { it.key.lowercase() }
+    }
+    // Tab kinds in order — the Downloads page carries a Playlists tab between Songs and Artists.
+    val tabs = buildList {
+        add(DownloadsTab.SONGS)
+        if (playlistsTab != null) add(DownloadsTab.PLAYLISTS)
+        add(DownloadsTab.ARTISTS)
+        add(DownloadsTab.ALBUMS)
     }
     DesktopPageScaffold(contentPadding) {
         Column(
@@ -7564,18 +7581,14 @@ private fun DesktopLocalMusicPage(
             }
             Spacer(Modifier.height(10.dp))
             TabRow(selectedTabIndex = selectedTab, containerColor = Color.Transparent) {
-                listOf("Songs", "Artists", "Albums").forEachIndexed { index, label ->
-                    Tab(selected = selectedTab == index, onClick = { selectedTab = index }, text = { Text(label) })
+                tabs.forEachIndexed { index, tab ->
+                    Tab(selected = selectedTab == index, onClick = { selectedTab = index }, text = { Text(tab.label) })
                 }
             }
             Spacer(Modifier.height(8.dp))
-            if (drillDown == null && header != null) {
-                header()
-                Spacer(Modifier.height(10.dp))
-            }
             if (loading) {
                 DesktopLoadingPage("Scanning local music…")
-            } else if (songs.isEmpty() && header == null) {
+            } else if (songs.isEmpty() && playlistsTab == null) {
                 DesktopEmptyPage(emptyIcon, emptyTitle, emptyDescription)
             } else if (drillDown != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -7584,8 +7597,8 @@ private fun DesktopLocalMusicPage(
                 }
                 Spacer(Modifier.height(6.dp))
                 DesktopLibrarySongContent(drillDown!!.second, view, onSongClick, menu)
-            } else when (selectedTab) {
-                0 -> DesktopLibrarySongContent(
+            } else when (tabs[selectedTab]) {
+                DownloadsTab.SONGS -> DesktopLibrarySongContent(
                     filteredSongs,
                     view,
                     onSongClick,
@@ -7593,8 +7606,11 @@ private fun DesktopLocalMusicPage(
                     emptyTitle = songsEmptyTitle,
                     emptyDescription = songsEmptyDescription,
                 )
-                1 -> DesktopLibraryGroupingContent(artists, view, onGroupClick = { drillDown = it })
-                else -> DesktopLibraryGroupingContent(albums, view, onGroupClick = { drillDown = it })
+                DownloadsTab.PLAYLISTS ->
+                    playlistsTab?.invoke()
+                        ?: DesktopEmptyPage(emptyIcon, emptyTitle, emptyDescription)
+                DownloadsTab.ARTISTS -> DesktopLibraryGroupingContent(artists, view, onGroupClick = { drillDown = it })
+                DownloadsTab.ALBUMS -> DesktopLibraryGroupingContent(albums, view, onGroupClick = { drillDown = it })
             }
         }
     }
