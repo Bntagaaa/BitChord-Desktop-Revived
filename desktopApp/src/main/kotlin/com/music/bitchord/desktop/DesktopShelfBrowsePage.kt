@@ -156,7 +156,7 @@ private fun DesktopBrowseGridCard(
                 .clip(RoundedCornerShape(9.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
         ) {
-            ViewportAsyncImage(
+            ViewportViewportAsyncImage(
                 model = item.thumbnailUrl,
                 contentDescription = item.title,
                 contentScale = ContentScale.Crop,
