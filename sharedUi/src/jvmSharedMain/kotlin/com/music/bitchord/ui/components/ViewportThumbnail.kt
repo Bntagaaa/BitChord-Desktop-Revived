@@ -33,7 +33,7 @@ internal fun Rect.hasArea(): Boolean = width > 0f && height > 0f
  * A larger *exit* margin is used by the caller so a card hovering at the viewport edge does
  * not repeatedly cancel/restart an image request during slow wheel movement or trackpad jitter.
  */
-internal fun shouldRequestThumbnail(
+fun shouldRequestThumbnail(
     rawBounds: Rect,
     clippedBounds: Rect,
     nearestVisibleAncestor: Rect?,
