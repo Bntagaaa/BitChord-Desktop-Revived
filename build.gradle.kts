@@ -42,3 +42,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20" apply false
     id("org.jetbrains.compose") version "1.10.3" apply false
 }
+
+// Keep the desktop-only executable bundle out of shared/Android dependencies.
+project(":desktopApp") {
+    apply(from = rootProject.file("gradle/desktop-ytdlp.gradle"))
+}
