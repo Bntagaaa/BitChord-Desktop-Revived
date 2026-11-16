@@ -93,7 +93,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
+import com.music.bitchord.ui.components.ViewportAsyncImage
 import com.music.bitchord.data.model.CARD_ART_PX
 import com.music.bitchord.data.model.HEADER_ART_PX
 import com.music.bitchord.data.model.TopPick
@@ -325,7 +325,7 @@ private fun TopPickCard(
                 branded = false
             }
             TopPickKind.FEATURED_ARTIST -> {
-                AsyncImage(
+                ViewportAsyncImage(
                     model = pick.images.firstOrNull().croppedAt(HEADER_ART_PX * 3 / 4, HEADER_ART_PX).whenArtworkReady(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
@@ -425,7 +425,7 @@ private fun ReleaseArt(url: String?, modifier: Modifier, motion: CardMotionSourc
     // steps out as the clip comes in.
     var covered by remember { mutableFloatStateOf(0f) }
     Box(modifier.background(Color.Black)) {
-        AsyncImage(
+        ViewportAsyncImage(
             model = rememberBlurredBackdrop(url.croppedAt(BACKDROP_SOURCE_PX).whenArtworkReady()),
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
@@ -446,7 +446,7 @@ private fun ReleaseArt(url: String?, modifier: Modifier, motion: CardMotionSourc
                     ),
                 ),
         )
-        AsyncImage(
+        ViewportAsyncImage(
             model = url.croppedAt(HEADER_ART_PX).whenArtworkReady(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
@@ -1606,7 +1606,7 @@ private fun ArtistCollageArt(
                 .offset(x = w * cx - diameter / 2, y = h * cy - diameter / 2)
                 .size(diameter)
                 .clip(CircleShape)
-            AsyncImage(
+            ViewportAsyncImage(
                 model = url.croppedAt(if (d > 0.5f) HEADER_ART_PX else CARD_ART_PX).whenArtworkReady(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
