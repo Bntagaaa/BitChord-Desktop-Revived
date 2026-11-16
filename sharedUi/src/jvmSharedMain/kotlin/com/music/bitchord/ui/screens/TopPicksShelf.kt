@@ -94,6 +94,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.music.bitchord.ui.components.ViewportAsyncImage
+import com.music.bitchord.ui.components.rememberViewportThumbnailGate
 import com.music.bitchord.data.model.CARD_ART_PX
 import com.music.bitchord.data.model.HEADER_ART_PX
 import com.music.bitchord.data.model.TopPick
@@ -424,9 +425,14 @@ private fun ReleaseArt(url: String?, modifier: Modifier, motion: CardMotionSourc
     // would leave the still showing through the clip's own fade, so the still
     // steps out as the clip comes in.
     var covered by remember { mutableFloatStateOf(0f) }
-    Box(modifier.background(Color.Black)) {
+    val backdropGate = rememberViewportThumbnailGate(url)
+    Box(modifier.then(backdropGate.modifier).background(Color.Black)) {
         ViewportAsyncImage(
-            model = rememberBlurredBackdrop(url.croppedAt(BACKDROP_SOURCE_PX).whenArtworkReady()),
+            // JVM blurred backdrops do their own Coil fetch + pixel processing. Gate *that*
+            // request too; gating only the resulting AsyncImage would still decode offscreen.
+            model = rememberBlurredBackdrop(
+                if (backdropGate.request) url.croppedAt(BACKDROP_SOURCE_PX).whenArtworkReady() else null
+            ),
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier
