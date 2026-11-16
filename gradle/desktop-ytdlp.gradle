@@ -81,6 +81,7 @@ def prepare = tasks.register('prepareYouTubeRuntime') {
         download("https://raw.githubusercontent.com/yt-dlp/yt-dlp/$ytVersion/LICENSE", new File(licenses, "yt-dlp-$ytVersion-LICENSE.txt"), null)
         download("https://raw.githubusercontent.com/yt-dlp/yt-dlp/$ytVersion/THIRD_PARTY_LICENSES.txt", new File(licenses, "yt-dlp-$ytVersion-THIRD_PARTY_LICENSES.txt"), null)
         download("https://raw.githubusercontent.com/denoland/deno/$denoVersion/LICENSE.md", new File(licenses, "deno-$denoVersion-LICENSE.md"), null)
+        // Brace the version before a dotted suffix; otherwise Groovy reads .tar as a property.
         new File(licenses, 'UPSTREAM-SOURCES.txt').text = """Unmodified upstream binaries; no executable is fetched by the installed app.
 yt-dlp $ytVersion (standalone distribution includes GPLv3+ components):
 https://github.com/yt-dlp/yt-dlp/releases/tag/$ytVersion
@@ -88,7 +89,7 @@ https://github.com/yt-dlp/yt-dlp/releases/download/$ytVersion/yt-dlp.tar.gz
 See the accompanying THIRD_PARTY_LICENSES for bundled components and their source locations.
 Deno $denoVersion:
 https://github.com/denoland/deno/tree/$denoVersion
-https://github.com/denoland/deno/archive/refs/tags/$denoVersion.tar.gz
+https://github.com/denoland/deno/archive/refs/tags/${denoVersion}.tar.gz
 Redistributors must preserve the upstream notices and corresponding-source obligations.
 """
         def manifest = new Properties()
