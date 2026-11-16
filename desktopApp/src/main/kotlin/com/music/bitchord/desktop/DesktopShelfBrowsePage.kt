@@ -33,7 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
+import com.music.bitchord.ui.components.ViewportAsyncImage
 import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.UiState
@@ -156,7 +156,7 @@ private fun DesktopBrowseGridCard(
                 .clip(RoundedCornerShape(9.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
         ) {
-            AsyncImage(
+            ViewportAsyncImage(
                 model = item.thumbnailUrl,
                 contentDescription = item.title,
                 contentScale = ContentScale.Crop,
