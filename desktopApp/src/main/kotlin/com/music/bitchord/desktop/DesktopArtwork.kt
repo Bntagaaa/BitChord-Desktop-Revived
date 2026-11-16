@@ -3,7 +3,6 @@ package com.music.bitchord.desktop
 import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.ui.components.ArtworkHover
 import com.music.bitchord.ui.components.ArtworkHoverMode
-import com.music.bitchord.ui.components.rememberViewportThumbnailGate
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -85,30 +84,26 @@ fun DesktopArtwork(
     hovered: Boolean? = null,
 ) {
     val sized = if (px != null) url.artworkAt(px) else url
-    val gate = rememberViewportThumbnailGate(sized)
-    val placedModifier = modifier.then(gate.modifier)
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = sized, key2 = gate.request) {
-        // A lazy shelf can precompose cards far outside its viewport. Do not download or decode
-        // these until they reach the image gate's small overscan region.
-        if (gate.request) {
-            value = withContext(Dispatchers.IO) { DesktopArtworkCache.load(sized) }
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = sized) {
+        value = withContext(Dispatchers.IO) {
+            DesktopArtworkCache.load(sized)
         }
     }
 
     if (hoverMode == null) {
         if (bitmap == null) {
-            Box(placedModifier.background(Color(0xFF2B2B35)))
+            Box(modifier.background(Color(0xFF2B2B35)))
         } else {
             Image(
                 painter = BitmapPainter(bitmap!!),
                 contentDescription = contentDescription,
                 contentScale = contentScale,
-                modifier = placedModifier,
+                modifier = modifier,
             )
         }
     } else {
         ArtworkHover(
-            modifier = placedModifier,
+            modifier = modifier,
             shape = RectangleShape,
             mode = hoverMode,
             hovered = hovered,

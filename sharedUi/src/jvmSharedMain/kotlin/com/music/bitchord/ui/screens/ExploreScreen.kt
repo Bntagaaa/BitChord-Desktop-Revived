@@ -44,7 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.music.bitchord.ui.components.ViewportAsyncImage
+import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.MoodGenre
 import com.music.bitchord.data.model.MoodGenreSection
@@ -244,7 +244,7 @@ private fun OldMoodGenreCard(
                     .background(Color.White.copy(alpha = .22f)),
             ) {
                 item.thumbnailUrl?.let { artwork ->
-                    ViewportAsyncImage(
+                    AsyncImage(
                         model = artwork,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
@@ -304,7 +304,7 @@ private fun ModernMoodGenreCard(
                 .background(tone.placeholder),
         ) {
             item.thumbnailUrl?.let { artwork ->
-                ViewportAsyncImage(
+                AsyncImage(
                     model = artwork,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,

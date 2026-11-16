@@ -98,7 +98,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.music.bitchord.ui.components.ViewportAsyncImage
+import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.isMatchPending
@@ -619,7 +619,7 @@ private fun SongRowContent(
                 mode = ArtworkHoverMode.DARKEN_AND_PLAY,
                 hovered = rowHovered,
             ) {
-                ViewportAsyncImage(
+                AsyncImage(
                     model = com.music.bitchord.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),

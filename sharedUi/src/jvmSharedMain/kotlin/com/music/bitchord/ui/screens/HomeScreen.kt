@@ -79,7 +79,7 @@ import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Storage
 import com.music.bitchord.ui.icons.BitChordIcons
-import com.music.bitchord.ui.components.ViewportAsyncImage
+import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.CARD_ART_PX
 import com.music.bitchord.data.model.HEADER_ART_PX
 import com.music.bitchord.data.model.HomeShelf
@@ -615,7 +615,7 @@ fun CompactTrackRow(
             hovered = rowHovered,
         ) {
 
-            ViewportAsyncImage(
+            AsyncImage(
                 model = thumbnailUrl.artworkAt(ROW_ART_PX),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
@@ -984,7 +984,7 @@ private fun HeroCard(
             mode = ArtworkHoverMode.DARKEN_ONLY,
             hovered = cardHovered,
         ) {
-            ViewportAsyncImage(
+            AsyncImage(
                 model = item.thumbnailUrl.artworkAt(HEADER_ART_PX),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
@@ -1105,7 +1105,7 @@ fun VideoShelfCard(
                 .thumbnailBorder(RoundedCornerShape(12.dp))
                 .background(placeholderColor),
         ) {
-            ViewportAsyncImage(
+            AsyncImage(
                 // Video stills are not resizable googleusercontent art; the
                 // largest the row listed is already about card size.
                 model = item.thumbnailUrl,
@@ -1338,7 +1338,7 @@ internal fun ShelfCard(
                         mode = ArtworkHoverMode.DARKEN_ONLY,
                         hovered = cardHovered,
                     ) {
-                        ViewportAsyncImage(
+                        AsyncImage(
                             model = if (item.isVideo) item.thumbnailUrl else item.thumbnailUrl.artworkAt(CARD_ART_PX),
                             contentDescription = null,
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop,

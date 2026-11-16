@@ -1,7 +1,6 @@
 package com.music.bitchord.desktop
 
 import androidx.compose.foundation.lazy.LazyListState
-import com.music.bitchord.ui.components.LocalViewportThumbnailsEnabled
 import com.music.bitchord.ui.components.LocalShelfRowChrome
 import com.music.bitchord.ui.components.ShelfRowChrome
 import com.music.bitchord.ui.components.ShelfRow
@@ -3606,9 +3605,6 @@ internal fun BitChordDesktopApp(
         typography = desktopTypography(DesktopFontSettings.mode),
     ) {
         CompositionLocalProvider(
-            // Only viewport-adjacent thumbnails issue image requests on desktop. Android retains
-            // its established image behavior; playback/PiP remain independent compositions.
-            LocalViewportThumbnailsEnabled provides true,
             LocalContentColor provides DesktopForeground,
             LocalNowPlaying provides selectedSong,
             LocalDesktopCompactHeadings provides true,

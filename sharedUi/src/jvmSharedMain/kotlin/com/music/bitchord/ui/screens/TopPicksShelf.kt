@@ -93,8 +93,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.music.bitchord.ui.components.ViewportAsyncImage
-import com.music.bitchord.ui.components.rememberViewportThumbnailGate
+import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.CARD_ART_PX
 import com.music.bitchord.data.model.HEADER_ART_PX
 import com.music.bitchord.data.model.TopPick
@@ -326,7 +325,7 @@ private fun TopPickCard(
                 branded = false
             }
             TopPickKind.FEATURED_ARTIST -> {
-                ViewportAsyncImage(
+                AsyncImage(
                     model = pick.images.firstOrNull().croppedAt(HEADER_ART_PX * 3 / 4, HEADER_ART_PX).whenArtworkReady(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
@@ -425,14 +424,9 @@ private fun ReleaseArt(url: String?, modifier: Modifier, motion: CardMotionSourc
     // would leave the still showing through the clip's own fade, so the still
     // steps out as the clip comes in.
     var covered by remember { mutableFloatStateOf(0f) }
-    val backdropGate = rememberViewportThumbnailGate(url)
-    Box(modifier.then(backdropGate.modifier).background(Color.Black)) {
-        ViewportAsyncImage(
-            // JVM blurred backdrops do their own Coil fetch + pixel processing. Gate *that*
-            // request too; gating only the resulting AsyncImage would still decode offscreen.
-            model = rememberBlurredBackdrop(
-                if (backdropGate.request) url.croppedAt(BACKDROP_SOURCE_PX).whenArtworkReady() else null
-            ),
+    Box(modifier.background(Color.Black)) {
+        AsyncImage(
+            model = rememberBlurredBackdrop(url.croppedAt(BACKDROP_SOURCE_PX).whenArtworkReady()),
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier
@@ -452,7 +446,7 @@ private fun ReleaseArt(url: String?, modifier: Modifier, motion: CardMotionSourc
                     ),
                 ),
         )
-        ViewportAsyncImage(
+        AsyncImage(
             model = url.croppedAt(HEADER_ART_PX).whenArtworkReady(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
@@ -1612,7 +1606,7 @@ private fun ArtistCollageArt(
                 .offset(x = w * cx - diameter / 2, y = h * cy - diameter / 2)
                 .size(diameter)
                 .clip(CircleShape)
-            ViewportAsyncImage(
+            AsyncImage(
                 model = url.croppedAt(if (d > 0.5f) HEADER_ART_PX else CARD_ART_PX).whenArtworkReady(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
