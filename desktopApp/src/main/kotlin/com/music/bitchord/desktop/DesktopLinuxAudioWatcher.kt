@@ -58,7 +58,7 @@ internal object DesktopLinuxAudioWatcher {
                 }
                 // A Bluetooth sink-input can appear after playback begins; route it even if
                 // the sink inventory itself has not changed.
-                DesktopLinuxPulseAudio.route(DesktopAudioDevices.selected.value)
+                DesktopLinuxPulseAudio.requestRoute()
             }
         }
     }
