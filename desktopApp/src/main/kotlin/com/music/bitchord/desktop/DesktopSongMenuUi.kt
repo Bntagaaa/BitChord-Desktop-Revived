@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.HighQuality
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material.icons.rounded.ThumbDownOffAlt
@@ -390,6 +391,12 @@ internal data class DesktopCollectionMenuActions(
     val pinned: Boolean = false,
     val onRename: (() -> Unit)? = null,
     val onDelete: (() -> Unit)? = null,
+    /** Whole-collection download state, when the page has been asked for as a whole. */
+    val playlistProgress: DesktopPlaylistDownloadProgress? = null,
+    /** The snapshot no longer matches the live listing — the download row becomes an update. */
+    val playlistStale: Boolean = false,
+    /** Throws the whole-collection download away; offered when one exists. */
+    val onRemovePlaylistDownload: (() -> Unit)? = null,
 )
 
 @Composable
@@ -425,7 +432,25 @@ internal fun DesktopCollectionContextMenu(
         }
         DesktopMenuDivider()
         actions.onDownloadAll?.let { download ->
-            DesktopMenuRow(BitChordIcons.Download, "Download all") { onDismiss(); download() }
+            val progress = actions.playlistProgress
+            when {
+                // Never asked for as a whole: a plain ask for everything listed.
+                progress == null -> DesktopMenuRow(BitChordIcons.Download, "Download all") { onDismiss(); download() }
+                // Asked for and still landing — the row says how far it has come.
+                progress.downloading -> DesktopMenuRow(
+                    icon = BitChordIcons.Clock,
+                    label = "Downloading · ${progress.done + progress.active} of ${progress.total}",
+                ) { onDismiss(); download() }
+                // In hand, but the live listing has moved on — the tap becomes an update.
+                actions.playlistStale -> DesktopMenuRow(Icons.Rounded.Refresh, "Update download") {
+                    onDismiss(); download()
+                }
+                // Every song the record holds is on disk; the tap stays a harmless refresh.
+                else -> DesktopMenuRow(BitChordIcons.Check, "Downloaded") { onDismiss(); download() }
+            }
+        }
+        actions.onRemovePlaylistDownload?.let { remove ->
+            DesktopMenuRow(Icons.Rounded.Delete, "Remove download") { onDismiss(); remove() }
         }
         actions.onShare?.let { share ->
             DesktopMenuRow(Icons.Rounded.Share, "Share") { onDismiss(); share() }
@@ -439,6 +464,26 @@ internal fun DesktopCollectionContextMenu(
                 DesktopMenuRow(Icons.Rounded.Delete, "Delete playlist") { onDismiss(); delete() }
             }
         }
+    }
+}
+
+/**
+ * The Downloads page's playlist-download menu: open it, update it when stale,
+ * or throw the record away.
+ */
+@Composable
+internal fun DesktopPlaylistDownloadRowMenu(
+    onOpen: () -> Unit,
+    onUpdate: (() -> Unit)?,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DesktopMenuSurface(onDismiss = onDismiss) {
+        DesktopMenuRow(Icons.Rounded.PlayArrow, "Open") { onDismiss(); onOpen() }
+        onUpdate?.let { update ->
+            DesktopMenuRow(Icons.Rounded.Refresh, "Update download") { onDismiss(); update() }
+        }
+        DesktopMenuRow(Icons.Rounded.Delete, "Remove download") { onDismiss(); onRemove() }
     }
 }
 
