@@ -4910,7 +4910,10 @@ internal fun BitChordDesktopApp(
                             onTopPickClick = if (DesktopContentPreferences.hideTopPicks) null else ::openTopPick,
                             onMoodClick = if (DesktopContentPreferences.hideHomeMoods) null else { mood, label -> openTopPick(TopPicks.moodStation(mood), label) },
                             onMoodsShowAll = { showMoodGrid = true },
-                            artworkMotion = !shortcutBlockedByModal && overlays.settingsPage == null && !overlays.nowPlaying && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
+                            // Expanded/fullscreen Now Playing is only a cover over Home. Do not
+                            // flip the underlying artwork mode when it opens or closes: doing so
+                            // can recreate visible artwork and look like the feed refreshed.
+                            artworkMotion = !shortcutBlockedByModal && overlays.settingsPage == null && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
                             state = (homeState as? UiState.Success<List<HomeShelf>>)?.let { loaded ->
                                 val prefs = DesktopContentPreferences
                                 val trimmed = loaded.data.mapNotNull { shelf ->
