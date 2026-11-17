@@ -69,7 +69,7 @@ internal class DesktopLinuxPulseSink private constructor(
 
     fun close() = api.pa_simple_free(stream)
 
-    private interface PulseSimple : Library {
+    internal interface PulseSimple : Library {
         fun pa_simple_new(
             server: String?,
             name: String,
@@ -137,7 +137,7 @@ internal class DesktopLinuxPulseSink private constructor(
             val sampleFormat = requireNotNull(sampleFormatFor(format)) {
                 "PulseAudio does not support this sample format"
             }
-            require(format.channels in 1..32 && format.sampleRate in 1..192_000) {
+            require(format.channels in 1..32 && format.sampleRate in 1..384_000) {
                 "Unsupported PulseAudio PCM rate/channels"
             }
             val native = requireNotNull(pulse) {
