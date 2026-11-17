@@ -13,10 +13,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Process-owned playback session, deliberately independent of the main Compose window.
  *
- * The main Window can be REMOVED from composition in the tray or PiP. Only this service,
- * platform media controls and (if open) the PiP Window remain alive until explicit Quit.
- * A visible UI temporarily attaches its richer queue/navigation handlers; when it is gone,
- * the service advances the persisted queue directly without retaining the UI's closures.
+ * The main Window stays composed but may be hidden in the tray or while PiP is open.
+ * This service still owns the audio engine independently of window visibility and
+ * supports background transport whenever UI callbacks are temporarily unavailable.
  */
 internal class DesktopPlaybackService(
     private val persistence: DesktopPersistence = DesktopPersistence(),
@@ -170,7 +169,7 @@ internal class DesktopPlaybackService(
                 liveQueue.value = current.copy(index = 0)
                 liveQueue.value.current?.let(::adopt)
             }
-            // AutoPlay is a UI-level network queue-builder; do not run it off a disposed screen.
+            // AutoPlay is a UI-level network queue-builder; do not run it without UI callbacks.
             // Existing queued songs continue, and the player never spontaneously stops mid-song.
         }
     }
