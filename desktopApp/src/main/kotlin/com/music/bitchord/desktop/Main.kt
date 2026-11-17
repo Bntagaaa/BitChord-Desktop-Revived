@@ -119,20 +119,20 @@ private fun desktopMain(
     }
     LaunchedEffect(visible, state.isMinimized) {
         if (!visible || state.isMinimized) {
-            // Wait one AWT turn after removal so Skiko releases the main window's
-            // native surfaces before malloc_trim / GC. A fast restore cancels this.
-            if (!visible) delay(100L)
-            if (!visible || state.isMinimized) DesktopMemoryOptimizer.onWindowHidden()
+            // The main Window remains composed while hidden, so trim inactive caches
+            // without waiting for native window destruction (which no longer happens).
+            DesktopMemoryOptimizer.onWindowHidden()
         } else {
             DesktopMemoryOptimizer.onWindowShown()
         }
     }
-    // Background transport services and PiP live outside the main window's composition.
+    // Background transport services and PiP stay independent of main-window visibility.
     DesktopBackgroundPlaybackHost(playbackService, pipHost)
     DesktopPipHostWindow(pipHost)
-    // Removing Window (rather than Window(visible=false)) destroys the page composition,
-    // its Compose/Skia layers and native AWT peer. The engine is process-owned above.
-    if (visible) Window(
+    // Keep the main Window IN composition when hidden to tray or PiP, just like 1.9.3.
+    // Its Compose page state, Home scroll and native peer survive show/hide cycles.
+    // The playback engine stays process-owned; no stream or UI reconstruction on restore.
+    Window(
         onCloseRequest = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },
         visible = visible,
         title = "BitChord",
