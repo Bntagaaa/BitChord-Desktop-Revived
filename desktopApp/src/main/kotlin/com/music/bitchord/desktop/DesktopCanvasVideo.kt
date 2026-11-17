@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.data.canvas.CanvasSource
+import com.music.bitchord.ui.graphics.argbPixels
+import com.music.bitchord.ui.graphics.imageBitmapOf
 import com.music.bitchord.ui.player.CanvasContentMode
 import com.music.bitchord.ui.player.CanvasVideoSpec
 import kotlinx.coroutines.Dispatchers
@@ -87,19 +89,19 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
             reportAspect(decoder.width.toFloat() / decoder.height.coerceAtLeast(1))
             var shown = 0
             try {
-                val pixels = ByteArray(decoder.width * decoder.height * 4)
+                val frames = DesktopMotionFrameBuffers(decoder.width * decoder.height * 4)
                 val info = ImageInfo.makeN32(decoder.width, decoder.height, ColorAlphaType.OPAQUE)
                 while (isActive) {
                     // Paused with the track, or for the length of the sleeve's
                     // collapse: the last frame stays up, nothing is decoded.
                     snapshotFlow { running }.first { it }
                     val started = System.currentTimeMillis()
+                    val pixels = frames.next()
                     val decoded = withContext(Dispatchers.IO) { decoder.nextFrame(pixels) }
                     if (!decoded) break
                     shown++
-                    // Handed to Skia rather than copied, so the next frame
-                    // cannot be decoded into the same array.
-                    frame = Image.makeRaster(info, pixels.copyOf(), decoder.width * 4).toComposeImageBitmap()
+                    // Reusing three buffers eliminates per-frame full-resolution array copying.
+                    frame = Image.makeRaster(info, pixels, decoder.width * 4).toComposeImageBitmap()
                     val spent = System.currentTimeMillis() - started
                     delay((decoder.frameIntervalMillis - spent).coerceAtLeast(0L))
                 }
@@ -121,11 +123,11 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
     // clip — another every so often.
     LaunchedEffect(rendered, spec.refreshFrameEveryMs) {
         if (!rendered) return@LaunchedEffect
-        frame?.let(reportFrame)
+        frame?.let { reportFrame(it.stableCanvasSnapshot()) }
         val interval = spec.refreshFrameEveryMs ?: return@LaunchedEffect
         while (isActive) {
             delay(interval)
-            frame?.let(reportFrame)
+            frame?.let { reportFrame(it.stableCanvasSnapshot()) }
         }
     }
 
@@ -188,6 +190,10 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
         }
     }
 }
+
+/** A backdrop/mesh may retain its frame for seconds; snapshot the recyclable buffer. */
+private fun ImageBitmap.stableCanvasSnapshot(): ImageBitmap =
+    imageBitmapOf(argbPixels(), width, height)
 
 /** The desktop's clip, in the shared player's terms. */
 internal fun DesktopCanvasArtwork.toShared(): CanvasArtwork = CanvasArtwork(

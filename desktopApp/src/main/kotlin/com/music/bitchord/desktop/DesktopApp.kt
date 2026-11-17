@@ -521,18 +521,19 @@ private enum class DesktopRepeatMode {
 }
 
 @Composable
-internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, pipHost: DesktopPipHost) {
+internal fun BitChordDesktopApp(
+    welcomeLaunch: DesktopWelcomeOnboarding.Launch,
+    pipHost: DesktopPipHost,
+    playbackService: DesktopPlaybackService,
+) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val shortcutRootFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { shortcutRootFocusRequester.requestFocus() }
     // Filled once the audio engine exists. Local playback helpers use this single hook so every
     // transport and queue gesture reaches Listen Together without duplicating protocol logic.
-    val partySyncHolder = remember { arrayOfNulls<DesktopPartySync>(1) }
+    val partySyncHolder = remember(playbackService) { arrayOf<DesktopPartySync?>(playbackService.partySync) }
     val partyState by DesktopListenTogether.state.collectAsState()
-    var personalQueueStash by remember { mutableStateOf<DesktopQueue?>(null) }
-    var personalPositionStash by remember { mutableStateOf(0L) }
-    var personalPlayingStash by remember { mutableStateOf(false) }
     var showFirstLaunchWelcome by remember(welcomeLaunch.markerKey) {
         mutableStateOf(welcomeLaunch.showWelcome)
     }
@@ -604,8 +605,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     // Recently Played has its own request and its own skeleton at the head of the page, as on the
     // phone; it is only asked for with an account to have played on.
     var homeRecentsLoading by remember { mutableStateOf(false) }
-    // Held out here so a page keeps its place when another is visited and it is come back to.
-    val homeListState = rememberLazyListState()
+    // A new visit starts at the top. Never retain Home scroll/layout state once Home is left.
+    var homeVisit by remember { mutableStateOf(0) }
+    val homeListState = remember(homeVisit) { LazyListState() }
     val newListState = rememberLazyListState()
     val exploreListState = rememberLazyListState()
     val moodGenreListState = rememberLazyListState()
@@ -637,16 +639,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     var exploreReloads by remember { mutableStateOf(0) }
     var moodGenreReloads by remember { mutableStateOf(0) }
     var moodGenreShelves by remember { mutableStateOf<UiState<List<HomeShelf>>>(UiState.Loading) }
-    var selectedSong by remember { mutableStateOf<Song?>(null) }
-    // The live queue: what is playing, what played before it, what is next.
-    var liveQueue by remember {
-        mutableStateOf(
-            DesktopQueue.restored(
-                persistence.queue(),
-                persistence.string("queue_index", "0").toIntOrNull() ?: 0,
-            ),
-        )
-    }
+    // Playback is process-owned: unmounting the entire main Window cannot replace its
+    // decoder, queue or current track. These state holders outlive this UI composition.
+    var selectedSong by playbackService.selectedSong
+    var liveQueue by playbackService.liveQueue
     // The order the queue was in before shuffle rearranged it, so the toggle can be undone.
     var preShuffleOrder by remember { mutableStateOf<List<String>>(emptyList()) }
     // One party AutoPlay top-up at a time; see topUpPartyAutoplay.
@@ -655,7 +651,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     // What was played on this computer. The account's own history replaces it
     // while signed in — see [remoteHistory] — because that is what Android's
     // History screen is and what makes a phone and a desktop agree.
-    var history by remember { mutableStateOf(persistence.history()) }
+    var history by playbackService.history
     var remoteHistory by remember { mutableStateOf<List<Song>>(emptyList()) }
     var likedIds by remember { mutableStateOf(persistence.likedIds()) }
     // In-flight tail of the Liked Music chain; replaced whenever the library is fetched again.
@@ -1722,96 +1718,9 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         }
     }
 
-    playbackEngine = remember {
-        DesktopPlaybackEngine(
-            onEnded = {
-                selectedSong?.let(DesktopScrobbling::onPlaybackEnded)
-                if (DesktopSleepTimer.afterTrack.value) {
-                    DesktopSleepTimer.cancel()
-                } else if (repeatMode == DesktopRepeatMode.ONE) {
-                    // Replayed in place. [startSong] makes the track a queue of one, which threw
-                    // the rest of the queue away the first time it repeated.
-                    val song = selectedSong
-                    if (song != null && liveQueue.current?.videoId == song.videoId) {
-                        playCurrent()
-                    } else {
-                        song?.let { startSong(it, true) }
-                    }
-                } else {
-                    playNext()
-                }
-            },
-            onCrossfaded = { song ->
-                scope.launch {
-                    // The queue moves with the audio. Only the selection used to, which left the
-                    // queue on the track that had just finished — so Next "advanced" onto the song
-                    // already playing, and every later skip landed one behind.
-                    liveQueue = liveQueue.afterHandoffTo(song.videoId)
-                    saveQueue()
-                    selectedSong = song
-                    history = (listOf(song) + history.filterNot { it.videoId == song.videoId }).take(50)
-                    persistence.saveHistory(history)
-                    DesktopScrobbling.updateNowPlaying(song)
-                    partySyncHolder[0]?.onLocalIntent()
-                }
-            },
-        )
-    }
-    val partySync = remember(playbackEngine) {
-        DesktopPartySync(
-            scope = scope,
-            engine = playbackEngine,
-            playTrack = { shared, at ->
-                // The phone's PartySync.load: the party's running order, standing on its track —
-                // so the queue on screen moves with the song rather than keeping the old one as
-                // "now playing" and the new one as the first thing still to come.
-                val songs = DesktopQueue.adopt(liveQueue.songs, shared.map { it.toDesktopSong() })
-                liveQueue = DesktopQueue(songs, at.coerceIn(songs.indices)).trimmed()
-                liveQueue.current?.let { song ->
-                    selectedSong = song
-                    playbackEngine.load(song, playWhenReady = false)
-                }
-            },
-            localQueue = { liveQueue.songs to liveQueue.index },
-            applyPartyUpcoming = { upcoming ->
-                val aligned = liveQueue.withPartyUpcoming(upcoming.map { it.toDesktopSong() })
-                if (aligned !== liveQueue) liveQueue = aligned
-            },
-            applyPartyAutoplay = { _ ->
-                // The party setting overrides the personal preference only while connected. The
-                // phone deliberately does not persist it or delete queue rows on this device.
-                autoplayJob?.cancel()
-                autoplayJob = null
-                autoplaySeed = null
-            },
-            onEnteredParty = {
-                if (personalQueueStash == null) {
-                    personalQueueStash = liveQueue
-                    personalPositionStash = playbackEngine.state.value.positionMs
-                    personalPlayingStash = playbackEngine.state.value.isPlaying
-                }
-            },
-            onLeftParty = {
-                personalQueueStash?.let { stashed ->
-                    liveQueue = stashed
-                    selectedSong = stashed.current
-                    stashed.current?.let {
-                        playbackEngine.load(it, personalPlayingStash, personalPositionStash)
-                    }
-                    saveQueue()
-                }
-                personalQueueStash = null
-            },
-        )
-    }
-    DisposableEffect(partySync) {
-        partySyncHolder[0] = partySync
-        partySync.start()
-        onDispose {
-            partySync.stop()
-            if (partySyncHolder[0] === partySync) partySyncHolder[0] = null
-        }
-    }
+    playbackEngine = playbackService.engine
+    // Party reconciliation stays alive in tray/PiP; there is never a second PartySync on restore.
+    val partySync = playbackService.partySync
     fun togglePlayPauseFromUser() {
         if (partySync.handleLockedPlayPause()) return
         playbackEngine.togglePlayPause()
@@ -1833,14 +1742,47 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         playbackEngine.pause()
         partySync.onLocalIntent()
     }
-    val mprisController = remember(playbackEngine) {
-        DesktopMprisController(
-            onRaise = DesktopWindowVisibility::raise,
+    SideEffect {
+        playbackService.shuffleState.value = shuffle
+        playbackService.repeatState.value = repeatMode.name
+        playbackService.rateState.value = playbackSpeed
+    }
+    // The main UI contributes richer queue/party actions only while it is mounted. On tray/PiP
+    // the process playback service owns the callbacks and does not retain this composition.
+    DisposableEffect(playbackService, partySync) {
+        val callbacks = DesktopPlaybackService.UiCallbacks(
+            onEnded = {
+                selectedSong?.let(DesktopScrobbling::onPlaybackEnded)
+                if (DesktopSleepTimer.afterTrack.value) {
+                    DesktopSleepTimer.cancel()
+                } else if (repeatMode == DesktopRepeatMode.ONE) {
+                    val song = selectedSong
+                    if (song != null && liveQueue.current?.videoId == song.videoId) playCurrent()
+                    else song?.let { startSong(it, true) }
+                } else playNext()
+            },
+            onCrossfaded = { song ->
+                scope.launch {
+                    liveQueue = liveQueue.afterHandoffTo(song.videoId)
+                    saveQueue()
+                    selectedSong = song
+                    history = (listOf(song) + history.filterNot { it.videoId == song.videoId }).take(50)
+                    persistence.saveHistory(history)
+                    DesktopScrobbling.updateNowPlaying(song)
+                    partySyncHolder[0]?.onLocalIntent()
+                }
+            },
             onPlay = ::playFromUser,
             onPause = ::pauseFromUser,
             onPlayPause = ::togglePlayPauseFromUser,
             onNext = ::playNext,
             onPrevious = ::playPrevious,
+            onSeek = { positionMs ->
+                if (!DesktopListenTogether.state.value.controlsLocked) {
+                    playbackEngine.seekTo(positionMs)
+                    partySync.onLocalIntent()
+                }
+            },
             onShuffleChanged = { enabled ->
                 shuffle = enabled
                 persistence.saveBoolean("shuffle", enabled)
@@ -1861,31 +1803,14 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                 volume = value.toFloat().coerceIn(0.0f, 1.0f)
                 persistence.saveString("volume", volume.toString())
             },
-            onSeek = { positionMs ->
-                if (!DesktopListenTogether.state.value.controlsLocked) {
-                    playbackEngine.seekTo(positionMs)
-                    partySync.onLocalIntent()
-                }
+            onPartyAutoplay = {
+                autoplayJob?.cancel()
+                autoplayJob = null
+                autoplaySeed = null
             },
         )
-    }
-    DisposableEffect(mprisController) {
-        mprisController.start()
-        onDispose { mprisController.stop() }
-    }
-    // The Windows half of the same idea. Linux has MPRIS above; on Windows this
-    // is what the media keys and the volume flyout's card talk to.
-    DisposableEffect(playbackEngine) {
-        DesktopWindowsMedia.start(
-            DesktopWindowsMedia.Controller(
-                onPlay = ::playFromUser,
-                onPause = ::pauseFromUser,
-                onNext = ::playNext,
-                onPrevious = ::playPrevious,
-                onStop = ::pauseFromUser,
-            ),
-        )
-        onDispose { DesktopWindowsMedia.stop() }
+        playbackService.attach(callbacks)
+        onDispose { playbackService.detach(callbacks) }
     }
 
     LaunchedEffect(playbackSpeed) { playbackEngine.setPlaybackSpeed(playbackSpeed) }
@@ -2004,24 +1929,14 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
 
     // The shared player reads the playhead off this one object, and only where it
     // draws it — see PlaybackPosition — so a tick never recomposes the player.
-    val playerPosition = remember { PlaybackPosition() }
-    LaunchedEffect(playbackEngine) {
-        playbackEngine.state.collect {
-            // The audio thread's own timestamp, not this collector's: it runs on the UI thread and
-            // gets to a reading as late as the UI is busy.
-            playerPosition.report(it.positionMs, it.positionSampledAtNanos)
-            playerPosition.seeks = it.seeks
-            playerPosition.advancing = !it.awaitingAudio
-            DesktopPlayerHost.videoClock.value = it
-        }
-    }
+    val playerPosition = playbackService.position
 
     // Lyrics and motion artwork follow whatever is *playing*, not whatever page happens to be open.
     // This is where Android keeps it — `MainActivity`, keyed on the player's own track — so the
     // lookup starts the moment a track does and the panel is already populated by the time anyone
     // opens the player. Run from the player page instead, nothing was fetched until it was opened,
     // and a track half a minute in then showed a skeleton and arrived mid-song.
-    val lyricsSession = remember { DesktopLyricsSession() }
+    val lyricsSession = playbackService.lyricsSession
     val lyricsSnapshot = lyricsSession.state
     val lyrics = lyricsSnapshot.result
     // The provider picked for this track in the player's lyrics drawer, if any.
@@ -2031,17 +1946,14 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     val lyricsError = lyricsSnapshot.error
     var canvas by remember { mutableStateOf<DesktopCanvasArtwork?>(null) }
 
-    // snapshotFlow reacts to live state even while the hidden main Window cannot render frames.
-    // One collector owns all lookups for main/fullscreen/PiP and cancels the previous track.
-    LaunchedEffect(playbackEngine) {
-        lyricsSession.follow(snapshotFlow {
-            val current = selectedSong
-            DesktopLyricsRequest(current,
-                playback.durationMs.takeIf { playback.song?.videoId == current?.videoId } ?: 0L,
-                syncedLyrics, videoBetaEnabled, prioritizeSyllables, lyricsOn, lyricsOrder,
-                lyricsOnly?.takeIf { it.first == current?.videoId }?.second)
-        }, currentTrack = { selectedSong?.videoId },
-            onLoaded = { id, result -> playbackEngine.setLoopLyrics(id, result.lines) })
+    // Keep the request settings live; the actual lyrics collector is process-owned, so the
+    // PiP and future tracks still receive lyrics after the main composition has been removed.
+    SideEffect {
+        playbackService.lyricsSettings.value = DesktopLyricsRequest(
+            selectedSong, playback.durationMs, syncedLyrics, videoBetaEnabled,
+            prioritizeSyllables, lyricsOn, lyricsOrder,
+            lyricsOnly?.takeIf { it.first == selectedSong?.videoId }?.second,
+        )
     }
 
     LaunchedEffect(selectedSong?.videoId, selectedSong?.isVideo, animatedCanvas) {
@@ -2056,27 +1968,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         canvas = withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(current) }
     }
 
-    LaunchedEffect(
-        playback.song?.videoId,
-        playback.isPlaying,
-        playback.durationMs,
-        playback.volume,
-        playback.error,
-        shuffle,
-        repeatMode,
-        playbackSpeed,
-    ) {
-        mprisController.update(
-            playback = playbackEngine.state.value,
-            shuffle = shuffle,
-            loopStatus = when (repeatMode) {
-                DesktopRepeatMode.OFF -> "None"
-                DesktopRepeatMode.ALL -> "Playlist"
-                DesktopRepeatMode.ONE -> "Track"
-            },
-            rate = playbackSpeed.toDouble(),
-        )
-    }
+
     LaunchedEffect(playback.song?.videoId, playback.isPlaying, playback.durationMs) {
         val snapshot = playbackEngine.state.value
         DesktopScrobbling.onPlaybackStateChanged(snapshot)
@@ -2148,7 +2040,12 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         replaySummary = withContext(Dispatchers.IO) { DesktopListeningStats.summary(replayPeriod) }
     }
     DisposableEffect(playbackEngine) {
-        onDispose { DesktopMusicVideo.stop(); playbackEngine.release() }
+        // Drop screen callbacks eagerly. Global platform hosts must not hold this composition.
+        onDispose {
+            DesktopMusicVideo.stop()
+            DesktopPlayerHost.onVolumeChange = {}
+            DesktopPlayerHost.pipelineDialog = null
+        }
     }
     /** Opens an artist's page, from a card, a search row or the player's credit. */
     fun openArtist(browseId: String, name: String) {
@@ -2549,6 +2446,11 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         if (overlays.settingsPage == null) settingsSession++
         overlays.settingsPage = DesktopSettingsPage.MAIN
     }
+    // A tray Settings request remounts the main Window first, then opens a fresh settings page.
+    val openSettingsRequest by DesktopWindowVisibility.settingsRequest.collectAsState()
+    LaunchedEffect(openSettingsRequest) {
+        if (openSettingsRequest != 0L) openSettings()
+    }
 
     /** Folder shortcuts match the default sidebar order; Spotify uses its brand icon. */
     val libraryLinks = remember {
@@ -2691,6 +2593,25 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         } finally { topPicksLoading = false }
     }
 
+    /** Release the complete Home feed on navigation, irrespective of current RSS. */
+    fun discardHome() {
+        if (homeEvicted) return
+        homeJob?.cancel()
+        homeJob = null
+        homeGeneration++ // Late network responses from a departed Home may never refill it.
+        homeState = UiState.Loading
+        homeContinuation = null
+        homeSeenTitles.clear()
+        homeLoadingMore = false
+        homeRecentsLoading = false
+        topPicks = null
+        topPicksLoading = false
+        homeIdentity = null
+        homeRenderedLogged = false
+        homeEvicted = true
+        homeVisit++ // Dispose the previous LazyListState and its scroll position.
+    }
+
     fun loadHome() {
         topPicks = null
         if (!youtubeSourceEnabled) {
@@ -2759,75 +2680,14 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                     // A page with nothing new is the feed looping back on itself, not running dry.
                     homeContinuation = feed.continuation.takeIf { homeSeenTitles.size > before }
                 },
-                onFailure = { homeContinuation = null },
+                onFailure = { if (generation == homeGeneration) homeContinuation = null },
             )
-            homeLoadingMore = false
+            if (generation == homeGeneration) homeLoadingMore = false
         }
     }
 
-    // The tray icon speaks StatusNotifierItem rather than going through AWT, which only implements
-    // the XEmbed tray a Wayland session does not have.
-    val tray = remember {
-        DesktopStatusNotifierController(
-            // Clicking the icon is how the window comes back once it has been closed to the tray,
-            // so it has to raise the window before it does anything inside it.
-            onActivate = {
-                DesktopWindowVisibility.show()
-                releaseShortcutTextFocus()
-            },
-            onPlayPause = { if (selectedSong != null) togglePlayPauseFromUser() },
-        )
-    }
-    DisposableEffect(tray, trayIconEnabled) {
-        if (trayIconEnabled) tray.start()
-        onDispose { tray.stop() }
-    }
-    // Deliberately not a key on the effect above.
-    DisposableEffect(trayIconEnabled, closeToTray) {
-        // The listener's choice, with the tray as its precondition: hiding with no tray to come
-        // back from leaves an audible process and no window.
-        DesktopWindowVisibility.keepRunningWhenClosed = trayIconEnabled && closeToTray
-        onDispose { DesktopWindowVisibility.keepRunningWhenClosed = false }
-    }
-    val appIcon by DesktopAppIconSettings.selected.collectAsState()
-    LaunchedEffect(tray, trayIconEnabled, appIcon) {
-        if (!trayIconEnabled) return@LaunchedEffect
-        // The logo travels to the tray as pixels: a themed icon name would be whatever the user's
-        // theme draws for a generic music player.
-        withContext(Dispatchers.IO) {
-            runCatching { Res.readBytes(appIcon.svgPath) }.onSuccess(tray::setIcon)
-        }
-    }
-    LaunchedEffect(tray) {
-        DesktopTrayMenu.bind(
-            onPlayPause = { if (selectedSong != null) togglePlayPauseFromUser() },
-            onNext = ::playNext,
-            onPrevious = ::playPrevious,
-            onOpenPlayer = {
-                DesktopWindowVisibility.show()
-                releaseShortcutTextFocus()
-            },
-            onOpenSettings = {
-                DesktopWindowVisibility.show()
-                openSettings()
-            },
-            onQuit = {
-                // Native work first: the audio thread and the media controls are inside FFmpeg,
-                // WASAPI and WinRT, and exitProcess would unload those libraries under them.
-                scope.launch(Dispatchers.IO) {
-                    DesktopPlaybackWrites.flush()
-                    playbackEngine.shutdown()
-                    DesktopWindowsMedia.stop()
-                    exitProcess(0)
-                }
-            },
-        )
-    }
-    LaunchedEffect(selectedSong, playback.isPlaying) {
-        val title = selectedSong?.let { "${it.title} — ${it.artist}" }
-        tray.update(title = title, isPlaying = playback.isPlaying)
-        DesktopTrayMenu.publish(title = title, playing = playback.isPlaying)
-    }
+    // Preferences update the process-owned tray, which remains alive while this Window is gone.
+    SideEffect { DesktopWindowVisibility.configureTray(trayIconEnabled, closeToTray) }
 
     LaunchedEffect(Unit) {
         // Unpacks the analyser and its models on first run in background scope
@@ -2853,11 +2713,28 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         loadHome()
     }
 
-    // A trimmed Home feed must be fetched again on the next visit, while preserving Back history.
-    LaunchedEffect(destination) {
-        if (destination == DesktopDestination.LISTEN_NOW && homeEvicted) {
+    // No inactive Home cache, even below 650 MiB. This also covers artist/album/playlist
+    // detail pages and settings that keep the destination unchanged. Fullscreen Now Playing
+    // is only an overlay: keep Home's feed and scroll ready underneath it.
+    val homeVisible = isHomeFeedVisible(
+        destination = destination,
+        nestedPageOpen = openedArtist != null || openedCollection != null ||
+            openedBrowse != null || selectedMoodGenre != null,
+        settingsOpen = overlays.settingsPage != null,
+        replayOpen = overlays.replay,
+        moodGridOpen = showMoodGrid,
+        nowPlayingOpen = overlays.nowPlaying,
+    )
+    LaunchedEffect(homeVisible) {
+        if (!homeVisible) {
+            if (!homeEvicted) {
+                discardHome()
+                DesktopImageLoader.trimMemory()
+                DesktopTrackLog.log("memory: discarded Home feed after leaving the page")
+            }
+        } else if (homeEvicted) {
             homeEvicted = false
-            loadHome()
+            loadHome() // Refresh from page one, not the old continuation token.
         }
     }
 
@@ -2865,7 +2742,7 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     // and Recently Played only exists with an account behind it.
     LaunchedEffect(youtubeSignedIn, activeAccountId) {
         val identity = "${DesktopYouTubeAuth.isSignedIn}/${DesktopAccounts.activeAccountId()}"
-        if (homeIdentity != null && identity != homeIdentity) loadHome()
+        if (homeVisible && homeIdentity != null && identity != homeIdentity) loadHome()
     }
 
     // The mark on a downloaded row, for the shared pages.
@@ -2974,28 +2851,27 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
         }
     }
 
-    // Page composables are already disposed on navigation; under RSS pressure trim
-    // their retained feed data. History, playback and the active page are untouched.
+    // Page composables are disposed on navigation. Under pressure, also trim native
+    // image caches even when only one page was visited, but never every five seconds.
+    // Home itself is discarded separately on every departure, regardless of RSS.
     LaunchedEffect(Unit) {
+        var lastActiveTrimNanos = System.nanoTime()
         while (isActive) {
             delay(5_000L)
             val rss = withContext(Dispatchers.IO) { DesktopPageMemoryPolicy.processResidentBytes() }
             if (rss == null || rss < DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES) continue
-            val evict = DesktopPageMemoryPolicy.oldestEvictable(recentPageUsage, destination) ?: continue
-            when (evict) {
-                DesktopDestination.LISTEN_NOW -> {
-                    homeJob?.cancel()
-                    homeJob = null
-                    homeState = UiState.Loading
-                    homeContinuation = null
-                    homeSeenTitles.clear()
-                    topPicks = null
-                    topPicksLoading = false
-                    homeIdentity = null
-                    homeEvicted = true
-                    homeGeneration++ // Ignore any in-flight Home responses from before eviction.
-                    homeRenderedLogged = false
+            val evict = DesktopPageMemoryPolicy.oldestEvictable(recentPageUsage, destination)
+            if (evict == null) {
+                val now = System.nanoTime()
+                if (DesktopPageMemoryPolicy.shouldTrimActivePage(rss, now - lastActiveTrimNanos)) {
+                    withContext(Dispatchers.IO) { DesktopPageMemoryPolicy.trimProcessMemory() }
+                    lastActiveTrimNanos = System.nanoTime()
+                    DesktopTrackLog.log("memory: trimmed caches on the active page at ${rss / 1_048_576L} MiB RSS")
                 }
+                continue
+            }
+            when (evict) {
+                DesktopDestination.LISTEN_NOW -> discardHome()
                 DesktopDestination.NEW -> newState = UiState.Loading
                 DesktopDestination.SEARCH, DesktopDestination.EXPLORE -> {
                     searchJob?.cancel()
@@ -3731,32 +3607,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
     }
 
     val pipController = pipHost.controller
-    val pipCloseFlow = remember { DesktopPipSettings.state.map { it.onClose }.distinctUntilChanged() }
-    val pipCloseEnabled by pipCloseFlow.collectAsState(initial = DesktopPipSettings.state.value.onClose)
     fun openPip() {
         if (pipController.show()) {
             dismissExpandedPlayerForNavigation()
         } else DesktopPlayerHost.showMessage("Picture in picture is unavailable; playback continues")
-    }
-    DisposableEffect(pipController, trayIconEnabled, closeToTray, pipCloseEnabled) {
-        DesktopWindowVisibility.onClosedToTray = {
-            if (trayIconEnabled && closeToTray && DesktopPipSettings.state.value.onClose) openPip()
-        }
-        onDispose { DesktopWindowVisibility.onClosedToTray = {} }
-    }
-    DisposableEffect(pipController) {
-        DesktopWindowVisibility.onMainShown = pipController::mainShown
-        onDispose { DesktopWindowVisibility.onMainShown = {}; pipController.dispose() }
-    }
-    DisposableEffect(pipHost, playbackEngine) {
-        val session = DesktopPipSession(presentation = {
-            val currentLyrics = lyricsSession.state
-            DesktopPipState(selectedSong, playback.isPlaying, playback.isLoading, playback.awaitingAudio,
-                playback.durationMs, liveQueue.hasPrevious, selectedSong != null, partyState.controlsLocked,
-                currentLyrics.trackId, currentLyrics.result?.lines, currentLyrics.loading, currentLyrics.error)
-        }, playerPosition, ::togglePlayPauseFromUser, ::playPrevious, ::playNext, ::seekPlayer)
-        pipHost.session = session
-        onDispose { if (pipHost.session === session) pipHost.session = null }
     }
 
     MaterialTheme(
@@ -5069,7 +4923,10 @@ internal fun BitChordDesktopApp(welcomeLaunch: DesktopWelcomeOnboarding.Launch, 
                             onTopPickClick = if (DesktopContentPreferences.hideTopPicks) null else ::openTopPick,
                             onMoodClick = if (DesktopContentPreferences.hideHomeMoods) null else { mood, label -> openTopPick(TopPicks.moodStation(mood), label) },
                             onMoodsShowAll = { showMoodGrid = true },
-                            artworkMotion = !shortcutBlockedByModal && overlays.settingsPage == null && !overlays.nowPlaying && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
+                            // Expanded/fullscreen Now Playing is only a cover over Home. Do not
+                            // flip the underlying artwork mode when it opens or closes: doing so
+                            // can recreate visible artwork and look like the feed refreshed.
+                            artworkMotion = !shortcutBlockedByModal && overlays.settingsPage == null && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
                             state = (homeState as? UiState.Success<List<HomeShelf>>)?.let { loaded ->
                                 val prefs = DesktopContentPreferences
                                 val trimmed = loaded.data.mapNotNull { shelf ->

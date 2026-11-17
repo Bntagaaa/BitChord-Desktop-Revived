@@ -71,10 +71,23 @@ fun main() {
     )
     // The public "apps open right now" count; see Presence.
     DesktopPresence.install(DesktopApplicationResources.owner)
-    try { desktopMain(welcomeLaunch) } finally { DesktopApplicationResources.close() }
+    val preferences = DesktopPersistence()
+    DesktopWindowVisibility.configureTray(
+        preferences.boolean("tray_icon", true),
+        preferences.boolean("close_to_tray", true),
+    )
+    // Unlike the main Window, this service survives tray/PiP transitions.
+    val playbackService = DesktopPlaybackService()
+    try { desktopMain(welcomeLaunch, playbackService) } finally {
+        playbackService.close()
+        DesktopApplicationResources.close()
+    }
 }
 
-private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = application {
+private fun desktopMain(
+    welcomeLaunch: DesktopWelcomeOnboarding.Launch,
+    playbackService: DesktopPlaybackService,
+) = application {
     DisposableEffect(Unit) { onDispose { DesktopApplicationResources.close() } }
     // Closing puts the window away rather than ending the process, while there is a tray icon to
     // bring it back from — see [DesktopWindowVisibility].
@@ -106,13 +119,19 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
     }
     LaunchedEffect(visible, state.isMinimized) {
         if (!visible || state.isMinimized) {
+            // The main Window remains composed while hidden, so trim inactive caches
+            // without waiting for native window destruction (which no longer happens).
             DesktopMemoryOptimizer.onWindowHidden()
         } else {
             DesktopMemoryOptimizer.onWindowShown()
         }
     }
-    // Keep the floating host outside the main Window's visibility-paused composition.
+    // Background transport services and PiP stay independent of main-window visibility.
+    DesktopBackgroundPlaybackHost(playbackService, pipHost)
     DesktopPipHostWindow(pipHost)
+    // Keep the main Window IN composition when hidden to tray or PiP, just like 1.9.3.
+    // Its Compose page state, Home scroll and native peer survive show/hide cycles.
+    // The playback engine stays process-owned; no stream or UI reconstruction on restore.
     Window(
         onCloseRequest = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },
         visible = visible,
@@ -338,7 +357,7 @@ private fun desktopMain(welcomeLaunch: DesktopWelcomeOnboarding.Launch) = applic
         ) {
             ProvideDesktopPresentationLifecycle(visible && !state.isMinimized) {
                 DesktopFlyoutHost {
-                    BitChordDesktopApp(welcomeLaunch, pipHost)
+                    BitChordDesktopApp(welcomeLaunch, pipHost, playbackService)
                 }
             }
         }

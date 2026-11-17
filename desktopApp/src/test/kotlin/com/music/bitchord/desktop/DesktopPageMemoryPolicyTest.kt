@@ -22,6 +22,14 @@ class DesktopPageMemoryPolicyTest {
         assertEquals(650L * 1024L * 1024L, DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES)
     }
 
+    @Test fun noInactivePageTrimIsThrottled() {
+        val limit = DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES
+        val cooldown = DesktopPageMemoryPolicy.ACTIVE_PAGE_TRIM_COOLDOWN_NS
+        kotlin.test.assertFalse(DesktopPageMemoryPolicy.shouldTrimActivePage(limit - 1L, cooldown))
+        kotlin.test.assertFalse(DesktopPageMemoryPolicy.shouldTrimActivePage(limit, cooldown - 1L))
+        kotlin.test.assertTrue(DesktopPageMemoryPolicy.shouldTrimActivePage(limit, cooldown))
+    }
+
     @Test fun trimProcessMemoryCompletesSafely() {
         DesktopPageMemoryPolicy.trimProcessMemory()
     }

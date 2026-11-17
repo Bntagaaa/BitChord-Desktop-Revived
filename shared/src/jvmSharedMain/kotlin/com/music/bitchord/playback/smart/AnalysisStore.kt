@@ -6,7 +6,8 @@ import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.util.concurrent.ConcurrentHashMap
+import java.util.Collections
+import java.util.LinkedHashMap
 import kotlin.math.roundToInt
 
 /**
@@ -65,11 +66,16 @@ class AnalysisStore(
     private val directory by lazy { File(directoryOf(), DIRECTORY) }
 
     /**
-     * Track ids known to have no file, so a track analysed in neither this
-     * session nor a previous one does not hit the filesystem on every tick.
-     * Only ever grows within a session, and a write clears the entry.
+     * Negative disk-lookup hints are useful for the active queue, but must never accumulate
+     * for every track encountered during a multi-hour listening session. Eviction merely
+     * causes a future filesystem check; it cannot lose a persisted analysis.
      */
-    private val known = ConcurrentHashMap<String, Boolean>()
+    private val known: MutableMap<String, Boolean> = Collections.synchronizedMap(
+        object : LinkedHashMap<String, Boolean>(64, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>): Boolean =
+                size > MAX_KNOWN_IDS
+        },
+    )
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -335,6 +341,7 @@ class AnalysisStore(
 
         /** A few thousand tracks' worth, at tens of kilobytes each. */
         const val MAX_ENTRIES = 2_000
+        private const val MAX_KNOWN_IDS = 1_024
 
         /** Milliseconds is finer than anything downstream distinguishes. */
         fun round(value: Double): Double =

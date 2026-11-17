@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -287,9 +288,11 @@ fun DesktopCanvasView(
     publishBackdrop: Boolean = true,
 ) {
     var frame by remember(url) { mutableStateOf<ImageBitmap?>(null) }
+    val windowVisible by DesktopWindowVisibility.visible.collectAsState()
 
-    LaunchedEffect(url, fallbackUrl, isPlaying, maxEdge, publishBackdrop) {
-        if (!isPlaying) return@LaunchedEffect
+    LaunchedEffect(url, fallbackUrl, isPlaying, windowVisible, maxEdge, publishBackdrop) {
+        // Album-page artwork must not keep reopening native FFmpeg decoders in the tray.
+        if (!isPlaying || !windowVisible) return@LaunchedEffect
         var retryDelayMs = 1_000L
         // Round and round until the track ends or the player is closed. A canvas is a few seconds
         // long, so one pass through it is not the feature — and the decoder cannot be relied on to
@@ -324,21 +327,25 @@ fun DesktopCanvasView(
             }
             var shown = 0
             try {
-                val pixels = ByteArray(decoder.width * decoder.height * 4)
+                val frames = DesktopMotionFrameBuffers(decoder.width * decoder.height * 4)
                 val info = ImageInfo.makeN32(decoder.width, decoder.height, ColorAlphaType.OPAQUE)
                 while (isActive) {
                     val started = System.currentTimeMillis()
+                    val pixels = frames.next()
                     val decoded = withContext(Dispatchers.IO) { decoder.nextFrame(pixels) }
                     if (!decoded) break
                     shown++
-                    // `pixels` is handed to Skia rather than copied into it, so the array cannot be
-                    // the one the decoder writes the next frame into.
-                    val next = Image.makeRaster(info, pixels.copyOf(), decoder.width * 4).toComposeImageBitmap()
+                    // Three reusable buffers avoid allocating an entire frame every 33–40 ms.
+                    val next = Image.makeRaster(info, pixels, decoder.width * 4).toComposeImageBitmap()
                     frame = next
-                    // The backdrop reads the first frame and holds it: re-meshing every frame would
-                    // be a full resample twenty-five times a second for a wash nobody is watching
-                    // closely, and the clip's palette does not change much across it anyway.
-                    if (shown == 1 && publishBackdrop) DesktopCanvasBackdrop.publish(url, next)
+                    // The backdrop holds its first frame for the whole clip. Snapshot that one
+                    // frame so the pool cannot mutate an image being held by another component.
+                    if (shown == 1 && publishBackdrop) {
+                        DesktopCanvasBackdrop.publish(
+                            url,
+                            Image.makeRaster(info, pixels.copyOf(), decoder.width * 4).toComposeImageBitmap(),
+                        )
+                    }
                     val spent = System.currentTimeMillis() - started
                     delay((decoder.frameIntervalMillis - spent).coerceAtLeast(0L))
                 }
