@@ -89,13 +89,15 @@ class DesktopYtDlpProcessTest {
         } finally { DesktopYtDlpFiles.removeDirectory(directory) }
     }
 
-    @Test fun excessiveOutputFailsBoundedly() = runBlocking {
-        val directory = DesktopYtDlpFiles.privateDirectory()
-        try {
-            assertFailsWith<IOException> {
-                DesktopYtDlpProcess.run(fixture("oversize"), directory, outputLimit = 1024)
-            }
-        } finally { DesktopYtDlpFiles.removeDirectory(directory) }
+    @Test fun excessiveOutputFailsBoundedly() {
+        runBlocking {
+            val directory = DesktopYtDlpFiles.privateDirectory()
+            try {
+                assertFailsWith<IOException> {
+                    DesktopYtDlpProcess.run(fixture("oversize"), directory, outputLimit = 1024)
+                }
+            } finally { DesktopYtDlpFiles.removeDirectory(directory) }
+        }
     }
 
     @Test fun stderrNeverLeaksSessionOrSignedUrl() = runBlocking {
