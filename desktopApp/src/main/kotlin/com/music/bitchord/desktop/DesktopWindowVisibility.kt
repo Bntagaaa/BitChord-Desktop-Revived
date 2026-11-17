@@ -27,7 +27,7 @@ internal object DesktopWindowVisibility {
     private val _trayEnabled = MutableStateFlow(true)
     val trayEnabled: StateFlow<Boolean> = _trayEnabled
 
-    /** Persistently configure the background tray. Never clear this when the main UI unmounts. */
+    /** Persistently configure the background tray, independent of main-window visibility. */
     fun configureTray(enabled: Boolean, closeToTray: Boolean) {
         _trayEnabled.value = enabled
         keepRunningWhenClosed = enabled && closeToTray
@@ -76,8 +76,8 @@ internal object DesktopWindowVisibility {
         // A window put away full-screen comes back full-screen with nothing on it, which reads as
         // the app having broken rather than as it having been hidden.
         DesktopWindowMode.exit()
-        // The app-level visibility collector trims *after* Window leaves the composition.
-        // Collecting before native Skia/AWT surfaces are disposed releases far less RAM.
+        // Hide the existing Window without removing its Compose UI from composition.
+        // The app-level visibility collector trims inactive caches on this transition.
         _visible.value = false
         runCatching { onClosedToTray() }.onFailure { DesktopTrackLog.log("PiP activation failed; remaining in tray") }
         DesktopTrackLog.log("window closed to the tray; playback continues")
