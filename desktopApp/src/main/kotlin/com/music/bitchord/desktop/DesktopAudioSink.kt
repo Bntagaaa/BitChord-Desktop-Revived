@@ -28,6 +28,9 @@ internal class DesktopAudioSink : DesktopAudioOutput {
 
     private var line: SourceDataLine? = null
 
+    /** PipeWire's PulseAudio compatibility server (or native PulseAudio). */
+    private var linuxPulse: DesktopLinuxPulseSink? = null
+
     /** True while the Windows shared-mode sink owns the output instead of Java Sound. */
     private var windowsOutput = false
 
@@ -50,7 +53,7 @@ internal class DesktopAudioSink : DesktopAudioOutput {
     @Volatile
     override var gain: Float = 1f
 
-    override val isOpen: Boolean get() = windowsOutput || line != null
+    override val isOpen: Boolean get() = windowsOutput || linuxPulse != null || line != null
 
     /** Whether the live line already belongs to the choice currently shown in the player. */
     override fun isUsingSelection(id: String): Boolean = isOpen && openedForSelection == id
@@ -79,6 +82,41 @@ internal class DesktopAudioSink : DesktopAudioOutput {
                 return@runCatching requested
             }
             DesktopTrackLog.log("WASAPI output unavailable; trying Java Sound: ${native.exceptionOrNull()?.message}")
+        }
+
+        if (DesktopPlatform.isLinux &&
+            (selectedDevice.isEmpty() || selectedDevice.startsWith(DesktopLinuxPulseAudio.PREFIX))
+        ) {
+            val native = DesktopLinuxPulseSink.open(selectedDevice, requested)
+            if (native.isSuccess) {
+                val opened = native.getOrThrow()
+                val previousLine = line
+                val previousPulse = linuxPulse
+                line = null
+                linuxPulse = opened
+                openedOn = null
+                openedForSelection = selectedDevice
+                format = requested
+                diagnosticBlocks = 0
+                closeLine(previousLine)
+                runCatching { previousPulse?.close() }
+                DesktopTrackLog.log(
+                    "audio output opened: ${opened.outputName} · " +
+                        "${requested.sampleRate} Hz · ${requested.channels} ch · PulseAudio / PipeWire",
+                )
+                return@runCatching requested
+            }
+            // A named Pulse sink must not silently render on an unrelated ALSA output.
+            // Leave the current output audible when a newly selected sink cannot be opened.
+            if (selectedDevice.startsWith(DesktopLinuxPulseAudio.PREFIX)) {
+                throw IllegalStateException(
+                    "Could not open selected audio output: ${native.exceptionOrNull()?.message}",
+                    native.exceptionOrNull(),
+                )
+            }
+            DesktopTrackLog.log(
+                "PulseAudio default unavailable, trying Java Sound: " + native.exceptionOrNull()?.message,
+            )
         }
 
         if (windowsOutput) {
@@ -131,12 +169,15 @@ internal class DesktopAudioSink : DesktopAudioOutput {
         // Bluetooth device can disappear between enumeration and this call; that must not turn a
         // failed switch into silent playback on every other device too.
         val previous = line
+        val previousPulse = linuxPulse
+        linuxPulse = null
         line = opened
         openedOn = mixer?.mixerInfo?.name
         openedForSelection = selectedDevice
         format = accepted
         diagnosticBlocks = 0
         closeLine(previous)
+        runCatching { previousPulse?.close() }
         DesktopTrackLog.log(
             "audio output opened: ${deviceName ?: "system default"} · " +
                 "${accepted.sampleRate} Hz · ${accepted.channels} ch · " +
@@ -153,10 +194,10 @@ internal class DesktopAudioSink : DesktopAudioOutput {
      */
     override val deviceName: String?
         get() = runCatching {
-            if (windowsOutput) {
-                DesktopWindowsAudio.deviceName()
-            } else {
-                line?.let { openedOn ?: AudioSystem.getMixer(null).mixerInfo?.name?.takeIf(String::isNotBlank) }
+            when {
+                windowsOutput -> DesktopWindowsAudio.deviceName()
+                linuxPulse != null -> linuxPulse?.outputName
+                else -> line?.let { openedOn ?: AudioSystem.getMixer(null).mixerInfo?.name?.takeIf(String::isNotBlank) }
             }
         }.getOrNull()
 
@@ -165,7 +206,11 @@ internal class DesktopAudioSink : DesktopAudioOutput {
 
     /** How much audio the device is holding, in bytes; 0 before the line is open. */
     override val bufferBytes: Int
-        get() = if (windowsOutput) windowsBufferBytes else runCatching { line?.bufferSize ?: 0 }.getOrDefault(0)
+        get() = when {
+            windowsOutput -> windowsBufferBytes
+            linuxPulse != null -> linuxPulse?.bufferBytes ?: 0
+            else -> runCatching { line?.bufferSize ?: 0 }.getOrDefault(0)
+        }
 
     /** Writes [count] interleaved samples, blocking until the device takes them. */
     override fun write(samples: FloatArray, count: Int): Int {
@@ -174,10 +219,14 @@ internal class DesktopAudioSink : DesktopAudioOutput {
             diagnose(samples, count, written)
             return written
         }
-        val target = line ?: return 0
         if (count <= 0) return 0
+        val pulse = linuxPulse
+        val target = line
+        if (pulse == null && target == null) return 0
         val bytes = convert(samples, count)
-        val written = target.write(bytes, 0, count * format.bytesPerSample)
+        val wanted = count * format.bytesPerSample
+        val written = if (pulse != null) pulse.write(bytes, wanted)
+            else target!!.write(bytes, 0, wanted)
         diagnose(samples, count, written)
         return written
     }
@@ -232,27 +281,51 @@ internal class DesktopAudioSink : DesktopAudioOutput {
 
     /** Frames the device has actually rendered — the honest playback position. */
     override fun framesPlayed(): Long =
-        if (windowsOutput) DesktopWindowsAudio.framesPlayed() else line?.longFramePosition ?: 0L
+        when {
+            windowsOutput -> DesktopWindowsAudio.framesPlayed()
+            linuxPulse != null -> linuxPulse?.framesPlayed() ?: 0L
+            else -> line?.longFramePosition ?: 0L
+        }
 
     override fun pause() {
-        if (windowsOutput) DesktopWindowsAudio.pause() else line?.stop()
+        if (windowsOutput) DesktopWindowsAudio.pause()
+        else if (linuxPulse == null) line?.stop()
+        // pa_simple cannot cork; the engine stops writing on pause.
     }
 
     override fun resume() {
-        if (windowsOutput) DesktopWindowsAudio.resume() else line?.start()
+        if (windowsOutput) DesktopWindowsAudio.resume()
+        else if (linuxPulse == null) line?.start()
     }
 
     /** Throws away what is queued, so a seek is heard at once. */
     override fun flush() {
-        if (windowsOutput) DesktopWindowsAudio.flush() else line?.flush()
+        when {
+            windowsOutput -> DesktopWindowsAudio.flush()
+            linuxPulse != null -> linuxPulse?.flush()
+            else -> line?.flush()
+        }
     }
 
     /** Waits for the queue to finish, so the end of a track is not clipped. */
     override fun drain() {
-        if (windowsOutput) DesktopWindowsAudio.drain() else runCatching { line?.drain() }
+        when {
+            windowsOutput -> DesktopWindowsAudio.drain()
+            linuxPulse != null -> linuxPulse?.drain()
+            else -> runCatching { line?.drain() }
+        }
     }
 
     override fun close() {
+        val pulse = linuxPulse
+        if (pulse != null) {
+            linuxPulse = null
+            openedOn = null
+            openedForSelection = null
+            diagnosticBlocks = 0
+            pulse.close()
+            return
+        }
         if (windowsOutput) {
             DesktopWindowsAudio.close()
             windowsOutput = false
