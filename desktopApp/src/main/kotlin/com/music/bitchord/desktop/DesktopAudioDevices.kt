@@ -30,7 +30,6 @@ internal object DesktopAudioDevices {
     fun select(id: String) {
         DesktopPersistence().saveString(KEY_DEVICE, id)
         _selected.value = id
-        if (DesktopPlatform.isLinux) DesktopLinuxPulseAudio.requestRoute()
     }
 
     private val _changes = MutableStateFlow(0)
