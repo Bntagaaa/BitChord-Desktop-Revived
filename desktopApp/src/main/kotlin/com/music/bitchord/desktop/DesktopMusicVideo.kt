@@ -143,7 +143,10 @@ internal object DesktopMusicVideo {
                 override fun nextFrame(pixels: ByteArray) = decoder.nextFrame(pixels)
                 override fun close() = decoder.close()
             }
-        }, onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") }, enabled = DesktopVideoBeta.enabled)
+        }, onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") },
+        enabled = combine(DesktopVideoBeta.enabled, DesktopGpuVideoBackend.legacy) { beta, legacy ->
+            beta && legacy
+        }.stateIn(scope, SharingStarted.Eagerly, DesktopVideoBeta.enabled.value && DesktopGpuVideoBackend.legacy.value))
     private const val QUALITY_KEY = "music_video_quality"
     init {
         session.held.value = DesktopPersistence().int(QUALITY_KEY, 0).takeIf { it in 144..4320 }
@@ -181,6 +184,11 @@ internal class VideoFrame(val width: Int, val height: Int, private val pixels: B
 
 @Composable
 internal fun DesktopMusicVideoSurface(id: String, fit: Boolean, onRendered: (Boolean) -> Unit, modifier: Modifier) {
+    val useLegacy by DesktopGpuVideoBackend.legacy.collectAsState()
+    if (!useLegacy) {
+        DesktopGpuMusicVideoSurface(id, fit, onRendered, modifier)
+        return
+    }
     val current by DesktopMusicVideo.frame.collectAsState()
     val failed by DesktopMusicVideo.failed.collectAsState()
     val image = current?.takeIf { it.first == id }?.second
