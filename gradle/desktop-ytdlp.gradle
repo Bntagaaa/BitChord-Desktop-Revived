@@ -1,0 +1,110 @@
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+import java.util.zip.ZipFile
+import org.gradle.language.jvm.tasks.ProcessResources
+
+// Applied only to :desktopApp. Every distribution carries the same verified resources,
+// including AppImage, native installers, and the cross-built Windows portable archive.
+def target = (findProperty('bitchord.target') ?: (System.getProperty('os.name').toLowerCase().contains('windows') ? 'windows' : 'linux')).toString().toLowerCase()
+if (!(target in ['windows', 'linux'])) throw new GradleException('Unsupported yt-dlp bundle platform')
+def windows = target == 'windows'
+def ytVersion = '2026.10.26'
+def denoVersion = 'v2.9.8'
+def ytAsset = windows ? 'yt-dlp.exe' : 'yt-dlp_linux'
+def ytHash = windows ? 'f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d' : '767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795'
+def denoAsset = windows ? 'deno-x86_64-pc-windows-msvc.zip' : 'deno-x86_64-unknown-linux-gnu.zip'
+def denoHash = windows ? 'cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf' : 'e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609'
+def generated = layout.buildDirectory.dir("generated/ytdlp/$target")
+def downloads = layout.buildDirectory.dir("downloads/ytdlp/$target")
+
+def sha256 = { File source ->
+    def digest = MessageDigest.getInstance('SHA-256')
+    source.withInputStream { input ->
+        byte[] buffer = new byte[65536]
+        int count
+        while ((count = input.read(buffer)) >= 0) {
+            if (count > 0) digest.update(buffer, 0, count)
+        }
+    }
+    digest.digest().encodeHex().toString()
+}
+
+def download = { String url, File destination, String expected ->
+    if (destination.isFile() && (expected == null || sha256(destination) == expected)) return
+    destination.parentFile.mkdirs()
+    def partial = new File(destination.parentFile, destination.name + '.part')
+    try {
+        def connection = new URI(url).toURL().openConnection()
+        connection.connectTimeout = 30000
+        connection.readTimeout = 120000
+        connection.setRequestProperty('User-Agent', 'BitChord-build/yt-dlp-bundle')
+        connection.inputStream.withCloseable { input ->
+            Files.copy(input, partial.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+        if (expected != null && sha256(partial) != expected) {
+            throw new GradleException("Checksum mismatch for ${destination.name}; refusing to bundle it")
+        }
+        Files.move(partial.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    } finally {
+        Files.deleteIfExists(partial.toPath())
+    }
+}
+
+def prepare = tasks.register('prepareYouTubeRuntime') {
+    group = 'distribution'
+    description = 'Bundles pinned, SHA-256 verified yt-dlp and Deno; never downloads them at playback time.'
+    inputs.file(rootProject.file('gradle/desktop-ytdlp.gradle'))
+    inputs.property('platform', target)
+    outputs.dir(generated)
+    doLast {
+        def cache = downloads.get().asFile
+        def resources = new File(generated.get().asFile, 'ytdlp')
+        resources.mkdirs()
+        def yt = new File(cache, "$ytVersion-$ytAsset")
+        def denoZip = new File(cache, "$denoVersion-$denoAsset")
+        download("https://github.com/yt-dlp/yt-dlp/releases/download/$ytVersion/$ytAsset", yt, ytHash)
+        download("https://github.com/denoland/deno/releases/download/$denoVersion/$denoAsset", denoZip, denoHash)
+        def ytName = windows ? 'yt-dlp.exe' : 'yt-dlp'
+        def denoName = windows ? 'deno.exe' : 'deno'
+        Files.copy(yt.toPath(), new File(resources, ytName).toPath(), StandardCopyOption.REPLACE_EXISTING)
+        new ZipFile(denoZip).withCloseable { zip ->
+            def entry = zip.getEntry(denoName)
+            if (entry == null || entry.isDirectory()) throw new GradleException('Deno executable missing from verified archive')
+            // Extract exactly one named entry, not arbitrary archive paths.
+            zip.getInputStream(entry).withCloseable { input ->
+                Files.copy(input, new File(resources, denoName).toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+        def licenses = new File(resources, 'licenses')
+        licenses.mkdirs()
+        download("https://raw.githubusercontent.com/yt-dlp/yt-dlp/$ytVersion/LICENSE", new File(licenses, "yt-dlp-$ytVersion-LICENSE.txt"), null)
+        download("https://raw.githubusercontent.com/yt-dlp/yt-dlp/$ytVersion/THIRD_PARTY_LICENSES.txt", new File(licenses, "yt-dlp-$ytVersion-THIRD_PARTY_LICENSES.txt"), null)
+        download("https://raw.githubusercontent.com/denoland/deno/$denoVersion/LICENSE.md", new File(licenses, "deno-$denoVersion-LICENSE.md"), null)
+        // Brace the version before a dotted suffix; otherwise Groovy reads .tar as a property.
+        new File(licenses, 'UPSTREAM-SOURCES.txt').text = """Unmodified upstream binaries; no executable is fetched by the installed app.
+yt-dlp $ytVersion (standalone distribution includes GPLv3+ components):
+https://github.com/yt-dlp/yt-dlp/releases/tag/$ytVersion
+https://github.com/yt-dlp/yt-dlp/releases/download/$ytVersion/yt-dlp.tar.gz
+See the accompanying THIRD_PARTY_LICENSES for bundled components and their source locations.
+Deno $denoVersion:
+https://github.com/denoland/deno/tree/$denoVersion
+https://github.com/denoland/deno/archive/refs/tags/${denoVersion}.tar.gz
+Redistributors must preserve the upstream notices and corresponding-source obligations.
+"""
+        def manifest = new Properties()
+        manifest.setProperty('platform', "$target-x86_64".toString())
+        manifest.setProperty('yt-dlp.version', ytVersion)
+        manifest.setProperty('yt-dlp.file', ytName)
+        manifest.setProperty('yt-dlp.sha256', ytHash)
+        manifest.setProperty('deno.version', denoVersion)
+        manifest.setProperty('deno.file', denoName)
+        manifest.setProperty('deno.sha256', sha256(new File(resources, denoName)))
+        new File(resources, 'runtime.properties').withOutputStream { manifest.store(it, 'Verified YouTube runtime') }
+    }
+}
+
+tasks.withType(ProcessResources).configureEach {
+    dependsOn(prepare)
+    from(generated)
+}
