@@ -102,6 +102,14 @@ class DesktopPersistence {
 
     fun saveDownloads(songs: List<Song>) = writeSongs(KEY_DOWNLOADS, songs)
 
+    /** Source playlists whose tracks were requested for offline download. Kept separate from
+     * editable local playlists so an online playlist is never accidentally modified. */
+    fun downloadedPlaylists(): List<DesktopPlaylist> =
+        readLines(KEY_DOWNLOADED_PLAYLISTS).mapNotNull(::decodePlaylist)
+
+    fun saveDownloadedPlaylists(playlists: List<DesktopPlaylist>) =
+        writeLines(KEY_DOWNLOADED_PLAYLISTS, playlists.map(DesktopPlaylist::toPreferenceLine))
+
     fun playlists(): List<DesktopPlaylist> = readLines(KEY_PLAYLISTS).mapNotNull(::decodePlaylist)
 
     fun savePlaylists(playlists: List<DesktopPlaylist>) = writeLines(KEY_PLAYLISTS, playlists.map(DesktopPlaylist::toPreferenceLine))
@@ -323,6 +331,7 @@ class DesktopPersistence {
         const val KEY_HISTORY = "history"
         const val KEY_QUEUE = "queue"
         const val KEY_DOWNLOADS = "downloads"
+        const val KEY_DOWNLOADED_PLAYLISTS = "downloaded_playlists"
         const val KEY_PLAYLISTS = "playlists"
         const val KEY_MODULE_INDEX_URL = "module_index_url"
         private const val KEY_ORIGINAL_VERSIONS = "original_versions"
@@ -372,3 +381,10 @@ private fun DesktopPlaylist.toPreferenceLine(): String = listOf(
         })
     },
 ).joinToString("#")
+
+/** Preserve playlist ordering and metadata, but play the actual verified local files. */
+internal fun DesktopPlaylist.availableDownloads(downloads: List<Song>): List<Song> {
+    if (songs.isEmpty() || downloads.isEmpty()) return emptyList()
+    val localById = downloads.filter(DesktopDownloadManager::isSaved).associateBy(Song::videoId)
+    return songs.mapNotNull { localById[it.videoId] }.distinctBy(Song::videoId)
+}
