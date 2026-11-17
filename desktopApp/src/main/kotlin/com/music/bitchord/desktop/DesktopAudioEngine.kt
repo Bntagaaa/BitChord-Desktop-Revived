@@ -98,13 +98,10 @@ class DesktopPlaybackEngine internal constructor(
     private val outputDeviceJob = scope.launch {
         DesktopAudioDevices.selected.collect { selected ->
             if (selected != observedOutputDevice) {
-                val previous = observedOutputDevice
                 observedOutputDevice = selected
-                // A Pulse sink change moves the existing stream. Reopening Java Sound here
-                // creates a new sink-input on the default device and races with pactl.
-                if (!DesktopPlatform.isLinux ||
-                    !DesktopLinuxPulseAudio.sameOutputLine(previous, selected, true)
-                ) commands += Command.Reconfigure
+                // Native PulseAudio must open the *named* sink, not just change the UI
+                // selection. The old stream is kept alive if the new sink fails to open.
+                commands += Command.Reconfigure
             }
         }
     }
@@ -1990,7 +1987,6 @@ class DesktopPlaybackEngine internal constructor(
             return
         }
         sink.gain = volume
-        if (DesktopPlatform.isLinux) DesktopLinuxPulseAudio.requestRoute()
         framesWritten = sink.framesPlayed()
         speedProcessor = DesktopAudioSpeed(sink.format.channels, sink.format.sampleRate)
         spatial = DesktopSpatialAudio(sink.format.channels, sink.format.sampleRate)
@@ -2017,7 +2013,6 @@ class DesktopPlaybackEngine internal constructor(
         sink.open(decoded.copy(bytesPerSample = precisionBytes(), isFloat = preferFloat))
             .onSuccess {
                 sink.gain = volume
-                if (DesktopPlatform.isLinux) DesktopLinuxPulseAudio.requestRoute()
                 framesWritten = sink.framesPlayed()
                 buildChain()
                 // A reopened line counts frames from zero again, so the clock has to be rebased
