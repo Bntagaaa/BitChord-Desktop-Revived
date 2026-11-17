@@ -99,6 +99,8 @@ class DesktopPlaybackEngine internal constructor(
         DesktopAudioDevices.selected.collect { selected ->
             if (selected != observedOutputDevice) {
                 observedOutputDevice = selected
+                // Native PulseAudio must open the *named* sink, not just change the UI
+                // selection. The old stream is kept alive if the new sink fails to open.
                 commands += Command.Reconfigure
             }
         }
@@ -115,9 +117,13 @@ class DesktopPlaybackEngine internal constructor(
             DesktopAudioDevices.changes.collect {
                 if (DesktopPlatform.isWindows) return@collect // its native side moves the stream itself
                 observedOutputDevice.let { chosen ->
-                    if (chosen != DesktopAudioDevices.SYSTEM_DEFAULT &&
-                        DesktopAudioDevices.mixerFor(chosen) == null
-                    ) {
+                    val disappeared = when {
+                        chosen == DesktopAudioDevices.SYSTEM_DEFAULT -> false
+                        DesktopPlatform.isLinux && chosen.startsWith(DesktopLinuxPulseAudio.PREFIX) ->
+                            DesktopLinuxPulseAudio.sinkPresent(chosen) == false
+                        else -> DesktopAudioDevices.mixerFor(chosen) == null
+                    }
+                    if (disappeared) {
                         // The stored device is gone: fall back to the system default rather than
                         // leaving playback pointed at a mixer that no longer exists.
                         DesktopAudioDevices.select(DesktopAudioDevices.SYSTEM_DEFAULT)

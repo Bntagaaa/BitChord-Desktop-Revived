@@ -5,7 +5,9 @@ name: Build tes Appimage
 on:
   # Keep the landscape PR's downloadable binary tied to its latest commit.
   push:
-    branches: [fix/1.9.2-landscape-lyrics-track-header]
+    branches:
+      - fix/1.9.2-landscape-lyrics-track-header
+      - fix/1.9.3-pipewire-output-switch
   workflow_call:
     inputs:
       version:
@@ -42,6 +44,8 @@ jobs:
     name: Portable AppImage for CachyOS / Linux
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    env:
+      BITCHORD_DESKTOP_ONLY: "true"
 
     steps:
       - name: Checkout selected branch
@@ -57,6 +61,8 @@ jobs:
           version="${INPUT_VERSION:-1.8.2-test}"
           if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_NAME" == "fix/1.9.2-landscape-lyrics-track-header" ]]; then
             version="1.9.2-landscape-${GITHUB_SHA:0:8}"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_NAME" == "fix/1.9.3-pipewire-output-switch" ]]; then
+            version="1.9.3-audio-${GITHUB_SHA:0:8}"
           fi
           if [[ ! "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
             echo "::error::Version label may only contain letters, digits, '.', '_' and '-' (max 64 characters)."
@@ -268,7 +274,7 @@ jobs:
           sudo apt-get install -y rpm fakeroot
 
       - name: Run tests
-        if: ${{ inputs.run_tests }}
+        if: ${{ github.event_name == 'push' || inputs.run_tests }}
         run: xvfb-run -a ./gradlew :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=${{ steps.meta.outputs.version }}"
 
       # Manual quick builds wrap jpackage once; the reusable audit also checks native packages.
