@@ -30,7 +30,30 @@ jobs:
         shell: bash
         run: |
           ./gradlew :desktopApp:compileKotlin --no-daemon --stacktrace
-      - name: Run desktop unit tests
+      # The video renderer uses packaged libmpv natives, not BitChord's optional
+      # C++ Automix analyser / Win32 window bridge. These have their own release
+      # CI; building them here can fail on a runner's mismatched MinGW/CMake
+      # toolchain even after the GPU Kotlin compilation succeeds.
+      - name: Run desktop unit tests (skip unrelated native C++ builds)
         shell: bash
         run: |
-          ./gradlew :desktopApp:test --no-daemon --stacktrace
+          ./gradlew :desktopApp:test \
+            -x :desktopApp:buildAnalysisNative \
+            -x :desktopApp:buildWindowNative \
+            --no-daemon --stacktrace
+      - name: Verify Windows portable classpath and video runtime
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          ./gradlew :desktopApp:windowsPortable \
+            -x :desktopApp:buildAnalysisNative \
+            -x :desktopApp:buildWindowNative \
+            --no-daemon --stacktrace
+      - name: Upload experimental Windows portable build
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-GPU-video-windows-portable
+          path: desktopApp/build/distributions/*windows-portable.zip
+          if-no-files-found: error
+          retention-days: 7
