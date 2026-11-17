@@ -56,10 +56,7 @@ internal object DesktopLinuxAudioWatcher {
                     DesktopAudioDevices.systemChanged()
                     DesktopTrackLog.log("audio devices changed ($now)")
                 }
-                // A Bluetooth sink-input can appear after playback begins; route it even if
-                // the sink inventory itself has not changed.
-                DesktopLinuxPulseAudio.requestRoute()
-            }
+             }
         }
     }
 
