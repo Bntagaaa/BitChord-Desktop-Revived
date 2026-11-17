@@ -35,9 +35,15 @@ val androidSdk: String? = file("local.properties")
     ?: System.getenv("ANDROID_HOME")
     ?: System.getenv("ANDROID_SDK_ROOT")
 
-if (androidSdk != null && file(androidSdk).isDirectory) {
+// CI Linux runners often have Android SDK variables even when building *only* desktop.
+// Loading :app then tries to auto-install its NDK and can fail on a corrupted SDK download.
+val desktopOnly = System.getenv("BITCHORD_DESKTOP_ONLY") == "true"
+if (!desktopOnly && androidSdk != null && file(androidSdk).isDirectory) {
     include(":sharedUi")
     include(":app")
 } else {
-    logger.lifecycle("No Android SDK found — building the desktop targets only.")
+    logger.lifecycle(
+        if (desktopOnly) "Desktop-only build requested — skipping Android project configuration."
+        else "No Android SDK found — building the desktop targets only.",
+    )
 }
