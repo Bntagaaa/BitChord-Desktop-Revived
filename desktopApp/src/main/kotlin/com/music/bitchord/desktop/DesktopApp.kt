@@ -6646,6 +6646,7 @@ private fun DesktopArtistPage(
                                             appleArt = appleArt,
                                             background = artistBackground,
                                             heroHeight = heroHeight,
+                                            motionVisible = artistListState.firstVisibleItemIndex == 0,
                                             onPlay = { if (top.isNotEmpty()) onPlaySongs(top, 0) },
                                             onShuffle = { if (top.isNotEmpty()) onShuffle(top) },
                                             onToggleSubscription = toggleSubscription,
@@ -6748,6 +6749,7 @@ private fun DesktopArtistBanner(
     appleArt: DesktopAppleArtistArt?,
     background: Color,
     heroHeight: Dp,
+    motionVisible: Boolean,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     onToggleSubscription: (() -> Unit)?,
@@ -6765,13 +6767,11 @@ private fun DesktopArtistBanner(
         // Wide banner for every artist, even with no motion or only portrait artwork.
         // Continued supplies wide/square HLS, Apple still art, then the YouTube Music fallback.
         motionUrl?.let { url ->
-            DesktopContinuedArtistMotionView(
+            DesktopGpuArtistMotion(
                 url = url,
                 modifier = Modifier.matchParentSize(),
                 fallbackUrl = appleArt?.squareVideoUrl?.takeIf { it != url },
-                maxEdge = 640,
-                contentScale = ContentScale.Crop,
-                publishBackdrop = false,
+                visible = motionVisible,
             )
         }
 
