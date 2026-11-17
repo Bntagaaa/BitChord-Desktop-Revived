@@ -40,5 +40,6 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.20" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20" apply false
-    id("org.jetbrains.compose") version "1.10.3" apply false
+    // MediaMP 0.5.1 requires the public LocalAwtWindow API (Compose 1.12+).
+    id("org.jetbrains.compose") version "1.12.0" apply false
 }
