@@ -20,9 +20,9 @@ import kotlin.system.exitProcess
 /**
  * A composition owned by application{}, OUTSIDE the main Window.
  *
- * The main Window may be removed entirely while the audio thread, PiP, tray and
- * system media controls keep operating. All callback closures here capture only
- * process-owned state; none captures a disposed screen, lazy list or page model.
+ * Tray, PiP and platform media controls remain independent of whether the main
+ * Window is visible. Its Compose UI now remains mounted while hidden; process-owned
+ * callbacks must still not depend on a specific page or window lifetime.
  */
 @Composable
 internal fun DesktopBackgroundPlaybackHost(
@@ -73,7 +73,7 @@ internal fun DesktopBackgroundPlaybackHost(
         onDispose { mpris.stop() }
     }
 
-    // Preserve the player's clock, metadata, and lyrics even if there is no main UI.
+    // Preserve the player's clock, metadata and lyrics while the main UI is hidden.
     LaunchedEffect(service) {
         service.engine.state.collect { state ->
             service.pipPlayback.value = state
