@@ -98,8 +98,9 @@ plugins {
 dependencies {
     // GPU-native video renders into Skiko without allocating a JVM bitmap per frame.
     // Keep this isolated from BitChord's FFmpeg audio playback stack.
-    implementation("org.openani.mediamp:mediamp-mpv:0.3.2")
-    runtimeOnly("org.openani.mediamp:mediamp-mpv-runtime:0.3.2")
+    // MediaMP >=0.4 no longer references the removed Compose LocalWindowKt class.
+    implementation("org.openani.mediamp:mediamp-mpv:0.5.1")
+    runtimeOnly("org.openani.mediamp:mediamp-mpv-runtime:0.5.1")
 
     // Already on the classpath through the NewPipe extractor.
     implementation("org.jsoup:jsoup:1.22.2")
