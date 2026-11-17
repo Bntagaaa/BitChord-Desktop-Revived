@@ -25,7 +25,7 @@ internal class DesktopLinuxPulseSink private constructor(
 ) {
     private var submittedFrames = 0L
     private var playedFrames = 0L
-    val bufferBytes: Int get() = format.byteRate / 5 // Estimate; libpulse manages its own buffer.
+    val bufferBytes: Int get() = format.byteRate / 5 // Requested stream target, server may adjust.
 
     /** Only the desktop playback thread may access this connection. */
     fun write(buffer: ByteArray, count: Int): Int {
@@ -78,7 +78,7 @@ internal class DesktopLinuxPulseSink private constructor(
             streamName: String,
             sampleSpec: SampleSpec,
             channelMap: Pointer?,
-            bufferAttr: Pointer?,
+            bufferAttr: BufferAttr?,
             error: IntByReference,
         ): Pointer?
 
@@ -95,6 +95,17 @@ internal class DesktopLinuxPulseSink private constructor(
         @JvmField var rate: Int = 44_100
         @JvmField var channels: Byte = 2
         override fun getFieldOrder(): List<String> = listOf("format", "rate", "channels")
+    }
+
+    /** 200ms target avoids PulseAudio's potentially multi-second default buffer. */
+    class BufferAttr : Structure() {
+        @JvmField var maxlength: Int = -1
+        @JvmField var tlength: Int = 0
+        @JvmField var prebuf: Int = -1
+        @JvmField var minreq: Int = -1
+        @JvmField var fragsize: Int = -1
+        override fun getFieldOrder(): List<String> =
+            listOf("maxlength", "tlength", "prebuf", "minreq", "fragsize")
     }
 
     companion object {
@@ -139,10 +150,14 @@ internal class DesktopLinuxPulseSink private constructor(
                 write()
             }
             val destination = targetName(selection)
+            val attr = BufferAttr().apply {
+                tlength = maxOf(format.frameBytes, format.byteRate / 5)
+                write()
+            }
             val error = IntByReference()
             val handle = native.pa_simple_new(
                 null, "BitChord", PA_STREAM_PLAYBACK, destination, "Music",
-                spec, null, null, error,
+                spec, null, attr, error,
             ) ?: error("Could not open PulseAudio sink ${destination ?: "default"} (code ${error.value})")
             DesktopLinuxPulseSink(native, handle, destination ?: "System default (PulseAudio)", format)
         }
