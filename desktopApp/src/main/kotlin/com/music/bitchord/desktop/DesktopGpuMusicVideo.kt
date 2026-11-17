@@ -66,21 +66,36 @@ internal fun DesktopGpuMusicVideoSurface(
                 playWhenReady = false,
                 startPositionMillis = DesktopMusicVideo.clock.value.positionMs.coerceAtLeast(0L),
             )
-            // Keep video slaved to the music clock, never the other way around.
-            // A large jump/seek is corrected; small jitter is left alone.
+            // Correct large drift only, rather than seeking dozens of times per second.
+            // The audio engine remains authoritative for play/pause and position.
+            var playing = false
+            var lastSeekGeneration = DesktopMusicVideo.clock.value.seeks
+            var lastCorrectionAt = 0L
             while (isActive) {
                 val audio = DesktopMusicVideo.clock.value
                 if (audio.song?.videoId != id) break
                 if (!audio.isPlaying || audio.awaitingAudio) {
-                    player.pause()
+                    if (playing) {
+                        player.pause()
+                        playing = false
+                    }
                     delay(120)
                     continue
                 }
                 val target = videoClockPosition(audio, DesktopMusicVideo.speed)
-                if (abs(player.currentPositionMillis.value - target) > 500) {
-                    player.seekTo(target.coerceAtLeast(0))
+                val now = System.nanoTime()
+                val requestedSeek = lastSeekGeneration != audio.seeks
+                if (requestedSeek ||
+                    (abs(player.currentPositionMillis.value - target) > 850 &&
+                        now - lastCorrectionAt > 1_000_000_000L)) {
+                    player.seekTo(target.coerceAtLeast(0L))
+                    lastCorrectionAt = now
+                    lastSeekGeneration = audio.seeks
                 }
-                player.play()
+                if (!playing) {
+                    player.play()
+                    playing = true
+                }
                 delay(150)
             }
         } catch (cancelled: CancellationException) {
