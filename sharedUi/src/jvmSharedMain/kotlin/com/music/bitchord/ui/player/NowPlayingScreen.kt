@@ -3281,7 +3281,9 @@ fun NowPlayingScreen(
                                 // Video thumbnails are 16:9; letterboxing them inside
                                 // the square sleeve looks like a broken frame.
                                 contentScale = ContentScale.Crop,
-                                onState = art::onState,
+                                onLoading = art::onState,
+                                onSuccess = art::onState,
+                                onError = art::onState,
                                 // TextureView-backed canvas frames can arrive
                                 // before Coil has decoded the sleeve. Alpha alone
                                 // doesn't hide this layer for that window: a
