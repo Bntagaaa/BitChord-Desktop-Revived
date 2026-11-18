@@ -8,7 +8,7 @@ import kotlin.coroutines.CoroutineContext
 /**
  * Optional native GPU video path. Never replaces BitChord's audio engine.
  *
- * MediaMP 0.3.2 renders libmpv textures straight into Skiko's Compose canvas on
+ * MediaMP 0.5.1 renders libmpv textures straight into Skiko's Compose canvas on
  * supported Linux/Windows drivers. When the native bridge cannot initialize,
  * switch both video surfaces back to the existing FFmpeg renderer. For diagnosis,
  * use -Dbitchord.video.renderer=ffmpeg.
@@ -28,15 +28,23 @@ internal object DesktopGpuVideoBackend {
                 MpvMediampPlayer.prepareLibraries()
                 prepared = true
             }
-            MpvMediampPlayer(Any(), context).also { player ->
-                val handle = player.impl as MPVHandle
-                // BitChord's audio engine owns all audio output and DSP.
-                handle.setPropertyString("aid", "no")
-                handle.setPropertyBoolean("mute", true)
-                handle.setPropertyString("hwdec", "auto-safe")
-                handle.setPropertyString("osc", "no")
-                // Avoid mpv retaining unnecessarily large network buffers per motion clip.
-                handle.setPropertyString("demuxer-max-bytes", "8388608")
+            MpvMediampPlayer(Any(), context).let { player ->
+                try {
+                    val handle = player.impl as MPVHandle
+                    // BitChord's audio engine owns all audio output and DSP.
+                    handle.setPropertyString("aid", "no")
+                    handle.setPropertyBoolean("mute", true)
+                    handle.setPropertyString("hwdec", "auto-safe")
+                    handle.setPropertyString("osc", "no")
+                    // Bound the buffer without reconfiguring BitChord's audio pipeline.
+                    handle.setPropertyString("demuxer-max-bytes", "8388608")
+                    player
+                } catch (failure: Throwable) {
+                    // A partially configured native player still owns a render
+                    // context and must be released before FFmpeg takes over.
+                    player.close()
+                    throw failure
+                }
             }
         }.getOrElse {
             fallback(it)
