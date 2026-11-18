@@ -263,7 +263,9 @@ internal fun LandscapeArtwork(
                 error = retainedArtPainter,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                onState = onArtState,
+                onLoading = onArtState,
+                onSuccess = onArtState,
+                onError = onArtState,
                 // Not drawn under a clip that got there first — see the
                 // portrait sleeve's note on TextureView stacking order.
                 modifier = Modifier
