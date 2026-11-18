@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.CancellationException
+import org.openani.mediamp.MediaStatus
 import org.openani.mediamp.mpv.compose.MpvMediampPlayerSurface
 import org.openani.mediamp.playUri
 import org.openani.mediamp.mpv.MpvMediampPlayer
@@ -49,6 +50,14 @@ internal fun DesktopGpuArtistMotion(
             maxEdge = 640, publishBackdrop = false, isPlaying = visible,
         )
         return
+    }
+    val status by player.state.collectAsState()
+    LaunchedEffect(status.mediaStatus) {
+        (status.mediaStatus as? MediaStatus.Error)?.let { failure ->
+            // A decoder can fail after playUri returned successfully. Without
+            // observing this, the GPU surface stays black indefinitely.
+            DesktopGpuVideoBackend.fallback(failure.error)
+        }
     }
     DisposableEffect(player) {
         onDispose { player.close() }
