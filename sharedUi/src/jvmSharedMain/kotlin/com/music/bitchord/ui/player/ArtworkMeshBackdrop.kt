@@ -41,6 +41,7 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import com.music.bitchord.data.model.CARD_ART_PX
 import com.music.bitchord.data.model.artworkAt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -120,9 +121,13 @@ fun rememberFullArtworkBlurImage(
             var loaded: ImageBitmap? = null
             for (attempt in 0 until FULL_BLUR_ATTEMPTS) {
                 if (attempt > 0) delay(FULL_BLUR_RETRY_DELAY_MS * attempt)
-                val result = runCatching {
+                val result = try {
                     SingletonImageLoader.get(context).execute(request)
-                }.getOrNull()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
                 loaded = (result as? SuccessResult)?.image?.toImageBitmap()
                 if (loaded != null) break
             }
