@@ -1,6 +1,6 @@
 package com.music.bitchord.ui.player
 
-import kotlin.test.Test
+import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
