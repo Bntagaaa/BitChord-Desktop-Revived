@@ -105,8 +105,6 @@ internal object DesktopAppearanceSettings {
     // Mica-style navigation is lightweight wallpaper tinting, independent of blur.
     private val _micaSidebar = flag(KEY_MICA_SIDEBAR, DesktopSidebarMica.isSupported)
     private val _hideVolumeBar = flag(KEY_HIDE_VOLUME_BAR, false)
-    // New floating bottom player is the default. The original top player is opt-in.
-    private val _enableOldTopMusicPlayerStyle = flag(KEY_ENABLE_OLD_TOP_MUSIC_PLAYER_STYLE, false)
     // v1.8 Explore cards remain the default; the classic v1.7 sleeve can be opted into.
     private val _useOldExploreCards = flag(KEY_USE_OLD_EXPLORE_CARDS, false)
 
@@ -140,9 +138,6 @@ internal object DesktopAppearanceSettings {
     /** Removes the volume slider from the main player. */
     val hideVolumeBar: StateFlow<Boolean> = _hideVolumeBar
 
-    /** Restores the original desktop top player instead of the floating bottom dock. */
-    val enableOldTopMusicPlayerStyle: StateFlow<Boolean> = _enableOldTopMusicPlayerStyle
-
     /** Switches Explore category artwork between current and classic v1.7 cards. */
     val useOldExploreCards: StateFlow<Boolean> = _useOldExploreCards
 
@@ -167,9 +162,6 @@ internal object DesktopAppearanceSettings {
 
     fun setHideVolumeBar(value: Boolean) = write(KEY_HIDE_VOLUME_BAR, value, _hideVolumeBar)
 
-    fun setEnableOldTopMusicPlayerStyle(value: Boolean) =
-        write(KEY_ENABLE_OLD_TOP_MUSIC_PLAYER_STYLE, value, _enableOldTopMusicPlayerStyle)
-
     fun setUseOldExploreCards(value: Boolean) =
         write(KEY_USE_OLD_EXPLORE_CARDS, value, _useOldExploreCards)
 
@@ -185,6 +177,5 @@ internal object DesktopAppearanceSettings {
     internal const val KEY_PERFORMANCE_PROFILE = "performance_profile"
     internal const val KEY_MICA_SIDEBAR = "mica_sidebar"
     internal const val KEY_HIDE_VOLUME_BAR = "hide_volume_bar"
-    internal const val KEY_ENABLE_OLD_TOP_MUSIC_PLAYER_STYLE = "enable_old_top_music_player_style"
     internal const val KEY_USE_OLD_EXPLORE_CARDS = "use_old_explore_cards"
 }
