@@ -2,21 +2,28 @@ name: GPU video renderer CI
 
 on:
   pull_request:
-    branches:
-      - 1.9.3-phase-1
+    branches: [1.9.3-phase-1]
     paths:
       - "desktopApp/**"
+      - "desktopUi/**"
+      - "sharedUi/**"
+      - "build.gradle.kts"
       - ".github/workflows/gpu-video-ci.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  compile-desktop:
-    name: Compile desktop (${{ matrix.os }})
+  desktop-gpu-regression:
+    name: GPU video + native regressions (${{ matrix.os }})
+    # Match the proven Check workflow toolchains: the Win2022/Ubuntu24 runners
+    # and skipping native build tasks caused spurious AutoMix/LoopMix failures.
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2022]
+        os: [ubuntu-22.04, windows-latest]
     env:
       BITCHORD_DESKTOP_ONLY: "true"
     steps:
@@ -26,29 +33,56 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Compile Kotlin desktop and resolve native runtime
+
+      - name: Provide desktop API key configuration
+        shell: bash
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
+        run: |
+          printf 'LASTFM_API_KEY=%s\n' "$LASTFM_API_KEY" > local.properties
+          printf 'LASTFM_SECRET=%s\n' "$LASTFM_SECRET" >> local.properties
+
+      - name: Set up Linux display for Compose UI tests
+        if: runner.os == 'Linux'
         shell: bash
         run: |
-          ./gradlew :desktopApp:compileKotlin --no-daemon --stacktrace
-      # The video renderer uses packaged libmpv natives, not BitChord's optional
-      # C++ Automix analyser / Win32 window bridge. These have their own release
-      # CI; building them here can fail on a runner's mismatched MinGW/CMake
-      # toolchain even after the GPU Kotlin compilation succeeds.
-      - name: Run desktop unit tests (skip unrelated native C++ builds)
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
+      # The full :desktopApp:test task genuinely exercises JNI DSP/LoopMix.
+      # Never skip buildAnalysisNative or buildWindowNative: the four failures
+      # in GPU CI #4 were exactly those tests running without their libraries.
+      - name: Run all desktop tests with packaged native analysers (Linux)
+        if: runner.os == 'Linux'
         shell: bash
         run: |
-          ./gradlew :desktopApp:test \
-            -x :desktopApp:buildAnalysisNative \
-            -x :desktopApp:buildWindowNative \
-            --no-daemon --stacktrace
-      - name: Verify Windows portable classpath and video runtime
+          xvfb-run -a ./gradlew :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=1.9.3-gpu-ci" --no-daemon --console=plain --stacktrace
+
+      - name: Run all desktop tests with packaged native analysers (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./gradlew.bat :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=1.9.3-gpu-ci" --no-daemon --console=plain --stacktrace
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build desktop distribution (both OS)
         shell: bash
         run: |
-          ./gradlew :desktopApp:windowsPortable \
-            -x :desktopApp:buildAnalysisNative \
-            -x :desktopApp:buildWindowNative \
-            --no-daemon --stacktrace
+          ./gradlew :desktopApp:createDistributable "-Pbitchord.version=1.9.3-gpu-ci" --no-daemon --stacktrace
+
+      - name: Verify packaged GPU UI classes
+        shell: bash
+        run: |
+          python3 .github/scripts/check-packaged-player-ui.py desktopApp/build/compose/binaries/main/app/BitChord
+
+      - name: Package experimental Windows portable ZIP
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./gradlew.bat :desktopApp:windowsPortable "-Pbitchord.version=1.9.3-gpu-ci" --no-daemon --stacktrace
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Upload experimental Windows portable build
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
@@ -57,3 +91,14 @@ jobs:
           path: desktopApp/build/distributions/*windows-portable.zip
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload test reports if unsuccessful
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-video-regression-${{ matrix.os }}-reports
+          path: |
+            desktopApp/build/reports/tests/
+            desktopUi/build/reports/tests/
+            shared/build/reports/tests/
+          if-no-files-found: ignore
