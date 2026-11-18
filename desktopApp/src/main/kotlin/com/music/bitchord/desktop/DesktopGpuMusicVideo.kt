@@ -41,6 +41,11 @@ internal fun DesktopGpuMusicVideoSurface(
     val held by DesktopMusicVideo.held.collectAsState()
     LaunchedEffect(status.mediaStatus) {
         onRendered(status.mediaStatus == MediaStatus.Ready)
+        // mpv may fail asynchronously after setMediaData has returned Ready.
+        // Switch to the existing FFmpeg decoder instead of freezing on black.
+        (status.mediaStatus as? MediaStatus.Error)?.let { failure ->
+            DesktopGpuVideoBackend.fallback(failure.error)
+        }
     }
     DisposableEffect(player) {
         onDispose {
@@ -104,7 +109,7 @@ internal fun DesktopGpuMusicVideoSurface(
             DesktopGpuVideoBackend.fallback(failure)
         }
     }
-    // MediaMP 0.3.2 uses native surfaces compatible with Compose/Skiko.
+    // MediaMP 0.5.1 uses native surfaces compatible with Compose/Skiko.
     // Surface aspect/fit follows its bounds, provided by the host overlay.
     MpvMediampPlayerSurface(player, modifier)
 }
