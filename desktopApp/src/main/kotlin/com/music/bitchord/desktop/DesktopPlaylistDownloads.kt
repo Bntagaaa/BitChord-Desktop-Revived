@@ -228,6 +228,14 @@ internal fun offlineProgress(
     )
 }
 
+/**
+ * How far a download has come, as the fraction a determinate bar reads — the
+ * in-flight songs count toward it (they are on their way, not waiting), it
+ * never passes the whole, and a record with nothing in it sits at zero.
+ */
+internal val DesktopPlaylistDownloadProgress.fraction: Float
+    get() = if (total <= 0) 0f else (done + active).coerceIn(0, total).toFloat() / total
+
 internal fun DesktopPlaylistDownload.toPreferenceLine(): String = listOf(
     encode(id),
     encode(title),

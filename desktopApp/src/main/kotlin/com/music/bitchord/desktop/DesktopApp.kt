@@ -142,6 +142,7 @@ import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
@@ -156,6 +157,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
@@ -176,6 +178,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -7355,7 +7358,7 @@ private fun DesktopDownloadsPage(
     )
 }
 
-/** The Playlists tab of Downloads — whole collections asked for as a whole. */
+/** The Playlists tab of Downloads — whole collections asked for as a whole, each standing square on its own cover. */
 @Composable
 private fun DesktopPlaylistDownloadsContent(
     records: List<DesktopPlaylistDownload>,
@@ -7374,15 +7377,17 @@ private fun DesktopPlaylistDownloadsContent(
         )
         return
     }
-    val listState = rememberLazyListState()
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize().desktopTopScrollFade(listState),
+    val gridState = rememberLazyGridState()
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 168.dp),
+        state = gridState,
+        modifier = Modifier.fillMaxSize().desktopTopScrollFade(gridState),
         contentPadding = pagePadding(bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        items(records, key = DesktopPlaylistDownload::id) { record ->
-            DesktopPlaylistDownloadRow(
+        gridItems(records, key = DesktopPlaylistDownload::id) { record ->
+            DesktopPlaylistDownloadTile(
                 record = record,
                 progress = offlineProgress(record.songs, downloadedIds, downloadInProgress),
                 stale = record.id in staleIds,
@@ -7394,9 +7399,12 @@ private fun DesktopPlaylistDownloadsContent(
     }
 }
 
-/** The row a downloaded collection lives in on the Downloads page. */
+/** The decode a tile's cover asks for — wide enough that even the widest column keeps its detail. */
+private const val TILE_ART_PX = 400
+
+/** The tile a downloaded collection stands on — a square cover carrying its state, opened by a click, kept by its menu. */
 @Composable
-private fun DesktopPlaylistDownloadRow(
+private fun DesktopPlaylistDownloadTile(
     record: DesktopPlaylistDownload,
     progress: DesktopPlaylistDownloadProgress,
     stale: Boolean,
@@ -7404,57 +7412,94 @@ private fun DesktopPlaylistDownloadRow(
     onUpdate: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    val rowHoverInteraction = remember { MutableInteractionSource() }
-    val rowHovered by rowHoverInteraction.collectIsHoveredAsState()
+    val tileHoverInteraction = remember { MutableInteractionSource() }
+    val tileHovered by tileHoverInteraction.collectIsHoveredAsState()
     var menuOpen by remember { mutableStateOf(false) }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .hoverable(rowHoverInteraction)
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (DesktopTheme.isDark) DesktopGlass.copy(alpha = 0.38f) else DesktopTheme.palette.cardInsetFill)
-            .desktopNoHoverClickable { onOpen() }
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        DesktopArtwork(
-            record.thumbnailUrl,
-            Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
-            px = ROW_ART_PX,
-            hoverMode = ArtworkHoverMode.DARKEN_ONLY,
-            hovered = rowHovered,
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                record.title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Medium,
+    Column(Modifier.fillMaxWidth().hoverable(tileHoverInteraction).desktopNoHoverClickable { onOpen() }) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(14.dp))) {
+            DesktopArtwork(
+                record.thumbnailUrl,
+                Modifier.matchParentSize(),
+                px = TILE_ART_PX,
+                hoverMode = ArtworkHoverMode.DARKEN_ONLY,
+                hovered = tileHovered,
             )
-            Text(
-                playlistDownloadLine(record, progress, stale),
-                color = DesktopSecondary,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            // A short scrim along the foot of the cover — the bar and the badges
+            // read against busy artwork because of it.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.62f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.42f),
+                        ),
+                    ),
             )
-        }
-        if (progress.downloading) {
-            Spacer(Modifier.width(10.dp))
-            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-        }
-        Box {
-            DesktopMoreButton(onClick = { menuOpen = true })
-            if (menuOpen) {
-                DesktopPlaylistDownloadRowMenu(
-                    onOpen = { menuOpen = false; onOpen() },
-                    onUpdate = { menuOpen = false; onUpdate() }.takeIf { stale },
-                    onRemove = { menuOpen = false; onRemove() },
-                    onDismiss = { menuOpen = false },
+            if (progress.downloading) {
+                LinearProgressIndicator(
+                    progress = { progress.fraction },
+                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp),
+                    color = DesktopAccent,
+                    trackColor = DesktopForeground.copy(alpha = 0.2f),
                 )
             }
+            when {
+                progress.complete -> DesktopPlaylistDownloadTileBadge(
+                    Icons.Rounded.DownloadDone,
+                    "Available offline",
+                    DesktopAccent,
+                )
+                stale -> DesktopPlaylistDownloadTileBadge(
+                    Icons.Rounded.Refresh,
+                    "Update available",
+                    DesktopSecondary,
+                )
+            }
+            if (tileHovered || menuOpen) {
+                Box(Modifier.align(Alignment.TopEnd)) {
+                    DesktopMoreButton(onClick = { menuOpen = true })
+                    if (menuOpen) {
+                        DesktopPlaylistDownloadRowMenu(
+                            onOpen = { menuOpen = false; onOpen() },
+                            onUpdate = { menuOpen = false; onUpdate() }.takeIf { stale },
+                            onRemove = { menuOpen = false; onRemove() },
+                            onDismiss = { menuOpen = false },
+                        )
+                    }
+                }
+            }
         }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            record.title,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            playlistDownloadLine(record, progress, stale),
+            color = DesktopSecondary,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** The state chip at a tile's corner — the icon says where the collection stands, the dark disc backs it. */
+@Composable
+private fun DesktopPlaylistDownloadTileBadge(icon: ImageVector, contentDescription: String, tint: Color) {
+    Box(
+        Modifier
+            .padding(8.dp)
+            .size(26.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.55f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription, tint = tint, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -7475,12 +7520,24 @@ private fun playlistDownloadLine(
 }
 
 /** The tabs a local-music page can carry — the Downloads page inserts Playlists between Songs and Artists. */
-private enum class DownloadsTab(val label: String) {
+internal enum class DownloadsTab(val label: String) {
     SONGS("Songs"),
     PLAYLISTS("Playlists"),
     ARTISTS("Artists"),
     ALBUMS("Albums"),
 }
+
+/** A local-music page's tab kinds in order — the Downloads page carries a Playlists tab between Songs and Artists. */
+internal fun downloadsTabs(withPlaylists: Boolean): List<DownloadsTab> = buildList {
+    add(DownloadsTab.SONGS)
+    if (withPlaylists) add(DownloadsTab.PLAYLISTS)
+    add(DownloadsTab.ARTISTS)
+    add(DownloadsTab.ALBUMS)
+}
+
+/** A page with a Playlists tab opens on it — the downloaded collections are the page's own headline. */
+internal fun downloadsDefaultTabIndex(tabs: List<DownloadsTab>): Int =
+    tabs.indexOf(DownloadsTab.PLAYLISTS).takeIf { it >= 0 } ?: 0
 
 @Composable
 private fun DesktopLocalMusicPage(
@@ -7502,7 +7559,10 @@ private fun DesktopLocalMusicPage(
     songsEmptyDescription: String = "Try a different search.",
 ) {
     val persistence = remember { DesktopPersistence() }
-    var selectedTab by remember(persistenceKey) { mutableStateOf(0) }
+    // Tab kinds in order — the Downloads page carries a Playlists tab between Songs and Artists,
+    // and opens on it: the downloaded collections are the page's own headline.
+    val tabs = downloadsTabs(playlistsTab != null)
+    var selectedTab by remember(persistenceKey) { mutableStateOf(downloadsDefaultTabIndex(tabs)) }
     var searchQuery by remember(persistenceKey) { mutableStateOf("") }
     var view by remember(persistenceKey) {
         mutableStateOf(
@@ -7534,13 +7594,6 @@ private fun DesktopLocalMusicPage(
     val albums = remember(filteredSongs) {
         filteredSongs.groupBy { it.albumName?.takeIf(String::isNotBlank) ?: "Unknown Album" }
             .entries.sortedBy { it.key.lowercase() }
-    }
-    // Tab kinds in order — the Downloads page carries a Playlists tab between Songs and Artists.
-    val tabs = buildList {
-        add(DownloadsTab.SONGS)
-        if (playlistsTab != null) add(DownloadsTab.PLAYLISTS)
-        add(DownloadsTab.ARTISTS)
-        add(DownloadsTab.ALBUMS)
     }
     DesktopPageScaffold(contentPadding) {
         Column(

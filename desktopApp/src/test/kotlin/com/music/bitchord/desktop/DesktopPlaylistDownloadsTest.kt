@@ -47,6 +47,30 @@ class DesktopPlaylistDownloadsTest {
     )
 
     @Test
+    fun `the fraction a tile's bar reads is the share of the whole the download has reached`() {
+        val snapshot = listOf(song("a"), song("b"), song("c"), song("d"))
+        val progress = offlineProgress(
+            snapshot,
+            downloadedIds = setOf("a"),
+            activeIds = setOf("b"),
+        )
+        assertEquals(0.5f, progress.fraction)
+        assertTrue(progress.downloading)
+    }
+
+    @Test
+    fun `a finished record sits at the whole bar and an empty one at zero`() {
+        val finished = offlineProgress(
+            listOf(song("a"), song("b")),
+            downloadedIds = setOf("a", "b"),
+            activeIds = emptySet(),
+        )
+        assertEquals(1f, finished.fraction)
+        assertTrue(finished.complete)
+        assertEquals(0f, offlineProgress(emptyList(), emptySet(), emptySet()).fraction)
+    }
+
+    @Test
     fun `a fresh ask leads and the old snapshot's stragglers follow`() {
         val existing = listOf(song("a"), song("b"), song("gone"))
         val fresh = listOf(song("c"), song("a"))
