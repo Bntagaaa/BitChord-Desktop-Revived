@@ -116,6 +116,35 @@ class DesktopReleaseNotesMarkdownTest {
         assertTrue(section.blocks.any { it is org.commonmark.node.BulletList })
     }
 
+    @Test fun formalReleaseHeadingsKeepChangeBulletsAndExcludeDownloads() {
+        for (heading in listOf("Changes", "New in v1.12.1")) {
+            val section = DesktopReleaseNotesMarkdown.whatsNew("""
+                # BitChord v1.12.1
+
+                This maintenance release improves song controls and downloaded playlist browsing.
+
+                ## $heading
+
+                - Added Like and More options controls to the desktop mini player.
+                - Fixed the Downloads Playlists tab's Grid/List control.
+
+                ## Downloads
+
+                Choose the package for your operating system.
+            """.trimIndent())
+            assertNull(section.preview)
+            val content = section.blocks.flatMap(::allNodes).filterIsInstance<org.commonmark.node.Text>()
+                .map { it.literal }
+            assertEquals(
+                listOf(
+                    "Added Like and More options controls to the desktop mini player.",
+                    "Fixed the Downloads Playlists tab's Grid/List control.",
+                ),
+                content,
+            )
+        }
+    }
+
     @Test fun missingWhatsNewDoesNotLeakInstallOrCreditsIntoPopup() {
         val section = DesktopReleaseNotesMarkdown.whatsNew("""
             # BitChord 1.8.3
