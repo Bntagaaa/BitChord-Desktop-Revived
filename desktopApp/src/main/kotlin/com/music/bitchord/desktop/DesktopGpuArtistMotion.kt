@@ -1,6 +1,8 @@
 package com.music.bitchord.desktop
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -8,10 +10,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import org.openani.mediamp.MediaStatus
 import org.openani.mediamp.mpv.compose.MpvMediampPlayerSurface
 import org.openani.mediamp.playUri
@@ -52,6 +55,7 @@ internal fun DesktopGpuArtistMotion(
         return
     }
     val status by player.state.collectAsState()
+    var firstFrame by remember(player) { mutableStateOf(false) }
     LaunchedEffect(status.mediaStatus) {
         (status.mediaStatus as? MediaStatus.Error)?.let { failure ->
             // A decoder can fail after playUri returned successfully. Without
@@ -69,6 +73,23 @@ internal fun DesktopGpuArtistMotion(
             // The renderer owns no audio output: BitChord's own playback engine is untouched.
             handle.setPropertyString("aid", "no")
             player.playUri(url)
+            // A successful open is NOT proof that Skiko received an actual
+            // video frame. Keep the still image below this layer visible until
+            // libmpv reports a decoded frame; detect stuck-black sessions.
+            val start = System.nanoTime()
+            while (isActive && !firstFrame) {
+                if (mpvHasDecodedFrame(handle)) {
+                    firstFrame = true
+                    break
+                }
+                if (System.nanoTime() - start > 9_000_000_000L) {
+                    DesktopGpuVideoBackend.fallback(
+                        IllegalStateException("Artist Motion: no decoded frame within 9s"),
+                    )
+                    break
+                }
+                delay(100)
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
@@ -85,5 +106,10 @@ internal fun DesktopGpuArtistMotion(
             }
         }
     }
-    MpvMediampPlayerSurface(player, modifier)
+    DesktopGpuVideoSurface(
+        player = player,
+        fit = false, // Artist hero uses ContentScale.Crop, not letterbox Fit.
+        modifier = modifier.alpha(if (firstFrame) 1f else 0f),
+        provisionalAspect = 2.119f,
+    )
 }
