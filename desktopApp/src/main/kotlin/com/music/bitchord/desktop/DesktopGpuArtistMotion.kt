@@ -109,7 +109,7 @@ internal fun DesktopGpuArtistMotion(
     DesktopGpuVideoSurface(
         player = player,
         fit = false, // Artist hero uses ContentScale.Crop, not letterbox Fit.
-        modifier = modifier.alpha(if (firstFrame) 1f else 0f),
+        modifier = modifier.alpha(if (firstFrame) 1f else 0.01f),
         provisionalAspect = 2.119f,
     )
 }
