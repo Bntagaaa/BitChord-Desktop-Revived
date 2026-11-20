@@ -136,7 +136,7 @@ internal fun DesktopGpuMusicVideoSurface(
     DesktopGpuVideoSurface(
         player = player,
         fit = fit,
-        modifier = modifier.alpha(if (firstFrame) 1f else 0f),
+        modifier = modifier.alpha(if (firstFrame) 1f else 0.01f),
         provisionalAspect = DesktopMusicVideo.aspect.value,
     )
 }
