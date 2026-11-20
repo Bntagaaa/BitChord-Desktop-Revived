@@ -16,11 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            shell: bash
-          - os: windows-latest
-            shell: msys2 {0}
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -43,21 +39,15 @@ jobs:
             gst-plugins-good:p
             gst-plugins-bad:p
             gst-libav:p
-      - name: Build and smoke-test decoder lifecycle
-        shell: ${{ matrix.shell }}
+      - name: Build and smoke-test decoder lifecycle on Linux
+        if: runner.os == 'Linux'
+        shell: bash
         env:
           CC: gcc
-        run: |
-          set -euo pipefail
-          bash tools/video-backend-probe/prepare.sh video-probe-build
-          probe=video-probe-build/gstreamer-probe
-          if [[ -f "$probe.exe" ]]; then probe="$probe.exe"; fi
-          "$probe" headless-cpu video-probe-build/cycles.mp4 3 | tee video-probe-build/probe.log
-          test "$(grep -c '^cycle=.* rendered=30 dropped=0 ' video-probe-build/probe.log)" -eq 3
-          set +e
-          "$probe" headless-cpu video-probe-build/missing.mp4 1 > video-probe-build/missing.log 2>&1
-          status=$?
-          set -e
-          cat video-probe-build/missing.log
-          test "$status" -eq 1
-          grep -q 'rendered=0' video-probe-build/missing.log
+        run: bash tools/video-backend-probe/smoke.sh video-probe-build
+      - name: Build and smoke-test decoder lifecycle on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          CC: gcc
+        run: bash tools/video-backend-probe/smoke.sh video-probe-build

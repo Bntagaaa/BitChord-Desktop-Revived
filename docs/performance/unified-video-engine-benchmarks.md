@@ -67,6 +67,8 @@ SDL_VIDEODRIVER=wayland "$out/mpv-wayland-probe" "$out/landscape.mp4"
 
 ## Comparable BitChord runs
 
+**A — Measured Linux baseline.** Built the current production sources from `87ada9ad` with JDK 21, including the Linux AutoMix library, and launched the packaged launcher with fresh configuration and NMT enabled. The welcome overlay was visible on Home, with no track playing. After 20 seconds of warm-up, 59 samples over 60 seconds yielded median RSS of 726,940 KiB, median PSS of 697,838 KiB, and a process peak RSS of 752,056 KiB. The initial JVM snapshot reported 111,772 KiB heap used and 128,000 KiB heap committed. NMT reported 325,299 KiB total committed, which includes heap and excludes some third-party allocations. Idle CPU and GPU memory were outside this measurement. [Idle process samples](unified-video-engine-evidence/bitchord-idle-memory.csv), [packaged idle capture](unified-video-engine-evidence/bitchord-idle.png).
+
 Use immutable baseline and candidate packages from the same configuration on Linux and Windows. Hold output settings, screen geometry, GPU driver, media sources and warm-up time fixed. Start a new app process for each scenario. Capture a screen recording or repeatable screenshot at the same playhead positions and record user-visible startup, frame timings and resource counters. Measure each process through setup, steady state, and a fixed post-close interval. On Linux use [the desktop sampler](../../scripts/profile-desktop-memory.sh) for RSS/PSS/fds and enable JVM NMT with `-XX:NativeMemoryTracking=summary` before launch. Use JFR for JVM allocation rate. On Windows gather private bytes, working set and CPU via process counters and a trace of presentation events. Include native allocator or GPU byte counts only if the platform instrumentation provides them.
 
 | Run | Repeatable scenario and evidence to retain |
@@ -81,4 +83,4 @@ Use immutable baseline and candidate packages from the same configuration on Lin
 | H — Software fallback | Force software mode and repeat B and E. Check first-frame presentation, startup timeouts, allocations and bounded pools. |
 | I — Renderer failure | Inject a renderer initialization failure and loss after playback. Record readiness, teardown, recovery, fallback count and fallback rendering. |
 
-The production migration is gated. These application runs and before/after results are pending, including live Windows GPU playback, ten-minute music-video runs, and base/candidate screenshot comparisons.
+The production migration is gated. Candidate measurements, application runs B–I, live Windows GPU playback, and base/candidate screenshot comparisons are pending.
