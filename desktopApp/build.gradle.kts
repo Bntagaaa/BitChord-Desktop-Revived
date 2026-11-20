@@ -606,3 +606,18 @@ compose.desktop {
     }
 
 }
+
+/**
+ * Windows native libraries can terminate the test executor without a JVM exception.
+ * Print each test before it runs so that CI logs identify the class/method that
+ * was active when the process exits with e.g. 0xC0000409.
+ * This does not skip or change any test assertions.
+ */
+tasks.withType<Test>().configureEach {
+    if (hostIsWindows) {
+        testLogging {
+            events("started", "passed", "failed", "skipped")
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
+    }
+}
