@@ -7,6 +7,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import com.music.bitchord.data.innertube.InnerTubeXResolver
 import com.music.bitchord.ui.player.MusicVideoQualityUi
@@ -39,8 +43,10 @@ internal fun DesktopGpuMusicVideoSurface(
     }
     val status by player.state.collectAsState()
     val held by DesktopMusicVideo.held.collectAsState()
+    var firstFrame by remember(player, held) { mutableStateOf(false) }
+    val report by rememberUpdatedState(onRendered)
+    LaunchedEffect(firstFrame) { report(firstFrame) }
     LaunchedEffect(status.mediaStatus) {
-        onRendered(status.mediaStatus == MediaStatus.Ready)
         // mpv may fail asynchronously after setMediaData has returned Ready.
         // Switch to the existing FFmpeg decoder instead of freezing on black.
         (status.mediaStatus as? MediaStatus.Error)?.let { failure ->
@@ -71,6 +77,23 @@ internal fun DesktopGpuMusicVideoSurface(
                 playWhenReady = false,
                 startPositionMillis = DesktopMusicVideo.clock.value.positionMs.coerceAtLeast(0L),
             )
+            // Ready only means the stream opened; Skiko may not yet have a
+            // frame. Never dismiss the artwork/loading UI before a video
+            // frame exists. A stalled native renderer falls back to FFmpeg.
+            val started = System.nanoTime()
+            while (isActive && !firstFrame) {
+                if (mpvHasDecodedFrame(handle)) {
+                    firstFrame = true
+                    break
+                }
+                if (System.nanoTime() - started > 9_000_000_000L) {
+                    DesktopGpuVideoBackend.fallback(
+                        IllegalStateException("Music video: no decoded frame within 9s"),
+                    )
+                    return@LaunchedEffect
+                }
+                delay(100)
+            }
             // Correct large drift only, rather than seeking dozens of times per second.
             // The audio engine remains authoritative for play/pause and position.
             var playing = false
@@ -109,7 +132,11 @@ internal fun DesktopGpuMusicVideoSurface(
             DesktopGpuVideoBackend.fallback(failure)
         }
     }
-    // MediaMP 0.5.1 uses native surfaces compatible with Compose/Skiko.
-    // Surface aspect/fit follows its bounds, provided by the host overlay.
-    MpvMediampPlayerSurface(player, modifier)
+    // Scale the existing GPU texture instead of decoding or copying a bitmap.
+    DesktopGpuVideoSurface(
+        player = player,
+        fit = fit,
+        modifier = modifier.alpha(if (firstFrame) 1f else 0f),
+        provisionalAspect = DesktopMusicVideo.aspect.value,
+    )
 }
