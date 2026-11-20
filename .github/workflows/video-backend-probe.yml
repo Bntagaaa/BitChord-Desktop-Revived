@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/video-backend-probe.yml'
       - 'tools/video-backend-probe/**'
+      - 'desktopApp/src/linuxTest/**'
       - 'desktopApp/src/test/kotlin/com/music/bitchord/desktop/DesktopGStreamerOverlayProbeTest.kt'
 
 permissions:
