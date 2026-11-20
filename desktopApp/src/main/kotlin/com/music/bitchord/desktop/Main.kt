@@ -22,12 +22,15 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.awt.Dimension
 import kotlin.math.roundToInt
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.swing.Swing
 import org.jetbrains.compose.resources.painterResource
@@ -84,6 +87,7 @@ fun main() {
     }
 }
 
+@OptIn(FlowPreview::class)
 private fun desktopMain(
     welcomeLaunch: DesktopWelcomeOnboarding.Launch,
     playbackService: DesktopPlaybackService,
@@ -96,7 +100,19 @@ private fun desktopMain(
     // Hoisted so the player can fill the screen and system caption actions stay synchronized.
     val placement by DesktopWindowMode.placement.collectAsState()
     val fullScreen by DesktopWindowMode.fullScreen.collectAsState()
-    val state = rememberWindowState(width = 1_220.dp, height = 780.dp)
+    // Where and how large the window was left last time, recovered onto a monitor that exists
+    // now — see [DesktopMainWindowGeometry.restore].
+    val openingBounds = remember {
+        DesktopMainWindowGeometry.restore(
+            DesktopMainWindowSettings.bounds.value,
+            DesktopMainWindowGeometry.screens(),
+        )
+    }
+    val state = rememberWindowState(
+        position = WindowPosition.Absolute(openingBounds.x.dp, openingBounds.y.dp),
+        width = openingBounds.width.dp,
+        height = openingBounds.height.dp,
+    )
     val pipHost = remember { DesktopPipHost() }
     val appIcon by DesktopAppIconSettings.selected.collectAsState()
     // Linux restores its native fullscreen state first (see below). Updating WindowState
@@ -145,6 +161,41 @@ private fun desktopMain(
         resizable = true,
     ) {
         val composeWindow = window
+        // Remember the ordinary floating bounds across launches. A maximised, fullscreen or
+        // minimised window has no size or place of its own worth keeping, so the last floating
+        // ones are what the next launch restores — quitting while maximised still opens at the
+        // size the reader had before it.
+        LaunchedEffect(composeWindow) {
+            snapshotFlow { Triple(state.placement, state.isMinimized, state.position to state.size) }
+                .debounce(350)
+                .collect { (placement, minimized, _) ->
+                    if (placement == androidx.compose.ui.window.WindowPlacement.Floating &&
+                        !minimized && !DesktopWindowMode.fullScreen.value
+                    ) {
+                        val bounds = composeWindow.bounds
+                        if (bounds.width > 0 && bounds.height > 0) {
+                            DesktopMainWindowSettings.update(
+                                DesktopMainWindowBounds(bounds.x, bounds.y, bounds.width, bounds.height),
+                            )
+                        }
+                    }
+                }
+        }
+        // The debounce may not have run when the process is sent away (tray Quit, an update
+        // install); this is the last chance to record the window as the reader left it.
+        DisposableEffect(composeWindow) {
+            onDispose {
+                val bounds = composeWindow.bounds
+                if (state.placement == androidx.compose.ui.window.WindowPlacement.Floating &&
+                    !state.isMinimized && !DesktopWindowMode.fullScreen.value &&
+                    bounds.width > 0 && bounds.height > 0
+                ) {
+                    DesktopMainWindowSettings.update(
+                        DesktopMainWindowBounds(bounds.x, bounds.y, bounds.width, bounds.height),
+                    )
+                }
+            }
+        }
         // ComposeWindow.placement=Maximized only sets the maximized bit; it does NOT
         // clear the fullscreen bit (unlike placement=Floating). Going directly from
         // Fullscreen -> Maximized therefore leaves KWin fullscreen. Always exit the
@@ -303,7 +354,7 @@ private fun desktopMain(
             if (DesktopPlatform.isWindows) {
                 // AWT dimensions use logical screen coordinates; its peer applies monitor DPI.
                 // Leave the opening size to rememberWindowState, including native frame insets.
-                composeWindow.minimumSize = Dimension(MIN_WINDOW_WIDTH_DP, MIN_WINDOW_HEIGHT_DP)
+                composeWindow.minimumSize = Dimension(DesktopMainWindowGeometry.MIN_WIDTH, DesktopMainWindowGeometry.MIN_HEIGHT)
                 // Styling may need the HWND created a frame after composition. Its failure never
                 // changes or recreates the decorated window.
                 repeat(10) {
@@ -324,8 +375,8 @@ private fun desktopMain(
                 val scaleX = if (DesktopPlatform.isLinux) 1.0 else transform.scaleX
                 val scaleY = if (DesktopPlatform.isLinux) 1.0 else transform.scaleY
                 composeWindow.minimumSize = Dimension(
-                    (MIN_WINDOW_WIDTH_DP * scaleX).roundToInt(),
-                    (MIN_WINDOW_HEIGHT_DP * scaleY).roundToInt(),
+                    (DesktopMainWindowGeometry.MIN_WIDTH * scaleX).roundToInt(),
+                    (DesktopMainWindowGeometry.MIN_HEIGHT * scaleY).roundToInt(),
                 )
                 composeWindow.size = Dimension(
                     (openingSize.width.value * scaleX).roundToInt(),
@@ -363,6 +414,3 @@ private fun desktopMain(
         }
     }
 }
-
-private const val MIN_WINDOW_WIDTH_DP = 900
-private const val MIN_WINDOW_HEIGHT_DP = 600
