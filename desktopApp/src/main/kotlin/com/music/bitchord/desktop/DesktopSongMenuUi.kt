@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.HighQuality
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material.icons.rounded.ThumbDownOffAlt
@@ -392,6 +393,12 @@ internal data class DesktopCollectionMenuActions(
     val pinned: Boolean = false,
     val onRename: (() -> Unit)? = null,
     val onDelete: (() -> Unit)? = null,
+    /** Whole-collection download state, when the page has been asked for as a whole. */
+    val playlistProgress: DesktopPlaylistDownloadProgress? = null,
+    /** The snapshot no longer matches the live listing — the download row becomes an update. */
+    val playlistStale: Boolean = false,
+    /** Throws the whole-collection download away; offered when one exists. */
+    val onRemovePlaylistDownload: (() -> Unit)? = null,
 )
 
 @Composable
@@ -427,7 +434,16 @@ internal fun DesktopCollectionContextMenu(
         }
         DesktopMenuDivider()
         actions.onDownloadAll?.let { download ->
-            DesktopMenuRow(DesktopPhoneMenuIcons.Download, "Download all") { onDismiss(); download() }
+            val progress = actions.playlistProgress
+            when {
+                progress == null -> DesktopMenuRow(DesktopPhoneMenuIcons.Download, "Download all") { onDismiss(); download() }
+                progress.downloading -> DesktopMenuRow(BitChordIcons.Clock, "Downloading · ${progress.done + progress.active} of ${progress.total}") { onDismiss(); download() }
+                actions.playlistStale -> DesktopMenuRow(Icons.Rounded.Refresh, "Update download") { onDismiss(); download() }
+                else -> DesktopMenuRow(BitChordIcons.Check, "Downloaded") { onDismiss(); download() }
+            }
+        }
+        actions.onRemovePlaylistDownload?.let { remove ->
+            DesktopMenuRow(Icons.Rounded.Delete, "Remove playlist download") { onDismiss(); remove() }
         }
         actions.onShare?.let { share ->
             DesktopMenuRow(Icons.Rounded.Share, "Share") { onDismiss(); share() }
@@ -441,6 +457,26 @@ internal fun DesktopCollectionContextMenu(
                 DesktopMenuRow(Icons.Rounded.Delete, "Delete playlist") { onDismiss(); delete() }
             }
         }
+    }
+}
+
+/**
+ * The Downloads page's playlist-download menu: open it, update it when stale,
+ * or throw the record away.
+ */
+@Composable
+internal fun DesktopPlaylistDownloadRowMenu(
+    onOpen: () -> Unit,
+    onUpdate: (() -> Unit)?,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DesktopMenuSurface(onDismiss = onDismiss) {
+        DesktopMenuRow(Icons.Rounded.PlayArrow, "Open") { onDismiss(); onOpen() }
+        onUpdate?.let { update ->
+            DesktopMenuRow(Icons.Rounded.Refresh, "Update download") { onDismiss(); update() }
+        }
+        DesktopMenuRow(Icons.Rounded.Delete, "Remove download") { onDismiss(); onRemove() }
     }
 }
 
