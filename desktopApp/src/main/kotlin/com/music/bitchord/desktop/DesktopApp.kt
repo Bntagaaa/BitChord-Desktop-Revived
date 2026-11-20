@@ -527,6 +527,9 @@ internal fun BitChordDesktopApp(
     playbackService: DesktopPlaybackService,
 ) {
     val scope = rememberCoroutineScope()
+    // Load the native GPU bridge before an artist/music-video surface is
+    // requested so extraction of the platform runtime does not block first paint.
+    LaunchedEffect(Unit) { DesktopGpuVideoBackend.prewarm() }
     val focusManager = LocalFocusManager.current
     val shortcutRootFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { shortcutRootFocusRequester.requestFocus() }
