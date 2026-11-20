@@ -1,6 +1,8 @@
 package com.music.bitchord.desktop
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 import org.openani.mediamp.mpv.MPVHandle
 import org.openani.mediamp.mpv.MpvMediampPlayer
 import kotlin.coroutines.CoroutineContext
@@ -21,13 +23,30 @@ internal object DesktopGpuVideoBackend {
     private var prepared = false
 
     @Synchronized
+    private fun ensurePrepared() {
+        if (!prepared) {
+            MpvMediampPlayer.prepareLibraries()
+            prepared = true
+        }
+    }
+
+    /**
+     * Extract/load libmpv on an IO dispatcher at app startup. Before this, the
+     * first Artist Motion/Video composable blocked the UI thread in remember()
+     * while the native libraries were extracted from the distribution jars.
+     */
+    suspend fun prewarm() {
+        if (legacy.value) return
+        withContext(Dispatchers.IO) {
+            runCatching { ensurePrepared() }.onFailure(::fallback)
+        }
+    }
+
+    @Synchronized
     fun create(context: CoroutineContext): MpvMediampPlayer? {
         if (legacy.value) return null
         return runCatching {
-            if (!prepared) {
-                MpvMediampPlayer.prepareLibraries()
-                prepared = true
-            }
+            ensurePrepared()
             MpvMediampPlayer(Any(), context).let { player ->
                 try {
                     val handle = player.impl as MPVHandle
