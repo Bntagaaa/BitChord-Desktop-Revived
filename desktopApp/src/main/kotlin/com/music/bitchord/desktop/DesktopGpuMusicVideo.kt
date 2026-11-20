@@ -74,7 +74,9 @@ internal fun DesktopGpuMusicVideoSurface(
             )
             player.playUri(
                 stream.url,
-                playWhenReady = false,
+                playWhenReady = DesktopMusicVideo.clock.value.let {
+                    it.isPlaying && !it.awaitingAudio
+                },
                 startPositionMillis = DesktopMusicVideo.clock.value.positionMs.coerceAtLeast(0L),
             )
             // Ready only means the stream opened; Skiko may not yet have a
