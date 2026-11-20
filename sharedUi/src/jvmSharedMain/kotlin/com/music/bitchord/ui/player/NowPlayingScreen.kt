@@ -2304,6 +2304,7 @@ fun NowPlayingScreen(
                 if (heroMode && heroHeight > 0.dp) {
                     heroClipMounted?.let { clip ->
                         CanvasArtworkPlayer(
+                            playbackIdentity = song.videoId,
                             canvas = clip,
                             isPlaying = isPlaying,
                             // Paused for the whole collapse into the queue/lyrics panel
@@ -3304,6 +3305,7 @@ fun NowPlayingScreen(
                             if (!heroMode && canvas != null) {
                                 WhileShown({ !collapsePastHalf }) {
                                     CanvasArtworkPlayer(
+                                        playbackIdentity = song.videoId,
                                         canvas = canvas,
                                         isPlaying = isPlaying,
                                         // The panels first: a collapse the tap asked

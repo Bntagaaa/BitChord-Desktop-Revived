@@ -161,6 +161,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                         fallbackUrl = clip.fallbackUrl,
                         modifier = Modifier.fillMaxSize(),
                         isPlaying = isPlaying,
+                        playbackIdentity = song.videoId,
                     )
                 }
                 // Blend only the lower edge into Astra's panel surface. The Canvas itself

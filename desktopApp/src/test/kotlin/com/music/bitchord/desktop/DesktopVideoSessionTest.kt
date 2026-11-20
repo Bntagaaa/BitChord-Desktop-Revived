@@ -10,8 +10,6 @@ import kotlin.test.*
 
 class DesktopVideoSessionTest {
     private class Decoder : DesktopVideoDecoder {
-        override val width = 16
-        override val height = 9
         @Volatile override var frameTimeMs = 0L
         val opens = AtomicInteger()
         val closes = AtomicInteger()
@@ -20,9 +18,9 @@ class DesktopVideoSessionTest {
         private var remaining = 0
         override fun open(stream: InnerTubeXResolver.VideoStream) { opens.incrementAndGet() }
         override fun seekTo(millis: Long): Boolean { frameTimeMs = millis; remaining = 1; seeks.incrementAndGet(); return true }
-        override fun nextFrame(pixels: ByteArray): Boolean {
-            if (remaining-- <= 0) { eofReads.incrementAndGet(); return false }
-            return true
+        override fun nextFrame(accept: (Long) -> Boolean): VideoFrame? {
+            if (remaining-- <= 0) { eofReads.incrementAndGet(); return null }
+            return if (accept(frameTimeMs)) VideoFrame(16, 9, ByteArray(16 * 9 * 4)) else null
         }
         override fun close() { closes.incrementAndGet() }
     }
@@ -52,28 +50,32 @@ class DesktopVideoSessionTest {
         } finally { session.close(); scope.cancel() }
     }
 
-    @Test fun surfacesAndMinimizeRetainTheSameSessionAndFrame() = runBlocking {
+    @Test fun surfacesReuseSessionDuringHandoffAndReleaseItWhenHidden() = runBlocking {
         val clock = MutableStateFlow(state("video"))
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val resolves = AtomicInteger()
         val decoder = Decoder()
         val session = DesktopVideoSession(scope, clock, { 1f }, { id, height -> resolves.incrementAndGet(); stream(id, height) }, { decoder })
         try {
-            await { session.frame.value != null } // Warmed even before opening the player.
-            val warm = session.frame.value
+            delay(100)
+            assertEquals(0, resolves.get())
             session.attach("video")
-            repeat(4) { session.detach("video"); delay(40); session.attach("video") }
-            assertSame(warm, session.frame.value)
+            await { session.frame.value != null }
+            val warm = session.frame.value
+            repeat(30) { session.detach("video"); delay(40); session.attach("video") }
+            assertSame(warm, session.frame.value, "opens=${decoder.opens.get()} closes=${decoder.closes.get()} seeks=${decoder.seeks.get()} failed=${session.failed.value}")
             assertEquals(1, resolves.get()); assertEquals(1, decoder.opens.get()); assertEquals(0, decoder.closes.get())
             session.detach("video")
             clock.value = clock.value.copy(positionMs = 90_000, seeks = 2)
             delay(80)
-            assertSame(warm, session.frame.value)
+            assertSame(warm, session.frame.value, "opens=${decoder.opens.get()} closes=${decoder.closes.get()} seeks=${decoder.seeks.get()} failed=${session.failed.value}")
             session.attach("video")
             await { decoder.frameTimeMs == 90_000L && session.frame.value !== warm }
             assertEquals(1, resolves.get()); assertEquals(1, decoder.opens.get())
+            session.detach("video")
+            await { session.frame.value == null && decoder.closes.get() == 1 }
         } finally {
-            session.close(); await { decoder.closes.get() == 1 }; scope.cancel()
+            session.close(); scope.cancel()
         }
     }
 
@@ -83,10 +85,12 @@ class DesktopVideoSessionTest {
         val decoders = CopyOnWriteArrayList<Decoder>()
         val session = DesktopVideoSession(scope, clock, { 1f }, { id, height -> stream(id, height) }, { Decoder().also(decoders::add) })
         try {
+            session.attach("a")
             await { session.frame.value?.first == "a" }
             session.held.value = 720
             await { decoders.size == 2 && decoders[1].opens.get() == 1 && session.frame.value != null }
             assertEquals(1, decoders[0].closes.get())
+            session.attach("b")
             clock.value = state("b")
             await { session.frame.value?.first == "b" }
             assertEquals(3, decoders.size); assertEquals(1, decoders[1].closes.get())
@@ -104,8 +108,9 @@ class DesktopVideoSessionTest {
             if (attempts.incrementAndGet() == 1) error("Offline") else stream(id, height)
         }, { Decoder() })
         try {
+            session.attach("a")
             await { session.failed.value }
-            session.attach("a"); session.detach("a"); session.attach("a"); delay(80)
+            session.detach("a"); session.attach("a"); delay(80)
             assertEquals(1, attempts.get())
             session.retry()
             await { session.frame.value != null }
@@ -118,9 +123,10 @@ class DesktopVideoSessionTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val decoder = Decoder()
         val session = DesktopVideoSession(scope, clock, { 1f }, { id, height -> stream(id, height) }, {
-            object : DesktopVideoDecoder by decoder { override fun nextFrame(pixels: ByteArray) = false }
+            object : DesktopVideoDecoder by decoder { override fun nextFrame(accept: (Long) -> Boolean): VideoFrame? = null }
         })
         try {
+            session.attach("empty")
             await { session.failed.value && decoder.closes.get() == 1 }
             assertNull(session.frame.value)
             assertEquals(1, decoder.opens.get())

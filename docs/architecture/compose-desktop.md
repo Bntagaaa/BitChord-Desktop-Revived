@@ -174,4 +174,4 @@ Earlier benchmark attempts stopped in the artifact inventory because Gradle had 
 
 ## Phase 1 desktop video replacement
 
-The [video audit](../performance/unified-video-engine-audit.md) maps the existing player, artist, window, and audio boundaries. The [backend gate](../performance/unified-video-engine-architecture.md) and [probe measurements](../performance/unified-video-engine-benchmarks.md) track native presentation and the compositor work required before migrating production consumers.
+The [video audit](../performance/unified-video-engine-audit.md) maps the existing player, artist, window, and audio boundaries. The [backend gate](../performance/unified-video-engine-architecture.md) and [probe measurements](../performance/unified-video-engine-benchmarks.md) track the unified software pipeline and the compositor work required for GPU playback.

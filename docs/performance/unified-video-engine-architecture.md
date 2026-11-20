@@ -1,6 +1,21 @@
 # Unified desktop video engine — backend gate
 
-**Status:** backend under evaluation. The probe runs outside the production playback paths. Shipping an engine requires a compositor-integrated frame on Linux and Windows with the existing player effects.
+**Status:** desktop playback uses the unified software path. GStreamer native texture presentation works in a development Compose scene on native Linux Wayland. Production GPU selection still needs a bridge to BitChord's existing window renderer. Live Windows GPU verification is deferred.
+
+## Implementation
+
+- `UnifiedVideoEngine` selects the decoder, owns looping motion workers and supplies the decoder used by the audio-clocked music-video session. The consolidated FFmpeg decoder preserves HLS variant selection for artist art and drains reordered frames before looping or reporting EOF.
+- Motion leases account for source, fallback, rendition size and clock identity. Now Playing and its details panel can share the same track's frame when they resolve the same clip. Separate clocks and configurations have separate playback. The last lease cancels the worker. A new lease waits for an older worker of the same key to finish closing.
+- One latest-frame slot owns each session's immutable Skia image. Software conversion writes directly into native Skia Data, avoiding the full-frame JVM buffer and clone. Draws take the latest image under its owner's lock. Skia retains the native image used by recorded commands. Track changes and shutdown clear the last frame and release its wrapper. A music-video frame waiting for its audio timestamp is released on cancellation, seek or detachment.
+- Now Playing, Spotify Canvas and Apple Motion Artwork retain their Compose drawing and visual effects. Palette and mesh callbacks sample the current image at the requested size. The details panel samples a 128-pixel image only when a clip first appears. Artist heroes take a lease only when their clipped layout bounds overlap the viewport. Main window minimize and tray visibility remove leases.
+- Windowed and fullscreen music video share the audio-clocked session with the PiP video cover. The last surface stops decode at detachment and releases its session after a 350 ms handoff interval. Current audio position, seek generation, playback rate and selected quality still drive presentation. PiP keeps still artwork as its failure fallback.
+- FFmpeg demux uses a cancellation callback and 15-second deadlines around open, read and seek. Callers preserve still artwork until a frame is available for Compose to draw, and the player callbacks distinguish decode from canvas submission. The software path does not expose a compositor acknowledgement.
+
+## Wayland Compose texture proof
+
+In the opt-in probe, VA-API decodes H.264 to VA surfaces. VA post-processing converts the frame to tiled RGBA DMA-BUF, which SDL's current EGL display imports as an `EGLImage`. Skia uses an OpenGL interface assembled from that same context. The actual desktop Compose scene draws the video, rounded clip and bottom gradient into the Wayland framebuffer. The appsink holds at most one queued sample and the draw holds one additional sample until GPU work completes. A blocking GL fence is used in the probe. GPU copies inside Skia and drivers were not traced. Pixel readback is limited to test assertions and an optional screenshot.
+
+BitChord's stock AWT window uses a different context path. Importing an EGL image across EGL and GLX crashed inside Mesa on the test host, so that bridge was discarded. A shippable renderer needs interoperable context ownership, production fences, texture reuse, context-loss handling and a Windows D3D import. The proven SDL/EGL path is development-only.
 
 ## Candidate evidence
 

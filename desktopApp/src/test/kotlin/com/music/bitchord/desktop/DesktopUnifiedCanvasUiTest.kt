@@ -1,0 +1,90 @@
+package com.music.bitchord.desktop
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.unit.IntSize
+import com.music.bitchord.data.canvas.CanvasArtwork
+import com.music.bitchord.ui.ProvideDesktopPresentationLifecycle
+import com.music.bitchord.ui.player.CanvasContentMode
+import com.music.bitchord.ui.player.CanvasVideoSpec
+import com.sun.net.httpserver.HttpServer
+import java.net.InetSocketAddress
+import java.nio.file.Files
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalTestApi::class)
+class DesktopUnifiedCanvasUiTest {
+    @Test
+    fun softwareCanvasDrawsAndSamplesOneClipThenRestoresStillArtworkOnHide() {
+        val fixture = checkNotNull(javaClass.getResourceAsStream("/video/red-h264.mp4")).use { it.readBytes() }
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val path = "/fixture-${UUID.randomUUID()}.mp4"
+        server.createContext(path) { request ->
+            request.sendResponseHeaders(200, fixture.size.toLong())
+            request.responseBody.use { it.write(fixture) }
+        }
+        server.start()
+        val url = "http://127.0.0.1:${server.address.port}$path"
+        try {
+            val surfaceVisible = mutableStateOf(true)
+            val submitted = AtomicBoolean(false)
+            val sampleSize = AtomicReference<IntSize?>()
+            runDesktopComposeUiTest(width = 160, height = 120) {
+                setContent {
+                    ProvideDesktopPresentationLifecycle(surfaceVisible.value) {
+                        Box(Modifier.fillMaxSize().background(Color.Blue).testTag("artwork")) {
+                            DesktopCanvasVideo(
+                                CanvasVideoSpec(
+                                    canvas = CanvasArtwork(url = url, title = "Fixture", artist = "Test", album = "Test"),
+                                    isPlaying = true,
+                                    contentMode = CanvasContentMode.CROP,
+                                    alignPortraitTop = false,
+                                    onAspectRatioChanged = {},
+                                    portraitRevealBounds = IntSize.Zero,
+                                    presentationAlpha = { 1f },
+                                    onRenderedChanged = { submitted.set(it) },
+                                    onFrameCaptured = { sampleSize.set(IntSize(it.width, it.height)) },
+                                    refreshFrameEveryMs = null,
+                                    frameCapturePx = 16,
+                                    onCoverChanged = {},
+                                    bottomFade = .5f,
+                                    bottomFadeEndPx = null,
+                                    pausedForTransition = false,
+                                ),
+                                Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                }
+                waitUntil(timeoutMillis = 5_000) { submitted.get() && sampleSize.get() != null }
+                mainClock.advanceTimeBy(400)
+                assertEquals(IntSize(16, 12), sampleSize.get())
+                val active = onNodeWithTag("artwork").captureToImage().toPixelMap()
+                assertTrue(active[80, 20].red > .85f)
+                assertTrue(active[80, 118].blue > .85f)
+                runOnIdle { surfaceVisible.value = false }
+                waitUntil(timeoutMillis = 5_000) { !submitted.get() }
+                val hidden = onNodeWithTag("artwork").captureToImage().toPixelMap()
+                assertTrue(hidden[80, 20].blue > .95f)
+            }
+        } finally {
+            server.stop(0)
+            DesktopMediaCache.existing(url, "mp4")?.let(Files::deleteIfExists)
+        }
+    }
+}

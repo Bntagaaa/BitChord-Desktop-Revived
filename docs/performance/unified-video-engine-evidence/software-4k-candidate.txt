@@ -1,0 +1,1 @@
+mode=candidate frames=180 seconds=8.414 first_ms=2410.940 allocated_bytes=1524832 bytes_per_frame=8471 MiB_per_second=0.173 peak_rss_kib=185928 sampled_rss_median_kib=184044 cpu_pct=77.82

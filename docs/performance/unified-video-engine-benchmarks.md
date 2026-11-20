@@ -83,4 +83,50 @@ Use immutable baseline and candidate packages from the same configuration on Lin
 | H — Software fallback | Force software mode and repeat B and E. Check first-frame presentation, startup timeouts, allocations and bounded pools. |
 | I — Renderer failure | Inject a renderer initialization failure and loss after playback. Record readiness, teardown, recovery, fallback count and fallback rendering. |
 
-The production migration is gated. Candidate measurements, application runs B–I, live Windows GPU playback, and base/candidate screenshot comparisons are pending.
+The hardware migration is gated. Full-application runs B–I and base/candidate visual comparisons are pending. The software decoder and Compose texture experiments below use isolated fixtures.
+
+## Unified software decode and raster draw
+
+On November 21, the baseline jar from `87ada9ad` and the unified candidate jar decoded the same generated H.264 files under JDK 21 with a 512 MiB heap cap. Each run decoded and drew 180 frames to the same 320×180 Skia raster target. The harness aimed for 30 FPS, with no skipped inputs. The older path copied the decoded frame to JVM scratch storage, cloned it and recreated the raster image on draw. The candidate writes packed pixels directly into native Skia storage.
+
+| Fixture and mode | Peak RSS from wait4 (KiB) | Median sampled RSS (KiB) | Decode-and-draw thread allocations per frame | CPU (one logical CPU) | First draw (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1080p baseline | 645,868 | 642,692 | 8,300,232 B | 77.92% | 1,049.60 |
+| 1080p unified | 129,744 | 130,210 | 8,471 B | 60.79% | 862.22 |
+| 4K baseline | 690,300 | 688,082 | 33,183,433 B | 88.31% | 2,200.56 |
+| 4K unified | 185,928 | 184,044 | 8,471 B | 77.82% | 2,410.94 |
+
+Thread allocations include the reflection and harness overhead and exclude other threads and native allocations. The 1080p peak from Linux `wait4` and sampled `VmRSS` use different kernel accounting. The first draw includes JVM/Skia startup. One run per mode cannot establish a startup improvement, a playback frame rate or long-session retention. The 4K candidate completed in 8.41 seconds for six seconds of source video, including 2.41 seconds to its first draw. The baseline took 10.33 seconds. These are decoder-and-raster comparisons. Full UI playback, GPU memory and ten-minute stream measurements are pending. [1080p baseline](unified-video-engine-evidence/software-1080p-baseline.txt), [1080p unified](unified-video-engine-evidence/software-1080p-candidate.txt), [4K baseline](unified-video-engine-evidence/software-4k-baseline.txt), [4K unified](unified-video-engine-evidence/software-4k-candidate.txt).
+
+Use the [software harness](../../tools/video-backend-probe/SoftwareDecoderBenchmark.java) with the app jar from each build and the same dependency directory. Generate each clip with FFmpeg and `testsrc2=size=1920x1080:rate=30` or `testsrc2=size=3840x2160:rate=30`, `-t 6 -an -c:v libx264 -preset ultrafast -pix_fmt yuv420p`. Use JDK 21 rather than the stripped packaged launcher to access the thread allocation counter. For Linux, run each invocation under GNU `time -v` or use `wait4(2)` to obtain CPU and high-water RSS.
+
+```bash
+# package_deps points to the Gradle distribution's lib/app directory.
+# skiko_jar is the resolved skiko-awt-runtime-linux-x64 jar with its native library.
+javac -cp "$package_deps/*" -d "$out" tools/video-backend-probe/SoftwareDecoderBenchmark.java
+java -Xms32m -Xmx512m -cp "$out:$baseline_jar:$skiko_jar:$package_deps/*" \
+  SoftwareDecoderBenchmark baseline "$out/1080p.mp4"
+java -Xms32m -Xmx512m -cp "$out:$candidate_jar:$skiko_jar:$package_deps/*" \
+  SoftwareDecoderBenchmark candidate "$out/1080p.mp4"
+```
+
+## Compose Wayland texture proof
+
+Use GStreamer 1.24 or newer with VA and the current SDL3, EGL and GL development packages. The tested Intel driver exposes the required tiled `AB24` modifier. The probe owns a native Wayland window and presents through the desktop Compose scene after composition. It asserts real video pixels, rounded clipping and the bottom gradient from the composed framebuffer and resizes from 640×480 to 720×520. Its one-shot readbacks are diagnostic.
+
+```bash
+cc -std=c11 -fPIC -shared -Wall -Wextra -Werror tools/video-backend-probe/gstreamer-compose-gl.c \
+  -o "$out/libbitchord-texture-probe.so" \
+  $(pkg-config --cflags --libs sdl3 egl gl gstreamer-app-1.0 gstreamer-allocators-1.0 gstreamer-video-1.0)
+ffmpeg -hide_banner -loglevel error -f lavfi -i 'testsrc2=size=1280x720:rate=30' \
+  -t 8 -an -c:v libx264 -preset ultrafast -pix_fmt yuv420p "$out/texture.mp4"
+BITCHORD_DESKTOP_ONLY=true SDL_VIDEODRIVER=wayland \
+  BITCHORD_GSTREAMER_TEXTURE_PROBE="$out/libbitchord-texture-probe.so" \
+  BITCHORD_GSTREAMER_CLIP="$out/texture.mp4" \
+  BITCHORD_GSTREAMER_TEXTURE_CAPTURE="$out/compose-texture.png" \
+  ./gradlew :desktopApp:test --rerun --tests '*DesktopGStreamerTextureProbeTest'
+```
+
+An opt-in 720p run swapped 200 of 240 input frames and resized successfully. The appsink drops superseded frames when the host falls behind. This is proof of the texture path and the effects, with further work needed for frame pacing and production host integration. A live Windows GPU run is deferred.
+
+The [resized framebuffer capture](unified-video-engine-evidence/compose-wayland-texture.png) shows the video cropped behind the rounded clip and bottom fade. [Texture caps and swap counters](unified-video-engine-evidence/compose-wayland-texture.txt).
