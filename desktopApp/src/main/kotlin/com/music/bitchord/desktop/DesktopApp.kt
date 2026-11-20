@@ -143,6 +143,7 @@ import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
@@ -157,6 +158,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
@@ -176,6 +178,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -659,7 +662,16 @@ internal fun BitChordDesktopApp(
     var dislikedIds by remember { mutableStateOf(persistence.dislikedIds()) }
     val overlays = remember { DesktopOverlays() }
     var downloads by remember { mutableStateOf(persistence.downloads()) }
-    var downloadedPlaylists by remember { mutableStateOf(persistence.downloadedPlaylists()) }
+    val playlistDownloadRecords by DesktopPlaylistDownloads.records.collectAsState()
+    var stalePlaylistDownloads by remember { mutableStateOf(setOf<String>()) }
+    // Import existing 1.9.3 offline playlist snapshots once; never delete existing audio files.
+    LaunchedEffect(Unit) {
+        val legacy = persistence.downloadedPlaylists()
+        if (legacy.isNotEmpty()) {
+            DesktopPlaylistDownloads.importLegacy(legacy, persistence.downloads())
+            persistence.saveDownloadedPlaylists(emptyList())
+        }
+    }
     var localSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var localMusicLoaded by remember { mutableStateOf(false) }
     var localMusicLoading by remember { mutableStateOf(false) }
@@ -1284,6 +1296,22 @@ internal fun BitChordDesktopApp(
         collectionReloads++
     }
 
+    /**
+     * A downloaded collection meeting its live listing again: if the page and
+     * the snapshot have come apart, the record is marked stale — the Downloads
+     * row and the page's menu then offer the update. Nothing is fetched in the
+     * background; a stale mark is only earned by actually seeing the listing.
+     */
+    fun notePlaylistDownloadState(loaded: DesktopCollection) {
+        val record = DesktopPlaylistDownloads.recordOf(loaded.browseId) ?: return
+        val fresh = loaded.songs.filter { it.unresolvedSpotifyTrack() == null }.map(Song::videoId)
+        stalePlaylistDownloads = if (fresh == record.songs.map(Song::videoId)) {
+            stalePlaylistDownloads - loaded.browseId
+        } else {
+            stalePlaylistDownloads + loaded.browseId
+        }
+    }
+
     // Keep Spotify's matching jobs alive when its first page arrives: loadSpotifyPlaylist changes
     // loading=false while it is still resolving Spotify ids into playable YouTube Music tracks.
     // Including loading in LaunchedEffect keys cancelled every matching job after the first page!
@@ -1342,8 +1370,20 @@ internal fun BitChordDesktopApp(
         ).fold(
             onSuccess = { loaded ->
                 if (openedCollection?.browseId == pending.browseId) openedCollection = loaded
+                notePlaylistDownloadState(loaded)
             },
-            onFailure = { collectionError = it.message ?: "Could not open ${pending.title.ifBlank { "this page" }}" },
+            onFailure = {
+                val record = DesktopPlaylistDownloads.recordOf(pending.browseId)
+                if (record != null) {
+                    // The downloaded copy goes up when the live listing cannot be reached.
+                    if (openedCollection?.browseId == pending.browseId) {
+                        collectionError = null
+                        openedCollection = record.toCollection()
+                    }
+                } else {
+                    collectionError = it.message ?: "Could not open ${pending.title.ifBlank { "this page" }}"
+                }
+            },
         )
     }
 
@@ -1392,24 +1432,86 @@ internal fun BitChordDesktopApp(
         }
     }
 
-    /** Everything on a page, in the order it is listed. */
-    fun downloadAll(songs: List<Song>, collection: DesktopCollection? = null) {
-        // Offline playlist identity is separate from individual saved files. Keep the original
-        // order and metadata, then resolve each track to its verified local copy in Downloads.
-        if (collection?.type == BrowseType.PLAYLIST && collection.browseId.isNotBlank() && songs.isNotEmpty()) {
-            val record = DesktopPlaylist(
-                id = collection.browseId,
-                title = collection.title,
-                songs = songs.distinctBy(Song::videoId),
-            )
-            downloadedPlaylists = listOf(record) +
-                downloadedPlaylists.filterNot { it.id == record.id }
-            persistence.saveDownloadedPlaylists(downloadedPlaylists)
-        }
-        val have = downloads.map(Song::videoId).toSet()
-        DesktopDownloadQueue.enqueueAll(
-            songs.filterNot { it.videoId in have || it.localPath != null },
+    /** Snapshot the listing into a record and ask for everything not yet in hand. */
+    fun rememberPlaylistDownload(listing: DesktopCollection) {
+        val record = DesktopPlaylistDownloads.remember(
+            listing.copy(songs = listing.songs.filter { it.unresolvedSpotifyTrack() == null }),
+            downloads,
         )
+        stalePlaylistDownloads = stalePlaylistDownloads - record.id
+        val missing = tracksMissingOffline(
+            record.songs,
+            downloads.map(Song::videoId).toSet(),
+            downloadInProgress,
+        )
+        if (missing.isNotEmpty()) DesktopDownloadQueue.enqueueAll(missing)
+        DesktopTrackLog.log(
+            "playlist download: '${record.title}' — ${record.songs.size - missing.size} of ${record.songs.size} in hand",
+        )
+    }
+
+    /**
+     * A collection asked for as a whole — the trigger that makes the playlist
+     * itself, not just its songs, live in Downloads. The listing may still be
+     * arriving in pages, so before a snapshot is taken any continuation is
+     * followed to the end: a download named for 843 songs should ask for 843,
+     * not the few hundred that had rendered when it was tapped. Songs already
+     * on disk, in the queue, or on another record's ledger are never asked for
+     * twice, and a record that already exists is refreshed in place.
+     */
+    fun downloadCollection(collection: DesktopCollection) {
+        // The account's own in-app playlist is already a first-class local list;
+        // freezing it into a download record would only let it go stale.
+        if (playlists.any { it.id == collection.browseId }) return
+        scope.launch {
+            var listing = collection
+            while (listing.continuation != null) {
+                val token = listing.continuation ?: break
+                val (songs, next) = DesktopSearchClient
+                    .moreCollectionSongs(token, listing.songs.firstOrNull()?.artist)
+                    .fold(
+                        onSuccess = { it },
+                        onFailure = {
+                            DesktopTrackLog.log(
+                                "playlist download: listing stopped at ${listing.songs.size} rows: ${it.message}",
+                            )
+                            emptyList<Song>() to null
+                        },
+                    )
+                listing = listing.copy(
+                    songs = (listing.songs + songs).distinctBy(Song::videoId),
+                    continuation = next,
+                )
+            }
+            rememberPlaylistDownload(listing)
+        }
+    }
+
+    /** The Update action on a stale record: fetch the live listing fresh, then merge. */
+    fun updatePlaylistDownload(record: DesktopPlaylistDownload) {
+        if (record.id.startsWith("spotify:playlist:")) {
+            // Spotify listings are resolved with the page open; opening it refreshes instead.
+            openCollection(record.id, record.toBrowseItem())
+            return
+        }
+        scope.launch {
+            DesktopSearchClient.browse(browseId = record.id, fallback = record.toBrowseItem())
+                .onSuccess { rememberPlaylistDownload(it) }
+                .onFailure {
+                    DesktopTrackLog.log("playlist update: '${record.title}' could not be reached: ${it.message}")
+                }
+        }
+    }
+
+    /**
+     * Remove only the collection record. Keep all audio files: 1.9.3 has existing
+     * independently-downloaded songs, and ownership cannot be safely inferred
+     * from the new records alone.
+     */
+    fun removePlaylistDownload(record: DesktopPlaylistDownload) {
+        DesktopPlaylistDownloads.forget(record.id)
+        stalePlaylistDownloads = stalePlaylistDownloads - record.id
+        DesktopTrackLog.log("removed offline playlist record '${record.title}' (audio files retained)")
     }
 
     /** Keeps a station queued ahead of whatever is playing. */
@@ -2751,11 +2853,13 @@ internal fun BitChordDesktopApp(
     }
 
     // What reached disk goes into the library's own record, which is what the Downloads page and
-    // every row's tick read from.
+    // every row's tick read from. The same song hydrates every playlist record holding it, so the
+    // snapshot itself can play offline without asking the library.
     LaunchedEffect(Unit) {
         DesktopDownloadQueue.finished.collect { saved ->
-            downloads = (listOf(saved) + downloads.filterNot { it.videoId == saved.videoId }).take(200)
+            downloads = (listOf(saved) + downloads.filterNot { it.videoId == saved.videoId }).take(2000)
             persistence.saveDownloads(downloads)
+            DesktopPlaylistDownloads.hydrate(saved)
         }
     }
 
@@ -4879,7 +4983,12 @@ internal fun BitChordDesktopApp(
                             onShuffle = { songs ->
                                 playSpotifyOrYoutubeSongs(songs.shuffled(), 0, openedCollection?.let { collectionSource(it) })
                             },
-                            onDownloadAll = { songs -> downloadAll(songs, openedCollection) },
+                            onDownloadAll = { downloadCollection(openedCollection!!) },
+                            playlistDownload = playlistDownloadRecords.firstOrNull { it.id == openedCollection!!.browseId },
+                            playlistStale = openedCollection!!.browseId in stalePlaylistDownloads,
+                            onRemovePlaylistDownload = playlistDownloadRecords
+                                .firstOrNull { it.id == openedCollection!!.browseId }
+                                ?.let { record -> { removePlaylistDownload(record) } },
                             signedIn = youtubeSignedIn,
                             onLibraryChanged = ::reloadLibrary,
                             onStartMix = ::startRadio,
@@ -5233,7 +5342,13 @@ internal fun BitChordDesktopApp(
                         destination == DesktopDestination.DOWNLOADS -> Box(Modifier.fillMaxSize()) {
                             DesktopDownloadsPage(
                                 downloads = downloads,
-                                playlists = downloadedPlaylists,
+                                playlistRecords = playlistDownloadRecords,
+                                downloadedIds = downloads.map(Song::videoId).toSet(),
+                                downloadInProgress = downloadInProgress,
+                                playlistStaleIds = stalePlaylistDownloads,
+                                onOpenPlaylist = { record -> openCollection(record.id, record.toBrowseItem()) },
+                                onUpdatePlaylist = ::updatePlaylistDownload,
+                                onRemovePlaylist = ::removePlaylistDownload,
                                 onSongClick = { playSong(it, source = DesktopQueueSource(DesktopStrings["downloads", "Downloads"], PlaybackSourceType.BROWSE)) },
                                 contentPadding = contentPadding,
                                 menu = { song -> songMenu(song) },
@@ -7154,14 +7269,19 @@ private fun DesktopHistoryPage(
 @Composable
 private fun DesktopDownloadsPage(
     downloads: List<Song>,
-    playlists: List<DesktopPlaylist>,
+    playlistRecords: List<DesktopPlaylistDownload>,
+    downloadedIds: Set<String>,
+    downloadInProgress: Set<String>,
+    playlistStaleIds: Set<String>,
     onSongClick: (Song) -> Unit,
+    onOpenPlaylist: (DesktopPlaylistDownload) -> Unit,
+    onUpdatePlaylist: (DesktopPlaylistDownload) -> Unit,
+    onRemovePlaylist: (DesktopPlaylistDownload) -> Unit,
     contentPadding: PaddingValues,
     menu: (@Composable (Song) -> Unit)? = null,
 ) {
     DesktopLocalMusicPage(
         songs = downloads,
-        downloadedPlaylists = playlists,
         onSongClick = onSongClick,
         contentPadding = contentPadding,
         menu = menu,
@@ -7171,13 +7291,206 @@ private fun DesktopDownloadsPage(
         emptyTitle = DesktopStrings["d_no_downloads", "No downloads"],
         emptyDescription = DesktopStrings["d_downloaded_songs_will_appear_here", "Downloaded songs will appear here."],
         persistenceKey = "downloaded",
+        playlistsTab = {
+            DesktopPlaylistDownloadsContent(
+                records = playlistRecords,
+                downloadedIds = downloadedIds,
+                downloadInProgress = downloadInProgress,
+                staleIds = playlistStaleIds,
+                onOpen = onOpenPlaylist,
+                onUpdate = onUpdatePlaylist,
+                onRemove = onRemovePlaylist,
+            )
+        },
+        songsEmptyTitle = "No downloaded songs",
+        songsEmptyDescription = "Downloaded songs will appear here.",
     )
 }
+
+/** The Playlists tab of Downloads — whole collections asked for as a whole, each standing square on its own cover. */
+@Composable
+private fun DesktopPlaylistDownloadsContent(
+    records: List<DesktopPlaylistDownload>,
+    downloadedIds: Set<String>,
+    downloadInProgress: Set<String>,
+    staleIds: Set<String>,
+    onOpen: (DesktopPlaylistDownload) -> Unit,
+    onUpdate: (DesktopPlaylistDownload) -> Unit,
+    onRemove: (DesktopPlaylistDownload) -> Unit,
+) {
+    if (records.isEmpty()) {
+        DesktopEmptyPage(
+            BitChordIcons.Download,
+            "No playlist downloads",
+            "Download a playlist or album from its menu, and it will stand here.",
+        )
+        return
+    }
+    val gridState = rememberLazyGridState()
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 168.dp),
+        state = gridState,
+        modifier = Modifier.fillMaxSize().desktopTopScrollFade(gridState),
+        contentPadding = pagePadding(bottom = 32.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        gridItems(records, key = DesktopPlaylistDownload::id) { record ->
+            DesktopPlaylistDownloadTile(
+                record = record,
+                progress = offlineProgress(record.songs, downloadedIds, downloadInProgress),
+                stale = record.id in staleIds,
+                onOpen = { onOpen(record) },
+                onUpdate = { onUpdate(record) },
+                onRemove = { onRemove(record) },
+            )
+        }
+    }
+}
+
+/** The decode a tile's cover asks for — wide enough that even the widest column keeps its detail. */
+private const val TILE_ART_PX = 400
+
+/** The tile a downloaded collection stands on — a square cover carrying its state, opened by a click, kept by its menu. */
+@Composable
+private fun DesktopPlaylistDownloadTile(
+    record: DesktopPlaylistDownload,
+    progress: DesktopPlaylistDownloadProgress,
+    stale: Boolean,
+    onOpen: () -> Unit,
+    onUpdate: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val tileHoverInteraction = remember { MutableInteractionSource() }
+    val tileHovered by tileHoverInteraction.collectIsHoveredAsState()
+    var menuOpen by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().hoverable(tileHoverInteraction).desktopNoHoverClickable { onOpen() }) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(14.dp))) {
+            DesktopArtwork(
+                record.thumbnailUrl,
+                Modifier.matchParentSize(),
+                px = TILE_ART_PX,
+                hoverMode = ArtworkHoverMode.DARKEN_ONLY,
+                hovered = tileHovered,
+            )
+            // A short scrim along the foot of the cover — the bar and the badges
+            // read against busy artwork because of it.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.62f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.42f),
+                        ),
+                    ),
+            )
+            if (progress.downloading) {
+                LinearProgressIndicator(
+                    progress = { progress.fraction },
+                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp),
+                    color = DesktopAccent,
+                    trackColor = DesktopForeground.copy(alpha = 0.2f),
+                )
+            }
+            when {
+                progress.complete -> DesktopPlaylistDownloadTileBadge(
+                    Icons.Rounded.DownloadDone,
+                    "Available offline",
+                    DesktopAccent,
+                )
+                stale -> DesktopPlaylistDownloadTileBadge(
+                    Icons.Rounded.Refresh,
+                    "Update available",
+                    DesktopSecondary,
+                )
+            }
+            if (tileHovered || menuOpen) {
+                Box(Modifier.align(Alignment.TopEnd)) {
+                    DesktopMoreButton(onClick = { menuOpen = true })
+                    if (menuOpen) {
+                        DesktopPlaylistDownloadRowMenu(
+                            onOpen = { menuOpen = false; onOpen() },
+                            onUpdate = { menuOpen = false; onUpdate() }.takeIf { stale },
+                            onRemove = { menuOpen = false; onRemove() },
+                            onDismiss = { menuOpen = false },
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            record.title,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            playlistDownloadLine(record, progress, stale),
+            color = DesktopSecondary,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** The state chip at a tile's corner — the icon says where the collection stands, the dark disc backs it. */
+@Composable
+private fun DesktopPlaylistDownloadTileBadge(icon: ImageVector, contentDescription: String, tint: Color) {
+    Box(
+        Modifier
+            .padding(8.dp)
+            .size(26.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.55f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription, tint = tint, modifier = Modifier.size(16.dp))
+    }
+}
+
+/** The billing line under the record's title — where it stands, in one clause. */
+private fun playlistDownloadLine(
+    record: DesktopPlaylistDownload,
+    progress: DesktopPlaylistDownloadProgress,
+    stale: Boolean,
+): String {
+    val billing = if (record.playlist) "Playlist" else "Album"
+    return when {
+        progress.downloading -> "$billing · ${progress.done + progress.active} of ${progress.total} downloading"
+        stale -> "$billing · ${record.songs.size} songs · update available"
+        progress.complete -> "$billing · ${record.songs.size} songs · available offline"
+        progress.done > 0 -> "$billing · ${progress.done} of ${progress.total} downloaded"
+        else -> "$billing · ${record.songs.size} songs"
+    }
+}
+
+/** The tabs a local-music page can carry — the Downloads page inserts Playlists between Songs and Artists. */
+internal enum class DownloadsTab(val label: String) {
+    SONGS("Songs"),
+    PLAYLISTS("Playlists"),
+    ARTISTS("Artists"),
+    ALBUMS("Albums"),
+}
+
+/** A local-music page's tab kinds in order — the Downloads page carries a Playlists tab between Songs and Artists. */
+internal fun downloadsTabs(withPlaylists: Boolean): List<DownloadsTab> = buildList {
+    add(DownloadsTab.SONGS)
+    if (withPlaylists) add(DownloadsTab.PLAYLISTS)
+    add(DownloadsTab.ARTISTS)
+    add(DownloadsTab.ALBUMS)
+}
+
+/** A page with a Playlists tab opens on it — the downloaded collections are the page's own headline. */
+internal fun downloadsDefaultTabIndex(tabs: List<DownloadsTab>): Int =
+    tabs.indexOf(DownloadsTab.PLAYLISTS).takeIf { it >= 0 } ?: 0
 
 @Composable
 private fun DesktopLocalMusicPage(
     songs: List<Song>,
-    downloadedPlaylists: List<DesktopPlaylist>? = null,
     onSongClick: (Song) -> Unit,
     contentPadding: PaddingValues,
     loading: Boolean = false,
@@ -7188,9 +7501,17 @@ private fun DesktopLocalMusicPage(
     emptyDescription: String = "Put audio files in your Music folder and reopen this page.",
     persistenceKey: String = "local",
     menu: (@Composable (Song) -> Unit)? = null,
+    /** A Playlists tab between Songs and Artists — the Downloads page's downloaded collections. */
+    playlistsTab: (@Composable () -> Unit)? = null,
+    /** Copy for the songs list's own empty state, for a page that has a playlists tab to show instead. */
+    songsEmptyTitle: String = "No matching music",
+    songsEmptyDescription: String = "Try a different search.",
 ) {
     val persistence = remember { DesktopPersistence() }
-    var selectedTab by remember(persistenceKey) { mutableStateOf(0) }
+    // Tab kinds in order — the Downloads page carries a Playlists tab between Songs and Artists,
+    // and opens on it: the downloaded collections are the page's own headline.
+    val tabs = downloadsTabs(playlistsTab != null)
+    var selectedTab by remember(persistenceKey) { mutableStateOf(downloadsDefaultTabIndex(tabs)) }
     var searchQuery by remember(persistenceKey) { mutableStateOf("") }
     var view by remember(persistenceKey) {
         mutableStateOf(
@@ -7222,16 +7543,6 @@ private fun DesktopLocalMusicPage(
     val albums = remember(filteredSongs) {
         filteredSongs.groupBy { it.albumName?.takeIf(String::isNotBlank) ?: "Unknown Album" }
             .entries.sortedBy { it.key.lowercase() }
-    }
-    val offlinePlaylists = remember(downloadedPlaylists, songs, searchQuery) {
-        downloadedPlaylists.orEmpty().mapNotNull { playlist ->
-            val saved = playlist.availableDownloads(songs)
-            if (saved.isEmpty()) return@mapNotNull null
-            if (searchQuery.isNotBlank() && !playlist.title.contains(searchQuery, ignoreCase = true) &&
-                saved.none { it.title.contains(searchQuery, ignoreCase = true) ||
-                    it.artist.contains(searchQuery, ignoreCase = true) }) return@mapNotNull null
-            java.util.AbstractMap.SimpleImmutableEntry(playlist.title, saved)
-        }
     }
     DesktopPageScaffold(contentPadding) {
         Column(
@@ -7272,15 +7583,14 @@ private fun DesktopLocalMusicPage(
             }
             Spacer(Modifier.height(10.dp))
             TabRow(selectedTabIndex = selectedTab, containerColor = Color.Transparent) {
-                (if (downloadedPlaylists != null) listOf("Songs", "Artists", "Albums", "Playlists")
-                 else listOf("Songs", "Artists", "Albums")).forEachIndexed { index, label ->
-                    Tab(selected = selectedTab == index, onClick = { selectedTab = index }, text = { Text(label) })
+                tabs.forEachIndexed { index, tab ->
+                    Tab(selected = selectedTab == index, onClick = { selectedTab = index }, text = { Text(tab.label) })
                 }
             }
             Spacer(Modifier.height(8.dp))
             if (loading) {
                 DesktopLoadingPage("Scanning local music…")
-            } else if (songs.isEmpty()) {
+            } else if (songs.isEmpty() && playlistsTab == null) {
                 DesktopEmptyPage(emptyIcon, emptyTitle, emptyDescription)
             } else if (drillDown != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -7289,11 +7599,20 @@ private fun DesktopLocalMusicPage(
                 }
                 Spacer(Modifier.height(6.dp))
                 DesktopLibrarySongContent(drillDown!!.second, view, onSongClick, menu)
-            } else when (selectedTab) {
-                0 -> DesktopLibrarySongContent(filteredSongs, view, onSongClick, menu)
-                1 -> DesktopLibraryGroupingContent(artists, view, onGroupClick = { drillDown = it })
-                2 -> DesktopLibraryGroupingContent(albums, view, onGroupClick = { drillDown = it })
-                else -> DesktopLibraryGroupingContent(offlinePlaylists, view, onGroupClick = { drillDown = it })
+            } else when (tabs[selectedTab]) {
+                DownloadsTab.SONGS -> DesktopLibrarySongContent(
+                    filteredSongs,
+                    view,
+                    onSongClick,
+                    menu,
+                    emptyTitle = songsEmptyTitle,
+                    emptyDescription = songsEmptyDescription,
+                )
+                DownloadsTab.PLAYLISTS ->
+                    playlistsTab?.invoke()
+                        ?: DesktopEmptyPage(emptyIcon, emptyTitle, emptyDescription)
+                DownloadsTab.ARTISTS -> DesktopLibraryGroupingContent(artists, view, onGroupClick = { drillDown = it })
+                DownloadsTab.ALBUMS -> DesktopLibraryGroupingContent(albums, view, onGroupClick = { drillDown = it })
             }
         }
     }
@@ -7312,11 +7631,13 @@ private fun DesktopLibrarySongContent(
     view: DesktopLibraryView,
     onSongClick: (Song) -> Unit,
     menu: (@Composable (Song) -> Unit)? = null,
+    emptyTitle: String = "No matching music",
+    emptyDescription: String = "Try a different search.",
 ) {
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
     if (songs.isEmpty()) {
-        DesktopEmptyPage(BitChordIcons.Search, "No matching music", "Try a different search.")
+        DesktopEmptyPage(BitChordIcons.Search, emptyTitle, emptyDescription)
     } else if (view == DesktopLibraryView.GRID) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 150.dp),
@@ -8749,6 +9070,12 @@ private fun DesktopCollectionPage(
     onAddToPlaylist: (Song) -> Unit,
     downloadedIds: Set<String>,
     downloadInProgress: Set<String>,
+    /** The record for this page's whole-collection download, when one exists. */
+    playlistDownload: DesktopPlaylistDownload?,
+    /** The record's snapshot no longer matches the live listing. */
+    playlistStale: Boolean = false,
+    /** Throws the whole-collection download away; offered when a record exists. */
+    onRemovePlaylistDownload: (() -> Unit)? = null,
     contentPadding: PaddingValues,
 ) {
     val songs = collection.songs
@@ -8917,6 +9244,11 @@ private fun DesktopCollectionPage(
                                             onDownloadAll = playableSongs.takeIf(List<Song>::isNotEmpty)?.let { ready ->
                                                 { onDownloadAll(ready) }
                                             },
+                                            playlistProgress = playlistDownload?.let { record ->
+                                                offlineProgress(record.songs, downloadedIds, downloadInProgress)
+                                            },
+                                            playlistStale = playlistStale,
+                                            onRemovePlaylistDownload = onRemovePlaylistDownload,
                                             onShare = onShare,
                                             onSaveToLibrary = libraryState?.let { status ->
                                                 {
