@@ -6762,7 +6762,10 @@ private fun DesktopArtistBanner(
         val motionUrl = appleArt?.wideVideoUrl ?: appleArt?.squareVideoUrl
         DesktopAppleArtistHero(
             fallbackUrl = fallbackUrl,
-            appleUrl = if (motionUrl != null) null else appleArt?.heroUrl,
+            // Show the artist's high-quality still art immediately while the
+            // native video surface prepares its first frame; avoid a black
+            // rectangle and avoid asking YouTube for a lower quality fallback.
+            appleUrl = appleArt?.heroUrl,
             fallbackPx = HEADER_ART_PX,
             modifier = Modifier.matchParentSize(),
         )
