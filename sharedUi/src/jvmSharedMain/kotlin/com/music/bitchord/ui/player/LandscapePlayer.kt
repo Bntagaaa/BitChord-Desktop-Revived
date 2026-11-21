@@ -272,6 +272,7 @@ internal fun LandscapeArtwork(
                     isPlaying = isPlaying,
                     pausedForTransition = pausedForTransition,
                     onRenderedChanged = onCanvasRenderedChange,
+                    frameCapturePx = 0,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

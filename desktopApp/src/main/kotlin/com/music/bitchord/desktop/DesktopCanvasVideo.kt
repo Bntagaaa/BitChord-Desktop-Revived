@@ -12,6 +12,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -58,14 +59,16 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
     val displayingFrame = rendered && submitted.value
     LaunchedEffect(displayingFrame) { reportRendered(displayingFrame) }
 
-    // One frame once there is one, and then — for a caller re-tinting off the
-    // clip — another every so often.
-    LaunchedEffect(source, displayingFrame, spec.refreshFrameEveryMs, spec.frameCapturePx) {
+    // Sample once for each requested backdrop update. A paused or stalled clip
+    // keeps its image and should not allocate a new snapshot of the same frame.
+    LaunchedEffect(presentation, displayingFrame, spec.refreshFrameEveryMs, spec.frameCapturePx) {
         if (!displayingFrame || spec.frameCapturePx <= 0) return@LaunchedEffect
+        var sampled = presentation.latest?.sequence
         presentation.sample(spec.frameCapturePx)?.let(reportFrame)
         val interval = spec.refreshFrameEveryMs ?: return@LaunchedEffect
         while (isActive) {
             delay(interval)
+            sampled = snapshotFlow { presentation.latest?.sequence }.first { it != null && it != sampled }
             presentation.sample(spec.frameCapturePx)?.let(reportFrame)
         }
     }

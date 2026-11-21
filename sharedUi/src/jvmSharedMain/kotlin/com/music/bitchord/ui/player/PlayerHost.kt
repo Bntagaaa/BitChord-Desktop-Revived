@@ -374,6 +374,7 @@ class CanvasVideoSpec(
     val onRenderedChanged: (Boolean) -> Unit,
     val onFrameCaptured: (ImageBitmap) -> Unit,
     val refreshFrameEveryMs: Long?,
+    /** Longest edge of a capture. Zero disables sampling. */
     val frameCapturePx: Int,
     val onCoverChanged: (Float) -> Unit,
     val bottomFade: Float,

@@ -103,8 +103,8 @@ internal object UnifiedVideoEngine {
                 var shown = false
                 try {
                     runInterruptible { decoder.open(path).getOrThrow() }
-                    while (currentCoroutineContext().isActive) {
-                        running.first { it }
+                    while (context.isActive) {
+                        if (!running.value) running.first { it }
                         val started = System.nanoTime()
                         val frame = decoder.nextFrame { context.ensureActive(); true } ?: break
                         publish(frame)

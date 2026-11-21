@@ -15,6 +15,13 @@ export BITCHORD_MV_PROFILE_CLIP="$clip"
 export BITCHORD_MV_PROFILE_DIR="$out"
 cycles="${BITCHORD_MV_PROFILE_CYCLES:-2}"
 [[ "$cycles" =~ ^[1-9][0-9]*$ ]] || exit 2
+fullscreen_seconds="${BITCHORD_CANVAS_FULLSCREEN_SECONDS:-0}"
+if [[ "$fullscreen_seconds" != 0 ]]; then
+  [[ "$fullscreen_seconds" =~ ^[1-9][0-9]*$ ]] && (( fullscreen_seconds >= 15 && fullscreen_seconds % 15 == 0 )) || {
+    echo 'BITCHORD_CANVAS_FULLSCREEN_SECONDS must be a positive multiple of 15.' >&2
+    exit 2
+  }
+fi
 case "${BITCHORD_VIDEO_PROFILE_SCENARIO:-music}" in
   music) test_name='DesktopMusicVideoMemoryProfileTest' ;;
   canvas) test_name='DesktopSpotifyCanvasMemoryProfileTest'; cycles=1 ;;
@@ -52,7 +59,7 @@ if [[ -s "$out/pid" ]]; then
     [[ "$(cat "$out/memory.swap.max")" == 0 ]]
   fi
   BITCHORD_MEMORY_PROFILE_JCMD=0 bash scripts/profile-desktop-memory.sh \
-    "$pid" "$((cycles * 150 + 30))" 1 "$out" > "$out/sampler.log" 2>&1 &
+    "$pid" "$((cycles * 150 + 30 + fullscreen_seconds))" 1 "$out" > "$out/sampler.log" 2>&1 &
   sampler=$!
 fi
 if ! wait "$build"; then

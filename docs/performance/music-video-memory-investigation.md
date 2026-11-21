@@ -123,3 +123,30 @@ The candidate's session record and backdrop sample were both gone by the first p
 ## Build and runtime coverage
 
 The Linux desktop app, shared, runtime and desktop UI suites passed locally with the JVM regression suites passing. The opt-in visible Music Video and Spotify Canvas runs were executed separately. The Linux desktop distributable was built and checked against 42 freshly compiled player classes. Packaged AutoMix JNI, resampling and model checks passed. Actual Windows GPU presentation was previously deferred. GitHub actions cover Linux and Windows JVM tests, Linux AppImage/DEB/RPM packaging, Windows ZIP/EXE/MSI packaging and packaged JNI/model tests. Provider-backed playback against a real account and simultaneous audio-output timing were outside this local fixture.
+
+## Sustained fullscreen animated artwork
+
+The earlier Canvas profile kept a small Canvas composable visible briefly before testing close. To investigate growth while the player is left open, this profile renders the real `DesktopPlayerSheet` and landscape `NowPlayingScreen` in a fullscreen Compose OpenGL window. It uses a local portrait H.264 loop, a still cover extracted from the same fixture, the Default backdrop, and a synthetic playhead updated every 500 ms. The sequence records a static baseline, 90 seconds of looping, 45 seconds paused on the last frame, and 15 seconds with artwork animation disabled. Linux swap is disabled only for the profile scope.
+
+JFR identified repeated Flow collector and short-circuit exception allocations under the motion decoder's active loop. The decoder now reads the current running state while playing and subscribes only when it needs to wait. The landscape artwork also used to capture one native bitmap for its default no-op callback. It now opts out. Layouts that use video colors still capture fresh frames, while paused or stalled frames are no longer sampled repeatedly.
+
+```bash
+ffmpeg -hide_banner -i /tmp/spotify-canvas.mp4 -frames:v 1 /tmp/canvas-cover.png
+BITCHORD_VIDEO_PROFILE_SCENARIO=canvas BITCHORD_CANVAS_FULLSCREEN_SECONDS=90 \
+  BITCHORD_CANVAS_PROFILE_COVER=/tmp/canvas-cover.png BITCHORD_MV_PROFILE_NO_SWAP=1 \
+  bash scripts/profile-music-video.sh /tmp/spotify-canvas.mp4 /tmp/canvas-fullscreen
+```
+
+Rebuild the baseline with the same profile test and script to compare both the shared UI and desktop decoder revisions. Allocation rates from JFR estimate Java allocation over the timed playback period. Sampled object stacks identify allocation sites. Neither describes retained native allocations. The local fixture does not reproduce provider-specific playback, library pressure, or the exact session reported for “7 rings”.
+
+| Stage | Baseline RSS / PSS (MiB) | Candidate RSS / PSS (MiB) |
+| --- | ---: | ---: |
+| Static, before enabling motion | 377.6 / 324.7 | 346.0 / 296.8 |
+| Playing at 15 s | 414.2 / 361.2 | 378.5 / 329.9 |
+| Playing at 90 s | 397.5 / 349.7 | 339.9 / 297.6 |
+| Paused for 45 s | 395.2 / 347.5 | 339.7 / 299.6 |
+| Animation disabled for 15 s | 394.8 / 347.0 | 341.7 / 301.6 |
+
+The baseline had a cold-start RSS peak of 416.4 MiB versus 385.6 MiB for the candidate. The starting values differed by about 32 MiB, which means the peak difference cannot be credited to this change. Neither run reproduced continuously increasing RSS. DRM client resident memory moved with playback, from approximately 143–149 MiB at the end of the active phase to 64–65 MiB after 45 seconds paused. Both runs removed the motion session after disabling animation. [Fullscreen phase samples](unified-video-engine-evidence/fullscreen-canvas-steady-state.csv).
+
+The estimated JVM allocation rate changed from 0.875 to 0.851 MiB/s over the same active interval. Nine sampled Flow objects had stacks in the baseline motion decoder and zero did in the candidate. This confirms removal of the repeated collector path in this capture. It does not establish a general reduction in RSS or rule out a slower, session-specific native leak. The Canvas UI regression verifies that the still frame is kept during pause, repeated sampling stops, the zero-capture request draws without taking a sample, and hiding still restores artwork.

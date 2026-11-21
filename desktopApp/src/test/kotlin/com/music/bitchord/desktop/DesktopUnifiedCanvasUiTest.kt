@@ -23,6 +23,7 @@ import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,10 +45,13 @@ class DesktopUnifiedCanvasUiTest {
         try {
             val surfaceVisible = mutableStateOf(true)
             val canvasEnabled = mutableStateOf(true)
+            val playing = mutableStateOf(true)
+            val capturePx = mutableStateOf(16)
             val source = MotionVideoSource(url, null, DesktopCanvasDecoder.MAX_EDGE,
                 MotionVideoSource.Clock.NowPlaying, "Fixture")
             val submitted = AtomicBoolean(false)
             val sampleSize = AtomicReference<IntSize?>()
+            val captures = AtomicInteger()
             runDesktopComposeUiTest(width = 160, height = 120) {
                 setContent {
                     ProvideDesktopPresentationLifecycle(surfaceVisible.value) {
@@ -56,7 +60,7 @@ class DesktopUnifiedCanvasUiTest {
                                 CanvasVideoSpec(
                                     canvas = CanvasArtwork(url = url, title = "Fixture", artist = "Test", album = "Test",
                                         source = CanvasSource.SPOTIFY),
-                                    isPlaying = true,
+                                    isPlaying = playing.value,
                                     contentMode = CanvasContentMode.CROP,
                                     alignPortraitTop = false,
                                     onAspectRatioChanged = {},
@@ -66,9 +70,12 @@ class DesktopUnifiedCanvasUiTest {
                                         submitted.set(it)
                                         if (!it) sampleSize.set(null)
                                     },
-                                    onFrameCaptured = { sampleSize.set(IntSize(it.width, it.height)) },
-                                    refreshFrameEveryMs = null,
-                                    frameCapturePx = 16,
+                                    onFrameCaptured = {
+                                        sampleSize.set(IntSize(it.width, it.height))
+                                        captures.incrementAndGet()
+                                    },
+                                    refreshFrameEveryMs = 1_000,
+                                    frameCapturePx = capturePx.value,
                                     onCoverChanged = {},
                                     bottomFade = .5f,
                                     bottomFadeEndPx = null,
@@ -85,7 +92,15 @@ class DesktopUnifiedCanvasUiTest {
                 val active = onNodeWithTag("artwork").captureToImage().toPixelMap()
                 assertTrue(active[80, 20].red > .85f)
                 assertTrue(active[80, 118].blue > .85f)
-                runOnIdle { surfaceVisible.value = false }
+                runOnIdle { playing.value = false }
+                mainClock.advanceTimeBy(1_200)
+                val pausedSamples = captures.get()
+                mainClock.advanceTimeBy(3_000)
+                assertEquals(pausedSamples, captures.get(), "A paused frame must not be sampled again")
+                runOnIdle {
+                    playing.value = true
+                    surfaceVisible.value = false
+                }
                 waitUntil(timeoutMillis = 5_000) {
                     !submitted.get() && !UnifiedVideoEngine.hasMotionSession(source)
                 }
@@ -103,6 +118,15 @@ class DesktopUnifiedCanvasUiTest {
                 }
                 assertEquals(null, sampleSize.get())
                 assertTrue(onNodeWithTag("artwork").captureToImage().toPixelMap()[80, 20].blue > .95f)
+
+                val beforeNoCapture = captures.get()
+                runOnIdle {
+                    capturePx.value = 0
+                    canvasEnabled.value = true
+                }
+                waitUntil(timeoutMillis = 5_000) { submitted.get() }
+                mainClock.advanceTimeBy(2_000)
+                assertEquals(beforeNoCapture, captures.get(), "Opting out must also skip the first sample")
             }
         } finally {
             server.stop(0)
