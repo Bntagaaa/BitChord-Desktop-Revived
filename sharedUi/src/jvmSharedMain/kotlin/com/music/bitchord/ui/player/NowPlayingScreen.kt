@@ -1287,7 +1287,7 @@ fun NowPlayingScreen(
     // had and never re-emits, so the `onState` that is the sole writer here
     // never fires again. Keyed on the cover there is nothing to reset: the
     // bitmap really is still loaded, so the state stays true.
-    val art = rememberPlayerArtwork(remoteArt)
+    val art = rememberPlayerArtwork(remoteArt, song.videoId)
     // Sticky, unlike [PlayerArtwork.loaded]: the banner is the shape of the player rather
     // than a property of the track in it. Waiting on each new cover would
     // collapse the banner into a card and blow it back out on every skip —
@@ -1385,7 +1385,7 @@ fun NowPlayingScreen(
     // Portrait clips always use the existing artwork mesh, even if the user
     // selected the legacy backdrop for ordinary artwork.
     val artMesh = if (playerBackdropTheme != PlayerTheme.DEFAULT) null else
-        key(song.videoId) { rememberArtworkMesh(remoteArt, canvasFrame, ART_PX) }
+        key(song.videoId) { rememberArtworkMesh(art.activeUrl, canvasFrame, ART_PX) }
     // Whether the banner is the presentation at all: full-bleed is on, and there
     // is something to blow out. The collapse is deliberately *not* part of this:
     // the sleeve goes from banner to thumbnail as one movement, rather than the
@@ -1657,7 +1657,7 @@ fun NowPlayingScreen(
     // reuse the same tiny pre-blurred bitmap instead of running a screen-sized
     // effect.
     val fullArtworkBlurImage = rememberFullArtworkBlurImage(
-        imageUrl = remoteArt,
+        imageUrl = art.activeUrl,
         artPx = ART_PX,
         prepare = playerBackdropTheme == PlayerTheme.SIMPLE ||
             landscape || tabletArtworkBackdrop || lyricsOpen || queueOpen || playerPrewarmStage >= 1,
@@ -2074,6 +2074,7 @@ fun NowPlayingScreen(
                         LandscapeArtwork(
                             artRequest = art.request,
                             artLoaded = art.loaded,
+                            retainedArtPainter = art.retainedPainter,
                             onArtState = art::onState,
                             canvas = canvas,
                             canvasRendered = canvasRendered,
@@ -3274,11 +3275,15 @@ fun NowPlayingScreen(
                                 // wide, and the one bitmap has to serve both shapes
                                 // with nothing to upscale between them.
                                 model = art.request,
+                                placeholder = art.retainedPainter,
+                                error = art.retainedPainter,
                                 contentDescription = null,
                                 // Video thumbnails are 16:9; letterboxing them inside
                                 // the square sleeve looks like a broken frame.
                                 contentScale = ContentScale.Crop,
-                                onState = art::onState,
+                                onLoading = art::onState,
+                                onSuccess = art::onState,
+                                onError = art::onState,
                                 // TextureView-backed canvas frames can arrive
                                 // before Coil has decoded the sleeve. Alpha alone
                                 // doesn't hide this layer for that window: a

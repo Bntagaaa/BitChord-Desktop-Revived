@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import androidx.compose.ui.graphics.painter.Painter
 import coil3.request.ImageRequest
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.icons.BitChordIcons
@@ -206,6 +207,7 @@ internal fun LandscapePlayerLayout(
 internal fun LandscapeArtwork(
     artRequest: ImageRequest,
     artLoaded: Boolean,
+    retainedArtPainter: Painter? = null,
     onArtState: (AsyncImagePainter.State) -> Unit,
     canvas: CanvasArtwork?,
     canvasRendered: Boolean,
@@ -257,9 +259,13 @@ internal fun LandscapeArtwork(
             }
             AsyncImage(
                 model = artRequest,
+                placeholder = retainedArtPainter,
+                error = retainedArtPainter,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                onState = onArtState,
+                onLoading = onArtState,
+                onSuccess = onArtState,
+                onError = onArtState,
                 // Not drawn under a clip that got there first — see the
                 // portrait sleeve's note on TextureView stacking order.
                 modifier = Modifier

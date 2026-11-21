@@ -23,6 +23,7 @@ import coil3.PlatformContext
 import coil3.compose.LocalPlatformContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImagePainter
+import androidx.compose.ui.graphics.painter.Painter
 import coil3.request.ImageRequest
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.data.model.Song
@@ -93,7 +94,31 @@ internal fun rememberCanvasArtwork(song: Song): CanvasArtwork? {
  * Everything here is keyed on the cover's [url] — see [rememberPlayerArtwork].
  */
 @Stable
-internal class PlayerArtwork(val url: String?, private val context: PlatformContext) {
+internal class PlayerArtwork(
+    val url: String?,
+    private val fallbackUrl: String?,
+    private val context: PlatformContext,
+) {
+    /**
+     * After the fast retries, a missing/expired YouTube Music cover may still be
+     * recoverable from the public thumbnail endpoint. Use the same effective URL
+     * for the sleeve, mesh and blur, so those layers do not disagree.
+     */
+    val activeUrl: String?
+        get() = when {
+            url.isNullOrBlank() -> fallbackUrl
+            attempt >= ART_RETRIES && fallbackUrl != null && fallbackUrl != url -> fallbackUrl
+            else -> url
+        }
+
+    /**
+     * A successfully decoded painter belongs to this artwork URL and survives
+     * landscape/portrait AsyncImage remounts. Coil can briefly go back to Loading
+     * when switching fullscreen, especially after a memory-cache trim; the
+     * retained painter is a placeholder for that interval, not another decode.
+     */
+    var retainedPainter by mutableStateOf<Painter?>(null)
+        private set
     /**
      * Whether the cover is on screen. Keyed on the artwork rather than on the
      * track, because that is what it actually describes and because only Coil
@@ -140,7 +165,7 @@ internal class PlayerArtwork(val url: String?, private val context: PlatformCont
     val request: ImageRequest by derivedStateOf {
         val attempt = attempt
         ImageRequest.Builder(context)
-            .data(url)
+            .data(activeUrl)
             .size(ART_PX)
             // What makes a retry a new request as far as Coil's model comparison
             // is concerned. Only from the second go onwards, so the ordinary
@@ -153,13 +178,23 @@ internal class PlayerArtwork(val url: String?, private val context: PlatformCont
 
     /** Fed from each painter drawing [request]. */
     fun onState(state: AsyncImagePainter.State) {
-        loaded = state is AsyncImagePainter.State.Success
-        // Only the failure is latched, and only upwards: the retry that clears
-        // it is [failed]'s own effect, and clearing it from a Loading state here
-        // would cancel that effect's wait every time the painter passed back
-        // through Loading.
-        if (state is AsyncImagePainter.State.Success) failed = false
-        if (state is AsyncImagePainter.State.Error) failed = true
+        when (state) {
+            is AsyncImagePainter.State.Success -> {
+                retainedPainter = state.painter
+                loaded = true
+                failed = false
+            }
+            is AsyncImagePainter.State.Error -> {
+                // Do not blank a previously successful sleeve during a temporary
+                // network failure or a new painter being mounted for fullscreen.
+                loaded = retainedPainter != null
+                failed = true
+            }
+            else -> {
+                // Loading/Empty is not a new failure; keep a good cover visible.
+                loaded = retainedPainter != null
+            }
+        }
     }
 
     internal fun retry() {
@@ -168,17 +203,32 @@ internal class PlayerArtwork(val url: String?, private val context: PlatformCont
     }
 }
 
+/** Recovery cadence after a transport/Coil error, never on successful loads. */
+internal fun playerArtworkRetryDelayMs(failedAttempts: Int): Long = when {
+    failedAttempts < ART_RETRIES -> ART_RETRY_DELAY_MS
+    failedAttempts == ART_RETRIES -> 5_000L
+    failedAttempts == ART_RETRIES + 1 -> 15_000L
+    else -> 60_000L // Stay recoverable without hammering permanently missing art.
+}
+
+private val YOUTUBE_VIDEO_ID = Regex("[A-Za-z0-9_-]{11}")
+
+/** Only use the public fallback for genuine YouTube video IDs, not local files. */
+internal fun youtubeThumbnailRecoveryUrl(videoId: String): String? =
+    videoId.takeIf { YOUTUBE_VIDEO_ID.matches(it) }
+        ?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
+
 @Composable
-internal fun rememberPlayerArtwork(remoteArt: String?): PlayerArtwork {
+internal fun rememberPlayerArtwork(remoteArt: String?, videoId: String): PlayerArtwork {
     val context = LocalPlatformContext.current
-    val artUrl = remoteArt?.artworkAt(ART_PX)
-    val art = remember(artUrl) { PlayerArtwork(artUrl, context) }
-    LaunchedEffect(artUrl, art.failed) {
-        // A track with no artwork at all fails immediately and would fail
-        // identically three more times: there is no request to make, so there is
-        // nothing a second go could do differently.
-        if (artUrl == null || !art.failed || art.attempt >= ART_RETRIES) return@LaunchedEffect
-        delay(ART_RETRY_DELAY_MS)
+    val artUrl = remoteArt?.takeIf { it.isNotBlank() }?.artworkAt(ART_PX)
+    val fallbackUrl = youtubeThumbnailRecoveryUrl(videoId)
+    val art = remember(artUrl, fallbackUrl) { PlayerArtwork(artUrl, fallbackUrl, context) }
+    LaunchedEffect(art, art.failed, art.attempt) {
+        if (art.activeUrl == null || !art.failed) return@LaunchedEffect
+        // A fast burst absorbs transient failures; later attempts are spread
+        // out so a missing cover neither stays blank forever nor spins on I/O.
+        delay(playerArtworkRetryDelayMs(art.attempt))
         art.retry()
     }
     return art

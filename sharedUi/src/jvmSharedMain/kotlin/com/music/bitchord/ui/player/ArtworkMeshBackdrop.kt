@@ -41,6 +41,7 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import com.music.bitchord.data.model.CARD_ART_PX
 import com.music.bitchord.data.model.artworkAt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -114,8 +115,23 @@ fun rememberFullArtworkBlurImage(
                 .size(FULL_BLUR_SOURCE_PX)
                 .forPixelAccess()
                 .build()
-            val result = SingletonImageLoader.get(context).execute(request)
-            (result as? SuccessResult)?.image?.toImageBitmap() ?: return@LaunchedEffect
+            // The fullscreen blur used to try once. A transient CDN/Coil
+            // failure left the whole player black for the rest of the song.
+            // Retry at low frequency, without adding a second full-size decode.
+            var loaded: ImageBitmap? = null
+            for (attempt in 0 until FULL_BLUR_ATTEMPTS) {
+                if (attempt > 0) delay(FULL_BLUR_RETRY_DELAY_MS * attempt)
+                val result = try {
+                    SingletonImageLoader.get(context).execute(request)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+                loaded = (result as? SuccessResult)?.image?.toImageBitmap()
+                if (loaded != null) break
+            }
+            loaded ?: return@LaunchedEffect
         }
         val blurred = withContext(Dispatchers.Default) {
             bitmap.fullBlurSized().boxBlurred(FULL_BLUR_PASSES)
@@ -514,6 +530,9 @@ private val FallbackBackdrop = Color(0xFF121212)
 /** A screen cannot recover detail discarded here; small is the performance feature. */
 private const val FULL_BLUR_SOURCE_PX = 128
 private const val FULL_BLUR_PASSES = 3
+/** Short bounded recovery for intermittent fullscreen background load failures. */
+private const val FULL_BLUR_ATTEMPTS = 4
+private const val FULL_BLUR_RETRY_DELAY_MS = 1_500L
 
 /** A handful of recent covers; each entry is only 64 KiB at 128x128 ARGB. */
 private val fullBlurCache = object : LinkedHashMap<String, ImageBitmap>(0, 0.75f, true) {
