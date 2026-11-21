@@ -2,6 +2,8 @@
 
 Baseline: `87ada9ada74e385a8bc168ffeca7d4b32aa43e23` on `1.9.3-phase-1`, the merge of [PR #156](https://github.com/Bntagaaa/BitChord-Desktop-Revived/pull/156). The workspace snapshot matched the fetched commit. The separate experimental branch ended at `d2468fe7`; it was inspected without merging.
 
+The investigation of 1080p retention after the unification used the later PR #157 baseline `f0a0c27e`. The [Music Video memory investigation](music-video-memory-investigation.md) traces frame ownership through FFmpeg, Skia, Compose, the system allocator and the graphics driver, and records before/after close measurements.
+
 ## Video and resource ownership
 
 | Consumer | Entry points | Current producer and ownership |

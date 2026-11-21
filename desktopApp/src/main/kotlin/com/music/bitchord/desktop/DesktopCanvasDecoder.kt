@@ -50,11 +50,12 @@ import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
 
 /** The motion artwork, decoded here rather than played by a second media stack. */
-internal class DesktopCanvasDecoder(
+internal class DesktopCanvasDecoder @JvmOverloads constructor(
     private val maxEdge: Int = 540,
     private val loopAtEnd: Boolean = true,
     private val preferMotionRendition: Boolean = false,
     private val owner: Job? = null,
+    private val reuseMusicRasterStorage: Boolean = false,
 ) : VideoDecoder {
 
     private var interrupt: AVIOInterruptCB.Callback_Pointer? = null
@@ -65,6 +66,7 @@ internal class DesktopCanvasDecoder(
     private var frame: AVFrame? = null
     private var scaler: SwsContext? = null
     private var imageInfo: ImageInfo? = null
+    private var musicRaster: MusicVideoRasterStorage? = null
     private val destination = VideoPixelPointer()
     private var planes: PointerPointer<BytePointer>? = null
     private var strides: IntPointer? = null
@@ -195,13 +197,14 @@ internal class DesktopCanvasDecoder(
                 val converter = scalerFor(decoded.format()) ?: return null
                 val info = checkNotNull(imageInfo)
                 val rowBytes = Math.multiplyExact(width, 4)
+                if (reuseMusicRasterStorage) {
+                    val storage = musicRaster ?: MusicVideoRasterStorage(info, rowBytes).also { musicRaster = it }
+                    scaleFrame(decoded, converter, storage.address)
+                    return VideoFrame(width, height, storage.snapshot())
+                }
                 // swscale implementations may access padding beyond the last pixel.
                 return Data.makeUninitialized(Math.addExact(Math.multiplyExact(rowBytes, height), 64)).use { data ->
-                    destination.pointAt(data.writableData())
-                    val output = checkNotNull(planes)
-                    val lines = checkNotNull(strides)
-                    check(av_image_fill_arrays(output, lines, destination, AV_PIX_FMT_BGRA, width, height, 1) >= 0)
-                    check(sws_scale(converter, decoded.data(), decoded.linesize(), 0, sourceHeight, output, lines) == height)
+                    scaleFrame(decoded, converter, data.writableData())
                     VideoFrame(width, height, Image.makeRaster(info, data, rowBytes))
                 }
             }
@@ -218,6 +221,14 @@ internal class DesktopCanvasDecoder(
             if (pkt.stream_index() == streamIndex) avcodec_send_packet(context, pkt)
             av_packet_unref(pkt)
         }
+    }
+
+    private fun scaleFrame(decoded: AVFrame, converter: SwsContext, address: Long) {
+        destination.pointAt(address)
+        val output = checkNotNull(planes)
+        val lines = checkNotNull(strides)
+        check(av_image_fill_arrays(output, lines, destination, AV_PIX_FMT_BGRA, width, height, 1) >= 0)
+        check(sws_scale(converter, decoded.data(), decoded.linesize(), 0, sourceHeight, output, lines) == height)
     }
 
     /** The converter for the format frames are actually arriving in. */
@@ -255,6 +266,8 @@ internal class DesktopCanvasDecoder(
     }
 
     override fun close() {
+        musicRaster?.close()
+        musicRaster = null
         frame?.let { av_frame_free(it) }
         packet?.let { av_packet_free(it) }
         scaler?.let { sws_freeContext(it) }

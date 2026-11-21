@@ -3,6 +3,10 @@ package com.music.bitchord.desktop
 import com.music.bitchord.data.innertube.InnerTubeXResolver
 import com.music.bitchord.data.model.Song
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import org.jetbrains.skia.Rect
+import org.jetbrains.skia.Surface
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,6 +66,12 @@ class DesktopVideoSessionTest {
             session.attach("video")
             await { session.frame.value != null }
             val warm = session.frame.value
+            // PiP mounts before the main surface is hidden. The remaining lease keeps the picture.
+            session.attach("video")
+            assertEquals(2, session.resources().surfaces)
+            session.detach("video")
+            assertEquals(1, session.resources().surfaces)
+            assertEquals(0, session.resources().handoffs)
             repeat(30) { session.detach("video"); delay(40); session.attach("video") }
             assertSame(warm, session.frame.value, "opens=${decoder.opens.get()} closes=${decoder.closes.get()} seeks=${decoder.seeks.get()} failed=${session.failed.value}")
             assertEquals(1, resolves.get()); assertEquals(1, decoder.opens.get()); assertEquals(0, decoder.closes.get())
@@ -143,11 +153,153 @@ class DesktopVideoSessionTest {
             session.attach("a")
             await { session.frame.value != null }
             val first = session.frame.value
+            session.withFrame("a") {}
             clock.value = clock.value.copy(isPlaying = true)
             await { decoder.eofReads.get() > 0 }
             clock.value = clock.value.copy(positionMs = 3000, seeks = 2)
             await { session.frame.value !== first && decoder.frameTimeMs == 3000L }
             assertEquals(1, attempts.get()); assertEquals(1, decoder.opens.get())
         } finally { session.close(); scope.cancel() }
+    }
+
+    @Test fun presentationBackpressureAndRepeatedPausedSeeksKeepOneDecoder() = runBlocking {
+        val clock = MutableStateFlow(state("video").copy(isPlaying = true))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val decoder = Decoder()
+        val session = DesktopVideoSession(scope, clock, { 1f }, ::stream, { decoder })
+        try {
+            session.attach("video")
+            await { session.presentation.value != null }
+            // No consumer has recorded this frame yet, so nothing else is decoded.
+            delay(80)
+            assertEquals(0, decoder.eofReads.get())
+            session.withFrame("video") {}
+            await { decoder.eofReads.get() > 0 }
+
+            repeat(4) { index ->
+                val previous = session.presentation.value
+                val position = (index + 2) * 1000L
+                clock.value = clock.value.copy(isPlaying = false, positionMs = position,
+                    seeks = clock.value.seeks + 1)
+                await { session.presentation.value != previous && decoder.frameTimeMs == position }
+                val reads = decoder.eofReads.get()
+                session.withFrame("video") {}
+                delay(30)
+                assertEquals(reads, decoder.eofReads.get())
+                clock.value = clock.value.copy(isPlaying = true)
+                await { decoder.eofReads.get() > reads }
+            }
+            assertEquals(1, decoder.opens.get())
+        } finally { session.close(); scope.cancel() }
+    }
+
+    @Test fun repeatedLastSurfaceCloseClearsWorkersAndPresentation() = runBlocking {
+        val clock = MutableStateFlow(state("video"))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val decoders = CopyOnWriteArrayList<Decoder>()
+        val session = DesktopVideoSession(scope, clock, { 1f }, { id, height ->
+            assertEquals(1080, height)
+            stream(id, height)
+        }, { Decoder().also(decoders::add) })
+        try {
+            repeat(30) {
+                session.attach("video")
+                await { session.presentation.value != null }
+                assertEquals(1, session.resources().publishedFrames)
+                session.detach("video")
+                await { session.resources() == MusicVideoResources(0, 0, 0, 0, 0, 0) }
+                assertNull(session.frame.value)
+                assertNull(session.presentation.value)
+            }
+            assertEquals(30, decoders.size)
+            assertTrue(decoders.all { it.opens.get() == 1 && it.closes.get() == 1 })
+        } finally { session.close(); scope.cancel() }
+    }
+
+    @Test fun cancelledDecodeCannotPublishAfterTheLastSurface() = runBlocking {
+        val clock = MutableStateFlow(state("video"))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val entered = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val delivered = CompletableDeferred<VideoFrame>()
+        val session = DesktopVideoSession(scope, clock, { 1f }, { id, height -> stream(id, height) }, {
+            object : DesktopVideoDecoder by Decoder() {
+                override fun nextFrame(accept: (Long) -> Boolean): VideoFrame {
+                    entered.complete(Unit)
+                    check(release.await(5, TimeUnit.SECONDS))
+                    return VideoFrame(2, 2, ByteArray(16)).also { delivered.complete(it) }
+                }
+            }
+        })
+        try {
+            session.attach("video")
+            withTimeout(3000) { entered.await() }
+            session.detach("video")
+            await { session.resources().handoffs == 0 }
+            release.countDown()
+            val late = withTimeout(3000) { delivered.await() }
+            await { session.resources() == MusicVideoResources(0, 0, 0, 0, 0, 0) }
+            assertNull(session.presentation.value)
+            assertNull(late.sample(2))
+        } finally {
+            release.countDown()
+            session.close()
+            scope.cancel()
+        }
+    }
+
+    @Test fun actualAudioEndReleasesThePictureWhileSurfaceRemainsMounted() = runBlocking {
+        val clock = MutableStateFlow(state("video").copy(durationMs = 6_000))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val decoder = Decoder()
+        val session = DesktopVideoSession(scope, clock, { 1f }, { id, height -> stream(id, height) }, { decoder })
+        try {
+            session.attach("video")
+            await { session.presentation.value != null }
+            clock.value = clock.value.copy(positionMs = 6_000, isPlaying = false)
+            await { session.resources() == MusicVideoResources(0, 0, 1, 0, 0, 0) }
+            assertEquals(1, decoder.closes.get())
+        } finally { session.close(); scope.cancel() }
+    }
+
+    @Test fun closingDuringDrawWaitsForTheCurrentImage() = runBlocking {
+        val clock = MutableStateFlow(state("video"))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val decoder = Decoder()
+        val session = DesktopVideoSession(scope, clock, { 1f }, ::stream, { decoder })
+        val entered = CompletableDeferred<Unit>()
+        val closing = CompletableDeferred<Unit>()
+        val allowDraw = CountDownLatch(1)
+        try {
+            session.attach("video")
+            await { session.frame.value != null }
+            val frame = checkNotNull(session.frame.value).second
+            val draw = async(Dispatchers.IO) {
+                session.withFrame("video") {
+                    entered.complete(Unit)
+                    check(allowDraw.await(5, TimeUnit.SECONDS))
+                    Surface.makeRasterN32Premul(16, 9).use { target ->
+                        assertTrue(it.drawTo(target.canvas, Rect.makeWH(16f, 9f)))
+                    }
+                }
+            }
+            try {
+                withTimeout(3000) { entered.await() }
+                val close = async(Dispatchers.IO) {
+                    closing.complete(Unit)
+                    session.close()
+                }
+                withTimeout(3000) { closing.await() }
+                assertFalse(close.isCompleted)
+                allowDraw.countDown()
+                close.await()
+                draw.await()
+                await { session.resources() == MusicVideoResources(0, 0, 0, 0, 0, 0) }
+                assertNull(frame.sample(2))
+            } finally { allowDraw.countDown() }
+        } finally {
+            session.close()
+            scope.cancel()
+        }
     }
 }

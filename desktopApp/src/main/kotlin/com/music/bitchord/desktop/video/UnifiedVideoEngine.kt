@@ -37,12 +37,14 @@ internal interface VideoDecoder : AutoCloseable {
 }
 
 internal interface VideoBackend {
-    fun decoder(maxEdge: Int, loop: Boolean, owner: Job?, preferMotionRendition: Boolean = false): VideoDecoder
+    fun decoder(maxEdge: Int, loop: Boolean, owner: Job?, preferMotionRendition: Boolean = false,
+        musicVideo: Boolean = false): VideoDecoder
 }
 
 private object FfmpegVideoBackend : VideoBackend {
-    override fun decoder(maxEdge: Int, loop: Boolean, owner: Job?, preferMotionRendition: Boolean) =
-        DesktopCanvasDecoder(maxEdge, loop, preferMotionRendition, owner)
+    override fun decoder(maxEdge: Int, loop: Boolean, owner: Job?, preferMotionRendition: Boolean,
+        musicVideo: Boolean) =
+        DesktopCanvasDecoder(maxEdge, loop, preferMotionRendition, owner, reuseMusicRasterStorage = musicVideo)
 }
 
 internal object UnifiedVideoEngine {
@@ -56,13 +58,25 @@ internal object UnifiedVideoEngine {
     fun motion(source: MotionVideoSource, running: Boolean) = motion.attach(source, running)
 
     fun musicDecoder(owner: Job?): DesktopVideoDecoder {
-        val decoder = backend.decoder(8192, loop = false, owner = owner)
         return object : DesktopVideoDecoder {
-            override val frameTimeMs get() = decoder.frameTimeMs
-            override fun open(stream: InnerTubeXResolver.VideoStream) = decoder.open(stream.url, stream.headers).getOrThrow()
-            override fun seekTo(millis: Long) = decoder.seekTo(millis)
-            override fun nextFrame(accept: (Long) -> Boolean) = decoder.nextFrame(accept)
-            override fun close() = decoder.close()
+            private var decoder: VideoDecoder? = null
+            override val frameTimeMs get() = decoder?.frameTimeMs ?: 0
+            override fun open(stream: InnerTubeXResolver.VideoStream) {
+                val reportedEdge = maxOf(stream.width, stream.height)
+                val maxEdge = if (stream.width > 0 && stream.height > 0) reportedEdge.coerceAtMost(8192) else 8192
+                val next = backend.decoder(maxEdge, loop = false, owner = owner, musicVideo = true)
+                decoder = next
+                next.open(stream.url, stream.headers).getOrThrow()
+                if (next is DesktopCanvasDecoder) {
+                    DesktopTrackLog.log("music video: stream ${stream.width}x${stream.height}, output ${next.width}x${next.height}")
+                }
+            }
+            override fun seekTo(millis: Long) = decoder?.seekTo(millis) == true
+            override fun nextFrame(accept: (Long) -> Boolean) = decoder?.nextFrame(accept)
+            override fun close() {
+                decoder?.close()
+                decoder = null
+            }
         }
     }
 

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.geometry.Size
 import com.music.bitchord.data.innertube.InnerTubeXResolver
 import com.music.bitchord.ui.player.MusicVideoQualityUi
 import com.music.bitchord.ui.LocalDesktopPresentationVisible
@@ -19,6 +20,17 @@ internal interface DesktopVideoDecoder {
     fun nextFrame(accept: (Long) -> Boolean = { true }): VideoFrame?
     fun close()
 }
+
+internal data class MusicVideoPresentation(val id: String, val size: Size, val sequence: Long)
+
+internal data class MusicVideoResources(
+    val sessions: Int,
+    val decoders: Int,
+    val surfaces: Int,
+    val handoffs: Int,
+    val publishedFrames: Int,
+    val publishedBytes: Long,
+)
 
 /** One audio-clocked decoder shared by the currently visible surfaces. */
 internal class DesktopVideoSession(
@@ -38,7 +50,14 @@ internal class DesktopVideoSession(
     val held = MutableStateFlow<Int?>(null)
     val quality = MutableStateFlow(MusicVideoQualityUi())
     val aspect = MutableStateFlow(16f / 9f)
-    val frame = MutableStateFlow<Pair<String, VideoFrame>?>(null)
+    private val latestFrame = MutableStateFlow<Pair<String, VideoFrame>?>(null)
+    internal val frame = latestFrame.asStateFlow()
+    private val mutablePresentation = MutableStateFlow<MusicVideoPresentation?>(null)
+    val presentation = mutablePresentation.asStateFlow()
+    private var sequence = 0L
+    private var activeSession = false
+    private var activeDecoder = false
+    private var awaitingDraw = false
     val failed = MutableStateFlow(false)
 
     @Synchronized fun attach(id: String) {
@@ -65,43 +84,83 @@ internal class DesktopVideoSession(
         if (pendingRelease[id] !== release) return
         pendingRelease.remove(id)
         liveSurfaces.value = liveSurfaces.value - id
+        if (latestFrame.value?.first == id) clearFrame()
     }
 
     fun retry() { retries.value++ }
 
     @Synchronized
-    private fun publish(next: Pair<String, VideoFrame>?) {
-        if (closed) {
-            next?.second?.close()
-            return
-        }
-        val old = frame.value
-        frame.value = next
+    private fun publish(id: String, next: VideoFrame, owner: Job, seek: Int): Boolean {
+        val audio = clock.value
+        if (closed || !owner.isActive || users.value[id] == null || audio.song?.videoId != id ||
+            audio.awaitingAudio || audio.seeks != seek) return false
+        val old = latestFrame.value
+        latestFrame.value = id to next
+        awaitingDraw = true
+        mutablePresentation.value = MusicVideoPresentation(id, next.intrinsicSize, ++sequence)
+        old?.second?.close()
+        return true
+    }
+
+    @Synchronized
+    private fun clearFrame() {
+        val old = latestFrame.value
+        latestFrame.value = null
+        awaitingDraw = false
+        mutablePresentation.value = null
         old?.second?.close()
     }
 
     @Synchronized
     fun withFrame(id: String, draw: (VideoFrame) -> Unit) {
-        frame.value?.takeIf { it.first == id }?.second?.let(draw)
+        if (users.value[id] == null) return
+        val current = latestFrame.value?.takeIf { it.first == id }?.second ?: return
+        draw(current)
+        awaitingDraw = false
     }
+
+    @Synchronized
+    fun resources(): MusicVideoResources {
+        val current = latestFrame.value?.second
+        return MusicVideoResources(
+            if (activeSession) 1 else 0, if (activeDecoder) 1 else 0,
+            users.value.values.sum(), pendingRelease.size, if (current == null) 0 else 1,
+            current?.let { it.width.toLong() * it.height * 4 } ?: 0L,
+        )
+    }
+
+    @Synchronized
+    private fun setActive(session: Boolean, decoder: Boolean) {
+        activeSession = session
+        activeDecoder = decoder
+    }
+
+    @Synchronized
+    private fun recordingBehind(id: String): Boolean =
+        awaitingDraw && (users.value[id] ?: 0) > 0
 
     private val job = scope.launch {
         val media = clock.combine(enabled) { audio, beta ->
-            audio.song?.takeIf { beta && it.isVideo }?.videoId
+            val ended = !audio.isPlaying && audio.durationMs > 0 && audio.positionMs >= audio.durationMs
+            audio.song?.takeIf { beta && it.isVideo && !ended }?.videoId
         }.distinctUntilChanged()
         val visibleMedia = media.combine(liveSurfaces) { id, active -> id?.takeIf { it in active } }
             .distinctUntilChanged()
         combine(visibleMedia, held, retries) { id, height, retry -> Triple(id, height, retry) }
             .collectLatest { (id, height, _) ->
-                publish(null)
+                clearFrame()
                 failed.value = false
                 quality.value = MusicVideoQualityUi(held = height)
                 if (id == null) return@collectLatest
-                val decoder = decoderFactory(currentCoroutineContext()[Job])
+                val worker = currentCoroutineContext().job
+                setActive(session = true, decoder = false)
+                var decoderToClose: DesktopVideoDecoder? = null
                 try {
                     val stream = resolve(id, height ?: 1080) ?: error("No playable video stream")
                     ensureActive()
+                    val decoder = decoderFactory(worker).also { decoderToClose = it }
                     decoder.open(stream)
+                    setActive(session = true, decoder = true)
                     ensureActive()
                     aspect.value = stream.aspect.takeIf { it > 0 } ?: 16f / 9f
                     quality.value = MusicVideoQualityUi(stream.heights, height, stream.height)
@@ -126,6 +185,12 @@ internal class DesktopVideoSession(
                         val jumped = oldTarget != null &&
                             (target < oldTarget - 750 || target > oldTarget + 2_000)
                         lastTargetMs = target
+                        // Until a surface records the current image, keep that image in the single slot.
+                        // Seeks still replace it immediately and discard any stale output.
+                        if (lastSeek == audio.seeks && !jumped && recordingBehind(id) && audio.isPlaying) {
+                            delay(10)
+                            continue
+                        }
                         if (lastSeek != audio.seeks || jumped) {
                             check(decoder.seekTo(target)) { "Video seek failed" }
                             lastSeek = audio.seeks
@@ -148,24 +213,26 @@ internal class DesktopVideoSession(
                             val latest = clock.value
                             if (latest.song?.videoId != id || latest.seeks != audio.seeks ||
                                 (audio.isPlaying && !latest.isPlaying) || latest.awaitingAudio || users.value[id] == null) continue
-                            publish(id to next)
-                            submitted = true
-                            producedFrame = true
+                            submitted = publish(id, next, worker, audio.seeks)
+                            producedFrame = producedFrame || submitted
                         } finally {
                             if (!submitted) next.close()
                         }
                     }
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Exception) {
-                    publish(null)
+                    clearFrame()
                     failed.value = true
                     onError(error)
-                } finally { decoder.close() }
+                } finally {
+                    clearFrame()
+                    try { decoderToClose?.close() } finally { setActive(session = false, decoder = false) }
+                }
             }
     }
     @Synchronized
     override fun close() {
-        publish(null)
+        clearFrame()
         closed = true
         pendingRelease.values.forEach { it.cancel() }
         pendingRelease.clear()
@@ -204,7 +271,7 @@ internal object DesktopMusicVideo {
     val held get() = session.held
     val quality get() = session.quality
     val aspect get() = session.aspect
-    val frame get() = session.frame
+    val presentation get() = session.presentation
     val failed get() = session.failed
     fun withFrame(id: String, draw: (VideoFrame) -> Unit) = session.withFrame(id, draw)
     fun attach(id: String) = session.attach(id)
@@ -220,11 +287,11 @@ internal fun videoClockPosition(state: DesktopPlaybackState, speed: Float, now: 
 
 @Composable
 internal fun DesktopMusicVideoSurface(id: String, fit: Boolean, onRendered: (Boolean) -> Unit, modifier: Modifier, showFailure: Boolean = true) {
-    val current = DesktopMusicVideo.frame.collectAsState()
+    val current = DesktopMusicVideo.presentation.collectAsState()
     val failed by DesktopMusicVideo.failed.collectAsState()
     val visible = LocalDesktopPresentationVisible.current
     val dimensions by remember(id, visible, current) {
-        derivedStateOf { current.value?.takeIf { visible && it.first == id }?.second?.intrinsicSize }
+        derivedStateOf { current.value?.takeIf { visible && it.id == id }?.size }
     }
     val report by rememberUpdatedState(onRendered)
     val submitted = remember(id, dimensions) { mutableStateOf(false) }

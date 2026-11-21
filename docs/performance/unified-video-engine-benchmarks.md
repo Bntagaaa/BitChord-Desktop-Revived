@@ -1,5 +1,7 @@
 # Unified video engine benchmarks
 
+The visible-window 1080p playback and post-close measurements for the Phase 1 software Music Video path are in the [Music Video memory investigation](music-video-memory-investigation.md). Those runs include the Compose renderer, audio-clock pacing, seeking, window transitions and the post-close allocator/driver observations.
+
 ## Measured native pipeline probe
 
 November 20, 2026, CachyOS Linux x86-64, KDE Wayland with XWayland, Intel UHD Graphics (ICL GT1), Intel iHD 26.3.5, Mesa 26.2.6, GStreamer 1.28.9. Both modes used the same 1080p H.264 fixture, 30 frames at 30 FPS and no audio. Each of 30 cycles opens, plays to EOS, sets the pipeline to NULL, and releases its references in the same process. All 30 cycles completed for both modes. There is no JVM in this comparison.
