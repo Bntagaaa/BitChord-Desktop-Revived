@@ -1,29 +1,13 @@
 package com.music.bitchord.desktop
 
-import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import org.jetbrains.skia.ColorAlphaType
-import org.jetbrains.skia.Image
-import org.jetbrains.skia.ImageInfo
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -34,6 +18,9 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
@@ -253,133 +240,55 @@ internal object DesktopCanvasCache {
         .followRedirects(HttpClient.Redirect.NORMAL)
         .build()
 
-    fun fileFor(url: String): java.nio.file.Path? {
+    fun fileFor(url: String): Path? {
         DesktopMediaCache.existing(url, "mp4")?.let { return it }
         return runCatching {
             val target = DesktopMediaCache.pathFor(url, "mp4")
-            val response = client.send(
-                HttpRequest.newBuilder(URI.create(url))
-                    .timeout(Duration.ofSeconds(30))
-                    .header("User-Agent", DESKTOP_CANVAS_UA)
-                    .header("Accept", "*/*")
-                    .GET()
-                    .build(),
-                HttpResponse.BodyHandlers.ofFile(target),
-            )
-            check(response.statusCode() in 200..299) { "canvas HTTP ${response.statusCode()}" }
-            check(java.nio.file.Files.size(target) > 0) { "canvas came back empty" }
-            // The only moment the cache can be over its limit is just after a write.
+            val staging = Files.createTempDirectory(target.parent, "motion-")
+            val download = staging.resolve("video")
+            try {
+                val response = client.send(
+                    HttpRequest.newBuilder(URI.create(url))
+                        .timeout(Duration.ofSeconds(30))
+                        .header("User-Agent", DESKTOP_CANVAS_UA)
+                        .header("Accept", "*/*")
+                        .GET()
+                        .build(),
+                    HttpResponse.BodyHandlers.ofFile(download),
+                )
+                check(response.statusCode() in 200..299 && Files.size(download) > 0) {
+                    "motion download did not return video (HTTP ${response.statusCode()})"
+                }
+                DesktopMediaCache.existing(url, "mp4") ?: Files.move(download, target, ATOMIC_MOVE)
+            } finally {
+                Files.deleteIfExists(download)
+                Files.deleteIfExists(staging)
+            }
+        }.onSuccess {
             DesktopMediaCache.trim()
-            target
-        }.onFailure { DesktopTrackLog.log("canvas: could not fetch the clip — ${it.message}") }.getOrNull()
+        }.onFailure {
+            DesktopTrackLog.log("motion download failed: ${it.javaClass.simpleName}")
+        }.getOrNull()
     }
 }
 
-/** The motion artwork, drawn as frames rather than played by a native child. */
+/** Motion artwork for the details panel and collection covers. */
 @Composable
 fun DesktopCanvasView(
     url: String,
     modifier: Modifier = Modifier,
     isPlaying: Boolean = true,
     contentScale: ContentScale = ContentScale.Crop,
-    /** Tried once if [url] will not decode — the Apple provider's second rendition of the clip. */
     fallbackUrl: String? = null,
-    maxEdge: Int = 540,
+    maxEdge: Int = DesktopCanvasDecoder.MAX_EDGE,
     publishBackdrop: Boolean = true,
+    playbackIdentity: String? = null,
 ) {
-    var frame by remember(url) { mutableStateOf<ImageBitmap?>(null) }
-    val windowVisible by DesktopWindowVisibility.visible.collectAsState()
-
-    LaunchedEffect(url, fallbackUrl, isPlaying, windowVisible, maxEdge, publishBackdrop) {
-        // Album-page artwork must not keep reopening native FFmpeg decoders in the tray.
-        if (!isPlaying || !windowVisible) return@LaunchedEffect
-        var retryDelayMs = 1_000L
-        // Round and round until the track ends or the player is closed. A canvas is a few seconds
-        // long, so one pass through it is not the feature — and the decoder cannot be relied on to
-        // rewind itself: its own seek does not take on an HLS manifest, which is what Apple serves,
-        // and the clip then stopped dead on its last frame for the rest of the song.
-        while (isActive) {
-            val decoder = DesktopCanvasDecoder(maxEdge)
-            val opened = withContext(Dispatchers.IO) {
-                var last: Result<Unit> = Result.failure(IllegalStateException("the clip could not be fetched"))
-                for (candidate in listOfNotNull(url, fallbackUrl)) {
-                    // A manifest names its segments relative to the host it came from, so saving the
-                    // playlist to disk and opening that leaves FFmpeg with nothing it can resolve.
-                    // Apple's motion artwork is HLS, which is how "could not open the clip" happened.
-                    val source = if (isManifest(candidate)) {
-                        candidate
-                    } else {
-                        DesktopCanvasCache.fileFor(candidate)?.toAbsolutePath()?.toString() ?: continue
-                    }
-                    last = decoder.open(source)
-                    if (last.isSuccess) break
-                }
-                last
-            }
-            if (opened.isFailure) {
-                DesktopTrackLog.log(
-                    "canvas: open failed; retrying in ${retryDelayMs}ms (${opened.exceptionOrNull()?.message})",
-                )
-                withContext(Dispatchers.IO) { decoder.close() }
-                delay(retryDelayMs)
-                retryDelayMs = (retryDelayMs * 2).coerceAtMost(10_000L)
-                continue
-            }
-            var shown = 0
-            try {
-                val frames = DesktopMotionFrameBuffers(decoder.width * decoder.height * 4)
-                val info = ImageInfo.makeN32(decoder.width, decoder.height, ColorAlphaType.OPAQUE)
-                while (isActive) {
-                    val started = System.currentTimeMillis()
-                    val pixels = frames.next()
-                    val decoded = withContext(Dispatchers.IO) { decoder.nextFrame(pixels) }
-                    if (!decoded) break
-                    shown++
-                    // Three reusable buffers avoid allocating an entire frame every 33–40 ms.
-                    val next = Image.makeRaster(info, pixels, decoder.width * 4).toComposeImageBitmap()
-                    frame = next
-                    // The backdrop holds its first frame for the whole clip. Snapshot that one
-                    // frame so the pool cannot mutate an image being held by another component.
-                    if (shown == 1 && publishBackdrop) {
-                        DesktopCanvasBackdrop.publish(
-                            url,
-                            Image.makeRaster(info, pixels.copyOf(), decoder.width * 4).toComposeImageBitmap(),
-                        )
-                    }
-                    val spent = System.currentTimeMillis() - started
-                    delay((decoder.frameIntervalMillis - spent).coerceAtLeast(0L))
-                }
-            } finally {
-                withContext(NonCancellable + Dispatchers.IO) { decoder.close() }
-            }
-            // HLS can fail mid-stream or return an empty pass intermittently. Reopen the
-            // manifest with bounded backoff instead of leaving a frozen frame forever.
-            if (shown == 0) {
-                DesktopTrackLog.log("canvas: stream decoded no frames; retrying in ${retryDelayMs}ms")
-                delay(retryDelayMs)
-                retryDelayMs = (retryDelayMs * 2).coerceAtMost(10_000L)
-            } else {
-                retryDelayMs = 1_000L
-                // The next pass opens a fresh HLS demuxer. A short pause avoids a tight loop at EOF.
-                delay(250L)
-            }
-        }
-    }
-
-    DisposableEffect(url, publishBackdrop) {
-        onDispose { if (publishBackdrop) DesktopCanvasBackdrop.clear(url) }
-    }
-
-    // Nothing at all until the first frame: a placeholder here would flash between the still cover
-    // and the clip on every track change.
-    frame?.let {
-        Image(
-            bitmap = it,
-            contentDescription = null,
-            contentScale = contentScale,
-            modifier = modifier,
-        )
-    }
+    val clock = if (playbackIdentity == null) MotionVideoSource.Clock.Artwork else MotionVideoSource.Clock.NowPlaying
+    DesktopMotionArtwork(
+        MotionVideoSource(url, fallbackUrl, maxEdge, clock, playbackIdentity),
+        modifier, isPlaying, contentScale, publishBackdrop,
+    )
 }
 
 private const val DESKTOP_CANVAS_UA =

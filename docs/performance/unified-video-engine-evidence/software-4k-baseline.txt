@@ -1,0 +1,1 @@
+mode=baseline frames=180 seconds=10.327 first_ms=2200.562 allocated_bytes=5973018096 bytes_per_frame=33183433 MiB_per_second=551.594 peak_rss_kib=690300 sampled_rss_median_kib=688082.0 cpu_pct=88.31

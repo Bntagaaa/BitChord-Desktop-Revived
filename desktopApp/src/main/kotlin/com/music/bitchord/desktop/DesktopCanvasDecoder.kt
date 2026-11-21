@@ -3,8 +3,10 @@ package com.music.bitchord.desktop
 import org.bytedeco.ffmpeg.avcodec.AVCodecContext
 import org.bytedeco.ffmpeg.avcodec.AVPacket
 import org.bytedeco.ffmpeg.avformat.AVFormatContext
+import org.bytedeco.ffmpeg.avformat.AVIOInterruptCB
 import org.bytedeco.ffmpeg.avutil.AVDictionary
 import org.bytedeco.ffmpeg.avutil.AVFrame
+import org.bytedeco.ffmpeg.global.avcodec.AVDISCARD_ALL
 import org.bytedeco.ffmpeg.global.avcodec.av_packet_alloc
 import org.bytedeco.ffmpeg.global.avcodec.av_packet_free
 import org.bytedeco.ffmpeg.global.avcodec.av_packet_unref
@@ -19,6 +21,7 @@ import org.bytedeco.ffmpeg.global.avcodec.avcodec_send_packet
 import org.bytedeco.ffmpeg.global.avformat.av_find_best_stream
 import org.bytedeco.ffmpeg.global.avformat.av_read_frame
 import org.bytedeco.ffmpeg.global.avformat.av_seek_frame
+import org.bytedeco.ffmpeg.global.avformat.avformat_alloc_context
 import org.bytedeco.ffmpeg.global.avformat.avformat_close_input
 import org.bytedeco.ffmpeg.global.avformat.avformat_find_stream_info
 import org.bytedeco.ffmpeg.global.avformat.AVSEEK_FLAG_BACKWARD
@@ -31,7 +34,6 @@ import org.bytedeco.ffmpeg.global.avutil.av_dict_set
 import org.bytedeco.ffmpeg.global.avutil.av_frame_alloc
 import org.bytedeco.ffmpeg.global.avutil.av_frame_free
 import org.bytedeco.ffmpeg.global.avutil.av_image_fill_arrays
-import org.bytedeco.ffmpeg.global.avutil.av_image_get_buffer_size
 import org.bytedeco.ffmpeg.global.swscale.SWS_BILINEAR
 import org.bytedeco.ffmpeg.global.swscale.sws_freeContext
 import org.bytedeco.ffmpeg.global.swscale.sws_getContext
@@ -39,34 +41,45 @@ import org.bytedeco.ffmpeg.global.swscale.sws_scale
 import org.bytedeco.ffmpeg.swscale.SwsContext
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.IntPointer
+import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
+import kotlinx.coroutines.Job
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.Data
+import org.jetbrains.skia.Image
+import org.jetbrains.skia.ImageInfo
 
 /** The motion artwork, decoded here rather than played by a second media stack. */
 internal class DesktopCanvasDecoder(
     private val maxEdge: Int = 540,
     private val loopAtEnd: Boolean = true,
-) {
+    private val preferMotionRendition: Boolean = false,
+    private val owner: Job? = null,
+) : VideoDecoder {
 
+    private var interrupt: AVIOInterruptCB.Callback_Pointer? = null
+    @Volatile private var readDeadline = Long.MAX_VALUE
     private var format: AVFormatContext? = null
     private var codec: AVCodecContext? = null
     private var packet: AVPacket? = null
     private var frame: AVFrame? = null
     private var scaler: SwsContext? = null
-    private var buffer: BytePointer? = null
-    private var view: java.nio.ByteBuffer? = null
+    private var imageInfo: ImageInfo? = null
+    private val destination = VideoPixelPointer()
     private var planes: PointerPointer<BytePointer>? = null
     private var strides: IntPointer? = null
+    private var draining = false
     private var scalerFormat = -1
     private var sourceWidth = 0
     private var sourceHeight = 0
     private var streamIndex = -1
     private var timeBase = 0.0
     private var streamStart = 0L
-    var frameTimeMs: Long = 0L
+    override var frameTimeMs: Long = 0L
         private set
 
     /** Seconds per frame, from the stream's own rate; used to pace playback. */
-    var frameIntervalMillis: Long = 40L
+    override var frameIntervalMillis: Long = 40L
         private set
 
     /** The size frames are handed back at, after scaling. */
@@ -76,8 +89,24 @@ internal class DesktopCanvasDecoder(
     var height: Int = 0
         private set
 
-    fun open(url: String, headers: Map<String, String> = emptyMap()): Result<Unit> = runCatching {
+    override fun open(url: String, headers: Map<String, String>): Result<Unit> = runCatching {
         DesktopAudioDecoder.ensureNetworkReady()
+        val source = if (preferMotionRendition && url.substringBefore('?').endsWith(".m3u8", ignoreCase = true)) {
+            val key = "$maxEdge|$url"
+            val remembered = if (headers.isEmpty()) synchronized(variants) { variants[key] } else null
+            remembered ?: canvasGet(url, headers)?.let { selectContinuedArtistVariant(url, it, maxEdge) }
+                ?.also { if (headers.isEmpty()) synchronized(variants) { variants[key] = it } } ?: url
+        } else url
+        val opened = avformat_alloc_context()
+        check(opened != null && !opened.isNull) { "could not allocate a video demuxer" }
+        format = opened
+        val callback = object : AVIOInterruptCB.Callback_Pointer() {
+            override fun call(opaque: Pointer?): Int =
+                if (owner?.isActive == false || System.nanoTime() >= readDeadline) 1 else 0
+        }
+        interrupt = callback
+        opened.interrupt_callback().callback(callback)
+        readDeadline = System.nanoTime() + IO_TIMEOUT_NANOS
         val options = AVDictionary(null)
         if (headers.isNotEmpty()) {
             av_dict_set(
@@ -89,8 +118,7 @@ internal class DesktopCanvasDecoder(
         }
         av_dict_set(options, "rw_timeout", "15000000", 0)
 
-        val opened = AVFormatContext(null)
-        val status = try { avformat_open_input(opened, url, null, options) } finally { av_dict_free(options) }
+        val status = try { avformat_open_input(opened, source, null, options) } finally { av_dict_free(options) }
         check(status >= 0) { "could not open the clip" }
         format = opened
         check(avformat_find_stream_info(opened, null as AVDictionary?) >= 0) { "no stream info" }
@@ -98,6 +126,24 @@ internal class DesktopCanvasDecoder(
             opened, AVMEDIA_TYPE_VIDEO, -1, -1, null as org.bytedeco.ffmpeg.avcodec.AVCodec?, 0,
         )
         check(streamIndex >= 0) { "no video stream" }
+
+        if (preferMotionRendition && isManifest(url)) {
+            // An HLS master lists every rendition as its own stream, and FFmpeg's pick is the largest:
+            // a 4K decode for a frame that is scaled down anyway. The smallest that still covers the
+            // target is taken instead, and the rest are dropped so their segments are never fetched.
+            val renditions = (0 until opened.nb_streams()).filter { i ->
+                val p = opened.streams(i).codecpar()
+                p.codec_type() == AVMEDIA_TYPE_VIDEO && p.width() > 0 && p.height() > 0
+            }
+            if (renditions.size > 1) {
+                fun edge(i: Int) = opened.streams(i).codecpar().let { maxOf(it.width(), it.height()) }
+                streamIndex = renditions.filter { edge(it) >= maxEdge }.minByOrNull(::edge)
+                    ?: renditions.maxBy(::edge)
+                for (i in 0 until opened.nb_streams()) {
+                    if (i != streamIndex) opened.streams(i).discard(AVDISCARD_ALL)
+                }
+            }
+        }
 
         val stream = opened.streams(streamIndex)
         streamStart = stream.start_time().takeIf { it != AV_NOPTS_VALUE } ?: 0L
@@ -115,8 +161,8 @@ internal class DesktopCanvasDecoder(
 
         // Scaled down on the way out.
         val scale = minOf(1.0, maxEdge.toDouble() / maxOf(sourceWidth, sourceHeight))
-        width = ((sourceWidth * scale).toInt() / 2) * 2
-        height = ((sourceHeight * scale).toInt() / 2) * 2
+        width = (((sourceWidth * scale).toInt() / 2) * 2).coerceAtLeast(2)
+        height = (((sourceHeight * scale).toInt() / 2) * 2).coerceAtLeast(2)
 
         val rate = stream.avg_frame_rate()
         if (rate.num() > 0 && rate.den() > 0) {
@@ -125,46 +171,48 @@ internal class DesktopCanvasDecoder(
             frameIntervalMillis = (1_000L * rate.den() / rate.num()).coerceIn(MIN_INTERVAL_MS, 200L)
         }
 
-        // Wired by FFmpeg rather than by hand.
-        val size = av_image_get_buffer_size(AV_PIX_FMT_BGRA, width, height, 1)
-        buffer = BytePointer(size.toLong())
-        view = buffer?.asByteBuffer()
+        imageInfo = ImageInfo.makeN32(width, height, ColorAlphaType.OPAQUE)
         planes = PointerPointer<BytePointer>(4)
         strides = IntPointer(4L)
-        check(
-            av_image_fill_arrays(planes, strides, buffer, AV_PIX_FMT_BGRA, width, height, 1) >= 0,
-        ) { "could not lay out the frame buffer" }
         packet = av_packet_alloc()
         frame = av_frame_alloc()
     }.onFailure { close() }
 
-    /** The next frame as BGRA bytes, looping at the end. */
-    fun nextFrame(into: ByteArray): Boolean {
-        val container = format ?: return false
-        val context = codec ?: return false
-        val pkt = packet ?: return false
-        val decoded = frame ?: return false
+    /** Decode directly into immutable frame storage owned by Skia. */
+    override fun nextFrame(accept: (Long) -> Boolean): VideoFrame? {
+        val container = format ?: return null
+        val context = codec ?: return null
+        val pkt = packet ?: return null
+        val decoded = frame ?: return null
+        readDeadline = System.nanoTime() + IO_TIMEOUT_NANOS
         var looped = false
         while (true) {
             if (avcodec_receive_frame(context, decoded) == 0) {
                 frameTimeMs = if (decoded.best_effort_timestamp() != AV_NOPTS_VALUE) {
                     ((decoded.best_effort_timestamp() - streamStart) * timeBase * 1000).toLong()
                 } else frameTimeMs + frameIntervalMillis
-                val converter = scalerFor(decoded.format()) ?: return false
-                sws_scale(converter, decoded.data(), decoded.linesize(), 0, sourceHeight, planes, strides)
-                // Read through an explicit NIO view rewound each time rather than through the
-                // pointer's own `get`, whose starting offset is its position.
-                view?.let { pixels ->
-                    pixels.rewind()
-                    pixels.get(into, 0, minOf(into.size, width * height * 4))
+                if (!accept(frameTimeMs)) continue
+                val converter = scalerFor(decoded.format()) ?: return null
+                val info = checkNotNull(imageInfo)
+                val rowBytes = Math.multiplyExact(width, 4)
+                // swscale implementations may access padding beyond the last pixel.
+                return Data.makeUninitialized(Math.addExact(Math.multiplyExact(rowBytes, height), 64)).use { data ->
+                    destination.pointAt(data.writableData())
+                    val output = checkNotNull(planes)
+                    val lines = checkNotNull(strides)
+                    check(av_image_fill_arrays(output, lines, destination, AV_PIX_FMT_BGRA, width, height, 1) >= 0)
+                    check(sws_scale(converter, decoded.data(), decoded.linesize(), 0, sourceHeight, output, lines) == height)
+                    VideoFrame(width, height, Image.makeRaster(info, data, rowBytes))
                 }
-                return true
+            }
+            if (draining) {
+                if (looped || !loopAtEnd || !seekTo(0)) return null
+                looped = true
+                continue
             }
             if (av_read_frame(container, pkt) < 0) {
-                if (looped || !loopAtEnd) return false
-                looped = true
-                av_seek_frame(container, streamIndex, 0, AVSEEK_FLAG_BACKWARD)
-                avcodec_flush_buffers(context)
+                draining = true
+                avcodec_send_packet(context, null as AVPacket?)
                 continue
             }
             if (pkt.stream_index() == streamIndex) avcodec_send_packet(context, pkt)
@@ -194,33 +242,36 @@ internal class DesktopCanvasDecoder(
         return built
     }
 
-    fun seekTo(millis: Long): Boolean {
+    override fun seekTo(millis: Long): Boolean {
         val opened = format ?: return false
         val context = codec ?: return false
         if (timeBase <= 0) return false
+        readDeadline = System.nanoTime() + IO_TIMEOUT_NANOS
         val timestamp = (millis / 1000.0 / timeBase).toLong() + streamStart
         if (av_seek_frame(opened, streamIndex, timestamp, AVSEEK_FLAG_BACKWARD) < 0) return false
         avcodec_flush_buffers(context)
+        draining = false
         return true
     }
 
-    fun close() {
+    override fun close() {
         frame?.let { av_frame_free(it) }
         packet?.let { av_packet_free(it) }
         scaler?.let { sws_freeContext(it) }
         codec?.let { avcodec_free_context(it) }
-        format?.let { avformat_close_input(it) }
-        buffer?.deallocate()
+        format?.takeUnless { it.isNull }?.let { avformat_close_input(it) }
+        interrupt?.close()
+        interrupt = null
         strides?.deallocate()
         planes?.deallocate()
         frame = null
         packet = null
         scaler = null
         scalerFormat = -1
+        draining = false
         codec = null
         format = null
-        buffer = null
-        view = null
+        imageInfo = null
         planes = null
         strides = null
         streamIndex = -1
@@ -228,7 +279,12 @@ internal class DesktopCanvasDecoder(
         sourceHeight = 0
     }
 
-    private companion object {
+    companion object {
+        private const val IO_TIMEOUT_NANOS = 15_000_000_000L
+        private val variants = object : LinkedHashMap<String, String>(64, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>) = size > 64
+        }
+
         /** Plenty for a sleeve, and a quarter of the pixels of the source. */
         const val MAX_EDGE = 540
 
@@ -237,4 +293,27 @@ internal class DesktopCanvasDecoder(
     }
 }
 
+private class VideoPixelPointer : BytePointer() {
+    fun pointAt(value: Long) { address = value }
+}
+
 private typealias DoublePointer = org.bytedeco.javacpp.DoublePointer
+
+internal fun selectContinuedArtistVariant(masterUrl: String, manifest: String, maxEdge: Int): String? {
+    data class Variant(val url: String, val edge: Int, val bandwidth: Long, val avc: Boolean)
+    val lines = manifest.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
+    val variants = lines.mapIndexedNotNull { index, line ->
+        if (!line.startsWith("#EXT-X-STREAM-INF:")) return@mapIndexedNotNull null
+        val resolution = Regex("RESOLUTION=(\\d+)x(\\d+)").find(line) ?: return@mapIndexedNotNull null
+        val path = lines.getOrNull(index + 1)?.takeUnless { it.startsWith('#') } ?: return@mapIndexedNotNull null
+        val uri = runCatching { java.net.URI(masterUrl).resolve(path) }.getOrNull() ?: return@mapIndexedNotNull null
+        if (uri.scheme !in setOf("https", "http") || uri.host == null || uri.userInfo != null) return@mapIndexedNotNull null
+        val edge = maxOf(resolution.groupValues[1].toInt(), resolution.groupValues[2].toInt())
+        val bandwidth = Regex("(?:^|,)BANDWIDTH=(\\d+)").find(line.substringAfter(':'))?.groupValues?.get(1)?.toLongOrNull() ?: Long.MAX_VALUE
+        val avc = Regex("""CODECS="[^"]*avc1[^"]*"""").containsMatchIn(line)
+        Variant(uri.toString(), edge, bandwidth, avc)
+    }
+    val supported = variants.filter { it.avc }.ifEmpty { variants }
+    return (supported.filter { it.edge >= maxEdge }.minWithOrNull(compareBy<Variant> { it.edge }.thenBy { it.bandwidth })
+        ?: supported.maxByOrNull { it.edge })?.url
+}
