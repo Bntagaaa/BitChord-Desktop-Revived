@@ -76,6 +76,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -97,6 +98,8 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.vectorResource
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -952,14 +955,20 @@ private fun OutputPartyPill(
 ) {
     val badge = rememberPartyBadge()
     val output = rememberOutputGlyph()
+    var outputBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     Pill {
+        Box(Modifier.onGloballyPositioned { outputBounds = it.boundsInWindow() }) {
         PillSegment(
             icon = output.icon,
             iconSize = output.size,
             contentDescription = stringResource(Res.string.audio_output),
-            onClick = onOutput,
+            onClick = {
+                AudioOutputMenuAnchor.bounds = outputBounds
+                onOutput()
+            },
             vibrant = true,
         )
+        }
         PillDivider()
         PillSegment(
             // Person rather than Groups: the three-person glyph is drawn half
@@ -1180,10 +1189,17 @@ internal fun OutputCaption(
     val jamName = badge.hostFirstName
         ?.let { stringResource(Res.string.listen_together_jam, it) }
         ?: stringResource(Res.string.listen_together_jam_unnamed)
+    var captionBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     val captionModifier = Modifier
         .fillMaxWidth(0.65f)
+        .onGloballyPositioned { captionBounds = it.boundsInWindow() }
         .additiveChrome(LocalPlayerChrome.current)
-        .clickable { if (badge.inParty) onOpenMembers() else onOpenOutput() }
+        .clickable {
+            if (badge.inParty) onOpenMembers() else {
+                AudioOutputMenuAnchor.bounds = captionBounds
+                onOpenOutput()
+            }
+        }
     if (!badge.inParty && isHiResOutput) {
         ShimmerText(
             text = outputName,
