@@ -89,6 +89,19 @@ internal fun AudioOutputSheet(
     val outputs = rememberAudioOutputs()
     val cast by PlayerPlatform.host.castState.collectAsStateWithLifecycle()
 
+    if (PlayerPlatform.host.musicVideoFullscreen != null) {
+        DesktopCompactAudioOutputMenu(
+            outputs = outputs,
+            cast = cast,
+            accountName = accountName,
+            anchorInWindow = AudioOutputMenuAnchor.bounds,
+            onDismiss = onDismiss,
+            onOpenPipeline = onOpenPipeline,
+            onOpenCast = onOpenCast,
+        )
+        return
+    }
+
     PlayerDrawer(
         hazeState = hazeState,
         title = stringResource(Res.string.audio_output),
