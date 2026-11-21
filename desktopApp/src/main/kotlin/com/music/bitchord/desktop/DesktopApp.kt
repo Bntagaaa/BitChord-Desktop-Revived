@@ -530,6 +530,9 @@ internal fun BitChordDesktopApp(
     playbackService: DesktopPlaybackService,
 ) {
     val scope = rememberCoroutineScope()
+    // Load the native GPU bridge before an artist/music-video surface is
+    // requested so extraction of the platform runtime does not block first paint.
+    LaunchedEffect(Unit) { DesktopGpuVideoBackend.prewarm() }
     val focusManager = LocalFocusManager.current
     val shortcutRootFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { shortcutRootFocusRequester.requestFocus() }
@@ -6761,6 +6764,7 @@ private fun DesktopArtistPage(
                                             appleArt = appleArt,
                                             background = artistBackground,
                                             heroHeight = heroHeight,
+                                            motionVisible = artistListState.firstVisibleItemIndex == 0,
                                             onPlay = { if (top.isNotEmpty()) onPlaySongs(top, 0) },
                                             onShuffle = { if (top.isNotEmpty()) onShuffle(top) },
                                             onToggleSubscription = toggleSubscription,
@@ -6863,6 +6867,7 @@ private fun DesktopArtistBanner(
     appleArt: DesktopAppleArtistArt?,
     background: Color,
     heroHeight: Dp,
+    motionVisible: Boolean,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     onToggleSubscription: (() -> Unit)?,
@@ -6872,7 +6877,10 @@ private fun DesktopArtistBanner(
         val motionUrl = appleArt?.wideVideoUrl ?: appleArt?.squareVideoUrl
         DesktopAppleArtistHero(
             fallbackUrl = fallbackUrl,
-            appleUrl = if (motionUrl != null) null else appleArt?.heroUrl,
+            // Show the artist's high-quality still art immediately while the
+            // native video surface prepares its first frame; avoid a black
+            // rectangle and avoid asking YouTube for a lower quality fallback.
+            appleUrl = appleArt?.heroUrl,
             fallbackPx = HEADER_ART_PX,
             modifier = Modifier.matchParentSize(),
         )
@@ -6880,13 +6888,11 @@ private fun DesktopArtistBanner(
         // Wide banner for every artist, even with no motion or only portrait artwork.
         // Continued supplies wide/square HLS, Apple still art, then the YouTube Music fallback.
         motionUrl?.let { url ->
-            DesktopContinuedArtistMotionView(
+            DesktopGpuArtistMotion(
                 url = url,
                 modifier = Modifier.matchParentSize(),
                 fallbackUrl = appleArt?.squareVideoUrl?.takeIf { it != url },
-                maxEdge = 640,
-                contentScale = ContentScale.Crop,
-                publishBackdrop = false,
+                visible = motionVisible,
             )
         }
 
