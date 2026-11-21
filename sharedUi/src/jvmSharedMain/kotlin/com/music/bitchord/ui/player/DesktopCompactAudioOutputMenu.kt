@@ -72,6 +72,10 @@ import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
+internal object AudioOutputMenuAnchor {
+    var bounds: Rect? = null
+}
+
 /**
  * Desktop-only output menu. It matches the compact account picker rather than
  * opening a phone-sized bottom drawer. The list scrolls independently and the
