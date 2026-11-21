@@ -10,6 +10,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Job
 import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.PictureRecorder
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.Surface
 
@@ -63,14 +64,21 @@ class DesktopNativeVideoFrameTest {
         } finally {
             decoder.close()
         }
-        first.use { frame ->
-            assertEquals(16, frame.width)
-            assertEquals(12, frame.height)
-            Surface.makeRasterN32Premul(1, 1).use { surface ->
-                assertTrue(frame.drawTo(surface.canvas, Rect.makeWH(1f, 1f)))
-                Bitmap().use { bitmap ->
-                    assertTrue(bitmap.allocN32Pixels(1, 1, true) && surface.readPixels(bitmap, 0, 0))
-                    assertTrue((bitmap.getColor(0, 0) ushr 16 and 0xff) > 220)
+        PictureRecorder().use { recorder ->
+            val bounds = Rect.makeWH(1f, 1f)
+            val canvas = recorder.beginRecording(bounds)
+            first.use { frame ->
+                assertEquals(16, frame.width)
+                assertEquals(12, frame.height)
+                assertTrue(frame.drawTo(canvas, bounds))
+            }
+            recorder.finishRecordingAsPicture().use { picture ->
+                Surface.makeRasterN32Premul(1, 1).use { surface ->
+                    surface.canvas.drawPicture(picture)
+                    Bitmap().use { bitmap ->
+                        assertTrue(bitmap.allocN32Pixels(1, 1, true) && surface.readPixels(bitmap, 0, 0))
+                        assertTrue((bitmap.getColor(0, 0) ushr 16 and 0xff) > 220)
+                    }
                 }
             }
         }

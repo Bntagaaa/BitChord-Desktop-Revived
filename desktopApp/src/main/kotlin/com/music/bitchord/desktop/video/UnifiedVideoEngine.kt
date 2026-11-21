@@ -40,14 +40,12 @@ internal interface VideoDecoder : AutoCloseable {
 }
 
 internal interface VideoBackend {
-    fun decoder(maxEdge: Int, loop: Boolean, owner: Job?, preferMotionRendition: Boolean = false,
-        musicVideo: Boolean = false): VideoDecoder
+    fun decoder(maxEdge: Int, loop: Boolean, owner: Job?, preferMotionRendition: Boolean = false): VideoDecoder
 }
 
 private object FfmpegVideoBackend : VideoBackend {
-    override fun decoder(maxEdge: Int, loop: Boolean, owner: Job?, preferMotionRendition: Boolean,
-        musicVideo: Boolean) =
-        DesktopCanvasDecoder(maxEdge, loop, preferMotionRendition, owner, reuseMusicRasterStorage = musicVideo)
+    override fun decoder(maxEdge: Int, loop: Boolean, owner: Job?, preferMotionRendition: Boolean) =
+        DesktopCanvasDecoder(maxEdge, loop, preferMotionRendition, owner)
 }
 
 internal object UnifiedVideoEngine {
@@ -68,7 +66,7 @@ internal object UnifiedVideoEngine {
             override fun open(stream: InnerTubeXResolver.VideoStream) {
                 val reportedEdge = maxOf(stream.width, stream.height)
                 val maxEdge = if (stream.width > 0 && stream.height > 0) reportedEdge.coerceAtMost(8192) else 8192
-                val next = backend.decoder(maxEdge, loop = false, owner = owner, musicVideo = true)
+                val next = backend.decoder(maxEdge, loop = false, owner = owner)
                 decoder = next
                 next.open(stream.url, stream.headers).getOrThrow()
                 if (next is DesktopCanvasDecoder) {
