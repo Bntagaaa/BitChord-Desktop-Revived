@@ -46,7 +46,14 @@ internal object DesktopWindowsMedia {
         this.controller = controller
         if (!available || !started.compareAndSet(false, true)) return
         if (!nativeStart()) {
+            // The native WinRT pump can fail to initialize on headless Windows runners.
+            // Even when it returns false, the C++ std::thread must be joined before the
+            // DLL is unloaded. Otherwise its destructor calls std::terminate() and
+            // crashes the Gradle test executor with Windows exit code 0xC0000409.
+            runCatching { nativeStop() }
+                .onFailure { DesktopTrackLog.log("Windows media controls cleanup failed: ${it.message}") }
             started.set(false)
+            this.controller = null
             DesktopTrackLog.log("Windows media controls could not be created")
             return
         }
@@ -59,8 +66,9 @@ internal object DesktopWindowsMedia {
     }
 
     fun stop() {
-        if (!started.compareAndSet(true, false)) return
+        // Clear stale handlers even when native startup failed or the DLL is absent.
         controller = null
+        if (!started.compareAndSet(true, false)) return
         runCatching { nativeStop() }
     }
 
