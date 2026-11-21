@@ -31,3 +31,26 @@ bash scripts/profile-music-video.sh /tmp/music-video-1080p.mp4 /tmp/music-video-
 For comparison, compile the old branch's `:desktopApp:compileKotlin` task in a separate checkout using the same desktop settings and JDK. Archive its `desktopApp/build/classes/kotlin/main` with `jar cf /tmp/music-video-baseline.jar -C desktopApp/build/classes/kotlin/main .`. Set `BITCHORD_MV_PROFILE_BASELINE_CLASSES=/tmp/music-video-baseline.jar` when invoking the same harness from the new checkout with a different output directory. This keeps test code, dependencies and capture overhead matched. `BITCHORD_MV_PROFILE_CYCLES` defaults to two per JVM.
 
 The harness records idle after a 15-second warm-up, first video draw, a pause, resume followed by three seeks, fullscreen-to-windowed handoff, final detach and samples at 1, 5, 15, 30 and 60 seconds. Its phase CSV and the existing `profile-desktop-memory.sh` process CSV can be joined by the nearest epoch timestamp. It records HotSpot NMT summaries, JFR thread allocation statistics and object samples, glibc allocator summaries and per-client DRM resident counters when those interfaces are available. NMT describes HotSpot-tracked memory. glibc arena size, free blocks and mmapped sizes describe that allocator's view. DRM reports graphics client buffers, which can overlap mappings counted by the OS. These are independent views of the process and should not be added together.
+
+## Interpreting a close
+
+The decoder and published frame counters reached zero within one second of final detachment on both pre-change baseline cycles. In the first matched baseline cycle, approximately 49 MiB of glibc arena blocks were already free at one second, versus approximately 11 MiB while idle at startup. The allocator still reported approximately 99 MiB of arena space. Its mmapped allocations had already returned to about 24 MiB. At the same moment the DRM client still reported about 36 MiB resident, falling to effectively zero by 60 seconds. HotSpot's committed Java heap remained 60 MiB throughout those baseline cycles. This separates allocator and graphics retention from the session's immediate ownership and shows why the peak-to-close RSS curve alone cannot locate the buffers.
+
+Some runs on this host also swapped a substantial portion of the process under system memory pressure. A drop in RSS/PSS while VmSwap increases is evidence of paging. The phase evidence therefore includes swap, alongside NMT and allocator counters. These counters cannot assign every byte to FFmpeg, Skia or the driver. Proving that every third-party allocation is freed would require temporal native allocation tracing and driver-level ownership instrumentation.
+
+The regression suite exercises 30 complete closes, short handoffs, two simultaneous surfaces, repeated paused seeks and resume, cancellation during a blocking decode, drawing concurrently with session disposal, audio end, and native image lifetime. The visible-window harness asserts that the first frame has actual color detail and that every completed handoff/close returns the instrumented resource counters to their expected values.
+
+## Spotify Canvas in Now Playing
+
+Spotify Canvas uses the engine's looping motion lease with a maximum decoded edge of 540 pixels. A portrait fixture resolves to approximately 302 × 540, or 0.62 MiB of BGRA payload per decoded frame. Now Playing also receives a separate backdrop sample up to 128 pixels on its longest edge. The 540 × 960 fixture produces a backdrop sample of 36,864 bytes. The derived palette or mesh is small and holds colors. The downloaded clip remains in the bounded disk cache.
+
+Before the change, a still-mounted Now Playing screen could retain its last backdrop sample by URL after the Canvas stopped displaying. Also, the Canvas draw node and its conditional offscreen composition layer remained mounted while its frame was empty. The renderer keeps only frame size and revision metadata now, and removes the Canvas draw node when the image goes away. The shared player drops the backdrop sample when the renderer reports it has stopped. Pause and active fades keep their existing frame and effects. The final motion lease closes the frame and decoder and removes the session record after the cancelled worker finishes.
+
+The separate Canvas harness exercises the production composable in a visible window. It plays the same portrait H.264 clip twice, first losing presentation visibility with the composable still mounted and then disabling Canvas while the window stays open.
+
+```bash
+ffmpeg -hide_banner -f lavfi -i 'testsrc2=size=540x960:rate=30' -t 8 -an \
+  -c:v libx264 -preset ultrafast -crf 30 -g 60 -pix_fmt yuv420p /tmp/spotify-canvas.mp4
+BITCHORD_VIDEO_PROFILE_SCENARIO=canvas bash scripts/profile-music-video.sh \
+  /tmp/spotify-canvas.mp4 /tmp/canvas-candidate
+```

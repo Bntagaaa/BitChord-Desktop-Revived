@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.IntSize
 import com.music.bitchord.data.canvas.CanvasArtwork
+import com.music.bitchord.data.canvas.CanvasSource
 import com.music.bitchord.ui.ProvideDesktopPresentationLifecycle
 import com.music.bitchord.ui.player.CanvasContentMode
 import com.music.bitchord.ui.player.CanvasVideoSpec
@@ -42,22 +43,29 @@ class DesktopUnifiedCanvasUiTest {
         val url = "http://127.0.0.1:${server.address.port}$path"
         try {
             val surfaceVisible = mutableStateOf(true)
+            val canvasEnabled = mutableStateOf(true)
+            val source = MotionVideoSource(url, null, DesktopCanvasDecoder.MAX_EDGE,
+                MotionVideoSource.Clock.NowPlaying, "Fixture")
             val submitted = AtomicBoolean(false)
             val sampleSize = AtomicReference<IntSize?>()
             runDesktopComposeUiTest(width = 160, height = 120) {
                 setContent {
                     ProvideDesktopPresentationLifecycle(surfaceVisible.value) {
                         Box(Modifier.fillMaxSize().background(Color.Blue).testTag("artwork")) {
-                            DesktopCanvasVideo(
+                            if (canvasEnabled.value) DesktopCanvasVideo(
                                 CanvasVideoSpec(
-                                    canvas = CanvasArtwork(url = url, title = "Fixture", artist = "Test", album = "Test"),
+                                    canvas = CanvasArtwork(url = url, title = "Fixture", artist = "Test", album = "Test",
+                                        source = CanvasSource.SPOTIFY),
                                     isPlaying = true,
                                     contentMode = CanvasContentMode.CROP,
                                     alignPortraitTop = false,
                                     onAspectRatioChanged = {},
                                     portraitRevealBounds = IntSize.Zero,
                                     presentationAlpha = { 1f },
-                                    onRenderedChanged = { submitted.set(it) },
+                                    onRenderedChanged = {
+                                        submitted.set(it)
+                                        if (!it) sampleSize.set(null)
+                                    },
                                     onFrameCaptured = { sampleSize.set(IntSize(it.width, it.height)) },
                                     refreshFrameEveryMs = null,
                                     frameCapturePx = 16,
@@ -66,7 +74,7 @@ class DesktopUnifiedCanvasUiTest {
                                     bottomFadeEndPx = null,
                                     pausedForTransition = false,
                                 ),
-                                Modifier.fillMaxSize(),
+                                Modifier.fillMaxSize().testTag("canvas"),
                             )
                         }
                     }
@@ -78,9 +86,23 @@ class DesktopUnifiedCanvasUiTest {
                 assertTrue(active[80, 20].red > .85f)
                 assertTrue(active[80, 118].blue > .85f)
                 runOnIdle { surfaceVisible.value = false }
-                waitUntil(timeoutMillis = 5_000) { !submitted.get() }
+                waitUntil(timeoutMillis = 5_000) {
+                    !submitted.get() && !UnifiedVideoEngine.hasMotionSession(source)
+                }
+                assertEquals(null, sampleSize.get())
+                onNodeWithTag("canvas").assertDoesNotExist()
                 val hidden = onNodeWithTag("artwork").captureToImage().toPixelMap()
                 assertTrue(hidden[80, 20].blue > .95f)
+
+                runOnIdle { surfaceVisible.value = true }
+                waitUntil(timeoutMillis = 5_000) { submitted.get() && sampleSize.get() != null }
+                assertTrue(UnifiedVideoEngine.hasMotionSession(source))
+                runOnIdle { canvasEnabled.value = false }
+                waitUntil(timeoutMillis = 5_000) {
+                    !submitted.get() && !UnifiedVideoEngine.hasMotionSession(source)
+                }
+                assertEquals(null, sampleSize.get())
+                assertTrue(onNodeWithTag("artwork").captureToImage().toPixelMap()[80, 20].blue > .95f)
             }
         } finally {
             server.stop(0)

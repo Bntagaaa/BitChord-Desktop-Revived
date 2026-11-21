@@ -1,5 +1,6 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.data.innertube.InnerTubeXResolver
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlin.test.Test
@@ -44,6 +45,35 @@ class DesktopNativeVideoFrameTest {
             }
         }
         assertNull(first.sample(16))
+    }
+
+    @Test fun musicVideoRenditionStaysDrawableAfterNativeDecoderDisposal() = withFixture { path ->
+        val decoder = UnifiedVideoEngine.musicDecoder(null)
+        val stream = InnerTubeXResolver.VideoStream("video", path, 16, 12, "video/mp4", emptyMap(), listOf(12))
+        val first = try {
+            decoder.open(stream)
+            val retained = assertNotNull(decoder.nextFrame())
+            try {
+                repeat(8) { assertNotNull(decoder.nextFrame()).close() }
+                retained
+            } catch (failure: Throwable) {
+                retained.close()
+                throw failure
+            }
+        } finally {
+            decoder.close()
+        }
+        first.use { frame ->
+            assertEquals(16, frame.width)
+            assertEquals(12, frame.height)
+            Surface.makeRasterN32Premul(1, 1).use { surface ->
+                assertTrue(frame.drawTo(surface.canvas, Rect.makeWH(1f, 1f)))
+                Bitmap().use { bitmap ->
+                    assertTrue(bitmap.allocN32Pixels(1, 1, true) && surface.readPixels(bitmap, 0, 0))
+                    assertTrue((bitmap.getColor(0, 0) ushr 16 and 0xff) > 220)
+                }
+            }
+        }
     }
 
     @Test fun seeksAndLoopsWithoutReopeningAndRejectsCancelledIo() = withFixture { path ->

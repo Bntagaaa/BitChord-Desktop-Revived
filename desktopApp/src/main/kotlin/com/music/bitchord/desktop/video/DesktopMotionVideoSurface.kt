@@ -23,7 +23,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 internal class MotionVideoPresentation {
-    var latest by mutableStateOf<VideoFrame?>(null)
+    var latest by mutableStateOf<MotionVideoFrameInfo?>(null)
     var lease: MotionVideoSessions.Lease? = null
 
     fun withFrame(read: (VideoFrame) -> Unit) = lease?.withFrame(read)
@@ -51,9 +51,10 @@ internal fun rememberMotionPresentation(
         try {
             coroutineScope {
                 launch { snapshotFlow { running }.collect(lease::running) }
-                lease.frame.collect { presentation.latest = it }
+                lease.presentation.collect { presentation.latest = it }
             }
         } finally {
+            presentation.latest = null
             presentation.lease = null
             lease.close()
         }
@@ -72,7 +73,7 @@ internal fun DesktopMotionArtwork(
 ) {
     var inViewport by remember(source) { mutableStateOf(!trackViewport) }
     val presentation = rememberMotionPresentation(source, playing, inViewport)
-    val size by remember(presentation) { derivedStateOf { presentation.latest?.intrinsicSize } }
+    val size by remember(presentation) { derivedStateOf { presentation.latest?.size } }
     val owner = remember(source) { Any() }
     val hasFrame = size != null
     LaunchedEffect(owner, publishBackdrop, hasFrame) {

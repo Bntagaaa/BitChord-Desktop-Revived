@@ -44,7 +44,7 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
     val source = MotionVideoSource(canvas.url, canvas.fallbackUrl, DesktopCanvasDecoder.MAX_EDGE,
         MotionVideoSource.Clock.NowPlaying, spec.playbackIdentity ?: canvas.title)
     val presentation = rememberMotionPresentation(source, spec.isPlaying && !spec.pausedForTransition)
-    val aspect by remember(presentation) { derivedStateOf { presentation.latest?.let { it.width.toFloat() / it.height } } }
+    val aspect by remember(presentation) { derivedStateOf { presentation.latest?.size?.let { it.width / it.height } } }
     val rendered = aspect != null
     val submitted = remember(presentation) { mutableStateOf(false) }
     val reportAspect by rememberUpdatedState(spec.onAspectRatioChanged)
@@ -55,12 +55,13 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
 
     LaunchedEffect(aspect) { aspect?.let(reportAspect) }
 
-    LaunchedEffect(rendered, submitted.value) { reportRendered(rendered && submitted.value) }
+    val displayingFrame = rendered && submitted.value
+    LaunchedEffect(displayingFrame) { reportRendered(displayingFrame) }
 
     // One frame once there is one, and then — for a caller re-tinting off the
     // clip — another every so often.
-    LaunchedEffect(source, rendered, spec.refreshFrameEveryMs, spec.frameCapturePx) {
-        if (!rendered) return@LaunchedEffect
+    LaunchedEffect(source, displayingFrame, spec.refreshFrameEveryMs, spec.frameCapturePx) {
+        if (!displayingFrame || spec.frameCapturePx <= 0) return@LaunchedEffect
         presentation.sample(spec.frameCapturePx)?.let(reportFrame)
         val interval = spec.refreshFrameEveryMs ?: return@LaunchedEffect
         while (isActive) {
@@ -84,6 +85,8 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
         }
     }
 
+    // Removing the draw node also releases its offscreen layer when the last frame is gone.
+    if (!rendered) return
     val bottomFade = spec.bottomFade
     val bottomFadeEndPx = spec.bottomFadeEndPx
     Canvas(
@@ -93,7 +96,7 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
             if (bottomFade > 0.001f) compositingStrategy = CompositingStrategy.Offscreen
         },
     ) {
-        val clipAspect = presentation.latest?.let { it.width.toFloat() / it.height } ?: return@Canvas
+        val clipAspect = presentation.latest?.size?.let { it.width / it.height } ?: return@Canvas
         val viewAspect = size.width / size.height
         val fit = spec.contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f
         val (drawWidth, drawHeight) = when {

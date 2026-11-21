@@ -1,5 +1,6 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.ui.geometry.Size
 import com.music.bitchord.data.innertube.InnerTubeXResolver
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
+
+internal data class MotionVideoFrameInfo(val size: Size, val sequence: Long)
 
 internal data class MotionVideoSource(
     val url: String,
@@ -56,6 +59,7 @@ internal object UnifiedVideoEngine {
     }
 
     fun motion(source: MotionVideoSource, running: Boolean) = motion.attach(source, running)
+    fun hasMotionSession(source: MotionVideoSource) = motion.hasSession(source)
 
     fun musicDecoder(owner: Job?): DesktopVideoDecoder {
         return object : DesktopVideoDecoder {
@@ -135,6 +139,8 @@ internal class MotionVideoSessions(
 
     private class Entry {
         val frame = MutableStateFlow<VideoFrame?>(null)
+        val presentation = MutableStateFlow<MotionVideoFrameInfo?>(null)
+        var sequence = 0L
         val running = MutableStateFlow(false)
         val views = mutableMapOf<Any, Boolean>()
         lateinit var job: Job
@@ -142,6 +148,7 @@ internal class MotionVideoSessions(
 
     internal class Lease(
         val frame: StateFlow<VideoFrame?>,
+        val presentation: StateFlow<MotionVideoFrameInfo?>,
         private val read: ((VideoFrame) -> Unit) -> Unit,
         private val update: (Boolean) -> Unit,
         private val release: () -> Unit,
@@ -153,7 +160,7 @@ internal class MotionVideoSessions(
 
     @Synchronized
     fun attach(source: MotionVideoSource, running: Boolean): Lease {
-        if (closed) return Lease(MutableStateFlow(null), {}, {}, {})
+        if (closed) return Lease(MutableStateFlow(null), MutableStateFlow(null), {}, {}, {})
         val previous = sessions[source]
         val entry = previous?.takeIf { it.views.isNotEmpty() } ?: Entry().also { created ->
             sessions[source] = created
@@ -168,7 +175,7 @@ internal class MotionVideoSessions(
         entry.views[token] = running
         entry.running.value = entry.views.containsValue(true)
         return Lease(
-            entry.frame, { readFrame(entry, token, it) },
+            entry.frame, entry.presentation, { readFrame(entry, token, it) },
             { setRunning(entry, token, it) }, { release(source, entry, token) },
         )
     }
@@ -181,6 +188,7 @@ internal class MotionVideoSessions(
         }
         val old = entry.frame.value
         entry.frame.value = next
+        entry.presentation.value = MotionVideoFrameInfo(next.intrinsicSize, ++entry.sequence)
         old?.close()
     }
 
@@ -208,6 +216,7 @@ internal class MotionVideoSessions(
     private fun clearFrame(entry: Entry) {
         val old = entry.frame.value
         entry.frame.value = null
+        entry.presentation.value = null
         old?.close()
     }
 
@@ -223,6 +232,9 @@ internal class MotionVideoSessions(
             entry.job.cancel()
         }
     }
+
+    @Synchronized
+    fun hasSession(source: MotionVideoSource): Boolean = source in sessions
 
     @Synchronized
     private fun removeIfIdle(source: MotionVideoSource, entry: Entry) {

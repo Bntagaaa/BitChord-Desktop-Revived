@@ -857,6 +857,10 @@ fun NowPlayingScreen(
     val canvasRenderedState = remember(canvas?.url) { mutableStateOf(false) }
     var canvasRendered by canvasRenderedState
     var canvasFrame by remember(canvas?.url) { mutableStateOf<ImageBitmap?>(null) }
+    val onCanvasRenderedChange: (Boolean) -> Unit = { rendered ->
+        canvasRendered = rendered
+        if (!rendered) canvasFrame = null
+    }
     // Spotify's phone presentation starts with the full control deck over its
     // video. It leaves on a Canvas tap, or after the optional idle timeout.
     var spotifyCanvasControlsOpen by remember(canvas?.url) { mutableStateOf(true) }
@@ -2078,7 +2082,7 @@ fun NowPlayingScreen(
                             canvas = canvas,
                             canvasRendered = canvasRendered,
                             isPlaying = isPlaying,
-                            onCanvasRenderedChange = { canvasRendered = it },
+                            onCanvasRenderedChange = onCanvasRenderedChange,
                             // A clip decoding behind a player on its way to the
                             // bar is work nobody sees — see [dockMoving].
                             pausedForTransition = dockMoving,
@@ -2336,7 +2340,7 @@ fun NowPlayingScreen(
                             // TextureView doesn't reliably take the fade from a
                             // Compose layer around it.
                             presentationAlpha = { (1f - 2f * p()).coerceIn(0f, 1f) * dockFade() },
-                            onRenderedChanged = { canvasRendered = it },
+                            onRenderedChanged = onCanvasRenderedChange,
                             onFrameCaptured = {
                                 if (playerBackdropTheme != PlayerTheme.SIMPLE &&
                                     !clipFullscreen && !tabletArtworkBackdrop &&
@@ -3313,7 +3317,7 @@ fun NowPlayingScreen(
                                         // asks after its first frame of movement.
                                         pausedForTransition = lyricsOpen || queueOpen || queueDragging ||
                                             collapseStarted || dockMoving,
-                                        onRenderedChanged = { canvasRendered = it },
+                                        onRenderedChanged = onCanvasRenderedChange,
                                         onFrameCaptured = {
                                             if (!tabletArtworkBackdrop && !lyricsOpen && !queueOpen) {
                                                 canvasFrame = it
