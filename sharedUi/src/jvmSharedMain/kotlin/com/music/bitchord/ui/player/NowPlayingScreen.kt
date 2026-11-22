@@ -792,7 +792,12 @@ fun NowPlayingScreen(
     var showVideoQuality by remember { mutableStateOf(false) }
     var showLyricsProviders by remember { mutableStateOf(false) }
     // Gated on the Bluetooth permission the first time — see [rememberOutputPicker].
+    var audioOutputAnchor by remember { mutableStateOf<Rect?>(null) }
     val openAudioOutput = rememberOutputPicker { showAudioOutput = true }
+    val openAnchoredAudioOutput: (Rect?) -> Unit = { anchor ->
+        audioOutputAnchor = anchor
+        openAudioOutput()
+    }
     // Listening in a party whose host has taken the controls: the transport
     // keeps only play/pause, which from here moves this device alone.
     val controlsLocked = rememberControlsLocked()
@@ -1551,7 +1556,7 @@ fun NowPlayingScreen(
             onToggleShuffle = onToggleShuffle,
             onCycleRepeat = onCycleRepeat,
             onToggleAutoplay = onToggleAutoplay,
-            onOpenOutput = openAudioOutput,
+            onOpenOutput = openAnchoredAudioOutput,
             onListenTogether = onListenTogether,
             onOpenListenTogetherMembers = openListenTogetherMembers,
         )
@@ -1563,7 +1568,7 @@ fun NowPlayingScreen(
         ) {
             OutputCaption(
                 accountName = accountName,
-                onOpenOutput = openAudioOutput,
+                onOpenOutput = openAnchoredAudioOutput,
                 onOpenMembers = openListenTogetherMembers,
             )
         }
@@ -1583,6 +1588,7 @@ fun NowPlayingScreen(
             AudioOutputSheet(
                 hazeState = playerHaze,
                 accountName = accountName,
+                anchor = audioOutputAnchor,
                 onDismiss = { showAudioOutput = false },
                 onOpenPipeline = { showAudioPipeline = true },
                 onOpenCast = { showCast = true },

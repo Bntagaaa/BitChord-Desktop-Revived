@@ -228,6 +228,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -504,7 +505,7 @@ internal enum class DesktopDestination(val id: String, val label: String) {
     SETTINGS("settings", "Settings"),
 }
 
-private enum class DesktopRepeatMode {
+internal enum class DesktopRepeatMode {
     OFF,
     ALL,
     ONE,
@@ -3575,7 +3576,7 @@ internal fun BitChordDesktopApp(
         overlays.accounts || overlays.signIn || overlays.playlistDialog || overlays.spotifyImport ||
         playlistTarget != null || overlays.rename || overlays.delete || overlays.downloadManager ||
         overlays.lastfmLogin || overlays.listenBrainzToken || overlays.discordToken ||
-        overlays.listenTogether || overlays.audioOutput || overlays.pipeline || playerMenuOpen
+        overlays.listenTogether || overlays.audioOutputAnchor != null || overlays.pipeline || playerMenuOpen
 
     val playerBackDepth = PlayerBack.depth.value
     var previousPlayerBackDepth by remember { mutableStateOf(playerBackDepth) }
@@ -3999,7 +4000,7 @@ internal fun BitChordDesktopApp(
                                 volume = it
                                 persistence.saveString("volume", it.toString())
                             },
-                            onOpenAudioOutput = { overlays.audioOutput = true },
+                            onOpenAudioOutput = { overlays.audioOutputAnchor = it },
                             onOpenPip = ::openPip,
                             onOpenLyrics = {
                                 releaseShortcutTextFocus()
@@ -4049,7 +4050,7 @@ internal fun BitChordDesktopApp(
                             volume = it
                             persistence.saveString("volume", it.toString())
                         },
-                        onOpenAudioOutput = { overlays.audioOutput = true },
+                        onOpenAudioOutput = { overlays.audioOutputAnchor = it },
                         onOpenPip = ::openPip,
                         onOpenLyrics = {
                             releaseShortcutTextFocus()
@@ -4483,8 +4484,8 @@ internal fun BitChordDesktopApp(
                             onDismiss = { overlays.listenTogether = false },
                         )
                     }
-                    if (overlays.audioOutput) {
-                        DesktopAudioOutputDialog(onDismiss = { overlays.audioOutput = false })
+                    overlays.audioOutputAnchor?.let { anchor ->
+                        DesktopAudioOutputMenu(anchor = anchor, onDismiss = { overlays.audioOutputAnchor = null })
                     }
                     if (overlays.pipeline) {
                         DesktopAudioPipelineDialog(
@@ -4849,7 +4850,7 @@ internal fun BitChordDesktopApp(
                                 )
                                 DesktopSettingsPage.CONTENT_PREFERENCES -> DesktopContentPreferencesPage(onBack = { overlays.settingsPage = DesktopSettingsPage.MAIN })
                                 DesktopSettingsPage.EQUALIZER -> DesktopEqualizerDialog(onDismiss = ::goBack)
-                                DesktopSettingsPage.AUDIO_OUTPUT -> DesktopAudioOutputDialog(onDismiss = ::goBack)
+                                DesktopSettingsPage.AUDIO_OUTPUT -> DesktopAudioOutputMenu(onDismiss = ::goBack)
                                 DesktopSettingsPage.LISTEN_TOGETHER -> DesktopListenTogetherDialog(
                                     autoplayEnabled = autoplay,
                                     onDismiss = ::goBack,
@@ -5386,7 +5387,7 @@ internal fun BitChordDesktopApp(
 }
 
 @Composable
-private fun DesktopTopBar(
+internal fun DesktopTopBar(
     song: Song?,
     isPlaying: Boolean,
     isLoading: Boolean,
@@ -5402,7 +5403,7 @@ private fun DesktopTopBar(
     onRepeatModeChange: (DesktopRepeatMode) -> Unit,
     onOpenNowPlaying: () -> Unit,
     onVolumeChange: (Float) -> Unit,
-    onOpenAudioOutput: () -> Unit,
+    onOpenAudioOutput: (Rect) -> Unit,
     onOpenLyrics: () -> Unit,
     onOpenPip: () -> Unit,
     onOpenQueue: () -> Unit,
@@ -5701,14 +5702,7 @@ private fun DesktopTopBar(
                         modifier = Modifier.width(78.dp),
                     )
                     Spacer(Modifier.width(5.dp))
-                    DesktopToolbarButton(onClick = onOpenAudioOutput, size = 32.dp) {
-                        Icon(
-                            Icons.Rounded.Headphones,
-                            DesktopStrings["audio_output", "Audio output"],
-                            tint = DesktopSecondary,
-                            modifier = Modifier.size(19.dp),
-                        )
-                    }
+                    DesktopAudioOutputButton(onOpenAudioOutput, iconSize = 19.dp)
                     }
                     if (fullControls || showCompactPanels) {
                     DesktopToolbarButton(onClick = onOpenLyrics, size = 32.dp) {
@@ -5754,10 +5748,11 @@ internal fun DesktopToolbarButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
     size: Dp = 36.dp,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     Box(
-        Modifier
+        modifier
             .size(size)
             .clip(CircleShape)
             .desktopHoverWash()
@@ -6092,7 +6087,7 @@ private fun DesktopBottomChrome(
     onShuffleChange: (Boolean) -> Unit,
     onRepeatModeChange: (DesktopRepeatMode) -> Unit,
     onVolumeChange: (Float) -> Unit,
-    onOpenAudioOutput: () -> Unit,
+    onOpenAudioOutput: (Rect) -> Unit,
     onOpenLyrics: () -> Unit,
     onOpenPip: () -> Unit,
     onOpenQueue: () -> Unit,
@@ -6193,7 +6188,7 @@ private fun DesktopFloatingNavigation(
 }
 
 @Composable
-private fun DesktopMiniPlayer(
+internal fun DesktopMiniPlayer(
     song: Song?,
     isPlaying: Boolean,
     isLoading: Boolean,
@@ -6210,7 +6205,7 @@ private fun DesktopMiniPlayer(
     onShuffleChange: (Boolean) -> Unit,
     onRepeatModeChange: (DesktopRepeatMode) -> Unit,
     onVolumeChange: (Float) -> Unit,
-    onOpenAudioOutput: () -> Unit,
+    onOpenAudioOutput: (Rect) -> Unit,
     onOpenLyrics: () -> Unit,
     onOpenPip: () -> Unit,
     onOpenQueue: () -> Unit,
@@ -6300,9 +6295,7 @@ private fun DesktopMiniPlayer(
                     DesktopToolbarButton(onClick = onOpenDetails, size = 32.dp) {
                         Icon(Icons.Rounded.Info, "Now playing details", tint = if (sidePanel == DesktopSidePanel.DETAILS) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
                     }
-                    DesktopToolbarButton(onClick = onOpenAudioOutput, size = 32.dp) {
-                        Icon(Icons.Rounded.Headphones, DesktopStrings["audio_output", "Audio output"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))
-                    }
+                    DesktopAudioOutputButton(onOpenAudioOutput)
                     DesktopThinSlider(
                         value = volume,
                         onValueChange = onVolumeChange,

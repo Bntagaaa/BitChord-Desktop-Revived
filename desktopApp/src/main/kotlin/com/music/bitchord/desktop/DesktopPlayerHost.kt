@@ -5,6 +5,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsSource
@@ -135,6 +136,22 @@ internal object DesktopPlayerHost : PlayerHost {
 
     @Composable
     override fun rememberOutputPicker(onOpen: () -> Unit): () -> Unit = onOpen
+
+    @Composable
+    override fun PlatformAudioOutputMenu(
+        anchor: Rect?,
+        onDismiss: () -> Unit,
+        onOpenPipeline: () -> Unit,
+        onOpenCast: () -> Unit,
+    ): Boolean {
+        DesktopAudioOutputMenu(
+            onDismiss = onDismiss,
+            anchor = anchor,
+            onOpenPipeline = onOpenPipeline,
+            onOpenCast = onOpenCast,
+        )
+        return true
+    }
 
     override fun selectAudioOutput(id: Int?) {
         val device = id?.let { listed.getOrNull(it) } ?: DesktopAudioDevices.SYSTEM_DEFAULT

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
 
 /**
  * Which of the app's dialogs, sheets and full-page overlays are showing.
@@ -19,7 +20,7 @@ internal class DesktopOverlays {
     var pipeline by mutableStateOf(false)
 
     /** Which device playback is sent to. */
-    var audioOutput by mutableStateOf(false)
+    var audioOutputAnchor by mutableStateOf<Rect?>(null)
 
     /** The party this device is listening with. */
     var listenTogether by mutableStateOf(false)
