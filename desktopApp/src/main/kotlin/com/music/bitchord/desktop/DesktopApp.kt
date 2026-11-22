@@ -434,6 +434,8 @@ internal fun desktopSwitchColors() = SwitchDefaults.colors(
 )
 internal val DesktopSecondary: Color get() = DesktopTheme.palette.secondary
 internal val DesktopDivider: Color get() = DesktopTheme.palette.divider
+private const val HOME_REQUEST_TIMEOUT_MS = 12_000L
+private const val PLAYER_METADATA_TIMEOUT_MS = 6_000L
 private const val STATS_SAMPLE_MS = 5_000L
 
 /** How often the playhead is offered to the history tracker. */
@@ -903,21 +905,20 @@ internal fun BitChordDesktopApp(
     var artistReloads by remember { mutableStateOf(0) }
 
     fun canonicalSong(song: Song): Song {
+        val needsArtist = song.artist.isUnknownArtist()
+        val needsArtwork = song.thumbnailUrl.isNullOrBlank()
+        if (!needsArtist && !needsArtwork) return song
+
         val homeSong = (homeState as? UiState.Success)?.data.orEmpty()
             .asSequence()
             .flatMap { it.items.asSequence() }
-            .filter { it.videoId == song.videoId }
-            .map(ShelfItem::toSong)
-            .firstOrNull()
-        return if (homeSong != null && song.artist.isUnknownArtist()) {
-            song.copy(
-                artist = homeSong.artist,
-                durationText = song.durationText ?: homeSong.durationText,
-                thumbnailUrl = song.thumbnailUrl ?: homeSong.thumbnailUrl,
-            )
-        } else {
-            song
-        }
+            .firstOrNull { it.videoId == song.videoId }
+            ?.toSong() ?: return song
+        return song.copy(
+            artist = if (needsArtist) homeSong.artist else song.artist,
+            durationText = song.durationText ?: homeSong.durationText,
+            thumbnailUrl = if (needsArtwork) homeSong.thumbnailUrl else song.thumbnailUrl,
+        )
     }
 
     lateinit var startSong: (Song, Boolean) -> Unit
@@ -2031,6 +2032,7 @@ internal fun BitChordDesktopApp(
     }
     val playbackPresentation = remember(playbackEngine) { playbackEngine.state.presentationStates() }
     val playback by playbackPresentation.collectAsState(initial = DesktopPlaybackState())
+    val playbackBuffering = playback.isLoading || (playback.isPlaying && playback.awaitingAudio)
 
     // The shared player reads the playhead off this one object, and only where it
     // draws it — see PlaybackPosition — so a tick never recomposes the player.
@@ -2092,20 +2094,23 @@ internal fun BitChordDesktopApp(
     LaunchedEffect(selectedSong?.videoId, needsPlayerTrackLinks, activeAccountId, activeProfileId) {
         trackLinks = null
         val current = selectedSong ?: return@LaunchedEffect
-        // Fetch only when the expanded player or docked song menu can use the links.
-        if (!needsPlayerTrackLinks || current.localUri != null || current.localPath != null) return@LaunchedEffect
-        if (current.artistId != null && current.albumId != null) return@LaunchedEffect
-        trackLinks = DesktopSearchClient.trackLinks(current.videoId).getOrNull()
+        if (!needsPlayerTrackLinks || !current.canFetchDesktopPlayerMetadata()) return@LaunchedEffect
+
+        val needsCover = current.thumbnailUrl.isNullOrBlank()
+        val needsCredits = current.artistId == null || current.albumId == null
+        if (!needsCover && !needsCredits) return@LaunchedEffect
+        val first = withTimeoutOrNull(PLAYER_METADATA_TIMEOUT_MS) {
+            DesktopSearchClient.trackLinks(current.videoId).getOrNull()
+        }
+        trackLinks = first
+        if (needsCover && first == null) {
+            delay(750)
+            trackLinks = withTimeoutOrNull(PLAYER_METADATA_TIMEOUT_MS) {
+                DesktopSearchClient.trackLinks(current.videoId).getOrNull()
+            }
+        }
     }
-    fun playerSongWithLinks(song: Song): Song {
-        val links = trackLinks?.takeIf { it.videoId == song.videoId } ?: return song
-        return song.copy(
-            artistId = song.artistId ?: links.artistId,
-            artists = song.artists.ifEmpty { links.artists },
-            albumId = song.albumId ?: links.albumId,
-            albumName = song.albumName ?: links.albumName,
-        )
-    }
+    fun playerSongWithLinks(song: Song): Song = song.withDesktopPlayerMetadata(trackLinks)
     // Keyed on the same things, plus the rate: Discord counts the bar down on
     // its own clock, so only a change to what it was told is worth another push.
     LaunchedEffect(playback.song?.videoId, playback.isPlaying, playback.durationMs, playbackSpeed) {
@@ -2747,37 +2752,40 @@ internal fun BitChordDesktopApp(
         DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.HOME_FEED_REQUESTED)
         homeJob?.cancel()
         homeJob = scope.launch {
-            launch {
-                DesktopSearchClient.home().fold(
-                    onSuccess = { feed ->
-                        if (generation != homeGeneration) return@fold
+            var mainFeedError: String? = null
+            coroutineScope {
+                launch {
+                    val result = withTimeoutOrNull(HOME_REQUEST_TIMEOUT_MS) { DesktopSearchClient.home() }
+                    if (generation != homeGeneration) return@launch
+                    val feed = result?.getOrNull()
+                    if (feed != null) {
                         homeContinuation = feed.continuation
                         publishHomeShelves(feed.shelves)
-                    },
-                    onFailure = {
-                        if (generation == homeGeneration && homeState !is UiState.Success) {
-                            homeState = UiState.Error(it.message ?: "Could not load Home")
-                        }
-                    },
-                )
-            }
-            if (signedIn) {
-                launch {
-                    YtMusicRepository.homeRecentlyPlayed()
-                        .onSuccess { shelf ->
-                            if (generation != homeGeneration) return@onSuccess
-                            homeRecentsLoading = false
-                            shelf?.let { publishHomeShelves(listOf(it), prepend = true) }
-                        }
-                        .onFailure { if (generation == homeGeneration) homeRecentsLoading = false }
-                }
-            }
-            DesktopSearchClient.HOME_SUPPLEMENT_BROWSE_IDS.forEach { browseId ->
-                launch {
-                    DesktopSearchClient.homeSupplement(browseId).onSuccess { shelves ->
-                        if (generation == homeGeneration) publishHomeShelves(shelves)
+                    } else {
+                        mainFeedError = result?.exceptionOrNull()?.message ?: "Home request timed out"
                     }
                 }
+                if (signedIn) {
+                    launch {
+                        val shelf = withTimeoutOrNull(HOME_REQUEST_TIMEOUT_MS) {
+                            YtMusicRepository.homeRecentlyPlayed().getOrNull()
+                        }
+                        if (generation != homeGeneration) return@launch
+                        homeRecentsLoading = false
+                        shelf?.let { publishHomeShelves(listOf(it), prepend = true) }
+                    }
+                }
+                DesktopSearchClient.HOME_SUPPLEMENT_BROWSE_IDS.forEach { browseId ->
+                    launch {
+                        val shelves = withTimeoutOrNull(HOME_REQUEST_TIMEOUT_MS) {
+                            DesktopSearchClient.homeSupplement(browseId).getOrNull()
+                        }
+                        if (generation == homeGeneration && shelves != null) publishHomeShelves(shelves)
+                    }
+                }
+            }
+            if (generation == homeGeneration && homeState is UiState.Loading) {
+                homeState = UiState.Error(mainFeedError ?: "No Home recommendations are available yet")
             }
         }
     }
@@ -4016,7 +4024,7 @@ internal fun BitChordDesktopApp(
                         DesktopTopBar(
                             song = selectedSong,
                             isPlaying = playback.isPlaying,
-                            isLoading = playback.isLoading,
+                            isLoading = playbackBuffering,
                             previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,
                             progress = if (playback.durationMs > 0L) playerPosition.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
                             volume = playback.volume,
@@ -4065,7 +4073,7 @@ internal fun BitChordDesktopApp(
                         showPlayer = !oldTopPlayerEnabled,
                         song = current,
                         isPlaying = playback.isPlaying,
-                        isLoading = playback.isLoading,
+                        isLoading = playbackBuffering,
                         previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,
                         progress = if (playback.durationMs > 0L) playerPosition.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
                         volume = playback.volume,
@@ -4211,7 +4219,7 @@ internal fun BitChordDesktopApp(
                         NowPlayingScreen(
                             song = playerSong,
                             isPlaying = playback.isPlaying,
-                            isLoading = playback.isLoading,
+                            isLoading = playbackBuffering,
                             position = playerPosition,
                             durationMs = playback.durationMs,
                             audioVersionSwitching = mediaVersionSwitching,
@@ -4345,6 +4353,23 @@ internal fun BitChordDesktopApp(
                                     .clip(RoundedCornerShape(50))
                                     .background(Color.Black.copy(alpha = 0.72f))
                                     .padding(horizontal = 18.dp, vertical = 10.dp),
+                            )
+                        }
+                    }
+                    playback.error?.takeIf { !playback.isLoading && !playback.isPlaying }?.let { message ->
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                            Text(
+                                text = message,
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .padding(start = 16.dp, end = 16.dp, bottom = if (overlays.nowPlaying) 36.dp else 104.dp)
+                                    .widthIn(max = 560.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.Black.copy(alpha = 0.84f))
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
                             )
                         }
                     }

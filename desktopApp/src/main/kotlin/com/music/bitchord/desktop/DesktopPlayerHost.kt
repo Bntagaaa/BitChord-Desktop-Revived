@@ -308,3 +308,19 @@ private fun DesktopAudioPipeline.toOutputFormat(): OutputFormatUi {
 internal fun lyricsSourceNamed(name: String): LyricsSource? =
     LyricsSource.entries.firstOrNull { it.label.equals(name, ignoreCase = true) }
         ?: LyricsSource.entries.firstOrNull { it.name.equals(name.replace(' ', '_'), ignoreCase = true) }
+
+/** Watch metadata is available for YouTube IDs; local and source-owned IDs use their own artwork. */
+internal fun Song.canFetchDesktopPlayerMetadata(): Boolean =
+    localUri == null && localPath == null && videoId.length == 11 &&
+        videoId.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }
+
+internal fun Song.withDesktopPlayerMetadata(metadata: Song?): Song {
+    val links = metadata?.takeIf { it.videoId == videoId } ?: return this
+    return copy(
+        artistId = artistId ?: links.artistId,
+        artists = artists.ifEmpty { links.artists },
+        albumId = albumId ?: links.albumId,
+        albumName = albumName ?: links.albumName,
+        thumbnailUrl = thumbnailUrl?.takeIf { it.isNotBlank() } ?: links.thumbnailUrl,
+    )
+}

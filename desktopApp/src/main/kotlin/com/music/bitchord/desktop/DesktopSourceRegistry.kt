@@ -342,31 +342,37 @@ internal object DesktopSourceRegistry {
         }
         val fallback = scope.async { youtube.resolve(song, quality).getOrNull() }
 
-        val quick: DesktopStream? = select {
-            lookup.onAwait { it }
-            // A YouTube leg that finished without a URL has not won anything.
-            fallback.onAwait { stream -> if (stream != null) null else lookup.await() }
-        }
+        var keepLookup = false
+        try {
+            val quick: DesktopStream? = select {
+                lookup.onAwait { it }
+                // A YouTube leg that finished without a URL has not won anything.
+                fallback.onAwait { stream -> if (stream != null) null else lookup.await() }
+            }
 
-        if (quick != null) {
+            if (quick != null) {
+                DesktopTrackLog.log(
+                    "substituted: '${song.title}' served by ${sourceNameFor(quick)} over YouTube" +
+                        " at ${quick.format.summary.ifBlank { "an unstated format" }}",
+                )
+                // Winning the race is not the same as being the best copy.
+                return@runCatching DesktopLiveResolution(quick, betterThan(quick, higher, song, quality))
+            }
+
+            val youtubeStream = fallback.await()
+                ?: lookup.await()
+                ?: error("No enabled music source could play this track")
+            // Still running means it lost the race rather than ran out of answers.
+            val pending = lookup.takeIf { it.isActive }
+            keepLookup = pending != null
+            if (pending != null) {
+                DesktopTrackLog.log("'${song.title}' started on YouTube while the other sources keep looking")
+            }
+            DesktopLiveResolution(youtubeStream, pending)
+        } finally {
             fallback.cancel()
-            DesktopTrackLog.log(
-                "substituted: '${song.title}' served by ${sourceNameFor(quick)} over YouTube" +
-                    " at ${quick.format.summary.ifBlank { "an unstated format" }}",
-            )
-            // Winning the race is not the same as being the best copy.
-            return@runCatching DesktopLiveResolution(quick, betterThan(quick, higher, song, quality))
+            if (!keepLookup) lookup.cancel()
         }
-
-        val youtubeStream = fallback.await()
-            ?: lookup.await()
-            ?: error("No enabled music source could play this track")
-        // Still running means it lost the race rather than ran out of answers.
-        val pending = lookup.takeIf { it.isActive }
-        if (pending != null) {
-            DesktopTrackLog.log("'${song.title}' started on YouTube while the other sources keep looking")
-        }
-        DesktopLiveResolution(youtubeStream, pending)
     }
 
     /**

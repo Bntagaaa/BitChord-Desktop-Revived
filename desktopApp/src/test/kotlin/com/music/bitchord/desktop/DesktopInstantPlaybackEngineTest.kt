@@ -7,6 +7,7 @@ import java.nio.ByteOrder
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.delay
 import kotlin.test.*
 
@@ -68,6 +69,25 @@ class DesktopInstantPlaybackEngineTest {
         resolve: suspend (Song) -> DesktopStream): DesktopPlaybackEngine =
         DesktopPlaybackEngine(ended, handoff, output, analysis) { song, _, _, _ -> Result.success(resolve(song)).map { DesktopLiveResolution(it) } }
             .also { engines += it }
+
+    @Test fun `resolution timeout clears loading and Play retries the failed track`() {
+        val output = Output()
+        val stream = tone()
+        val attempts = AtomicInteger()
+        val engine = DesktopPlaybackEngine({}, {}, output, sourceTimeoutMs = 200) { _, _, _, _ ->
+            if (attempts.incrementAndGet() == 1) delay(10_000)
+            Result.success(DesktopLiveResolution(stream))
+        }.also { engines += it }
+        engine.load(song("stalled"))
+        waitFor("resolution timeout") { engine.state.value.error != null }
+        assertFalse(engine.state.value.isLoading)
+        assertTrue(engine.state.value.error.orEmpty().contains("Timed out"))
+        engine.togglePlayPause()
+        waitFor("retried track PCM") { output.writes > 0 }
+        assertEquals(2, attempts.get())
+        assertEquals("stalled", engine.state.value.song?.videoId)
+        assertNull(engine.state.value.error)
+    }
 
     @Test fun `five rapid skips cancel an obsolete resolution and only latest reaches output`() {
         val stream = tone()

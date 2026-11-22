@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.ConnectionPool
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -259,7 +260,7 @@ object StreamResolver {
      * starting a track, and ExoPlayer asks again for every re-open: each seek
      * outside the buffer, and each range the cache fills in.
      */
-    suspend fun resolve(videoId: String): String {
+    suspend fun resolve(videoId: String, clientWalkTimeoutMs: Long? = null): String {
         init
 
         recent[videoId]
@@ -271,7 +272,7 @@ object StreamResolver {
         // See [rememberUnplayable] for why this is the fix for "stuck loading".
         unplayableReason(videoId)?.let { throw PermanentlyUnplayableException(it) }
 
-        val stream = coalescedResolve(videoId)
+        val stream = coalescedResolve(videoId, clientWalkTimeoutMs)
 
         // The container carries no bitrate field, so this is the only place the
         // real figure is ever known.
@@ -366,79 +367,51 @@ object StreamResolver {
     private const val UNPLAYABLE_TTL_MS = 10 * 60 * 1000L
 
     /**
-     * One walk per videoId at a time.
-     *
-     * [AudioCache]'s read-ahead resolves the queued track before it is
-     * reached, to warm the cache; if the queue advances faster than that
-     * walk finishes, playback calls [resolve] for the same track a second
-     * time before the first walk has populated [recent]. Left alone, that is
-     * two full client walks in flight for the same track at once, each
-     * paying for the other's requests — round trips measured elsewhere in
-     * this file at ~250ms stretched past 3s under exactly this contention.
-     * A second caller for a videoId already being resolved waits on the
-     * first walk instead of starting its own.
-     *
-     * Parented to [resolverScope] rather than the caller's own coroutine, so
-     * that a caller giving up on its own timeout — see
-     * [PlaybackService][com.music.bitchord.playback.PlaybackService] —
-     * cancels only its own wait, not the walk a second caller may still be
-     * waiting on. Being parented elsewhere is also why the walk has to be told
-     * whose it is — [TrackLog.about] — rather than inheriting it: this is the
-     * single largest producer of lines in the log, and every one of them was
-     * previously filed against whatever happened to be playing while the walk
-     * ran, which for read-ahead is the track before this one.
-     */    private suspend fun coalescedResolve(videoId: String): Stream {
-        inFlight[videoId]?.let { return it.await() }
-        // Started lazily so that losing the race below costs nothing: the walk
-        // that gets discarded has not run a line, so cancelling it fires no
-        // requests and leaves no half-finished deferred behind.
-        val walk = resolverScope.async(TrackLog.about(videoId), start = CoroutineStart.LAZY) {
-            resolveUncached(videoId)
+     * Playback and read-ahead share an active walk. Cancel it after the last
+     * caller leaves so obsolete tracks stop queuing for NewPipe extraction.
+     */
+    private suspend fun coalescedResolve(videoId: String, clientWalkTimeoutMs: Long?): Stream {
+        val flight = synchronized(inFlight) {
+            val current = inFlight.getOrPut(videoId) {
+                ResolveFlight(resolverScope.async(TrackLog.about(videoId), start = CoroutineStart.LAZY) {
+                    resolveUncached(videoId, clientWalkTimeoutMs)
+                })
+            }
+            current.waiters++
+            current
         }
-        val running = inFlight.putIfAbsent(videoId, walk)
-        if (running != null) {
-            walk.cancel()
-            return running.await()
+        try {
+            return flight.walk.await()
+        } finally {
+            synchronized(inFlight) {
+                if (--flight.waiters == 0) {
+                    inFlight.remove(videoId)
+                    flight.walk.cancel()
+                }
+            }
         }
-        // Unregistered by the walk's own completion rather than by the awaiter,
-        // which is the difference between coalescing and only appearing to.
-        //
-        // This used to be `try { deferred.await() } finally { inFlight.remove }`,
-        // and the finally is the bug: the walk is parented to [resolverScope]
-        // precisely so a caller giving up does not kill it, so a caller that
-        // gives up — which is every read-ahead resolve the queue moves past, and
-        // every [PlaybackService] resolve that hits its own timeout — took the
-        // still-running walk out of the map on its way out. The next caller then
-        // found nothing in flight and started a second full walk against the
-        // same videoId, which is exactly what the logs show: two overlapping
-        // resolves for one track, 4472ms and 4620ms, 2.8s of them concurrent,
-        // each paying for the other's round trips. The doc comment above
-        // promised one walk per videoId and the finally guaranteed the opposite.
-        walk.invokeOnCompletion { inFlight.remove(videoId, walk) }
-        walk.start()
-        return walk.await()
     }
 
-    private val inFlight = ConcurrentHashMap<String, Deferred<Stream>>()
+    private class ResolveFlight(val walk: Deferred<Stream>, var waiters: Int = 0)
+    private val inFlight = mutableMapOf<String, ResolveFlight>()
 
     private val resolverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private suspend fun resolveUncached(videoId: String): Stream {
+    private suspend fun resolveUncached(videoId: String, clientWalkTimeoutMs: Long?): Stream {
         val resolveStart = MonotonicClock.nowMs()
         val stream = try {
-            timed("$videoId InnerTubeX") { innerTubeXStream(videoId) }
-                ?.let { found ->
-                    // A live broadcast's adaptive URL is one window of a stream
-                    // that keeps growing: it plays the few seconds that exist
-                    // and then ends. Live is played from its HLS playlist.
-                    if (!isLiveUrl(found.url)) found
-                    else timed("$videoId live HLS") { liveHlsStream(videoId) } ?: found
-                }
-
-                ?: run {
-                    TrackLog.w(TAG, "InnerTubeX found no usable stream for $videoId; falling back to extraction")
-                    timed("$videoId newPipeStream") { newPipeStream(videoId, ::pickForQuality) }
-                }
+            val primary = timed("$videoId InnerTubeX") {
+                if (clientWalkTimeoutMs == null) innerTubeXStream(videoId)
+                else withTimeoutOrNull(clientWalkTimeoutMs) { innerTubeXStream(videoId) }
+            }
+            primary?.let { found ->
+                // An adaptive broadcast URL covers one window; the HLS playlist keeps growing.
+                if (!isLiveUrl(found.url)) found
+                else timed("$videoId live HLS") { liveHlsStream(videoId) } ?: found
+            } ?: run {
+                TrackLog.w(TAG, "InnerTubeX found no usable stream for $videoId; falling back to extraction")
+                timed("$videoId newPipeStream") { newPipeStream(videoId, ::pickForQuality) }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: LinkageError) {
