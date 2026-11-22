@@ -120,6 +120,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -262,6 +263,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -2083,14 +2085,26 @@ internal fun BitChordDesktopApp(
         if (destination != DesktopDestination.HISTORY || !youtubeSignedIn) return@LaunchedEffect
         DesktopSearchClient.history().onSuccess { remoteHistory = it }
     }
-    LaunchedEffect(selectedSong?.videoId, overlays.nowPlaying) {
+    var miniPlayerMenuOpen by remember(
+        selectedSong?.videoId, activeAccountId, activeProfileId, overlays.nowPlaying, oldTopPlayerEnabled,
+    ) { mutableStateOf(false) }
+    val needsPlayerTrackLinks = overlays.nowPlaying || miniPlayerMenuOpen
+    LaunchedEffect(selectedSong?.videoId, needsPlayerTrackLinks, activeAccountId, activeProfileId) {
         trackLinks = null
         val current = selectedSong ?: return@LaunchedEffect
-        // Only while the player is up, so playing from the mini player costs
-        // nothing, and only when something is actually missing.
-        if (!overlays.nowPlaying) return@LaunchedEffect
+        // Fetch only when the expanded player or docked song menu can use the links.
+        if (!needsPlayerTrackLinks || current.localUri != null || current.localPath != null) return@LaunchedEffect
         if (current.artistId != null && current.albumId != null) return@LaunchedEffect
         trackLinks = DesktopSearchClient.trackLinks(current.videoId).getOrNull()
+    }
+    fun playerSongWithLinks(song: Song): Song {
+        val links = trackLinks?.takeIf { it.videoId == song.videoId } ?: return song
+        return song.copy(
+            artistId = song.artistId ?: links.artistId,
+            artists = song.artists.ifEmpty { links.artists },
+            albumId = song.albumId ?: links.albumId,
+            albumName = song.albumName ?: links.albumName,
+        )
     }
     // Keyed on the same things, plus the rate: Discord counts the bar down on
     // its own clock, so only a change to what it was told is worth another push.
@@ -3402,6 +3416,30 @@ internal fun BitChordDesktopApp(
         onShare = ::shareSong,
     )
 
+    @Composable
+    fun playerTrackMenu(song: Song, onDismiss: () -> Unit) {
+        DesktopSongMenuFor(
+            song = playerSongWithLinks(song),
+            liked = song.videoId in likedIds,
+            actions = playerSongActions(song),
+            onToggleLike = { toggleLike(song) },
+            onRevertToOriginal = {
+                DesktopOriginalVersion.pin(song.videoId)
+                playbackEngine.reloadCurrent()
+            }.takeIf {
+                playback.streamSourceId != null &&
+                    playback.streamSourceId != "youtube" &&
+                    DesktopMusicSources.hasYouTubeOriginal(song) &&
+                    !DesktopOriginalVersion.isPinned(song.videoId)
+            },
+            onUpgradeQuality = {
+                DesktopOriginalVersion.clear(song.videoId)
+                playbackEngine.reloadCurrent(forceSourceRefresh = true)
+            }.takeIf { DesktopOriginalVersion.isPinned(song.videoId) },
+            onDismiss = onDismiss,
+        )
+    }
+
     // What the shared player reads as settings, kept in step with the window's own.
     SideEffect {
         DesktopPlayerHost.videoSpeed = playbackSpeed
@@ -4019,12 +4057,13 @@ internal fun BitChordDesktopApp(
                     }
                 },
                 bottomBar = { compact ->
+                    val current = selectedSong
                     DesktopBottomChrome(
                         compact = compact,
                         destination = destination,
                         settingsOpen = overlays.settingsPage != null,
                         showPlayer = !oldTopPlayerEnabled,
-                        song = selectedSong,
+                        song = current,
                         isPlaying = playback.isPlaying,
                         isLoading = playback.isLoading,
                         previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,
@@ -4064,6 +4103,19 @@ internal fun BitChordDesktopApp(
                             releaseShortcutTextFocus()
                             overlays.toggleSidePanel(DesktopSidePanel.DETAILS)
                         },
+                        liked = current?.videoId in likedIds,
+                        onToggleLike = current?.takeIf { youtubeSignedIn || it.localUri != null }
+                            ?.let { song -> { toggleLike(song) } },
+                        songMenu = if (current != null) {
+                            {
+                                Box {
+                                    DesktopMoreButton(onClick = { miniPlayerMenuOpen = true })
+                                    if (miniPlayerMenuOpen) {
+                                        playerTrackMenu(current, onDismiss = { miniPlayerMenuOpen = false })
+                                    }
+                                }
+                            }
+                        } else null,
                     )
                 },
                 trailing = {
@@ -4155,20 +4207,7 @@ internal fun BitChordDesktopApp(
                         },
                     ) { windowWidth, windowHeight ->
                         val current = selectedSong ?: return@DesktopPlayerSheet
-                        val playerSong = trackLinks?.takeIf { it.videoId == current.videoId }
-                            ?.let { extra ->
-                                current.copy(
-                                    artistId = current.artistId ?: extra.artistId,
-                                    // Same as on the phone: the watch-queue lookup
-                                    // is what carries a channel per credited
-                                    // artist, so it is what makes every name in
-                                    // the credit line openable.
-                                    artists = current.artists.ifEmpty { extra.artists },
-                                    albumId = current.albumId ?: extra.albumId,
-                                    albumName = current.albumName ?: extra.albumName,
-                                )
-                            }
-                            ?: current
+                        val playerSong = playerSongWithLinks(current)
                         NowPlayingScreen(
                             song = playerSong,
                             isPlaying = playback.isPlaying,
@@ -4284,26 +4323,7 @@ internal fun BitChordDesktopApp(
                                     .size(34.dp),
                             ) {
                                 CompositionLocalProvider(LocalDesktopMenuHorizontalBias provides (-220).dp) {
-                                DesktopSongMenuFor(
-                                    song = playerSong,
-                                    liked = current.videoId in likedIds,
-                                    actions = playerSongActions(current),
-                                    onToggleLike = { toggleLike(current) },
-                                    onRevertToOriginal = {
-                                        DesktopOriginalVersion.pin(current.videoId)
-                                        playbackEngine.reloadCurrent()
-                                    }.takeIf {
-                                        playback.streamSourceId != null &&
-                                            playback.streamSourceId != "youtube" &&
-                                            DesktopMusicSources.hasYouTubeOriginal(current) &&
-                                            !DesktopOriginalVersion.isPinned(current.videoId)
-                                    },
-                                    onUpgradeQuality = {
-                                        DesktopOriginalVersion.clear(current.videoId)
-                                        playbackEngine.reloadCurrent(forceSourceRefresh = true)
-                                    }.takeIf { DesktopOriginalVersion.isPinned(current.videoId) },
-                                    onDismiss = { playerMenuOpen = false },
-                                )
+                                    playerTrackMenu(current, onDismiss = { playerMenuOpen = false })
                                 }
                             }
                         }
@@ -5342,6 +5362,7 @@ internal fun BitChordDesktopApp(
                         )
                         destination == DesktopDestination.DOWNLOADS -> Box(Modifier.fillMaxSize()) {
                             DesktopDownloadsPage(
+                                persistence = persistence,
                                 downloads = downloads,
                                 playlistRecords = playlistDownloadRecords,
                                 downloadedIds = downloads.map(Song::videoId).toSet(),
@@ -5367,6 +5388,7 @@ internal fun BitChordDesktopApp(
                             }
                         }
                         destination == DesktopDestination.LOCAL_MUSIC -> DesktopLocalMusicPage(
+                            persistence = persistence,
                             songs = remember(localSongs, downloads) {
                                 DesktopLocalMusic.withDownloadedArtwork(localSongs, downloads)
                             },
@@ -6092,6 +6114,9 @@ private fun DesktopBottomChrome(
     onOpenPip: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenDetails: () -> Unit,
+    liked: Boolean,
+    onToggleLike: (() -> Unit)?,
+    songMenu: (@Composable () -> Unit)?,
 ) {
     Column(
         Modifier
@@ -6123,6 +6148,9 @@ private fun DesktopBottomChrome(
                 onOpenPip = onOpenPip,
                 onOpenQueue = onOpenQueue,
                 onOpenDetails = onOpenDetails,
+                liked = liked,
+                onToggleLike = onToggleLike,
+                songMenu = songMenu,
             )
         }
         if (compact) DesktopFloatingNavigation(destination, settingsOpen, onDestinationSelected)
@@ -6210,6 +6238,9 @@ internal fun DesktopMiniPlayer(
     onOpenPip: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenDetails: () -> Unit,
+    liked: Boolean = false,
+    onToggleLike: (() -> Unit)? = null,
+    songMenu: (@Composable () -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(16.dp)
     val dockSurface = if (DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.FLOATING_PLAYER)) {
@@ -6229,7 +6260,14 @@ internal fun DesktopMiniPlayer(
         color = Color.Transparent,
         tonalElevation = 0.dp,
     ) {
-        Box(Modifier.fillMaxWidth()) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // A side panel can narrow the dock even in a full-size window.
+            val compactControls = maxWidth < 560.dp
+            val hideSecondaryTools = maxWidth < 450.dp
+            val showArtwork = maxWidth >= 380.dp
+            val showVolume = maxWidth >= 650.dp
+            val transportSize = if (compactControls) 28.dp else 34.dp
+            val toolSize = if (compactControls) 28.dp else 32.dp
             // Both playing and empty states share the original dock height:
             // 42.dp artwork + 8.dp vertical padding on each side = 58.dp.
             Row(
@@ -6241,23 +6279,23 @@ internal fun DesktopMiniPlayer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                DesktopToolbarButton(onClick = { onShuffleChange(!shuffle) }, size = 34.dp) {
+                if (!compactControls) DesktopToolbarButton(onClick = { onShuffleChange(!shuffle) }, size = transportSize) {
                     Icon(painterResource(Res.drawable.player_transport_shuffle), "Shuffle", tint = if (shuffle) DesktopAccent else DesktopSecondary, modifier = Modifier.size(18.dp))
                 }
-                DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = 34.dp) {
+                DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = transportSize) {
                     Icon(painterResource(Res.drawable.player_transport_previous), "Previous", tint = if (previousEnabled) DesktopForeground else DesktopSecondary.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
                 }
-                DesktopToolbarButton(onClick = onPlayPause, enabled = song != null, size = 36.dp) {
+                DesktopToolbarButton(onClick = onPlayPause, enabled = song != null, size = transportSize + 2.dp) {
                     if (isLoading) {
                         CircularProgressIndicator(Modifier.size(18.dp), color = DesktopForeground, strokeWidth = 2.dp)
                     } else {
                         Icon(painterResource(if (isPlaying) Res.drawable.player_transport_pause else Res.drawable.player_transport_play), if (isPlaying) "Pause" else "Play", tint = DesktopForeground, modifier = Modifier.size(23.dp))
                     }
                 }
-                DesktopToolbarButton(onClick = onNext, enabled = song != null, size = 34.dp) {
+                DesktopToolbarButton(onClick = onNext, enabled = song != null, size = transportSize) {
                     Icon(painterResource(Res.drawable.player_transport_next), "Next", tint = DesktopForeground, modifier = Modifier.size(20.dp))
                 }
-                DesktopToolbarButton(onClick = { onRepeatModeChange(repeatMode.next()) }, size = 34.dp) {
+                if (!compactControls) DesktopToolbarButton(onClick = { onRepeatModeChange(repeatMode.next()) }, size = transportSize) {
                     val tint = if (repeatMode == DesktopRepeatMode.OFF) DesktopSecondary else DesktopAccent
                     Icon(
                         painterResource(
@@ -6277,26 +6315,48 @@ internal fun DesktopMiniPlayer(
                     // and let the brand mark float at the actual center of the dock.
                     Spacer(Modifier.weight(1f))
                 } else {
-                    Spacer(Modifier.width(8.dp))
-                    DesktopArtwork(song.thumbnailUrl, Modifier.trackArtSize(42.dp, song.isVideo).clip(RoundedCornerShape(7.dp)), px = ROW_ART_PX)
+                    if (showArtwork) {
+                        Spacer(Modifier.width(if (compactControls) 2.dp else 8.dp))
+                        val artworkHeight = if (compactControls) 34.dp else 42.dp
+                        DesktopArtwork(song.thumbnailUrl, Modifier.trackArtSize(artworkHeight, song.isVideo).clip(RoundedCornerShape(7.dp)), px = ROW_ART_PX)
+                    }
                     Column(Modifier.weight(1f).padding(start = 8.dp, end = 8.dp)) {
                         Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                         Text(song.artist, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    if (onToggleLike != null) {
+                        Box(
+                            Modifier
+                                .size(toolSize)
+                                .clip(CircleShape)
+                                .desktopHoverWash()
+                                .toggleable(value = liked, role = Role.Checkbox, onValueChange = { onToggleLike() }),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
+                                contentDescription = if (liked) DesktopStrings["remove_from_liked", "Remove from Liked Music"]
+                                    else DesktopStrings["like", "Like"],
+                                tint = if (liked) DesktopAccent else DesktopSecondary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                    songMenu?.invoke()
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-                    DesktopToolbarButton(onClick = onOpenLyrics, size = 32.dp) {
+                    DesktopToolbarButton(onClick = onOpenLyrics, size = toolSize) {
                         Icon(painterResource(Res.drawable.player_transport_lyrics), "Lyrics", tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
                     }
-                    DesktopPipLauncher(onOpenPip, enabled = song != null)
-                    DesktopToolbarButton(onClick = onOpenQueue, size = 32.dp) {
+                    if (!hideSecondaryTools) DesktopPipLauncher(onOpenPip, enabled = song != null)
+                    DesktopToolbarButton(onClick = onOpenQueue, size = toolSize) {
                         Icon(painterResource(Res.drawable.player_transport_up_next), "Queue", tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
                     }
-                    DesktopToolbarButton(onClick = onOpenDetails, size = 32.dp) {
+                    if (!hideSecondaryTools) DesktopToolbarButton(onClick = onOpenDetails, size = toolSize) {
                         Icon(Icons.Rounded.Info, "Now playing details", tint = if (sidePanel == DesktopSidePanel.DETAILS) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
                     }
-                    DesktopAudioOutputButton(onOpenAudioOutput)
-                    DesktopThinSlider(
+                    if (!hideSecondaryTools) DesktopAudioOutputButton(onOpenAudioOutput)
+                    if (showVolume) DesktopThinSlider(
                         value = volume,
                         onValueChange = onVolumeChange,
                         idleHeight = 4.dp,
@@ -7260,7 +7320,8 @@ private fun DesktopHistoryPage(
 }
 
 @Composable
-private fun DesktopDownloadsPage(
+internal fun DesktopDownloadsPage(
+    persistence: DesktopPersistence,
     downloads: List<Song>,
     playlistRecords: List<DesktopPlaylistDownload>,
     downloadedIds: Set<String>,
@@ -7274,6 +7335,7 @@ private fun DesktopDownloadsPage(
     menu: (@Composable (Song) -> Unit)? = null,
 ) {
     DesktopLocalMusicPage(
+        persistence = persistence,
         songs = downloads,
         onSongClick = onSongClick,
         contentPadding = contentPadding,
@@ -7284,9 +7346,10 @@ private fun DesktopDownloadsPage(
         emptyTitle = DesktopStrings["d_no_downloads", "No downloads"],
         emptyDescription = DesktopStrings["d_downloaded_songs_will_appear_here", "Downloaded songs will appear here."],
         persistenceKey = "downloaded",
-        playlistsTab = {
+        playlistsTab = { view ->
             DesktopPlaylistDownloadsContent(
                 records = playlistRecords,
+                view = view,
                 downloadedIds = downloadedIds,
                 downloadInProgress = downloadInProgress,
                 staleIds = playlistStaleIds,
@@ -7300,10 +7363,11 @@ private fun DesktopDownloadsPage(
     )
 }
 
-/** The Playlists tab of Downloads — whole collections asked for as a whole, each standing square on its own cover. */
+/** Downloaded collections can be browsed as covers or as full-width rows. */
 @Composable
 private fun DesktopPlaylistDownloadsContent(
     records: List<DesktopPlaylistDownload>,
+    view: DesktopLibraryView,
     downloadedIds: Set<String>,
     downloadInProgress: Set<String>,
     staleIds: Set<String>,
@@ -7319,24 +7383,27 @@ private fun DesktopPlaylistDownloadsContent(
         )
         return
     }
+    val showGrid = view == DesktopLibraryView.GRID
     val gridState = rememberLazyGridState()
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 168.dp),
+        columns = if (showGrid) GridCells.Adaptive(minSize = 168.dp) else GridCells.Fixed(1),
         state = gridState,
         modifier = Modifier.fillMaxSize().desktopTopScrollFade(gridState),
         contentPadding = pagePadding(bottom = 32.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(if (showGrid) 16.dp else 4.dp),
     ) {
         gridItems(records, key = DesktopPlaylistDownload::id) { record ->
-            DesktopPlaylistDownloadTile(
-                record = record,
-                progress = offlineProgress(record.songs, downloadedIds, downloadInProgress),
-                stale = record.id in staleIds,
-                onOpen = { onOpen(record) },
-                onUpdate = { onUpdate(record) },
-                onRemove = { onRemove(record) },
-            )
+            val progress = offlineProgress(record.songs, downloadedIds, downloadInProgress)
+            val stale = record.id in staleIds
+            val open = { onOpen(record) }
+            val update = { onUpdate(record) }.takeIf { stale }
+            val remove = { onRemove(record) }
+            if (showGrid) {
+                DesktopPlaylistDownloadTile(record, progress, stale, open, update, remove)
+            } else {
+                DesktopPlaylistDownloadRow(record, progress, stale, open, update, remove)
+            }
         }
     }
 }
@@ -7351,12 +7418,11 @@ private fun DesktopPlaylistDownloadTile(
     progress: DesktopPlaylistDownloadProgress,
     stale: Boolean,
     onOpen: () -> Unit,
-    onUpdate: () -> Unit,
+    onUpdate: (() -> Unit)?,
     onRemove: () -> Unit,
 ) {
     val tileHoverInteraction = remember { MutableInteractionSource() }
     val tileHovered by tileHoverInteraction.collectIsHoveredAsState()
-    var menuOpen by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().hoverable(tileHoverInteraction).desktopNoHoverClickable { onOpen() }) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(14.dp))) {
             DesktopArtwork(
@@ -7399,35 +7465,101 @@ private fun DesktopPlaylistDownloadTile(
                     DesktopSecondary,
                 )
             }
-            if (tileHovered || menuOpen) {
-                Box(Modifier.align(Alignment.TopEnd)) {
-                    DesktopMoreButton(onClick = { menuOpen = true })
-                    if (menuOpen) {
-                        DesktopPlaylistDownloadRowMenu(
-                            onOpen = { menuOpen = false; onOpen() },
-                            onUpdate = { menuOpen = false; onUpdate() }.takeIf { stale },
-                            onRemove = { menuOpen = false; onRemove() },
-                            onDismiss = { menuOpen = false },
-                        )
-                    }
-                }
-            }
+            DesktopPlaylistDownloadMenuButton(
+                onOpen, onUpdate, onRemove, modifier = Modifier.align(Alignment.TopEnd), visible = tileHovered,
+            )
         }
         Spacer(Modifier.height(8.dp))
-        Text(
-            record.title,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
-            playlistDownloadLine(record, progress, stale),
-            color = DesktopSecondary,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        DesktopPlaylistDownloadLabels(record, progress, stale)
     }
+}
+
+@Composable
+private fun DesktopPlaylistDownloadRow(
+    record: DesktopPlaylistDownload,
+    progress: DesktopPlaylistDownloadProgress,
+    stale: Boolean,
+    onOpen: () -> Unit,
+    onUpdate: (() -> Unit)?,
+    onRemove: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    Row(
+        Modifier.fillMaxWidth()
+            .hoverable(interaction)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (DesktopTheme.isDark) DesktopGlass.copy(alpha = 0.38f) else DesktopTheme.palette.cardInsetFill)
+            .desktopNoHoverClickable(onClick = onOpen)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DesktopArtwork(
+            record.thumbnailUrl,
+            Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
+            px = ROW_ART_PX,
+            hoverMode = ArtworkHoverMode.DARKEN_ONLY,
+            hovered = hovered,
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            DesktopPlaylistDownloadLabels(record, progress, stale)
+            if (progress.downloading) {
+                LinearProgressIndicator(
+                    progress = { progress.fraction },
+                    modifier = Modifier.padding(top = 5.dp).width(160.dp).height(3.dp),
+                    color = DesktopAccent,
+                    trackColor = DesktopForeground.copy(alpha = 0.2f),
+                )
+            }
+        }
+        DesktopPlaylistDownloadMenuButton(onOpen, onUpdate, onRemove)
+    }
+}
+
+@Composable
+private fun DesktopPlaylistDownloadMenuButton(
+    onOpen: () -> Unit,
+    onUpdate: (() -> Unit)?,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+    visible: Boolean = true,
+) {
+    var open by remember { mutableStateOf(false) }
+    if (visible || open) {
+        Box(modifier) {
+            DesktopMoreButton(onClick = { open = true })
+            if (open) {
+                DesktopPlaylistDownloadRowMenu(
+                    onOpen = onOpen,
+                    onUpdate = onUpdate,
+                    onRemove = onRemove,
+                    onDismiss = { open = false },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopPlaylistDownloadLabels(
+    record: DesktopPlaylistDownload,
+    progress: DesktopPlaylistDownloadProgress,
+    stale: Boolean,
+) {
+    Text(
+        record.title,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        fontWeight = FontWeight.Medium,
+    )
+    Text(
+        playlistDownloadLine(record, progress, stale),
+        color = DesktopSecondary,
+        style = MaterialTheme.typography.bodySmall,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /** The state chip at a tile's corner — the icon says where the collection stands, the dark disc backs it. */
@@ -7483,6 +7615,7 @@ internal fun downloadsDefaultTabIndex(tabs: List<DownloadsTab>): Int =
 
 @Composable
 private fun DesktopLocalMusicPage(
+    persistence: DesktopPersistence,
     songs: List<Song>,
     onSongClick: (Song) -> Unit,
     contentPadding: PaddingValues,
@@ -7495,25 +7628,24 @@ private fun DesktopLocalMusicPage(
     persistenceKey: String = "local",
     menu: (@Composable (Song) -> Unit)? = null,
     /** A Playlists tab between Songs and Artists — the Downloads page's downloaded collections. */
-    playlistsTab: (@Composable () -> Unit)? = null,
+    playlistsTab: (@Composable (DesktopLibraryView) -> Unit)? = null,
     /** Copy for the songs list's own empty state, for a page that has a playlists tab to show instead. */
     songsEmptyTitle: String = "No matching music",
     songsEmptyDescription: String = "Try a different search.",
 ) {
-    val persistence = remember { DesktopPersistence() }
     // Tab kinds in order — the Downloads page carries a Playlists tab between Songs and Artists,
     // and opens on it: the downloaded collections are the page's own headline.
     val tabs = downloadsTabs(playlistsTab != null)
     var selectedTab by remember(persistenceKey) { mutableStateOf(downloadsDefaultTabIndex(tabs)) }
     var searchQuery by remember(persistenceKey) { mutableStateOf("") }
-    var view by remember(persistenceKey) {
-        mutableStateOf(
-            if (persistence.string("${persistenceKey}_view", "LIST") == "GRID") {
-                DesktopLibraryView.GRID
-            } else {
-                DesktopLibraryView.LIST
-            },
-        )
+    var drillDown by remember(persistenceKey) { mutableStateOf<Pair<String, List<Song>>?>(null) }
+    // Preserve the square grid introduced for Playlists and the list default for songs.
+    val isPlaylistsTab = tabs[selectedTab] == DownloadsTab.PLAYLISTS && drillDown == null
+    val viewKey = if (isPlaylistsTab) "${persistenceKey}_playlists_view" else "${persistenceKey}_view"
+    val defaultView = if (isPlaylistsTab) DesktopLibraryView.GRID else DesktopLibraryView.LIST
+    var view by remember(viewKey) {
+        val savedView = persistence.string(viewKey, defaultView.name)
+        mutableStateOf(DesktopLibraryView.entries.firstOrNull { it.name == savedView } ?: defaultView)
     }
     var sort by remember(persistenceKey) {
         mutableStateOf(
@@ -7522,7 +7654,6 @@ private fun DesktopLocalMusicPage(
             }.getOrDefault(DesktopLibrarySort.TITLE_ASC),
         )
     }
-    var drillDown by remember(persistenceKey) { mutableStateOf<Pair<String, List<Song>>?>(null) }
     val filteredSongs = remember(songs, sort, searchQuery) {
         songs.sortedForDesktopLibrary(sort).filter { song ->
             searchQuery.isBlank() || song.title.contains(searchQuery, true) || song.artist.contains(searchQuery, true) ||
@@ -7569,7 +7700,7 @@ private fun DesktopLocalMusicPage(
                 }
                 IconButton(onClick = {
                     view = if (view == DesktopLibraryView.LIST) DesktopLibraryView.GRID else DesktopLibraryView.LIST
-                    persistence.saveString("${persistenceKey}_view", view.name)
+                    persistence.saveString(viewKey, view.name)
                 }) {
                     Icon(if (view == DesktopLibraryView.LIST) BitChordIcons.GridView else BitChordIcons.ListView, "Change view")
                 }
@@ -7602,7 +7733,7 @@ private fun DesktopLocalMusicPage(
                     emptyDescription = songsEmptyDescription,
                 )
                 DownloadsTab.PLAYLISTS ->
-                    playlistsTab?.invoke()
+                    playlistsTab?.invoke(view)
                         ?: DesktopEmptyPage(emptyIcon, emptyTitle, emptyDescription)
                 DownloadsTab.ARTISTS -> DesktopLibraryGroupingContent(artists, view, onGroupClick = { drillDown = it })
                 DownloadsTab.ALBUMS -> DesktopLibraryGroupingContent(albums, view, onGroupClick = { drillDown = it })

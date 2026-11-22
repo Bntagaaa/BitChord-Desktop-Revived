@@ -384,11 +384,13 @@ class CanvasVideoSpec(
     val onRenderedChanged: (Boolean) -> Unit,
     val onFrameCaptured: (ImageBitmap) -> Unit,
     val refreshFrameEveryMs: Long?,
+    /** Longest edge of a capture. Zero disables sampling. */
     val frameCapturePx: Int,
     val onCoverChanged: (Float) -> Unit,
     val bottomFade: Float,
     val bottomFadeEndPx: Float?,
     val pausedForTransition: Boolean,
+    val playbackIdentity: String? = null,
 )
 
 /**
@@ -413,6 +415,7 @@ fun CanvasArtworkPlayer(
     bottomFade: Float = 0f,
     bottomFadeEndPx: Float? = null,
     pausedForTransition: Boolean = false,
+    playbackIdentity: String? = null,
 ) {
     PlayerPlatform.host.CanvasVideo(
         CanvasVideoSpec(
@@ -431,6 +434,7 @@ fun CanvasArtworkPlayer(
             bottomFade = bottomFade,
             bottomFadeEndPx = bottomFadeEndPx,
             pausedForTransition = pausedForTransition,
+            playbackIdentity = playbackIdentity,
         ),
         modifier,
     )

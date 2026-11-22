@@ -402,6 +402,8 @@ fun SongRow(
     searchPlayingStyle: Boolean = false,
     /** True while a Downloads row belongs to the current multi-selection. */
     selected: Boolean = false,
+    /** Search video rows keep SongRow interactions, but show their widescreen artwork at 16:9. */
+    landscapeArtwork: Boolean = false,
 ) {
     val haptics = rememberHaptics()
     val swipeStateHolder = remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
@@ -440,6 +442,7 @@ fun SongRow(
             activeTint = activeTint,
             searchPlayingStyle = searchPlayingStyle,
             selected = selected,
+            landscapeArtwork = landscapeArtwork,
         )
         return
     }
@@ -487,6 +490,7 @@ fun SongRow(
             activeTint = activeTint,
             searchPlayingStyle = searchPlayingStyle,
             selected = selected,
+            landscapeArtwork = landscapeArtwork,
         )
     }
 }
@@ -554,6 +558,7 @@ private fun SongRowContent(
     activeTint: Color = MaterialTheme.colorScheme.primary,
     searchPlayingStyle: Boolean = false,
     selected: Boolean = false,
+    landscapeArtwork: Boolean = false,
 ) {
     val titleColor by animateColorAsState(
         targetValue = if (isCurrent && !searchPlayingStyle) activeTint else MaterialTheme.colorScheme.onBackground,
@@ -614,7 +619,9 @@ private fun SongRowContent(
             }
         } else {
             ArtworkHover(
-                modifier = Modifier.size(52.dp).thumbnailBorder(RoundedCornerShape(8.dp)),
+                modifier = Modifier
+                    .size(width = if (landscapeArtwork) 92.dp else 52.dp, height = 52.dp)
+                    .thumbnailBorder(RoundedCornerShape(8.dp)),
                 shape = RoundedCornerShape(8.dp),
                 mode = ArtworkHoverMode.DARKEN_AND_PLAY,
                 hovered = rowHovered,
@@ -622,6 +629,7 @@ private fun SongRowContent(
                 AsyncImage(
                     model = com.music.bitchord.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
                     contentDescription = null,
+                    contentScale = if (landscapeArtwork) ContentScale.Crop else ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
 
                 )
@@ -709,10 +717,12 @@ fun RowMoreButton(
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     iconSize: Dp = 20.dp,
+    /** Full-width rows may overhang into their page gutter; compact columns must pass 0.dp. */
+    outset: Dp = ROW_MORE_OUTSET,
 ) {
     Box(
         modifier = modifier
-            .hangIntoGutter(ROW_MORE_OUTSET)
+            .hangIntoGutter(outset)
             .size(36.dp)
             .clip(CircleShape)
             .clickable(onClick = onClick),

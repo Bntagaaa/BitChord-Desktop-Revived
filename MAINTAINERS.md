@@ -15,8 +15,8 @@ Maintainers oversee project direction, repository maintenance, review and mergin
 This list is automatically generated from GitHub repository contributor data.
 
 <!-- BEGIN CONTRIBUTORS -->
-- [@kushagrasinghx](https://github.com/kushagrasinghx)
 - [@Bntagaaa](https://github.com/Bntagaaa)
+- [@kushagrasinghx](https://github.com/kushagrasinghx)
 - [@Galaxyyss](https://github.com/Galaxyyss)
 - [@NeoTurcios](https://github.com/NeoTurcios)
 - [@KabirSinghBhatia](https://github.com/KabirSinghBhatia)
@@ -33,6 +33,7 @@ This list is automatically generated from GitHub repository contributor data.
 - [@nitinbhat972](https://github.com/nitinbhat972)
 - [@AngelCas04](https://github.com/AngelCas04)
 - [@rairulyle](https://github.com/rairulyle)
+- [@nxfu](https://github.com/nxfu)
 - [@CHEYCKIT](https://github.com/CHEYCKIT)
 - [@tmyt105](https://github.com/tmyt105)
 - [@hasanbkaylan](https://github.com/hasanbkaylan)
@@ -49,7 +50,6 @@ This list is automatically generated from GitHub repository contributor data.
 - [@impin2rex](https://github.com/impin2rex)
 - [@SHUBH-snippet](https://github.com/SHUBH-snippet)
 - [@Sourabhnamdev9981](https://github.com/Sourabhnamdev9981)
-- [@nxfu](https://github.com/nxfu)
 - [@santhoshg-io](https://github.com/santhoshg-io)
 - [@yxyydev](https://github.com/yxyydev)
 <!-- END CONTRIBUTORS -->
