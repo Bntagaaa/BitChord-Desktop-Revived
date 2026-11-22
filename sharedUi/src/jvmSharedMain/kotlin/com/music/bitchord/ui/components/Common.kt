@@ -709,10 +709,12 @@ fun RowMoreButton(
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     iconSize: Dp = 20.dp,
+    /** Full-width rows may overhang into their page gutter; compact columns must pass 0.dp. */
+    outset: Dp = ROW_MORE_OUTSET,
 ) {
     Box(
         modifier = modifier
-            .hangIntoGutter(ROW_MORE_OUTSET)
+            .hangIntoGutter(outset)
             .size(36.dp)
             .clip(CircleShape)
             .clickable(onClick = onClick),
