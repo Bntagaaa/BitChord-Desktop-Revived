@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
@@ -20,13 +21,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.isDisplayed
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -38,6 +45,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.music.bitchord.data.model.Song
 import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs
@@ -105,6 +113,111 @@ class DesktopPanelMenuTest {
     @Test fun `menu anchor and blur follow desktop scaling`() = menuScene(1.5f)
 
     @Test fun `menu stays inside the window at the bottom right and Escape restores focus`() = menuScene(1f, edge = true)
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun `toolbar output buttons open an in-window menu above or below the actual control`() {
+        val anchor = mutableStateOf<Rect?>(null)
+        val atTop = mutableStateOf(false)
+        val title = DesktopStrings["audio_output", "Audio output"]
+        val song = Song("output-menu", "Menu test track", "BitChord", null)
+        val openOutput: (Rect) -> Unit = { anchor.value = it }
+        compose.setContent {
+            Box(Modifier.size(1160.dp, 620.dp).testTag("audio-output-scene")) {
+                Frame(
+                    onMenuClosed = {},
+                    topBar = {
+                        if (atTop.value) {
+                            DesktopTopBar(
+                                song = song, isPlaying = true, isLoading = false, previousEnabled = true,
+                                progress = 0.3f, volume = 0.7f, shuffle = false, repeatMode = DesktopRepeatMode.OFF,
+                                onPlayPause = {}, onPrevious = {}, onNext = {}, onShuffleChange = {},
+                                onRepeatModeChange = {}, onOpenNowPlaying = {}, onVolumeChange = {},
+                                onOpenAudioOutput = openOutput, onOpenLyrics = {}, onOpenPip = {},
+                                onOpenQueue = {}, onOpenDetails = {}, sidePanel = null,
+                            )
+                        }
+                    },
+                    bottomBar = {
+                        if (!atTop.value) {
+                            DesktopMiniPlayer(
+                                song = song, isPlaying = true, isLoading = false, previousEnabled = true,
+                                progress = 0.3f, volume = 0.7f, shuffle = false, repeatMode = DesktopRepeatMode.OFF,
+                                sidePanel = null, onExpand = {}, onPlayPause = {}, onPrevious = {}, onNext = {},
+                                onShuffleChange = {}, onRepeatModeChange = {}, onVolumeChange = {},
+                                onOpenAudioOutput = openOutput, onOpenLyrics = {}, onOpenPip = {},
+                                onOpenQueue = {}, onOpenDetails = {},
+                            )
+                        }
+                    },
+                    overlay = {
+                        anchor.value?.let {
+                            DesktopAudioOutputMenu(anchor = it, onDismiss = { anchor.value = null })
+                        }
+                    },
+                    content = {
+                        Box(Modifier.fillMaxSize().background(
+                            Brush.linearGradient(listOf(Color(0xff242338), Color(0xff3b2847), Color(0xff181a20))),
+                        )) {
+                            Text("Library", color = Color.White, modifier = Modifier.padding(24.dp))
+                        }
+                    },
+                )
+            }
+        }
+        val button = compose.onNodeWithContentDescription(title)
+        val menu = compose.onNodeWithText(title)
+        repeat(2) { index ->
+            val trigger = button.fetchSemanticsNode().boundsInRoot
+            button.performMouseInput { click(center) }
+            compose.mainClock.advanceTimeBy(240)
+            menu.assertIsDisplayed()
+            val menuTitle = menu.fetchSemanticsNode().boundsInRoot
+            if (index == 0) {
+                assertTrue(menuTitle.bottom < trigger.top)
+            } else {
+                assertTrue(menuTitle.top > trigger.bottom)
+            }
+            assertEquals(1, compose.onAllNodes(isRoot()).fetchSemanticsNodes().size)
+            compose.onNodeWithText(DesktopStrings["d_system_default", "System default"]).assertIsDisplayed()
+            val mode = if (index == 0) "floating" else "top"
+            saveLandscapePlayerScreenshot(compose.onRoot().captureToImage(), "audio-output-$mode.png")
+
+            compose.onNodeWithTag("audio-output-scene").performMouseInput { click(Offset(30f, 300f)) }
+            menu.assertDoesNotExist()
+            compose.runOnIdle { atTop.value = true }
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun `compact menu scrolls long content within its height cap`() {
+        compose.setContent {
+            Box(Modifier.size(600.dp, 620.dp)) {
+                Frame(onMenuClosed = {}, overlay = {
+                    DesktopMenuSurface(
+                        onDismiss = {},
+                        anchor = Rect(50f, 50f, 80f, 80f),
+                        modifier = Modifier.testTag("compact-menu"),
+                        maxHeight = 390.dp,
+                    ) {
+                        repeat(20) { index ->
+                            Box(Modifier.fillMaxWidth().height(40.dp)) { Text("Output ${index + 1}") }
+                        }
+                    }
+                })
+            }
+        }
+        val menu = compose.onNodeWithTag("compact-menu")
+        val bounds = menu.fetchSemanticsNode().boundsInRoot
+        assertTrue(bounds.height <= with(compose.density) { 390.dp.roundToPx() } + 1f)
+        val lastOutput = compose.onNodeWithText("Output 20")
+        assertTrue(!lastOutput.isDisplayed())
+        menu.performMouseInput {
+            moveTo(center)
+            scroll(1_500f)
+        }
+        compose.mainClock.advanceTimeBy(500)
+        lastOutput.assertIsDisplayed()
+    }
 
     @Test fun `Home panel blurs its live feed while other pages keep a solid panel`() {
         val home = mutableStateOf(true)
@@ -235,6 +348,8 @@ class DesktopPanelMenuTest {
         home: Boolean = false,
         panel: @Composable () -> Unit = {},
         content: @Composable () -> Unit = { Box(Modifier.fillMaxSize().background(Color.Green)) },
+        topBar: @Composable () -> Unit = {},
+        bottomBar: @Composable () -> Unit = {},
     ) {
         DesktopFrame(
             containerColor = Color.Black,
@@ -248,8 +363,8 @@ class DesktopPanelMenuTest {
             onSidebarDrawerOpenChange = {},
             backdrop = { Box(Modifier.fillMaxSize().background(Color.Green)) },
             sidebar = { _, _, _ -> },
-            bottomBar = {},
-            topBar = {},
+            bottomBar = { bottomBar() },
+            topBar = { topBar() },
             overlay = overlay,
             trailing = panel,
         ) { content() }

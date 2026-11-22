@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -71,6 +72,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -514,7 +516,13 @@ private fun sleepTimerLabel(minutes: Int?, afterTrack: Boolean): String = when {
 
 /** The panel a menu is drawn in: a floating card in the app's own glass. */
 @Composable
-internal fun DesktopMenuSurface(onDismiss: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun DesktopMenuSurface(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    anchor: Rect? = null,
+    maxHeight: Dp = 520.dp,
+    content: @Composable () -> Unit,
+) {
     val menuScrollState = rememberScrollState()
     val portal = LocalDesktopMenuPortal.current
     val owner = remember { Any() }
@@ -524,14 +532,20 @@ internal fun DesktopMenuSurface(onDismiss: () -> Unit, modifier: Modifier = Modi
     val pressAnchor = remember(owner) { portal?.recentPress() }
     val latestContent = rememberUpdatedState(content)
     val latestDismiss = rememberUpdatedState(onDismiss)
-    val menuContent: @Composable () -> Unit = remember(owner) { { MenuCard(menuScrollState, modifier) { latestContent.value() } } }
+    val menuContent: @Composable () -> Unit = remember(owner, modifier, maxHeight) {
+        { MenuCard(menuScrollState, modifier, maxHeight) { latestContent.value() } }
+    }
     if (portal != null) {
         Spacer(Modifier.size(1.dp).onGloballyPositioned {
-            val bounds = pressAnchor ?: (it.parentLayoutCoordinates?.boundsInRoot() ?: it.boundsInRoot())
-            if (portal.entry.value?.owner !== owner || portal.entry.value?.anchor != bounds ||
-                portal.entry.value?.horizontalBiasPx != horizontalBiasPx) {
-                portal.entry.value = DesktopMenuPortalEntry(owner, horizontalBiasPx, bounds, { latestDismiss.value() }, menuContent)
-            }
+            val bounds = anchor ?: pressAnchor ?: (it.parentLayoutCoordinates?.boundsInRoot() ?: it.boundsInRoot())
+            portal.show(DesktopMenuPortalEntry(
+                owner = owner,
+                horizontalBiasPx = horizontalBiasPx,
+                anchor = bounds,
+                onDismiss = { latestDismiss.value() },
+                content = menuContent,
+                keepAdjacent = anchor != null,
+            ))
         })
         DisposableEffect(portal, owner) {
             onDispose {
@@ -549,16 +563,21 @@ internal fun DesktopMenuSurface(onDismiss: () -> Unit, modifier: Modifier = Modi
 }
 
 @Composable
-private fun MenuCard(menuScrollState: androidx.compose.foundation.ScrollState, modifier: Modifier, content: @Composable () -> Unit) {
+private fun MenuCard(
+    menuScrollState: androidx.compose.foundation.ScrollState,
+    modifier: Modifier,
+    maxHeight: Dp,
+    content: @Composable () -> Unit,
+) {
     val shape = RoundedCornerShape(16.dp)
     Box(modifier.widthIn(min = 276.dp, max = 306.dp).desktopMenuGlass(shape)) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
                 // A menu with every optional row on it is taller than a small window; capped and
                 // scrolled rather than run off the screen.
-                .heightIn(max = 520.dp)
+                .heightIn(max = maxHeight)
+                .padding(vertical = 4.dp)
                 .desktopTopScrollFade(menuScrollState)
                 .verticalScroll(menuScrollState),
         ) {

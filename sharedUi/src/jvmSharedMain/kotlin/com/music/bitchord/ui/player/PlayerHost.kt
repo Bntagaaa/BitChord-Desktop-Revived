@@ -2,6 +2,7 @@ package com.music.bitchord.ui.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.music.bitchord.data.canvas.CanvasArtwork
@@ -98,6 +99,15 @@ interface PlayerHost {
      */
     @Composable
     fun rememberOutputPicker(onOpen: () -> Unit): () -> Unit
+
+    /** Returns true when the platform owns presentation of the output picker. */
+    @Composable
+    fun PlatformAudioOutputMenu(
+        anchor: Rect?,
+        onDismiss: () -> Unit,
+        onOpenPipeline: () -> Unit,
+        onOpenCast: () -> Unit,
+    ): Boolean = false
 
     fun selectAudioOutput(id: Int?)
 

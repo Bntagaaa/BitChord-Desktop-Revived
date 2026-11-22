@@ -1,10 +1,15 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
@@ -34,8 +39,10 @@ class DesktopLandscapePlayerTest {
     @Test fun changingTracksWithLyricsOpenRevealsTheRealMetadataForTwoSeconds() =
         verify(1000, 600, verifyTrackChange = true)
 
+    @Test fun expandedOutputPillAndCaptionOpenTheDesktopPortal() = verify(1360, 800, verifyOutputMenu = true)
+
     private fun verify(width: Int, height: Int, density: Float = 1f, reduceBlur: Boolean = true,
-        verifyTrackChange: Boolean = false, verifyScroll: Boolean = true) = runDesktopComposeUiTest(width = width, height = height) {
+        verifyTrackChange: Boolean = false, verifyScroll: Boolean = true, verifyOutputMenu: Boolean = false) = runDesktopComposeUiTest(width = width, height = height) {
         mainClock.autoAdvance = false
         val lastScreen = MutableStateFlow(LastPlayerScreen.MAIN)
         val host = object : PlayerHost by DesktopPlayerHost {
@@ -50,13 +57,14 @@ class DesktopLandscapePlayerTest {
                 override fun setLastPlayerScreen(value: LastPlayerScreen) { lastScreen.value = value }
             }
             override suspend fun canvasFor(song: Song): com.music.bitchord.data.canvas.CanvasArtwork? = null
-            @Composable override fun rememberRemoteArtworkUrl(song: Song?): String? = null
+            @Composable override fun rememberRemoteArtworkUrl(song: Song?): String? = song?.thumbnailUrl
         }
         PlayerPlatform.install(host)
         DesktopWindowMode.exit()
         val mounted = mutableStateOf(true)
+        val previewArtwork = if (verifyOutputMenu) DesktopPipUiTest.fixtureArtwork() else null
         val songs = listOf(
-            Song("landscape-a", "Landscape Track A", "Test Artist", null),
+            Song("landscape-a", "Landscape Track A", "Test Artist", previewArtwork?.toURI()?.toString()),
             Song("landscape-b", "Landscape Track B", "Test Artist B", null),
         )
         val index = mutableStateOf(0)
@@ -64,31 +72,80 @@ class DesktopLandscapePlayerTest {
         try {
             setContent {
                 CompositionLocalProvider(LocalDensity provides Density(density, 1f)) {
-                if (mounted.value) MaterialTheme(colorScheme = darkColorScheme(primary = Color.White)) {
-                    DesktopPlayerSheet(true, onDismiss = {}, dragToDismiss = false) { windowWidth, windowHeight ->
-                        NowPlayingScreen(song = songs[index.value], isPlaying = false, isLoading = false,
-                            position = playhead, durationMs = 400_000,
-                            audioVersionSwitching = false, qualityUpgraded = false,
-                            queue = songs, queueIndex = index.value, hasPrevious = true, hasNext = true,
-                            repeatMode = 0, shuffleEnabled = false, autoplayEnabled = false,
-                            signedIn = true, accountName = null, likeStatus = LikeStatus.INDIFFERENT,
-                            onToggleLike = {}, onPlayPause = {}, onNext = { index.value = 1 }, onPrevious = { index.value = 0 },
-                            onBlockedControl = {}, onSeek = {}, onSeekFraction = {}, onToggleShuffle = {},
-                            onCycleRepeat = {}, onToggleAutoplay = {}, onJumpTo = {}, onRemoveFromQueue = {},
-                            onMoveInQueue = { _, _ -> }, onClearQueue = {}, onOpenMenu = {}, onOpenAlbum = {},
-                            onOpenArtist = { _, _ -> }, onOpenPlaybackSource = {}, onListenTogether = {},
-                            lyrics = listOf(LyricLine(0, "First lyric"), LyricLine(20_000, "Current lyric"),
-                                LyricLine(40_000, "Next lyric"), LyricLine(60_000, "Last lyric")) +
-                                (4..15).map { LyricLine(it * 20_000L, "Later lyric $it") },
-                            lyricsSource = LyricsSource.KUGOU, lyricsProviderStates = emptyMap(),
-                            onSelectLyricsProvider = {}, lyricsUnavailable = false, lyricsOffsetOpen = false,
-                            onDismissLyricsOffset = {}, windowWidth = windowWidth, windowHeight = windowHeight)
+                    if (mounted.value) MaterialTheme(colorScheme = darkColorScheme(primary = Color.White)) {
+                        val player: @Composable () -> Unit = {
+                            DesktopPlayerSheet(true, onDismiss = {}, dragToDismiss = false) { windowWidth, windowHeight ->
+                                NowPlayingScreen(song = songs[index.value], isPlaying = false, isLoading = false,
+                                    position = playhead, durationMs = 400_000,
+                                    audioVersionSwitching = false, qualityUpgraded = false,
+                                    queue = songs, queueIndex = index.value, hasPrevious = true, hasNext = true,
+                                    repeatMode = 0, shuffleEnabled = false, autoplayEnabled = false,
+                                    signedIn = true, accountName = null, likeStatus = LikeStatus.INDIFFERENT,
+                                    onToggleLike = {}, onPlayPause = {}, onNext = { index.value = 1 }, onPrevious = { index.value = 0 },
+                                    onBlockedControl = {}, onSeek = {}, onSeekFraction = {}, onToggleShuffle = {},
+                                    onCycleRepeat = {}, onToggleAutoplay = {}, onJumpTo = {}, onRemoveFromQueue = {},
+                                    onMoveInQueue = { _, _ -> }, onClearQueue = {}, onOpenMenu = {}, onOpenAlbum = {},
+                                    onOpenArtist = { _, _ -> }, onOpenPlaybackSource = {}, onListenTogether = {},
+                                    lyrics = listOf(LyricLine(0, "First lyric"), LyricLine(20_000, "Current lyric"),
+                                        LyricLine(40_000, "Next lyric"), LyricLine(60_000, "Last lyric")) +
+                                        (4..15).map { LyricLine(it * 20_000L, "Later lyric $it") },
+                                    lyricsSource = LyricsSource.KUGOU, lyricsProviderStates = emptyMap(),
+                                    onSelectLyricsProvider = {}, lyricsUnavailable = false, lyricsOffsetOpen = false,
+                                    onDismissLyricsOffset = {}, windowWidth = windowWidth, windowHeight = windowHeight)
+                            }
+                        }
+                        if (verifyOutputMenu) {
+                            val portal = remember { DesktopMenuPortalState() }
+                            DesktopFrame(
+                                containerColor = Color.Black,
+                                hasFloatingPlayer = false,
+                                homePanelOverlay = false,
+                                menuPortal = portal,
+                                onMenuClosed = {},
+                                sidebarCollapsed = true,
+                                sidebarDrawerOpen = false,
+                                onSidebarCollapsedChange = {},
+                                onSidebarDrawerOpenChange = {},
+                                backdrop = {},
+                                sidebar = { _, _, _ -> },
+                                bottomBar = {},
+                                topBar = {},
+                                overlay = player,
+                            ) { Box(Modifier.fillMaxSize().testTag("desktop-under-player")) }
+                        } else player()
                     }
-                }
                 }
             }
             mainClock.advanceTimeBy(2500)
             waitForIdle()
+            if (verifyOutputMenu) {
+                val title = DesktopStrings["audio_output", "Audio output"]
+                val menu = onNodeWithText(title)
+                val defaultOutput = onNode(
+                    hasText(DesktopStrings["d_system_default", "System default"]) and
+                        SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected),
+                )
+                val pipeline = onNodeWithText("Audio pipeline", ignoreCase = true)
+                val triggers = listOf(
+                    "expanded" to onNodeWithContentDescription(title),
+                    "expanded-caption" to onNodeWithTag("player-output-caption"),
+                )
+                for ((variant, trigger) in triggers) {
+                    val anchor = trigger.getUnclippedBoundsInRoot()
+                    trigger.performMouseInput { click(center) }
+                    mainClock.advanceTimeBy(320)
+                    val bounds = menu.getUnclippedBoundsInRoot()
+                    assertTrue(bounds.bottom < anchor.top, "Expanded output menu should open above its trigger: $bounds vs $anchor")
+                    defaultOutput.assertIsDisplayed()
+                    pipeline.assertExists()
+                    assertEquals(1, onAllNodes(isRoot()).fetchSemanticsNodes().size, "The menu must stay in the player window")
+                    saveLandscapePlayerScreenshot(onRoot().captureToImage(), "audio-output-$variant.png")
+                    menu.performKeyInput { pressKey(Key.Escape) }
+                    mainClock.advanceTimeBy(240)
+                    menu.assertDoesNotExist()
+                }
+                return@runDesktopComposeUiTest
+            }
             val artwork = onNodeWithTag("landscape-artwork").getUnclippedBoundsInRoot()
             val header = onNodeWithTag("landscape-track-header").getUnclippedBoundsInRoot()
             val controls = onNodeWithTag("landscape-main-controls").getUnclippedBoundsInRoot()
@@ -109,7 +166,7 @@ class DesktopLandscapePlayerTest {
                 1f, "Center the visible controls in the window, not just their container")
             assertTrue(controls.bottom <= actionBounds.top, "The centered toolbar must not cover compact transport controls")
             assertTrue(output.bottom <= onNodeWithTag("landscape-output-controls").getUnclippedBoundsInRoot().bottom)
-            save(onRoot().captureToImage(), "$width-main.png")
+            saveLandscapePlayerScreenshot(onRoot().captureToImage(), "$width-main.png")
 
             val title = onNodeWithText("Landscape Track A").getUnclippedBoundsInRoot()
             onNodeWithContentDescription("Next").performClick()
@@ -130,7 +187,7 @@ class DesktopLandscapePlayerTest {
                     "The real header must travel upward when Lyrics opens")
             } else assertEquals(artwork.top, moving.top)
             assertEquals(output, onNodeWithTag("player-output-caption").getUnclippedBoundsInRoot())
-            save(onRoot().captureToImage(), "$width-opening-lyrics.png")
+            saveLandscapePlayerScreenshot(onRoot().captureToImage(), "$width-opening-lyrics.png")
             mainClock.advanceTimeBy(600)
             waitForIdle()
             val lyricsHeader = onNodeWithTag("landscape-track-header").getUnclippedBoundsInRoot()
@@ -144,7 +201,7 @@ class DesktopLandscapePlayerTest {
             onNodeWithText("Lyrics by KuGou").assertDoesNotExist()
             onNodeWithContentDescription("Romanize lyrics").assertDoesNotExist()
             onNodeWithContentDescription("Translate lyrics").assertDoesNotExist()
-            save(onRoot().captureToImage(), "$width-lyrics-hidden-controls.png")
+            saveLandscapePlayerScreenshot(onRoot().captureToImage(), "$width-lyrics-hidden-controls.png")
             mainClock.advanceTimeBy(2000)
             waitForIdle()
             onNodeWithText("Landscape Track B").assertDoesNotExist()
@@ -185,7 +242,7 @@ class DesktopLandscapePlayerTest {
             assertEquals(44f, (viewport.bottom - shortened.bottom).value, 1f)
             assertEquals(frame, onNodeWithTag("landscape-lyrics-frame").getUnclippedBoundsInRoot())
             assertEquals(lyricsHeader, onNodeWithTag("landscape-track-header").getUnclippedBoundsInRoot())
-            save(onRoot().captureToImage(), "$width-lyrics-hover-controls.png")
+            saveLandscapePlayerScreenshot(onRoot().captureToImage(), "$width-lyrics-hover-controls.png")
 
             // Enter the revealed footer itself: the fixed outer hover target must
             // keep all three controls present until the pointer actually leaves.
@@ -207,7 +264,7 @@ class DesktopLandscapePlayerTest {
                 onNodeWithText("Landscape Track B").assertDoesNotExist()
                 assertTrue((firstRow.top - frame.top).value in 0f..60f,
                     "The opening lyric starts at the top instead of leaving half the cover empty")
-                save(onRoot().captureToImage(), "$width-lyrics-start.png")
+                saveLandscapePlayerScreenshot(onRoot().captureToImage(), "$width-lyrics-start.png")
                 runOnIdle { playhead.report(200_000) }
                 mainClock.advanceTimeBy(2000)
                 waitForIdle()
@@ -215,7 +272,7 @@ class DesktopLandscapePlayerTest {
                 assertEquals((frame.top.value + frame.bottom.value) / 2f,
                     (laterRow.top.value + laterRow.bottom.value) / 2f, 3f,
                     "Later lyrics settle in the center once preceding rows fill the upper half")
-                save(onRoot().captureToImage(), "$width-lyrics-later.png")
+                saveLandscapePlayerScreenshot(onRoot().captureToImage(), "$width-lyrics-later.png")
                 runOnIdle { playhead.report(0) }
                 mainClock.advanceTimeBy(2000)
                 waitForIdle()
@@ -244,18 +301,19 @@ class DesktopLandscapePlayerTest {
             runOnIdle { mounted.value = false; DesktopWindowMode.exit() }
             waitForIdle()
             PlayerPlatform.install(DesktopPlayerHost)
+            previewArtwork?.delete()
         }
     }
+}
 
-    private fun save(bitmap: androidx.compose.ui.graphics.ImageBitmap, name: String) {
-        val pixels = bitmap.toPixelMap()
-        val output = java.awt.image.BufferedImage(bitmap.width, bitmap.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
-        val argb = IntArray(bitmap.width * bitmap.height) {
-            pixels[it % bitmap.width, it / bitmap.width].toArgb()
-        }
-        output.setRGB(0, 0, bitmap.width, bitmap.height, argb, 0, bitmap.width)
-        val target = java.io.File("build/reports/landscape-player/$name")
-        target.parentFile.mkdirs()
-        javax.imageio.ImageIO.write(output, "png", target)
+internal fun saveLandscapePlayerScreenshot(bitmap: androidx.compose.ui.graphics.ImageBitmap, name: String) {
+    val pixels = bitmap.toPixelMap()
+    val output = java.awt.image.BufferedImage(bitmap.width, bitmap.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+    val argb = IntArray(bitmap.width * bitmap.height) {
+        pixels[it % bitmap.width, it / bitmap.width].toArgb()
     }
+    output.setRGB(0, 0, bitmap.width, bitmap.height, argb, 0, bitmap.width)
+    val target = java.io.File("build/reports/landscape-player/$name")
+    target.parentFile.mkdirs()
+    javax.imageio.ImageIO.write(output, "png", target)
 }
