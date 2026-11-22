@@ -40,6 +40,10 @@ gradle.projectsEvaluated {
 }
 GRADLE
 
+if [[ -n "${BITCHORD_CANVAS_CLOSE_MODE:-}" ]]; then
+  [[ "$test_name" == DesktopSpotifyCanvasMemoryProfileTest && "$fullscreen_seconds" != 0 ]] || exit 2
+  cycles=3
+fi
 gradle=(./gradlew)
 if [[ "${BITCHORD_MV_PROFILE_NO_SWAP:-0}" == 1 ]]; then
   gradle=(systemd-run --user --scope -p MemorySwapMax=0 ./gradlew --no-daemon)

@@ -7,6 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -166,6 +167,9 @@ private fun ProfileFullscreenCanvas(
     val position = remember { PlaybackPosition() }
     val enabled = remember { MutableStateFlow(false) }
     var playing by remember { mutableStateOf(false) }
+    val returnProbe = System.getenv("BITCHORD_CANVAS_CLOSE_MODE")
+    var shown by remember { mutableStateOf(returnProbe == null) }
+    val closeMetrics = remember(output) { CloseCycleMetrics(output) }
     val source = remember(artwork) {
         MotionVideoSource(artwork.url, null, DesktopCanvasDecoder.MAX_EDGE,
             MotionVideoSource.Clock.NowPlaying, artwork.title)
@@ -183,9 +187,19 @@ private fun ProfileFullscreenCanvas(
             override fun cachedCanvas(song: Song): CanvasArtwork = artwork
             override suspend fun canvasFor(song: Song): CanvasArtwork = artwork
             @Composable override fun rememberRemoteArtworkUrl(song: Song?): String? = coverUrl
+            @Composable override fun CanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
+                val measured = if (returnProbe == "canvas") modifier.drawWithContent {
+                    drawContent()
+                    closeMetrics.drawSubmitted()
+                } else modifier
+                DesktopPlayerHost.CanvasVideo(spec, measured)
+            }
         }.also(PlayerPlatform::install)
     }
-    val state = rememberWindowState(placement = WindowPlacement.Fullscreen, width = 1220.dp, height = 780.dp)
+    val state = rememberWindowState(
+        placement = if (returnProbe == null) WindowPlacement.Fullscreen else WindowPlacement.Floating,
+        width = 1220.dp, height = 780.dp,
+    )
     val phases = remember { output.resolve("phases.csv").apply {
         writeText("epoch_ms,stage,heap_used_bytes,heap_committed_bytes,running_session\n")
     } }
@@ -196,20 +210,26 @@ private fun ProfileFullscreenCanvas(
     Window(state = state, title = "BitChord fullscreen animated artwork profile", onCloseRequest = {
         finish(Result.failure(IllegalStateException("The profile window closed before sampling finished")))
     }) {
-        MaterialTheme(colorScheme = darkColorScheme(primary = Color.White)) {
-            DesktopPlayerSheet(true, onDismiss = {}, dragToDismiss = false) { width, height ->
-                NowPlayingScreen(song = song, isPlaying = playing, isLoading = false,
-                    position = position, durationMs = 400_000, audioVersionSwitching = false,
-                    qualityUpgraded = false, queue = listOf(song), queueIndex = 0, hasPrevious = false,
-                    hasNext = false, repeatMode = 0, shuffleEnabled = false, autoplayEnabled = false,
-                    signedIn = true, accountName = null, likeStatus = LikeStatus.INDIFFERENT,
-                    onToggleLike = {}, onPlayPause = {}, onNext = {}, onPrevious = {}, onBlockedControl = {},
-                    onSeek = {}, onSeekFraction = {}, onToggleShuffle = {}, onCycleRepeat = {}, onToggleAutoplay = {},
-                    onJumpTo = {}, onRemoveFromQueue = {}, onMoveInQueue = { _, _ -> }, onClearQueue = {},
-                    onOpenMenu = {}, onOpenAlbum = {}, onOpenArtist = { _, _ -> }, onOpenPlaybackSource = {},
-                    onListenTogether = {}, lyrics = null, lyricsSource = null, lyricsProviderStates = emptyMap(),
-                    onSelectLyricsProvider = {}, lyricsUnavailable = false, lyricsOffsetOpen = false,
-                    onDismissLyricsOffset = {}, windowWidth = width, windowHeight = height)
+        Box(Modifier.fillMaxSize().background(Color.DarkGray)) {
+            MaterialTheme(colorScheme = darkColorScheme(primary = Color.White)) {
+                DesktopPlayerSheet(shown, onDismiss = {}, dragToDismiss = false) { width, height ->
+                    if (returnProbe != null) DisposableEffect(Unit) {
+                        closeMetrics.mounted = true
+                        onDispose { closeMetrics.mounted = false }
+                    }
+                    NowPlayingScreen(song = song, isPlaying = playing, isLoading = false,
+                        position = position, durationMs = 400_000, audioVersionSwitching = false,
+                        qualityUpgraded = false, queue = listOf(song), queueIndex = 0, hasPrevious = false,
+                        hasNext = false, repeatMode = 0, shuffleEnabled = false, autoplayEnabled = false,
+                        signedIn = true, accountName = null, likeStatus = LikeStatus.INDIFFERENT,
+                        onToggleLike = {}, onPlayPause = {}, onNext = {}, onPrevious = {}, onBlockedControl = {},
+                        onSeek = {}, onSeekFraction = {}, onToggleShuffle = {}, onCycleRepeat = {}, onToggleAutoplay = {},
+                        onJumpTo = {}, onRemoveFromQueue = {}, onMoveInQueue = { _, _ -> }, onClearQueue = {},
+                        onOpenMenu = {}, onOpenAlbum = {}, onOpenArtist = { _, _ -> }, onOpenPlaybackSource = {},
+                        onListenTogether = {}, lyrics = null, lyricsSource = null, lyricsProviderStates = emptyMap(),
+                        onSelectLyricsProvider = {}, lyricsUnavailable = false, lyricsOffsetOpen = false,
+                        onDismissLyricsOffset = {}, windowWidth = width, windowHeight = height)
+                }
             }
         }
         LaunchedEffect(playing) {
@@ -221,6 +241,40 @@ private fun ProfileFullscreenCanvas(
         LaunchedEffect(host) {
             finish(runCatching {
                 output.resolve("render-api").writeText(window.renderApi.toString())
+                if (returnProbe != null) {
+                    require(returnProbe == "static" || returnProbe == "canvas")
+                    DesktopImageLoader.install()
+                    delay(15_000)
+                    record("idle")
+                    repeat(3) { index ->
+                        closeMetrics.open(index + 1)
+                        playing = true
+                        shown = true
+                        enabled.value = returnProbe == "canvas"
+                        state.placement = WindowPlacement.Fullscreen
+                        withTimeout(15_000) {
+                            while (!closeMetrics.mounted ||
+                                (enabled.value && (!active() || closeMetrics.firstDrawMs == null))) delay(25)
+                        }
+                        delay(10_000)
+                        record("playing-${index + 1}")
+                        val startedClosing = System.nanoTime()
+                        closeMetrics.closing = true
+                        shown = false
+                        playing = false
+                        state.placement = WindowPlacement.Floating
+                        withTimeout(10_000) {
+                            while (active() || closeMetrics.mounted) delay(25)
+                        }
+                        closeMetrics.finishCycle(startedClosing)
+                        for ((wait, stage) in listOf(15_000L to 15, 15_000L to 30, 30_000L to 60)) {
+                            delay(wait)
+                            check(!active() && !closeMetrics.mounted)
+                            record("cycle-${index + 1}-after-$stage")
+                        }
+                    }
+                    return@runCatching
+                }
                 playing = true
                 delay(15_000)
                 record("static")
@@ -242,4 +296,50 @@ private fun ProfileFullscreenCanvas(
             })
         }
     }
+}
+
+
+/** Draw submission intervals and process CPU are observables, not compositor presentation. */
+private class CloseCycleMetrics(output: File) {
+    private val log = output.resolve("timing.csv")
+    private val process = ProcessHandle.current()
+    private val draws = mutableListOf<Double>()
+    private var cycle = 0
+    private var openedNanos = 0L
+    private var lastDraw = 0L
+    private var cpuStartedMs: Long? = null
+    var mounted = false
+    var closing = false
+    var firstDrawMs: Double? = null
+        private set
+
+    fun open(number: Int) {
+        cycle = number
+        openedNanos = System.nanoTime()
+        cpuStartedMs = cpuMs()
+        lastDraw = 0
+        firstDrawMs = null
+        closing = false
+        draws.clear()
+        if (cycle == 1) log.writeText("cycle,first_draw_ms,draw_interval_p95_ms,unmount_ms,process_cpu_ms\n")
+    }
+
+    fun drawSubmitted() {
+        if (closing) return
+        val now = System.nanoTime()
+        if (firstDrawMs == null) firstDrawMs = (now - openedNanos) / 1_000_000.0
+        if (lastDraw != 0L) draws += (now - lastDraw) / 1_000_000.0
+        lastDraw = now
+    }
+
+    fun finishCycle(startedClosing: Long) {
+        val sorted = draws.sorted()
+        val p95 = sorted.getOrNull((sorted.size * .95).toInt())
+        val endCpu = cpuMs()
+        val cpu = cpuStartedMs?.let { if (endCpu != null) endCpu - it else null }
+        val unmount = (System.nanoTime() - startedClosing) / 1_000_000.0
+        log.appendText("$cycle,${firstDrawMs ?: ""},${p95 ?: ""},$unmount,${cpu ?: ""}\n")
+    }
+
+    private fun cpuMs(): Long? = process.info().totalCpuDuration().orElse(null)?.toMillis()
 }

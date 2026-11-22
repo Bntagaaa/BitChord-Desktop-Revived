@@ -168,3 +168,27 @@ The idle, fullscreen and return-to-Home values are short-window medians. The two
 Landscape Now Playing now uses one clipping and shadow layer and stops drawing the still cover once the cropped animated picture is opaque. The still image stays available during the fade and on fallback. It also uses the current track ID as the motion session identity, so a simultaneous details panel can reuse the decoder when the source and options match.
 
 Home observations are tracked separately. Its resident footprint after returning was still about 80 MiB above its starting value, where swap was comparable. The Home feed may keep eligible artwork motion active under the Now Playing overlay, with a different gate from the mood grid. The live run did not isolate Home or establish that it owns the remaining footprint. This follow-up changes only Now Playing.
+
+## Resource ownership after repeated Now Playing closes
+
+The close probe opens the production Now Playing sheet in an otherwise empty Compose OpenGL window and returns it to windowed mode. Each run does three open/play/close cycles with the same cover and local motion fixture. Audio is simulated, and Home is absent. The test waits for the sheet content to leave composition and the motion session to finish, then checks both again at 15, 30 and 60 seconds. The Linux process ran with swap disabled in the profiling scope.
+
+```bash
+BITCHORD_VIDEO_PROFILE_SCENARIO=canvas BITCHORD_CANVAS_FULLSCREEN_SECONDS=15 \
+  BITCHORD_CANVAS_CLOSE_MODE=canvas BITCHORD_CANVAS_PROFILE_COVER=/tmp/canvas-cover.png \
+  BITCHORD_MV_PROFILE_NO_SWAP=1 bash scripts/profile-music-video.sh \
+  /tmp/spotify-canvas.mp4 /tmp/canvas-close
+```
+
+Use `BITCHORD_CANVAS_CLOSE_MODE=static` in a separate run to open and close the same player with original cover art and Canvas disabled. The close-mode timing log captures Canvas draw-submission intervals and elapsed time from close until sheet disposal and session shutdown. Process CPU time includes warm-up, playback and close. These timings are a baseline for a future comparison, and draw submissions are distinct from compositor-presented frames.
+
+| Mode | Idle RSS / PSS / DRM (MiB) | Cycle 1 at 60 s | Cycle 2 at 60 s | Cycle 3 at 60 s |
+| --- | ---: | ---: | ---: | ---: |
+| Static artwork | 297.7 / 251.5 / 11.4 | 386.4 / 338.8 / 90.8 | 386.6 / 338.1 / 97.4 | 389.9 / 341.7 / 99.7 |
+| Canvas | 315.1 / 269.6 / 11.7 | 437.2 / 388.8 / 101.5 | 450.4 / 402.0 / 83.6 | 450.1 / 401.7 / 79.0 |
+
+All six cycles disposed the sheet. All three Canvas sessions also shut down before the close check finished. The check took 430–576 ms in the static run and 447–541 ms in the Canvas run. The last motion lease clears and closes its frame, cancels the decoder, and removes the session after native close. A second compatible view still owns its lease. The sheet composition owns the backdrop snapshot state and remembered render layers. The limited shared artwork and blur caches are available for reopening.
+
+The Canvas run retained resident memory after the first visit and stayed near 450 MiB RSS at 60 seconds in both warm cycles, while the DRM resident counter fell. The static run also retained RSS despite having no Canvas worker. NMT still reported more committed JVM memory after opening the player, and some samples retained DRM memory with the sheet closed. The counters have overlapping scopes and cannot assign every residual byte. These three cycles do not establish a long-run plateau under every driver or workload.
+
+The Canvas run reached the first Canvas draw in 3.12 s on the cold visit and 279–403 ms on the warm visits. Its p95 draw-submission intervals were 19–35 ms and total process CPU time was 5.45–14.29 seconds per cycle. These are baseline timings. The close measurements did not reveal a player-owned frame, snapshot or layer that warranted a runtime cleanup change, so there is no candidate performance comparison or claimed RSS reduction. [15/30/60-second measurements](unified-video-engine-evidence/now-playing-close-cycles.csv) and [timing measurements](unified-video-engine-evidence/now-playing-close-timing.csv).
