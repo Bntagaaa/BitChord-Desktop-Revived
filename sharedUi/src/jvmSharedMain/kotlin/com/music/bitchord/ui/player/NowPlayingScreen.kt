@@ -2083,6 +2083,7 @@ fun NowPlayingScreen(
                             canvasRendered = canvasRendered,
                             isPlaying = isPlaying,
                             onCanvasRenderedChange = onCanvasRenderedChange,
+                            playbackIdentity = song.videoId,
                             // A clip decoding behind a player on its way to the
                             // bar is work nobody sees — see [dockMoving].
                             pausedForTransition = dockMoving,

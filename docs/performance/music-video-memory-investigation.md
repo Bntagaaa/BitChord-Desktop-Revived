@@ -150,3 +150,21 @@ Rebuild the baseline with the same profile test and script to compare both the s
 The baseline had a cold-start RSS peak of 416.4 MiB versus 385.6 MiB for the candidate. The starting values differed by about 32 MiB, which means the peak difference cannot be credited to this change. Neither run reproduced continuously increasing RSS. DRM client resident memory moved with playback, from approximately 143–149 MiB at the end of the active phase to 64–65 MiB after 45 seconds paused. Both runs removed the motion session after disabling animation. [Fullscreen phase samples](unified-video-engine-evidence/fullscreen-canvas-steady-state.csv).
 
 The estimated JVM allocation rate changed from 0.875 to 0.851 MiB/s over the same active interval. Nine sampled Flow objects had stacks in the baseline motion decoder and zero did in the candidate. This confirms removal of the repeated collector path in this capture. It does not establish a general reduction in RSS or rule out a slower, session-specific native leak. The Canvas UI regression verifies that the still frame is kept during pause, repeated sampling stops, the zero-capture request draws without taking a sample, and hiding still restores artwork.
+
+## Provider-backed fullscreen session
+
+A live AppImage session played “7 rings” with animated artwork in fullscreen Now Playing. Its bundled decoder still subscribed to the running Flow on each active frame, so this capture predates the loop change above.
+
+| Observed interval | RSS (MiB) | PSS (MiB) | Swap (MiB) |
+| --- | ---: | ---: | ---: |
+| Home at idle before playback | 547.8 | 499.3 | 61.6 |
+| Shortly after fullscreen confirmation | 680.7 | 630.0 | 72.8 |
+| Playing immediately before the cache trim | 685.9 | 635.3 | 72.1 |
+| First sample after the cache trim | 633.5 | 583.0 | 72.0 |
+| Home after closing Now Playing and keeping playback paused | 627.5 | 577.7 | 61.7 |
+
+The idle, fullscreen and return-to-Home values are short-window medians. The two cache-trim samples are adjacent observations. The desktop log recorded an active-page cache trim at about 686 MiB RSS exactly when the drop occurred. The process rose by several MiB after fullscreen settled, and the trim reclaimed about 52 MiB of resident memory without a corresponding increase in swap. This identifies the cause of that drop. The AppImage lacks JFR and did not have NMT enabled, so the object and native owners responsible for the gradual rise remain unverified. The song advanced briefly before the paused control, and the log recorded another cache trim near the return to Home. These transitions do not isolate how much memory the overlay released.
+
+Landscape Now Playing now uses one clipping and shadow layer and stops drawing the still cover once the cropped animated picture is opaque. The still image stays available during the fade and on fallback. It also uses the current track ID as the motion session identity, so a simultaneous details panel can reuse the decoder when the source and options match.
+
+Home observations are tracked separately. Its resident footprint after returning was still about 80 MiB above its starting value, where swap was comparable. The Home feed may keep eligible artwork motion active under the Now Playing overlay, with a different gate from the mood grid. The live run did not isolate Home or establish that it owns the remaining footprint. This follow-up changes only Now Playing.
