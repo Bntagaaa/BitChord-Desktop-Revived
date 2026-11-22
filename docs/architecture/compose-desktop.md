@@ -171,3 +171,7 @@ Addressing runtime memory swelling during active UI browsing across screens (whe
 GitHub rejected draft creation from Actions with: "GitHub Actions is not permitted to create or approve pull requests (createPullRequest)." Repository settings were not changed. The environment also currently denies api.github.com, preventing a direct authenticated CLI fallback. The prepared PR description is in compose-pr.md. The implementation branch is pushed normally; no automatic merge is attempted.
 
 Earlier benchmark attempts stopped in the artifact inventory because Gradle had packaged project classes without creating every project JAR. The audit now declares its artifact build dependencies; run 42546036077 completed both packaged builds and all six real process measurements.
+
+## Phase 1 desktop video replacement
+
+The [video audit](../performance/unified-video-engine-audit.md) maps the existing player, artist, window, and audio boundaries. The [backend gate](../performance/unified-video-engine-architecture.md) and [probe measurements](../performance/unified-video-engine-benchmarks.md) track the unified software pipeline and the compositor work required for GPU playback.

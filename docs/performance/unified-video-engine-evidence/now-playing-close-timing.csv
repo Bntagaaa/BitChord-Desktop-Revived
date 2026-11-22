@@ -1,0 +1,7 @@
+mode,cycle,first_draw_ms,draw_interval_p95_ms,unmount_ms,process_cpu_ms
+static,1,,,576.289744,6330
+static,2,,,430.441098,2780
+static,3,,,480.842584,2370
+canvas,1,3118.108025,32.901205,540.974352,14290
+canvas,2,403.167964,19.34081,446.981139,7490
+canvas,3,278.654104,34.669912,462.715617,5450

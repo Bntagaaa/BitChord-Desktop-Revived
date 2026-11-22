@@ -286,9 +286,9 @@ internal fun AndroidCanvasArtworkPlayer(
     }
 
     val reportRendered by rememberUpdatedState(onRenderedChanged)
-    LaunchedEffect(rendered) {
-        reportRendered(rendered)
-        if (!rendered) return@LaunchedEffect
+    LaunchedEffect(rendered) { reportRendered(rendered) }
+    LaunchedEffect(rendered, frameCapturePx) {
+        if (!rendered || frameCapturePx <= 0) return@LaunchedEffect
         // Let the surface actually paint the frame that just triggered this
         // before reading it back — grabbing it the instant the callback fires
         // can still catch the previous, empty buffer.
@@ -311,7 +311,7 @@ internal fun AndroidCanvasArtworkPlayer(
     LaunchedEffect(rendered, refreshFrameEveryMs, frameCapturePx, clipAspect, contentMode, alignPortraitTop) {
         val interval = refreshFrameEveryMs ?: return@LaunchedEffect
         Log.d(TAG, "periodic frame refresh started, interval=$interval")
-        if (!rendered) return@LaunchedEffect
+        if (!rendered || frameCapturePx <= 0) return@LaunchedEffect
         while (isActive) {
             delay(interval)
             val view = textureView ?: continue

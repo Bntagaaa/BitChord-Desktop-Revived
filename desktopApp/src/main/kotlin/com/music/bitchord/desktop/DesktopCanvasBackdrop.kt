@@ -17,19 +17,21 @@ import androidx.compose.ui.graphics.ImageBitmap
  */
 internal object DesktopCanvasBackdrop {
 
-    private var held by mutableStateOf<Pair<String, ImageBitmap>?>(null)
+    private data class Sample(val url: String, val owner: Any, val frame: ImageBitmap)
+
+    private var held by mutableStateOf<Sample?>(null)
 
     /** Called with the clip's first frame, which is all the mesh needs. */
-    fun publish(url: String, frame: ImageBitmap) {
-        held = url to frame
+    fun publish(url: String, owner: Any, frame: ImageBitmap) {
+        held = Sample(url, owner, frame)
     }
 
     /** Dropped when the clip stops, so the still cover takes the backdrop back. */
-    fun clear(url: String) {
-        if (held?.first == url) held = null
+    fun clear(owner: Any) {
+        if (held?.owner === owner) held = null
     }
 
     /** The frame for [url], or null when that clip is not the one playing. */
     fun frameFor(url: String?): ImageBitmap? =
-        url?.let { wanted -> held?.takeIf { it.first == wanted }?.second }
+        url?.let { wanted -> held?.takeIf { it.url == wanted }?.frame }
 }
