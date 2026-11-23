@@ -35,6 +35,7 @@ import com.music.bitchord.ui.screens.LibraryLink
 import com.music.bitchord.ui.screens.LibraryScreen
 import com.music.bitchord.ui.screens.MoodGenrePlaylistsScreen
 import com.music.bitchord.ui.screens.SearchScreen
+import com.music.bitchord.ui.screens.MixesScreen
 import com.music.bitchord.data.NerdStats
 import com.music.bitchord.playback.PlaybackPosition
 import com.music.bitchord.playback.QueueSource
@@ -316,6 +317,7 @@ import com.music.bitchord.data.model.LibraryPage
 import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.MoodGenre
 import com.music.bitchord.data.model.MoodGenreSection
+import com.music.bitchord.data.model.KeyedMix
 import com.music.bitchord.data.model.PLAYER_ART_PX
 import com.music.bitchord.data.model.PlaylistPrivacy
 import com.music.bitchord.data.model.ROW_ART_PX
@@ -501,6 +503,7 @@ internal enum class DesktopDestination(val id: String, val label: String) {
     LIBRARY("library", "Library"),
     SPOTIFY("spotify", "Spotify"),
     SEARCH("search", "Search"),
+    RADIO("radio", "Radio"),
     HISTORY("history", "History"),
     DOWNLOADS("downloads", "Downloads"),
     LOCAL_MUSIC("local-music", "Local Music"),
@@ -618,6 +621,7 @@ internal fun BitChordDesktopApp(
     val exploreListState = rememberLazyListState()
     val moodGenreListState = rememberLazyListState()
     val searchListState = rememberLazyListState()
+    val radioListState = rememberLazyListState()
     val libraryListState = rememberLazyListState()
     val libraryGridState = rememberLazyGridState()
     val spotifyGridState = rememberLazyGridState()
@@ -638,6 +642,9 @@ internal fun BitChordDesktopApp(
     var homeRenderedLogged by remember { mutableStateOf(false) }
     var exploreState by remember { mutableStateOf<UiState<List<MoodGenreSection>>>(UiState.Loading) }
     var newState by remember { mutableStateOf<UiState<List<HomeShelf>>>(UiState.Loading) }
+    var radioState by remember { mutableStateOf<UiState<List<KeyedMix>>>(UiState.Loading) }
+    var radioLoadedIdentity by remember { mutableStateOf<String?>(null) }
+    var radioReloads by remember { mutableStateOf(0) }
     var newReloads by remember { mutableStateOf(0) }
     var selectedMoodGenre by remember { mutableStateOf<MoodGenre?>(null) }
     // Bumped by a retry so the loaders below re-run without the state they are keyed on having to
@@ -827,6 +834,25 @@ internal fun BitChordDesktopApp(
             ?.let(DesktopSearchClient::userPlaylists)
             .orEmpty()
     }
+    // The original BitChord Radio tab loads the signed-in listener's "Mixed for you"
+    // feed. Do not reuse another profile's personal mixes after an account switch.
+    LaunchedEffect(destination, youtubeSignedIn, activeAccountId, activeProfileId, sessionRevision, radioReloads) {
+        if (destination != DesktopDestination.RADIO) return@LaunchedEffect
+        if (!youtubeSignedIn) {
+            radioLoadedIdentity = null
+            radioState = UiState.Loading
+            return@LaunchedEffect
+        }
+        val identity = "$activeAccountId/$activeProfileId/$sessionRevision/$radioReloads"
+        if (radioLoadedIdentity == identity) return@LaunchedEffect
+        radioLoadedIdentity = identity
+        radioState = UiState.Loading
+        DesktopSearchClient.mixedForYouKeyed().fold(
+            onSuccess = { radioState = UiState.Success(it) },
+            onFailure = { radioState = UiState.Error(it.message ?: "Couldn't load your mixes") },
+        )
+    }
+
     // The add-to-playlist dialog intentionally keeps only playlists owned by the account. The
     // sidebar is a library browser instead, so it shows the complete paged shelf: owned, saved,
     // and YouTube's built-in playlists such as Liked Music.
@@ -5084,6 +5110,22 @@ internal fun BitChordDesktopApp(
                             leadHero = false,
                             onShelfOpen = ::openShelfDestination,
                         )
+                        destination == DesktopDestination.RADIO -> MixesScreen(
+                            title = "Radio",
+                            state = radioState,
+                            signedIn = youtubeSignedIn,
+                            listState = radioListState,
+                            onItemClick = { item -> openShelfItem(item, "Radio") },
+                            // Existing desktop playlist long-press actions are not implemented;
+                            // avoid replacing a browse destination with a track-only song menu.
+                            onItemLongPress = null,
+                            onRetry = { radioReloads++ },
+                            onSignIn = { overlays.signIn = true },
+                            refreshing = false,
+                            onRefresh = { radioReloads++ },
+                            pullState = rememberPullToRefreshState(),
+                            contentPadding = sharedPagePadding,
+                        )
                         destination == DesktopDestination.NEW -> DesktopNewPage(
                             state = newState,
                             listState = newListState,
@@ -5893,6 +5935,9 @@ private fun DesktopSidebar(
                 !settingsOpen && (destination == DesktopDestination.SEARCH || destination == DesktopDestination.EXPLORE), collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.SEARCH)
             }
+            DesktopSidebarItem(DesktopPrimaryNavigationIcons.Radio, "Radio", !settingsOpen && destination == DesktopDestination.RADIO, collapsed = collapsed) {
+                onDestinationSelected(DesktopDestination.RADIO)
+            }
             // Match the mobile tab bar glyphs; Library and Spotify remain independent destinations.
             DesktopSidebarItem(DesktopPrimaryNavigationIcons.Library, "Library", !settingsOpen && destination == DesktopDestination.LIBRARY, collapsed = collapsed) {
                 onDestinationSelected(DesktopDestination.LIBRARY)
@@ -6168,6 +6213,7 @@ private fun DesktopFloatingNavigation(
         DesktopDestination.LISTEN_NOW to (DesktopPrimaryNavigationIcons.Home to "Home"),
         DesktopDestination.NEW to (DesktopPrimaryNavigationIcons.New to "New"),
         DesktopDestination.SEARCH to (DesktopPrimaryNavigationIcons.Search to "Search"),
+        DesktopDestination.RADIO to (DesktopPrimaryNavigationIcons.Radio to "Radio"),
         DesktopDestination.LIBRARY to (DesktopPrimaryNavigationIcons.Library to "Library"),
     )
     val selected: DesktopDestination? = if (settingsOpen) {
