@@ -153,6 +153,8 @@
     <string name="recent_search_remove">Remove “%1$s” from recent searches</string>
     <string name="recent_searches">Recent searches</string>
     <string name="replay_subtitle">Your top songs, artists, albums and genres</string>
+    <string name="mixes_yours">Your Mixes</string>
+    <string name="mixes_none">No mixes yet. Keep listening and YouTube Music will make some for you.</string>
     <string name="retry">Retry</string>
     <string name="saved_to_youtube_music">Saved to YouTube Music</string>
     <string name="search">Search</string>
