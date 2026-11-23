@@ -14,5 +14,6 @@ internal object DesktopPrimaryNavigationIcons {
     val Home: ImageVector get() = BitChordIcons.Home
     val New: ImageVector get() = BitChordIcons.TabExplore
     val Search: ImageVector get() = BitChordIcons.TabSearch
+    val Radio: ImageVector get() = BitChordIcons.TabRadio
     val Library: ImageVector get() = BitChordIcons.TabLibrary
 }
