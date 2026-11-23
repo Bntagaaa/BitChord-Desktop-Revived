@@ -11,6 +11,7 @@ class DesktopPrimaryNavigationIconsTest {
         assertSame(BitChordIcons.Home, DesktopPrimaryNavigationIcons.Home)
         assertSame(BitChordIcons.TabExplore, DesktopPrimaryNavigationIcons.New)
         assertSame(BitChordIcons.TabSearch, DesktopPrimaryNavigationIcons.Search)
+        assertSame(BitChordIcons.TabRadio, DesktopPrimaryNavigationIcons.Radio)
         assertSame(BitChordIcons.TabLibrary, DesktopPrimaryNavigationIcons.Library)
     }
 
