@@ -7,6 +7,7 @@ import com.music.bitchord.data.model.BrowseItem
 import com.music.bitchord.data.model.BrowseType
 import com.music.bitchord.data.model.HomeFeed
 import com.music.bitchord.data.model.HomeShelf
+import com.music.bitchord.data.model.KeyedMix
 import com.music.bitchord.data.model.LibraryPage
 import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.MoodGenreSection
@@ -37,6 +38,9 @@ object DesktopSearchClient {
     }
 
     suspend fun home(): Result<HomeFeed> = YtMusicRepository.home()
+
+    /** The original BitChord Radio feed: account-specific, localized music mixes. */
+    suspend fun mixedForYouKeyed(): Result<List<KeyedMix>> = YtMusicRepository.mixedForYouKeyed()
 
     suspend fun moreHome(token: String): Result<HomeFeed> = YtMusicRepository.moreHome(token)
 
