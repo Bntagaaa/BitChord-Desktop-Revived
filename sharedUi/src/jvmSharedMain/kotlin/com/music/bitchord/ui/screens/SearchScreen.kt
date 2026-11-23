@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -60,6 +61,8 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.NorthWest
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -71,6 +74,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -111,6 +115,7 @@ import com.music.bitchord.ui.components.songListSkeleton
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 fun SearchScreen(
@@ -439,46 +444,65 @@ fun SearchScreen(
                             else -> null
                         } }
                     val topResult = results.data.filterIsInstance<SearchResult.TopTrack>().firstOrNull()
-                    if (filter == SearchFilter.ALL && topResult != null) {
-                        item(key = "search:top-result:${topResult.song.videoId}") {
-                            TopResultCard(
-                                song = topResult.song,
-                                onPlay = { onTopResultPlay(topResult.song) },
-                                onPlaylist = { onTopResultPlaylist(topResult.song) },
-                                onLongPress = { onSongLongPress(topResult.song) },
-                            )
-                        }
-                    }
-                    searchSections(results.data, filter).forEach { section ->
-                        section.title?.let { title ->
-                            item(key = "search-section:$title") {
-                                Text(
-                                    text = title,
-                                    modifier = Modifier.padding(
-                                        start = PAGE_GUTTER,
-                                        end = PAGE_GUTTER,
-                                        top = 16.dp,
-                                        bottom = 6.dp,
-                                    ),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                    if (filter == SearchFilter.ALL) {
+                        val allSongs = results.data.filterIsInstance<SearchResult.Track>().map { it.song }
+                        val featuredSong = topResult?.song ?: allSongs.firstOrNull()
+                        if (featuredSong != null || allSongs.isNotEmpty()) {
+                            item(key = "search:all-featured") {
+                                SearchAllFeatured(
+                                    topSong = featuredSong,
+                                    songs = allSongs,
+                                    tracks = tracks,
+                                    currentSong = currentSong,
+                                    isPlaying = isPlaying,
+                                    onTopResultPlay = onTopResultPlay,
+                                    onTopResultPlaylist = onTopResultPlaylist,
+                                    onSongClick = onSongClick,
+                                    onSongLongPress = onSongLongPress,
+                                    onSongSwipe = onSongSwipe,
                                 )
                             }
                         }
+                    }
+                    searchSections(results.data, filter).forEach { section ->
+                        // All has a compact Songs preview beside its promoted result;
+                        // the dedicated Songs tab keeps its original complete list.
+                        if (filter == SearchFilter.ALL && section.title == "Songs") return@forEach
                         val browseGrid = section.rows.all {
                             it is SearchResult.Browse && it.item.type in
                                 setOf(BrowseType.ARTIST, BrowseType.ALBUM, BrowseType.PLAYLIST)
                         }
                         if (browseGrid && section.rows.isNotEmpty()) {
                             val browseItems = section.rows.filterIsInstance<SearchResult.Browse>().map { it.item }
-                            item(key = "search-grid:${section.title ?: filter.label}") {
-                                SearchBrowseGrid(
-                                    items = browseItems,
-                                    onBrowseClick = onBrowseClick,
-                                    onBrowseLongPress = onBrowseLongPress,
-                                )
+                            if (filter == SearchFilter.ALL) {
+                                item(key = "search-shelf:${section.title}") {
+                                    SearchBrowseShelf(
+                                        title = section.title.orEmpty(),
+                                        items = browseItems,
+                                        onBrowseClick = onBrowseClick,
+                                        onBrowseLongPress = onBrowseLongPress,
+                                    )
+                                }
+                            } else {
+                                section.title?.let { title ->
+                                    item(key = "search-section:$title") {
+                                        SearchSectionHeading(title)
+                                    }
+                                }
+                                item(key = "search-grid:${section.title ?: filter.label}") {
+                                    SearchBrowseGrid(
+                                        items = browseItems,
+                                        onBrowseClick = onBrowseClick,
+                                        onBrowseLongPress = onBrowseLongPress,
+                                    )
+                                }
                             }
                         } else {
+                            section.title?.let { title ->
+                                item(key = "search-section:$title") {
+                                    SearchSectionHeading(title)
+                                }
+                            }
                             itemsIndexed(
                                 items = section.rows,
                                 key = { index, row ->
@@ -597,6 +621,144 @@ private fun LazyListScope.librarySearchResults(
     }
 }
 
+/**
+ * The All overview follows the reference layout: one featured result beside a
+ * short Songs list on wide windows, stacked vertically at smaller widths.
+ * Theme, song-row behaviors and artwork components stay native to BitChord.
+ */
+@Composable
+private fun SearchAllFeatured(
+    topSong: Song?,
+    songs: List<Song>,
+    tracks: List<Song>,
+    currentSong: Song?,
+    isPlaying: Boolean,
+    onTopResultPlay: (Song) -> Unit,
+    onTopResultPlaylist: (Song) -> Unit,
+    onSongClick: (List<Song>, Int) -> Unit,
+    onSongLongPress: (Song) -> Unit,
+    onSongSwipe: (Song) -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = PAGE_GUTTER)) {
+        if (maxWidth >= 720.dp && topSong != null && songs.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                SearchTopResultSection(
+                    song = topSong,
+                    modifier = Modifier.weight(0.31f),
+                    onPlay = { onTopResultPlay(topSong) },
+                    onPlaylist = { onTopResultPlaylist(topSong) },
+                    onLongPress = { onSongLongPress(topSong) },
+                )
+                SearchAllSongsSection(
+                    songs = songs,
+                    tracks = tracks,
+                    currentSong = currentSong,
+                    isPlaying = isPlaying,
+                    onSongClick = onSongClick,
+                    onSongLongPress = onSongLongPress,
+                    onSongSwipe = onSongSwipe,
+                    modifier = Modifier.weight(0.69f),
+                )
+            }
+        } else {
+            Column(Modifier.fillMaxWidth()) {
+                if (topSong != null) {
+                    SearchTopResultSection(
+                        song = topSong,
+                        onPlay = { onTopResultPlay(topSong) },
+                        onPlaylist = { onTopResultPlaylist(topSong) },
+                        onLongPress = { onSongLongPress(topSong) },
+                    )
+                }
+                if (songs.isNotEmpty()) {
+                    SearchAllSongsSection(
+                        songs = songs,
+                        tracks = tracks,
+                        currentSong = currentSong,
+                        isPlaying = isPlaying,
+                        onSongClick = onSongClick,
+                        onSongLongPress = onSongLongPress,
+                        onSongSwipe = onSongSwipe,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchSectionHeading(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title,
+        modifier = modifier.padding(
+            start = PAGE_GUTTER,
+            end = PAGE_GUTTER,
+            top = 16.dp,
+            bottom = 6.dp,
+        ),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+}
+
+@Composable
+private fun SearchTopResultSection(
+    song: Song,
+    onPlay: () -> Unit,
+    onPlaylist: () -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        // The column is already inset by SearchAllFeatured.
+        SearchSectionHeading("Top result", Modifier.offset(x = -PAGE_GUTTER))
+        TopResultCard(
+            song = song,
+            onPlay = onPlay,
+            onPlaylist = onPlaylist,
+            onLongPress = onLongPress,
+        )
+    }
+}
+
+@Composable
+private fun SearchAllSongsSection(
+    songs: List<Song>,
+    tracks: List<Song>,
+    currentSong: Song?,
+    isPlaying: Boolean,
+    onSongClick: (List<Song>, Int) -> Unit,
+    onSongLongPress: (Song) -> Unit,
+    onSongSwipe: (Song) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        SearchSectionHeading("Songs", Modifier.offset(x = -PAGE_GUTTER))
+        songs.take(4).forEachIndexed { index, song ->
+            SongRow(
+                song = song,
+                onClick = { onSongClick(tracks, tracks.indexOf(song).coerceAtLeast(0)) },
+                onLongPress = { onSongLongPress(song) },
+                onSwipeToQueue = { onSongSwipe(song) },
+                isCurrent = song.isSameTrackAs(currentSong),
+                isPlaying = isPlaying && song.isSameTrackAs(currentSong),
+                searchPlayingStyle = true,
+            )
+            if (index < songs.take(4).lastIndex) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = ROW_DIVIDER_INSET),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+        }
+    }
+}
+
 /** The All response carries its highest-confidence music hit as a promoted card. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -614,20 +776,19 @@ private fun TopResultCard(
         animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
         label = "search-top-result-highlight",
     )
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = PAGE_GUTTER, vertical = 10.dp)
+            .padding(top = 6.dp, bottom = 10.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(highlight)
             .hoverable(interaction)
             .longPressMenuClickable(onClick = onPlay, onLongClick = onLongPress)
             .contextClick(onLongPress)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(14.dp),
     ) {
         ArtworkHover(
-            modifier = Modifier.size(72.dp),
+            modifier = Modifier.size(90.dp),
             shape = RoundedCornerShape(9.dp),
             mode = ArtworkHoverMode.DARKEN_AND_PLAY,
             hovered = hovered,
@@ -639,42 +800,46 @@ private fun TopResultCard(
                 contentScale = ContentScale.Crop,
             )
         }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = song.title,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = song.artist,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onPlaylist) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.PlaylistAdd,
+                    contentDescription = stringResource(Res.string.playlist_action),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(
+                onClick = onPlay,
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(PlayingAccent),
+            ) {
+                Icon(
+                    Icons.Rounded.PlayArrow,
+                    contentDescription = stringResource(Res.string.play),
+                    tint = Color.White,
+                )
+            }
+            RowMoreButton(onClick = onLongPress)
         }
-        IconButton(onClick = onPlaylist) {
-            Icon(
-                Icons.AutoMirrored.Rounded.PlaylistAdd,
-                contentDescription = stringResource(Res.string.playlist_action),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        IconButton(onClick = onPlay, modifier = Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .background(PlayingAccent)) {
-            Icon(
-                Icons.Rounded.PlayArrow,
-                contentDescription = stringResource(Res.string.play),
-                tint = Color.White,
-            )
-        }
-        RowMoreButton(onClick = onLongPress)
     }
 }
 
@@ -1072,6 +1237,67 @@ private fun BrowseRow(item: BrowseItem, onClick: () -> Unit, onLongPress: (() ->
  * Search uses Spotify's content hierarchy but BitChord's existing Material theme.
  * Browse categories become a responsive cover grid, while Songs and Videos remain rows.
  */
+@Composable
+private fun SearchBrowseShelf(
+    title: String,
+    items: List<BrowseItem>,
+    onBrowseClick: (BrowseItem) -> Unit,
+    onBrowseLongPress: ((BrowseItem) -> Unit)?,
+) {
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val cardWidth = ((maxWidth - PAGE_GUTTER * 2) / 6f).coerceIn(144.dp, 212.dp)
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = PAGE_GUTTER, end = PAGE_GUTTER),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f).padding(top = 16.dp, bottom = 6.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            scrollState.animateScrollTo((scrollState.value - 560).coerceAtLeast(0))
+                        }
+                    },
+                    enabled = scrollState.value > 0,
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Scroll $title left")
+                }
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            scrollState.animateScrollTo((scrollState.value + 560).coerceAtMost(scrollState.maxValue))
+                        }
+                    },
+                    enabled = scrollState.value < scrollState.maxValue,
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Scroll $title right")
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState)
+                    .padding(horizontal = PAGE_GUTTER),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items.forEach { browse ->
+                    SearchBrowseCard(
+                        item = browse,
+                        modifier = Modifier.width(cardWidth),
+                        onClick = { onBrowseClick(browse) },
+                        onLongPress = onBrowseLongPress?.let { handler -> { handler(browse) } },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun SearchBrowseGrid(
     items: List<BrowseItem>,
