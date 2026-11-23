@@ -9311,16 +9311,21 @@ private fun DesktopCollectionPage(
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item {
-                // Match the web player's two-anchor playlist header while preserving
-                // BitChord's existing typography, artwork treatment and action buttons.
-                val webPlaylistHeader = collection.type == BrowseType.PLAYLIST
-                BoxWithConstraints(Modifier.fillMaxWidth().padding(bottom = 36.dp)) {
-                    val stacked = webPlaylistHeader && maxWidth < 540.dp
-                    val artworkSize = when {
-                        !webPlaylistHeader -> 286.dp
-                        stacked -> 192.dp
-                        else -> 236.dp
-                    }
+                // A compact web-player-scale detail header for BOTH albums and playlists.
+                // Preserve the app's font family, theme, artwork renderer and menu behavior.
+                val compactCollectionHeader =
+                    collection.type == BrowseType.PLAYLIST || collection.type == BrowseType.ALBUM
+                BoxWithConstraints(
+                    Modifier.fillMaxWidth().padding(
+                        start = if (compactCollectionHeader) 4.dp else 0.dp,
+                        top = if (compactCollectionHeader) 10.dp else 0.dp,
+                        bottom = if (compactCollectionHeader) 12.dp else 36.dp,
+                    ),
+                ) {
+                    val stacked = compactCollectionHeader && maxWidth < 360.dp
+                    // At desktop UI scale 1.25, 112.dp renders near the 140px cover in
+                    // the reference; 236.dp rendered near 295px in the rejected layout.
+                    val artworkSize = if (compactCollectionHeader) 112.dp else 286.dp
                     // The services hang motion artwork off the release, so a page for one asks for
                     // it directly rather than picking a track and hoping it sits on the right
                     // edition.
@@ -9349,8 +9354,9 @@ private fun DesktopCollectionPage(
                     }
                     val headline: @Composable () -> Unit = {
                         Column {
-                            // Playlist type already appears in the metadata, as on the web player.
-                            if (!webPlaylistHeader) {
+                            // Album/playlist type remains in the metadata line; don't duplicate
+                            // the large eyebrow above the compact title.
+                            if (!compactCollectionHeader) {
                                 Text(
                                     typeLabel.uppercase(),
                                     color = DesktopSecondary,
@@ -9362,51 +9368,77 @@ private fun DesktopCollectionPage(
                             }
                             Text(
                                 collection.title,
-                                style = MaterialTheme.typography.displaySmall,
+                                style = if (compactCollectionHeader) {
+                                    MaterialTheme.typography.titleMedium.copy(
+                                        fontSize = 16.sp,
+                                        lineHeight = 20.sp,
+                                    )
+                                } else MaterialTheme.typography.displaySmall,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             if (credit.isNotBlank()) {
-                                Spacer(Modifier.height(6.dp))
+                                Spacer(Modifier.height(if (compactCollectionHeader) 2.dp else 6.dp))
                                 Text(
                                     credit,
                                     color = DesktopAccent,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = if (compactCollectionHeader) {
+                                        MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, lineHeight = 12.sp)
+                                    } else MaterialTheme.typography.titleMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
                             if (metadata.isNotBlank()) {
-                                Spacer(Modifier.height(8.dp))
-                                Text(metadata, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
+                                Spacer(Modifier.height(if (compactCollectionHeader) 4.dp else 8.dp))
+                                Text(
+                                    metadata,
+                                    color = DesktopSecondary,
+                                    style = if (compactCollectionHeader) {
+                                        MaterialTheme.typography.bodySmall.copy(fontSize = 8.sp, lineHeight = 11.sp)
+                                    } else MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
                         }
                     }
                     val description = collection.description?.trim()?.takeIf { it.isNotBlank() }
                     val blurb: @Composable () -> Unit = {
-                        if (webPlaylistHeader && description != null) {
+                        if (compactCollectionHeader && description != null) {
                             Text(
                                 description,
                                 color = DesktopSecondary,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 9.sp,
+                                    lineHeight = 12.sp,
+                                ),
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
-                    // Keep the original Search and More handlers and menu anchor. FlowRow
-                    // only wraps actions when a narrow desktop window needs more room.
+                    // Keep the original Shuffle / Search / More handlers and menu anchor.
+                    // Scale only the compact header controls; other screens stay untouched.
                     val actions: @Composable () -> Unit = {
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(if (compactCollectionHeader) 6.dp else 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            DesktopCircleButton(BitChordIcons.Shuffle, DesktopStrings["shuffle", "Shuffle"], onClick = { onShuffle(songs) })
+                            val buttonSize = if (compactCollectionHeader) 28.dp else 50.dp
+                            DesktopCircleButton(
+                                BitChordIcons.Shuffle,
+                                DesktopStrings["shuffle", "Shuffle"],
+                                onClick = { onShuffle(songs) },
+                                size = buttonSize,
+                            )
                             DesktopPlayPill(
                                 label = DesktopStrings["play", "Play"],
                                 onClick = { if (songs.isNotEmpty()) onPlaySongs(songs, 0) },
-                                iconOnly = true,
+                                iconOnly = !compactCollectionHeader,
+                                size = buttonSize,
+                                compact = compactCollectionHeader,
                             )
                             DesktopCircleButton(
                                 if (searching) Icons.Rounded.Close else BitChordIcons.Search,
@@ -9415,9 +9447,15 @@ private fun DesktopCollectionPage(
                                     searching = !searching
                                     if (!searching) listQuery = ""
                                 },
+                                size = buttonSize,
                             )
                             Box {
-                                DesktopCircleButton(Icons.Rounded.MoreHoriz, DesktopStrings["more", "More"], onClick = { moreOpen = true })
+                                DesktopCircleButton(
+                                    Icons.Rounded.MoreHoriz,
+                                    DesktopStrings["more", "More"],
+                                    onClick = { moreOpen = true },
+                                    size = buttonSize,
+                                )
                                 if (moreOpen) {
                                     DesktopCollectionContextMenu(
                                         actions = DesktopCollectionMenuActions(
@@ -9485,33 +9523,33 @@ private fun DesktopCollectionPage(
                                 Column(Modifier.weight(1f).padding(top = 6.dp)) { headline() }
                             }
                             if (description != null) {
-                                Spacer(Modifier.height(12.dp))
+                                Spacer(Modifier.height(8.dp))
                                 blurb()
                             }
-                            Spacer(Modifier.height(14.dp))
+                            Spacer(Modifier.height(8.dp))
                             actions()
                         }
                     } else {
                         Row(
                             Modifier.fillMaxWidth(),
-                            verticalAlignment = if (webPlaylistHeader) Alignment.Top else Alignment.CenterVertically,
+                            verticalAlignment = if (compactCollectionHeader) Alignment.Top else Alignment.CenterVertically,
                         ) {
                             artwork()
-                            Spacer(Modifier.width(30.dp))
+                            Spacer(Modifier.width(if (compactCollectionHeader) 22.dp else 30.dp))
                             Column(
                                 modifier = Modifier.weight(1f).then(
-                                    if (webPlaylistHeader) Modifier.heightIn(min = artworkSize) else Modifier
+                                    if (compactCollectionHeader) Modifier.heightIn(min = artworkSize) else Modifier
                                 ),
-                                verticalArrangement = if (webPlaylistHeader) Arrangement.SpaceBetween else Arrangement.Top,
+                                verticalArrangement = if (compactCollectionHeader) Arrangement.SpaceBetween else Arrangement.Top,
                             ) {
-                                Column(Modifier.padding(top = if (webPlaylistHeader) 26.dp else 0.dp)) {
+                                Column(Modifier.padding(top = if (compactCollectionHeader) 16.dp else 0.dp)) {
                                     headline()
                                 }
                                 Column {
-                                    if (webPlaylistHeader) {
+                                    if (compactCollectionHeader) {
                                         if (description != null) {
                                             blurb()
-                                            Spacer(Modifier.height(12.dp))
+                                            Spacer(Modifier.height(6.dp))
                                         }
                                     } else {
                                         Spacer(Modifier.height(24.dp))
