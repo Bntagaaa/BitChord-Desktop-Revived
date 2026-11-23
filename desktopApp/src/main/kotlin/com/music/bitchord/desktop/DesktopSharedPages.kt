@@ -255,6 +255,7 @@ internal fun DesktopPlayPill(
     onClick: () -> Unit,
     iconOnly: Boolean = false,
     size: Dp = 50.dp,
+    compact: Boolean = false,
 ) {
     Row(
         Modifier
@@ -263,7 +264,7 @@ internal fun DesktopPlayPill(
             .background(DesktopAccent)
             .desktopHoverWash()
             .clickable(onClick = onClick)
-            .then(if (iconOnly) Modifier else Modifier.padding(horizontal = 32.dp)),
+            .then(if (iconOnly) Modifier else Modifier.padding(horizontal = if (compact) 12.dp else 32.dp)),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -271,11 +272,18 @@ internal fun DesktopPlayPill(
             BitChordIcons.Play,
             contentDescription = if (iconOnly) label else null,
             tint = DesktopOnAccent,
-            modifier = Modifier.size(if (iconOnly) size * 0.44f else 18.dp),
+            modifier = Modifier.size(
+                if (iconOnly) size * 0.44f else if (compact) 14.dp else 18.dp,
+            ),
         )
         if (!iconOnly) {
-            Spacer(Modifier.width(8.dp))
-            Text(label, style = MaterialTheme.typography.titleMedium, color = DesktopOnAccent)
+            Spacer(Modifier.width(if (compact) 4.dp else 8.dp))
+            Text(
+                label,
+                style = if (compact) MaterialTheme.typography.titleMedium.copy(fontSize = 12.sp)
+                    else MaterialTheme.typography.titleMedium,
+                color = DesktopOnAccent,
+            )
         }
     }
 }
