@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ inputs.version || github.ref_name }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -497,7 +497,27 @@ jobs:
           (cd dist && rm -f SHA256SUMS && sha256sum -- * > SHA256SUMS && sha256sum --check SHA256SUMS)
           if [[ "$v" == *-* ]]; then echo 'IS_PRERELEASE=true' >> "$GITHUB_ENV"; else echo 'IS_PRERELEASE=false' >> "$GITHUB_ENV"; fi
 
+      # Only set the release metadata when the tag has no release yet.
+      # On rebuilds, replace downloadable assets without overwriting manually edited notes.
+      - name: Find existing release
+        id: release_lookup
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id' > /dev/null 2> "$RUNNER_TEMP/release-lookup.err"; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+            echo "Release ${RELEASE_TAG} already exists; preserving its title and description."
+          elif grep -q 'HTTP 404' "$RUNNER_TEMP/release-lookup.err"; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          else
+            cat "$RUNNER_TEMP/release-lookup.err" >&2
+            exit 1
+          fi
+
       - name: Select release notes
+        if: steps.release_lookup.outputs.exists == 'false'
         shell: bash
         run: |
           set -euo pipefail
@@ -509,7 +529,8 @@ jobs:
           fi
           echo "RELEASE_NOTES_PATH=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_ENV"
 
-      - name: Draft the release
+      - name: Draft a new release
+        if: steps.release_lookup.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
@@ -521,3 +542,12 @@ jobs:
           files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Replace files without touching existing release metadata
+        if: steps.release_lookup.outputs.exists == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" dist/* --clobber
