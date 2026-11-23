@@ -9311,10 +9311,16 @@ private fun DesktopCollectionPage(
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item {
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = 36.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                // Match the web player's two-anchor playlist header while preserving
+                // BitChord's existing typography, artwork treatment and action buttons.
+                val webPlaylistHeader = collection.type == BrowseType.PLAYLIST
+                BoxWithConstraints(Modifier.fillMaxWidth().padding(bottom = 36.dp)) {
+                    val stacked = webPlaylistHeader && maxWidth < 540.dp
+                    val artworkSize = when {
+                        !webPlaylistHeader -> 286.dp
+                        stacked -> 192.dp
+                        else -> 236.dp
+                    }
                     // The services hang motion artwork off the release, so a page for one asks for
                     // it directly rather than picking a track and hoping it sits on the right
                     // edition.
@@ -9330,53 +9336,71 @@ private fun DesktopCollectionPage(
                             }
                         }
                     }
-                    Box(Modifier.size(286.dp).clip(RoundedCornerShape(8.dp))) {
-                        DesktopArtwork(
-                            collection.thumbnailUrl ?: songs.firstOrNull()?.thumbnailUrl,
-                            Modifier.fillMaxSize(),
-                        )
-                        albumCanvas?.let {
-                            DesktopCanvasView(it.url, Modifier.fillMaxSize(), fallbackUrl = it.fallbackUrl)
+                    val artwork: @Composable () -> Unit = {
+                        Box(Modifier.size(artworkSize).clip(RoundedCornerShape(8.dp))) {
+                            DesktopArtwork(
+                                collection.thumbnailUrl ?: songs.firstOrNull()?.thumbnailUrl,
+                                Modifier.fillMaxSize(),
+                            )
+                            albumCanvas?.let {
+                                DesktopCanvasView(it.url, Modifier.fillMaxSize(), fallbackUrl = it.fallbackUrl)
+                            }
                         }
                     }
-                    Spacer(Modifier.width(30.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            typeLabel.uppercase(),
-                            color = DesktopSecondary,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.2.sp,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            collection.title,
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (credit.isNotBlank()) {
-                            Spacer(Modifier.height(6.dp))
+                    val headline: @Composable () -> Unit = {
+                        Column {
+                            // Playlist type already appears in the metadata, as on the web player.
+                            if (!webPlaylistHeader) {
+                                Text(
+                                    typeLabel.uppercase(),
+                                    color = DesktopSecondary,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.2.sp,
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
                             Text(
-                                credit,
-                                color = DesktopAccent,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
+                                collection.title,
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (credit.isNotBlank()) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    credit,
+                                    color = DesktopAccent,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (metadata.isNotBlank()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(metadata, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                    val description = collection.description?.trim()?.takeIf { it.isNotBlank() }
+                    val blurb: @Composable () -> Unit = {
+                        if (webPlaylistHeader && description != null) {
+                            Text(
+                                description,
+                                color = DesktopSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        if (metadata.isNotBlank()) {
-                            Spacer(Modifier.height(8.dp))
-                            Text(metadata, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        // The phone's release controls, in its order: Shuffle, Play, search this
-                        // list, and everything else behind the overflow — downloading a release is
-                        // done once, finding a track on it is done while reading the page.
-                        Row(
+                    }
+                    // Keep the original Search and More handlers and menu anchor. FlowRow
+                    // only wraps actions when a narrow desktop window needs more room.
+                    val actions: @Composable () -> Unit = {
+                        FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             DesktopCircleButton(BitChordIcons.Shuffle, DesktopStrings["shuffle", "Shuffle"], onClick = { onShuffle(songs) })
                             DesktopPlayPill(
@@ -9446,6 +9470,53 @@ private fun DesktopCollectionPage(
                                         ),
                                         onDismiss = { moreOpen = false },
                                     )
+                                }
+                            }
+                        }
+                    }
+                    if (stacked) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                artwork()
+                                Column(Modifier.weight(1f).padding(top = 6.dp)) { headline() }
+                            }
+                            if (description != null) {
+                                Spacer(Modifier.height(12.dp))
+                                blurb()
+                            }
+                            Spacer(Modifier.height(14.dp))
+                            actions()
+                        }
+                    } else {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = if (webPlaylistHeader) Alignment.Top else Alignment.CenterVertically,
+                        ) {
+                            artwork()
+                            Spacer(Modifier.width(30.dp))
+                            Column(
+                                modifier = Modifier.weight(1f).then(
+                                    if (webPlaylistHeader) Modifier.heightIn(min = artworkSize) else Modifier
+                                ),
+                                verticalArrangement = if (webPlaylistHeader) Arrangement.SpaceBetween else Arrangement.Top,
+                            ) {
+                                Column(Modifier.padding(top = if (webPlaylistHeader) 26.dp else 0.dp)) {
+                                    headline()
+                                }
+                                Column {
+                                    if (webPlaylistHeader) {
+                                        if (description != null) {
+                                            blurb()
+                                            Spacer(Modifier.height(12.dp))
+                                        }
+                                    } else {
+                                        Spacer(Modifier.height(24.dp))
+                                    }
+                                    actions()
                                 }
                             }
                         }
