@@ -7,6 +7,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -65,7 +66,7 @@ internal fun Modifier.desktopCard(shape: Shape): Modifier =
 internal fun Modifier.desktopCardInset(shape: Shape): Modifier =
     clip(shape).background(DesktopCardInsetFill).border(0.5.dp, DesktopCardEdge, shape)
 
-/** The rule between two rows of a card. A page of Settings has none: its rows are spaced, not ruled. */
+/** A popup card separator. Settings groups supply their own inset dividers. */
 @Composable
 internal fun DesktopCardRule(modifier: Modifier = Modifier) {
     if (LocalDesktopPanelIsPage.current) return
@@ -90,16 +91,16 @@ internal val DesktopSettingsPageWidth = 840.dp
 /** A page of Settings: a column down the middle of the page area, as tall as the area. */
 @Composable
 internal fun DesktopSettingsPageFrame(
-    maxWidth: Dp = DesktopSettingsPageWidth,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        val gutter = if (maxWidth < 500.dp) 16.dp else DesktopSettingsPageGutter
         Column(
             Modifier
-                .widthIn(max = maxWidth)
+                .widthIn(max = DesktopSettingsPageWidth)
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = DesktopSettingsPageGutter),
+                .padding(horizontal = gutter),
             content = content,
         )
     }
@@ -169,10 +170,7 @@ internal fun DesktopDialogPanel(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (!popup && LocalDesktopPanelIsPage.current) {
-        DesktopSettingsPageFrame(
-            maxWidth = maxOf(maxWidth.dp, DesktopSettingsPageWidth),
-            content = content,
-        )
+        DesktopSettingsPageFrame(content = content)
         return
     }
     DesktopRegisterFlyout(

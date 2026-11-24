@@ -65,8 +65,10 @@ internal fun DesktopTranslationLanguageDialog(onDismiss: () -> Unit) {
 
     val languageListState = rememberLazyListState()
     DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 420) {
+        val page = LocalDesktopPanelIsPage.current
+        if (page) DesktopSettingsPageTitle(DesktopSettingsPage.TRANSLATION_LANGUAGE.title)
         Column(Modifier.fillMaxWidth().padding(horizontal = panelInset(20.dp), vertical = 18.dp)) {
-            Text(
+            if (!page) Text(
                 DesktopStrings["translation_language", "Translation language"],
                 style = MaterialTheme.typography.titleLarge,
                 color = DesktopForeground,
@@ -79,19 +81,25 @@ internal fun DesktopTranslationLanguageDialog(onDismiss: () -> Unit) {
         }
 
         Box(Modifier.fillMaxWidth().padding(horizontal = panelInset(20.dp))) {
-            DesktopSearchField(
-                query = filter,
-                onQueryChange = { filter = it },
-                onSearch = {},
-                placeholder = DesktopStrings["d_filter_languages", "Filter languages"],
-            )
+            val placeholder = DesktopStrings["d_filter_languages", "Filter languages"]
+            if (page) {
+                DesktopSettingsSearch(filter, { filter = it }, placeholder = placeholder)
+            } else {
+                DesktopSearchField(
+                    query = filter,
+                    onQueryChange = { filter = it },
+                    onSearch = {},
+                    placeholder = placeholder,
+                )
+            }
         }
 
         LazyColumn(
             state = languageListState,
             modifier = Modifier.fillMaxWidth().then(desktopPanelBody(cardMax = 340.dp))
-                .desktopTopScrollFade(languageListState).padding(top = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+                .desktopTopScrollFade(languageListState).padding(top = 12.dp)
+                .then(if (page) Modifier.settingsCard() else Modifier),
+            verticalArrangement = Arrangement.spacedBy(if (page) 0.dp else 2.dp),
         ) {
             item {
                 LanguageRow(
@@ -102,6 +110,7 @@ internal fun DesktopTranslationLanguageDialog(onDismiss: () -> Unit) {
                 )
             }
             items(shown, key = { it.first }) { (code, name) ->
+                if (page) DesktopSettingsDivider()
                 LanguageRow(
                     name = name,
                     detail = code,
@@ -120,6 +129,10 @@ internal fun DesktopTranslationLanguageDialog(onDismiss: () -> Unit) {
 
 @Composable
 private fun LanguageRow(name: String, detail: String, selected: Boolean, onClick: () -> Unit) {
+    if (LocalDesktopPanelIsPage.current) {
+        DesktopSettingsRow(name, detail, selected = selected, onClick = onClick)
+        return
+    }
     Row(
         Modifier
             .fillMaxWidth()

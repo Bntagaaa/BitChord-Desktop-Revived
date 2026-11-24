@@ -105,8 +105,7 @@ internal object DesktopAudioDevices {
     }
 
     /** What Settings shows for the stored choice. */
-    fun label(): String {
-        val stored = _selected.value
+    fun label(stored: String = _selected.value): String {
         val default = DesktopStrings["d_system_default", "System default"]
         if (stored == SYSTEM_DEFAULT) return default
         // An unplugged choice plays on the default until it returns, so say so rather than
