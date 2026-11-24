@@ -5,6 +5,8 @@ import kotlin.math.roundToLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+internal const val AUTO_MIX_LOOKAHEAD_NANOS = 120_000_000L
+
 internal data class DesktopAutoMixArtworkTrack(
     val id: String,
     val entry: String?,
@@ -41,7 +43,7 @@ internal data class DesktopAutoMixVisualSample(
 ) {
     fun progress(nowNanos: Long): Float {
         if (revealStart == Long.MAX_VALUE || revealEnd <= revealStart) return 0f
-        val ahead = if (playing) ((nowNanos - sampledAtNanos) / 1e9).coerceIn(0.0, 0.12) * rate else 0.0
+        val ahead = if (playing) (nowNanos - sampledAtNanos).coerceIn(0L, AUTO_MIX_LOOKAHEAD_NANOS) / 1e9 * rate else 0.0
         val audible = minOf(played + ahead, submitted.toDouble())
         return ((audible - revealStart) / (revealEnd - revealStart)).toFloat().coerceIn(0f, 1f)
     }

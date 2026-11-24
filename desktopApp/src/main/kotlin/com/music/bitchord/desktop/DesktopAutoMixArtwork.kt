@@ -8,11 +8,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -36,6 +36,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.random.Random
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeoutOrNull
@@ -167,26 +168,29 @@ internal fun rememberDesktopAutoMixPair(mini: Boolean): DesktopAutoMixArtworkPai
 
 @Composable
 private fun rememberDesktopAutoMixProgress(generation: Long): () -> Float {
-    val samples: State<DesktopAutoMixVisualSample?> = DesktopPlayerHost.autoMixVisual.collectAsState()
-    val frame = remember(generation) { mutableLongStateOf(System.nanoTime()) }
-    val animate by remember(samples, generation) {
-        derivedStateOf {
-            val sample = samples.value
-            sample != null && sample.pair.generation == generation && sample.playing &&
-                sample.revealStart != Long.MAX_VALUE && sample.progress(sample.sampledAtNanos) < 1f
+    val feed = DesktopPlayerHost.autoMixVisual
+    val samples = feed.collectAsState()
+    val frame = remember(feed, generation) { mutableLongStateOf(System.nanoTime()) }
+    LaunchedEffect(feed, generation) {
+        feed.collectLatest { sample ->
+            if (sample == null || sample.pair.generation != generation || !sample.playing) return@collectLatest
+            val limitNanos = sample.sampledAtNanos + AUTO_MIX_LOOKAHEAD_NANOS
+            val limitProgress = sample.progress(limitNanos)
+            if (limitProgress <= sample.progress(frame.longValue)) return@collectLatest
+            do {
+                withFrameNanos { frame.longValue = System.nanoTime() }
+            } while (frame.longValue < limitNanos && sample.progress(frame.longValue) < limitProgress)
         }
-    }
-    LaunchedEffect(animate, generation) {
-        if (animate) while (true) withFrameNanos { frame.longValue = System.nanoTime() }
     }
     return remember(samples, frame, generation) {
         var shown = 0f
-        {
+        val progress = derivedStateOf(structuralEqualityPolicy()) {
             val sample = samples.value?.takeIf { it.pair.generation == generation }
             val next = sample?.progress(frame.longValue) ?: 1f
             shown = maxOf(shown, next)
             shown
         }
+        return@remember { progress.value }
     }
 }
 

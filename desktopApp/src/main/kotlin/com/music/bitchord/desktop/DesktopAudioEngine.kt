@@ -1129,14 +1129,13 @@ class DesktopPlaybackEngine internal constructor(
         val track = current
         if (track == null || paused) {
             if (paused) sink.pause()
-            sampleVisual(playing = false)
-            loopRuntime?.let(::loopPosition)
+            val loop = loopRuntime
+            if (loop != null) loopPosition(loop) else sampleVisual(playing = false)
             if (paused && fadeRemaining > 0) publishBlend(playing = false)
             java.util.concurrent.locks.LockSupport.parkNanos(20_000_000L)
             return
         }
         sink.resume()
-        sampleVisual(playing = true)
 
         loopRuntime?.let { runtime ->
             if (!automixEnabled || DesktopListenTogether.state.value.inParty || playbackSpeed != 1f || skipSilenceEnabled || !loopWordsClear(runtime)) {
@@ -1147,6 +1146,7 @@ class DesktopPlaybackEngine internal constructor(
             renderLoop(runtime)
             return
         }
+        sampleVisual(playing = true)
         val block = readCurrent(track)
         val count = currentReadCount
         if (block == null) {
@@ -1342,6 +1342,10 @@ class DesktopPlaybackEngine internal constructor(
         val channels = sink.format.channels.coerceAtLeast(1)
         val plan = activePlan
         val subBlock = TransitionFilter.GLIDE_FRAMES * channels
+        val echo = transitionEcho?.takeIf { plan != null && plan.echoSeconds > 0.0 }
+        val echoAt = if (echo != null) DesktopTransitionRide.echoAt(checkNotNull(plan)) else 0f
+        val echoFrom = if (echo != null) DesktopTransitionRide.echoFrom(checkNotNull(plan)) else 0f
+        val echoKill = if (echo != null) DesktopTransitionRide.echoKill(checkNotNull(plan)) else 1f
 
         var index = 0
         while (index < count) {
@@ -1365,19 +1369,14 @@ class DesktopPlaybackEngine internal constructor(
             } else 1f / kotlin.math.sqrt((outgoingLevel + into).coerceAtLeast(1f))
             val stop = minOf(count, index + subBlock)
             val span = stop - index
+            val delay = echo?.takeIf { progress >= echoFrom }
+            val send = if (delay == null || progress >= echoAt) 0f
+                else ((progress - echoFrom) / (echoAt - echoFrom)).coerceIn(0f, 1f)
+            val dry = if (delay == null) 1f else 1f - ((progress - echoAt) / echoKill).coerceIn(0f, 1f)
             while (index < stop) {
                 val channel = index % channels
-                var leaving = outgoingFilter.filter(channel, block[index])
-                if (plan != null && plan.echoSeconds > 0.0) {
-                    val echoAt = DesktopTransitionRide.echoAt(plan)
-                    val echoFrom = DesktopTransitionRide.echoFrom(plan)
-                    if (progress >= echoFrom) {
-                        val send = if (progress >= echoAt) 0f else ((progress - echoFrom) / (echoAt - echoFrom)).coerceIn(0f, 1f)
-                        val kill = DesktopTransitionRide.echoKill(plan)
-                        val dry = (1f - ((progress - echoAt) / kill).coerceIn(0f, 1f))
-                        leaving = transitionEcho?.process(leaving, send, dry) ?: leaving
-                    }
-                }
+                val filtered = outgoingFilter.filter(channel, block[index])
+                val leaving = delay?.process(filtered, send, dry) ?: filtered
                 val arriving = if (index < otherCount) {
                     incomingFilter.filter(channel, other!![index])
                 } else {
@@ -1809,18 +1808,20 @@ class DesktopPlaybackEngine internal constructor(
         val last = DesktopPlayerSettings.smartMixBlend.value
         if (last != null && !playing && !last.playing) return
         val listenerSpeed = playbackSpeed.toDouble().takeIf { it > 0.0 } ?: 1.0
-        val outgoingHeardUs = _state.value.let { state ->
-            if (state.song?.videoId == track.song.videoId) state.positionMs * 1_000 else null
-        } ?: outgoingHeardUs()
-        val sides = listOf(
-            Triple(analysisFor(track.song.videoId), outgoingHeardUs, listenerSpeed * track.tempoRate),
-            Triple(analysisFor(incoming.song.videoId), incomingHeardUs(incoming), listenerSpeed * incoming.tempoRate),
-        ).let { if (displaySwitched) it.reversed() else it }
-        val side = sides.firstOrNull { (analysis, _, _) -> analysis.beatInterval > 0.0 || analysis.bpm > 0.0 }
+        val preferred = if (displaySwitched) incoming else track
+        val other = if (displaySwitched) track else incoming
+        val preferredGrid = analysisFor(preferred.song.videoId)
+        val side = if (preferredGrid.beatInterval > 0.0 || preferredGrid.bpm > 0.0) preferred else other
+        val analysis = if (side === preferred) preferredGrid else analysisFor(other.song.videoId)
         var beatMs = 0f
         var anchor = 0L
-        if (side != null) {
-            val (analysis, heardUs, speed) = side
+        if (analysis.beatInterval > 0.0 || analysis.bpm > 0.0) {
+            val speed = listenerSpeed * side.tempoRate
+            val heardUs = if (side === incoming) incomingHeardUs(incoming) else {
+                _state.value.let { state ->
+                    if (state.song?.videoId == track.song.videoId) state.positionMs * 1_000 else null
+                } ?: outgoingHeardUs()
+            }
             val beat = if (analysis.beatInterval > 0.0) analysis.beatInterval else 60.0 / analysis.bpm
             val sinceBeat = ((heardUs / 1_000_000.0 - analysis.firstBeat) % beat + beat) % beat
             beatMs = (beat * 1000.0 / speed).toFloat()
@@ -1836,7 +1837,7 @@ class DesktopPlaybackEngine internal constructor(
             (DesktopPlayerSettings.automixArtwork.value || DesktopPlayerSettings.automixMiniArtwork.value)
 
     private fun sampleVisual(playing: Boolean) {
-        if (visual.state.value != null) visual.sample(sink.framesPlayed(), framesWritten, playing)
+        if ((visual.state.value?.rate ?: 0) > 0) visual.sample(sink.framesPlayed(), framesWritten, playing)
     }
 
     /** The outgoing track's heard position, from the sink's clock — [publishPosition]'s sum. */
@@ -2522,12 +2523,14 @@ class DesktopPlaybackEngine internal constructor(
 
     private fun loopPosition(runtime: LoopPlayback) {
         val clock = runtime.session.clock
-        if (sink.framesPlayed() < runtime.sinkStart) {
-            val position = playhead.at(sink.framesPlayed()) / 1000
+        val played = sink.framesPlayed()
+        visual.sample(played, framesWritten, playing = !paused)
+        if (played < runtime.sinkStart) {
+            val position = playhead.at(played) / 1000
             _state.update { it.copy(positionMs = position, positionSampledAtNanos = System.nanoTime(), mixing = false) }
             return
         }
-        val seconds = ((sink.framesPlayed() - runtime.sinkStart).coerceAtLeast(0L)).toDouble() / runtime.session.sampleRate
+        val seconds = (played - runtime.sinkStart).toDouble() / runtime.session.sampleRate
         val incoming = seconds >= clock.handoffAt
         if (DesktopPlayerSettings.showNerdStats.value) {
             val beat = clock.beatAt(seconds).first

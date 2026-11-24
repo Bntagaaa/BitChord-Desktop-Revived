@@ -17,10 +17,11 @@ internal class DesktopTransitionEcho(private val sampleRate: Int, channels: Int)
     }
 
     fun process(sample: Float, send: Float, dry: Float): Float {
-        val read = Math.floorMod(cursor - delaySamples, ring.size)
-        val delayed = ring[read]
+        val read = cursor - delaySamples
+        val delayed = ring[if (read < 0) read + ring.size else read]
         ring[cursor] = sample * send + delayed * FEEDBACK
-        cursor = (cursor + 1) % ring.size
+        cursor++
+        if (cursor == ring.size) cursor = 0
         return sample * dry + delayed * WET
     }
 
