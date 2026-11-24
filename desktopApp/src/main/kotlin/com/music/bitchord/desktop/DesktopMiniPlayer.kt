@@ -9,8 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -33,12 +33,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,16 +54,20 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -93,6 +96,7 @@ internal data class DesktopMiniPlayerMenuActions(
     val enabled: Boolean,
     val transportInMenu: Boolean,
     val panelsInMenu: Boolean,
+    val secondaryInMenu: Boolean,
     val shuffle: Boolean,
     val repeatMode: DesktopRepeatMode,
     val sidePanel: DesktopSidePanel?,
@@ -102,8 +106,10 @@ internal data class DesktopMiniPlayerMenuActions(
     val onOpenQueue: () -> Unit,
     val onOpenPip: () -> Unit,
     val onOpenDetails: () -> Unit,
-    val onOpenAudioOutput: () -> Unit,
-)
+) {
+    // Audio output is always a dedicated toolbar control, never overflow-only.
+    val hasOverflow: Boolean get() = transportInMenu || panelsInMenu || secondaryInMenu
+}
 
 @Composable
 internal fun DesktopMiniPlayer(
@@ -139,11 +145,13 @@ internal fun DesktopMiniPlayer(
     val dockSurface = if (DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.FLOATING_PLAYER)) {
         Modifier.desktopBarGlass(shape, DesktopBlurArea.FLOATING_PLAYER)
     } else {
-        Modifier.background(DesktopTheme.palette.floatingPlayerSurface, shape)
+        Modifier
+            .background(DesktopTheme.palette.floatingPlayerSurface, shape)
+            .border(0.5.dp, DesktopBarEdge, shape)
     }
     Surface(
         modifier = Modifier
-            .widthIn(max = 736.dp)
+            .widthIn(max = 760.dp)
             .fillMaxWidth()
             // The shadow precedes clipping so it remains outside the capsule.
             .shadow(16.dp, shape, clip = false,
@@ -156,23 +164,24 @@ internal fun DesktopMiniPlayer(
                 Color.Transparent,
                 Color.Black.copy(alpha = if (DesktopTheme.isDark) 0.055f else 0.025f),
             )))
-            .border(1.dp, foreground.copy(alpha = if (DesktopTheme.isDark) 0.20f else 0.14f), shape)
             .hoverable(dockInteraction)
             .testTag("mini-player"),
         shape = shape,
         color = Color.Transparent,
         tonalElevation = 0.dp,
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth().height(64.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().height(58.dp)) {
             val compact = maxWidth < 640.dp
             val panelsInMenu = maxWidth < 440.dp
-            val showArtwork = maxWidth >= 380.dp
-            val buttonSize = if (compact) 30.dp else 36.dp
-            var outputAnchor by remember { mutableStateOf<Rect?>(null) }
+            val secondaryInMenu = maxWidth < 450.dp
+            val showArtwork = maxWidth >= 380.dp && (song?.isVideo != true || maxWidth >= 480.dp)
+            val transportSize = if (compact) 28.dp else 34.dp
+            val toolSize = if (compact) 28.dp else 32.dp
             val menuActions = DesktopMiniPlayerMenuActions(
                 enabled = song != null,
                 transportInMenu = compact,
                 panelsInMenu = panelsInMenu,
+                secondaryInMenu = secondaryInMenu,
                 shuffle = shuffle,
                 repeatMode = repeatMode,
                 sidePanel = sidePanel,
@@ -182,26 +191,25 @@ internal fun DesktopMiniPlayer(
                 onOpenQueue = onOpenQueue,
                 onOpenPip = onOpenPip,
                 onOpenDetails = onOpenDetails,
-                onOpenAudioOutput = { outputAnchor?.let(onOpenAudioOutput) },
             )
             Row(
-                Modifier.fillMaxSize().padding(horizontal = if (compact) 12.dp else 16.dp),
+                Modifier.fillMaxSize().padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp),
                 ) {
-                    if (!compact) DesktopToolbarButton(onClick = { onShuffleChange(!shuffle) }, size = buttonSize) {
+                    if (!compact) DesktopToolbarButton(onClick = { onShuffleChange(!shuffle) }, size = transportSize) {
                         Icon(painterResource(Res.drawable.player_transport_shuffle), "Shuffle",
                             tint = if (shuffle) DesktopAccent else DesktopSecondary, modifier = Modifier.size(30.dp))
                     }
-                    DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = buttonSize) {
+                    DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = transportSize) {
                         Icon(painterResource(Res.drawable.player_transport_previous), "Previous",
                             tint = if (previousEnabled) foreground else DesktopSecondary.copy(alpha = 0.4f),
                             modifier = Modifier.size(28.dp))
                     }
-                    DesktopToolbarButton(onClick = onPlayPause, enabled = song != null, size = buttonSize) {
+                    DesktopToolbarButton(onClick = onPlayPause, enabled = song != null, size = transportSize) {
                         if (isLoading) {
                             CircularProgressIndicator(Modifier.size(18.dp), color = foreground, strokeWidth = 2.dp)
                         } else {
@@ -209,29 +217,29 @@ internal fun DesktopMiniPlayer(
                                 if (isPlaying) "Pause" else "Play", tint = foreground, modifier = Modifier.size(32.dp))
                         }
                     }
-                    DesktopToolbarButton(onClick = onNext, enabled = song != null, size = buttonSize) {
+                    DesktopToolbarButton(onClick = onNext, enabled = song != null, size = transportSize) {
                         Icon(painterResource(Res.drawable.player_transport_next), "Next", tint = foreground, modifier = Modifier.size(28.dp))
                     }
-                    if (!compact) DesktopToolbarButton(onClick = { onRepeatModeChange(repeatMode.next()) }, size = buttonSize) {
+                    if (!compact) DesktopToolbarButton(onClick = { onRepeatModeChange(repeatMode.next()) }, size = transportSize) {
                         Icon(painterResource(if (repeatMode == DesktopRepeatMode.ONE) Res.drawable.player_transport_repeat_one
                             else Res.drawable.player_transport_repeat), "Repeat ${repeatMode.label()}",
                             tint = if (repeatMode == DesktopRepeatMode.OFF) DesktopSecondary else DesktopAccent,
                             modifier = Modifier.size(32.dp))
                     }
                 }
-                Spacer(Modifier.width(if (compact) 8.dp else 22.dp))
+                Spacer(Modifier.width(if (compact) 8.dp else 14.dp))
                 if (song == null) {
                     Spacer(Modifier.weight(1f))
                 } else {
                     DesktopMiniPlayerTrack(song, progress, showArtwork, dockHovered, onExpand,
                         Modifier.weight(1f))
                 }
-                Spacer(Modifier.width(if (compact) 8.dp else 12.dp))
+                Spacer(Modifier.width(8.dp))
                 DesktopMiniPlayerTools(
                     song = song, liked = liked, onToggleLike = onToggleLike, songMenu = songMenu,
-                    actions = menuActions, buttonSize = buttonSize, volume = volume,
+                    actions = menuActions, buttonSize = toolSize, volume = volume,
                     onVolumeChange = onVolumeChange,
-                    onOutputAnchor = { outputAnchor = it },
+                    onOpenAudioOutput = onOpenAudioOutput,
                 )
             }
             if (song == null) {
@@ -295,7 +303,6 @@ private fun DesktopMiniPlayerTrack(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DesktopMiniPlayerTools(
     song: Song?,
@@ -306,23 +313,21 @@ private fun DesktopMiniPlayerTools(
     buttonSize: Dp,
     volume: Float,
     onVolumeChange: (Float) -> Unit,
-    onOutputAnchor: (Rect) -> Unit,
+    onOpenAudioOutput: (Rect) -> Unit,
 ) {
     val toolsInteraction = remember { MutableInteractionSource() }
     val toolsHovered by toolsInteraction.collectIsHoveredAsState()
     val speakerInteraction = remember { MutableInteractionSource() }
     val speakerHovered by speakerInteraction.collectIsHoveredAsState()
-    val sliderInteraction = remember { MutableInteractionSource() }
-    val dragging by sliderInteraction.collectIsDraggedAsState()
-    val sliderFocused by sliderInteraction.collectIsFocusedAsState()
+    var volumeChanging by remember { mutableStateOf(false) }
+    var sliderFocused by remember { mutableStateOf(false) }
     var speakerFocused by remember { mutableStateOf(false) }
     var showVolume by remember { mutableStateOf(false) }
     val duration = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 120
-    LaunchedEffect(toolsHovered, speakerHovered, speakerFocused, sliderFocused, dragging) {
-        if (speakerHovered || speakerFocused || sliderFocused || dragging) {
+    LaunchedEffect(toolsHovered, speakerHovered, speakerFocused, sliderFocused, volumeChanging) {
+        if (speakerHovered || speakerFocused || sliderFocused || volumeChanging) {
             showVolume = true
         } else if (!toolsHovered) {
-            // A short grace period lets the pointer cross from the speaker onto the slider.
             delay(160)
             showVolume = false
         }
@@ -330,10 +335,20 @@ private fun DesktopMiniPlayerTools(
     val foreground = DesktopForeground
     val actionSlots = if (actions.panelsInMenu) 2 else 4
     Row(
-        Modifier.width(buttonSize * (actionSlots + 1)).height(40.dp)
-            .hoverable(toolsInteraction).testTag("mini-player-actions"),
+        Modifier.height(40.dp).hoverable(toolsInteraction).testTag("mini-player-actions"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Extra desktop tools stay in fixed slots outside the hover-volume swap.
+        // Preserve the original launchers, including the output picker's real anchor.
+        if (!actions.secondaryInMenu) {
+            DesktopPipLauncher(actions.onOpenPip, enabled = song != null)
+            DesktopToolbarButton(onClick = actions.onOpenDetails, size = 32.dp) {
+                Icon(Icons.Rounded.Info, "Now playing details",
+                    tint = if (actions.sidePanel == DesktopSidePanel.DETAILS) DesktopAccent else DesktopSecondary,
+                    modifier = Modifier.size(18.dp))
+            }
+        }
+        DesktopAudioOutputButton(onOpenAudioOutput)
         Box(Modifier.width(buttonSize * actionSlots).height(40.dp), contentAlignment = Alignment.CenterEnd) {
             androidx.compose.animation.AnimatedVisibility(!showVolume, enter = fadeIn(tween(duration)), exit = fadeOut(tween(duration))) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -351,7 +366,7 @@ private fun DesktopMiniPlayerTools(
                     Box(Modifier.size(buttonSize), contentAlignment = Alignment.Center) {
                         if (song != null && songMenu != null) {
                             songMenu(actions)
-                        } else {
+                        } else if (actions.hasOverflow) {
                             DesktopMiniPlayerFallbackMenu(song != null, actions, buttonSize)
                         }
                     }
@@ -370,34 +385,52 @@ private fun DesktopMiniPlayerTools(
                 }
             }
             androidx.compose.animation.AnimatedVisibility(showVolume, enter = fadeIn(tween(duration)), exit = fadeOut(tween(duration))) {
-                Slider(
-                    value = volume.coerceIn(0f, 1f), onValueChange = onVolumeChange,
-                    interactionSource = sliderInteraction,
-                    modifier = Modifier.widthIn(max = 116.dp).fillMaxWidth().height(36.dp)
-                        .padding(horizontal = 8.dp).testTag("mini-player-volume")
-                        .semantics { contentDescription = "Volume" },
-                    thumb = { Canvas(Modifier.size(12.dp)) { drawCircle(foreground) } },
-                    track = { slider ->
-                        Canvas(Modifier.fillMaxWidth().height(4.dp)) {
-                            val radius = CornerRadius(size.height / 2)
-                            drawRoundRect(foreground.copy(alpha = 0.22f), cornerRadius = radius)
-                            drawRoundRect(foreground,
-                                size = Size(size.width * slider.value.coerceIn(0f, 1f), size.height), cornerRadius = radius)
-                        }
+                // Reuse the original Revived thumb-free slider and its animated drag height.
+                DesktopThinSlider(
+                    value = volume,
+                    onValueChange = {
+                        volumeChanging = true
+                        onVolumeChange(it)
                     },
+                    onValueChangeFinished = { volumeChanging = false },
+                    idleHeight = 4.dp,
+                    activeHeight = 7.dp,
+                    modifier = Modifier.widthIn(max = 72.dp).fillMaxWidth()
+                        .testTag("mini-player-volume")
+                        .onFocusChanged { sliderFocused = it.isFocused }
+                        .onKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) false else {
+                                val next = when (event.key) {
+                                    Key.DirectionLeft, Key.DirectionDown -> volume - 0.05f
+                                    Key.DirectionRight, Key.DirectionUp -> volume + 0.05f
+                                    Key.MoveHome -> 0f
+                                    Key.MoveEnd -> 1f
+                                    else -> null
+                                }
+                                if (next == null) false else {
+                                    onVolumeChange(next.coerceIn(0f, 1f))
+                                    true
+                                }
+                            }
+                        }
+                        .focusable()
+                        .semantics {
+                            contentDescription = "Volume"
+                            progressBarRangeInfo = ProgressBarRangeInfo(volume.coerceIn(0f, 1f), 0f..1f)
+                            setProgress { onVolumeChange(it.coerceIn(0f, 1f)); true }
+                        },
                 )
             }
         }
-        // Click retains Revived's output picker; hover/focus exposes the persisted volume slider.
+        // Volume and audio output have separate direct controls.
         DesktopToolbarButton(
-            onClick = actions.onOpenAudioOutput, size = buttonSize,
+            onClick = { showVolume = true }, size = buttonSize,
             modifier = Modifier.hoverable(speakerInteraction)
                 .onFocusChanged { speakerFocused = it.isFocused }
-                .onGloballyPositioned { onOutputAnchor(it.boundsInRoot()) }
                 .testTag("mini-player-volume-button"),
         ) {
             Icon(if (volume <= 0f) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp,
-                DesktopStrings["audio_output", "Audio output"], tint = foreground.copy(alpha = 0.88f), modifier = Modifier.size(24.dp))
+                "Volume control", tint = foreground.copy(alpha = 0.88f), modifier = Modifier.size(24.dp))
         }
     }
 }

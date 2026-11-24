@@ -81,6 +81,12 @@ class DesktopMiniPlayerLayoutTest {
                 .fetchSemanticsNode().boundsInRoot
             val tools = onNodeWithTag("mini-player-actions").fetchSemanticsNode().boundsInRoot
             onNodeWithContentDescription("Lyrics").assertIsDisplayed()
+            val directLabels = listOf("Picture in picture", "Now playing details", DesktopStrings["audio_output", "Audio output"])
+            val directBounds = directLabels.associateWith { label ->
+                onNodeWithContentDescription(label).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            }
+            assertEquals(760f, dock.width, 1f)
+            assertEquals(58f, dock.height, 1f)
             assertEquals(track.left, progress.left, 1f)
             assertEquals(track.right, progress.right, 1f)
             assertTrue(progress.left > dock.left && progress.right < tools.left,
@@ -93,6 +99,9 @@ class DesktopMiniPlayerLayoutTest {
             val slider = onNodeWithTag("mini-player-volume")
             slider.assertIsDisplayed()
             onNodeWithContentDescription("Lyrics").assertDoesNotExist()
+            directBounds.forEach { (label, bounds) ->
+                assertEquals(bounds, onNodeWithContentDescription(label).assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
+            }
             slider.performMouseInput { moveTo(center) }
             mainClock.advanceTimeBy(250)
             slider.assertIsDisplayed()
@@ -118,15 +127,17 @@ class DesktopMiniPlayerLayoutTest {
                 moveTo(Offset(center.x * 1.5f, center.y))
                 release()
             }
-            speaker.performMouseInput { click(center) }
+            onNodeWithContentDescription("Picture in picture").performMouseInput { click(center) }
+            onNodeWithContentDescription("Now playing details").performMouseInput { click(center) }
+            onNodeWithContentDescription(DesktopStrings["audio_output", "Audio output"]).performMouseInput { click(center) }
             runOnIdle {
                 assertTrue(events.volume > 0.6f, "Dragging the visible slider must change playback volume")
-                assertEquals(listOf("audio"), events.actions)
+                assertEquals(listOf("pip", "details", "audio"), events.actions)
                 val anchor = assertNotNull(events.outputAnchor)
                 assertTrue(anchor.width > 0f && anchor.left >= tools.left && anchor.right <= dock.right)
             }
             onNodeWithTag("mini-player-track").performMouseInput { click(center) }
-            runOnIdle { assertEquals(listOf("audio", "expand"), events.actions) }
+            runOnIdle { assertEquals(listOf("pip", "details", "audio", "expand"), events.actions) }
         }
 
     @Test
@@ -148,7 +159,7 @@ class DesktopMiniPlayerLayoutTest {
                     }
                 }
                 val labels = listOf("Shuffle", "Repeat Off", "Lyrics", "Queue",
-                    "Picture in picture", "Now playing details", "Audio output")
+                    "Picture in picture", "Now playing details")
                 onNodeWithContentDescription("More options").performMouseInput { click() }
                 labels.forEach { onNodeWithText(it).assertIsDisplayed() }
                 save(onRoot().captureToImage(), if (withSongMenu) "narrow-song-menu.png" else "narrow-player-menu.png")
@@ -157,6 +168,7 @@ class DesktopMiniPlayerLayoutTest {
                     onNodeWithContentDescription("More options").performMouseInput { click() }
                     onNodeWithText(label).assertIsDisplayed().performMouseInput { click() }
                 }
+                onNodeWithContentDescription(DesktopStrings["audio_output", "Audio output"]).assertIsDisplayed().performMouseInput { click(center) }
                 runOnIdle {
                     assertTrue(events.shuffle)
                     assertEquals(DesktopRepeatMode.ALL, events.repeatMode)
@@ -180,9 +192,9 @@ class DesktopMiniPlayerLayoutTest {
         val originalPitchBlack = DesktopTheme.pitchBlack
         val artwork = DesktopPipUiTest.fixtureArtwork()
         val variants = listOf(
-            Variant(736, 1f), Variant(736, 1f, light = true), Variant(736, 1f, empty = true),
+            Variant(760, 1f), Variant(760, 1f, light = true), Variant(760, 1f, empty = true),
             Variant(480, 1f), Variant(360, 1f),
-            Variant(736, 1.25f), Variant(480, 1.25f), Variant(360, 1.25f),
+            Variant(760, 1.25f), Variant(480, 1.25f), Variant(360, 1.25f),
         )
         try {
             DesktopTheme.updatePitchBlack(false)
@@ -204,7 +216,7 @@ class DesktopMiniPlayerLayoutTest {
                     }
                     val dock = onNodeWithTag("mini-player").fetchSemanticsNode().boundsInRoot
                     assertEquals(variant.width * variant.scale, dock.width, 1f)
-                    assertEquals(64f * variant.scale, dock.height, 1f)
+                    assertEquals(58f * variant.scale, dock.height, 1f)
                     val tools = onNodeWithTag("mini-player-actions").fetchSemanticsNode().boundsInRoot
                     assertTrue(tools.left >= dock.left && tools.right <= dock.right)
                     if (song == null) {
@@ -221,6 +233,11 @@ class DesktopMiniPlayerLayoutTest {
                         assertTrue(title.left >= track.left && title.right <= track.right + 1f)
                         onNodeWithContentDescription("Like").assertIsDisplayed()
                         onNodeWithContentDescription("More options").assertIsDisplayed()
+                        onNodeWithContentDescription(DesktopStrings["audio_output", "Audio output"]).assertIsDisplayed()
+                        if (variant.width >= 450) {
+                            onNodeWithContentDescription("Picture in picture").assertIsDisplayed()
+                            onNodeWithContentDescription("Now playing details").assertIsDisplayed()
+                        }
                     }
                     save(onRoot().captureToImage(), variant.filename)
                 }
@@ -245,7 +262,7 @@ class DesktopMiniPlayerLayoutTest {
     }
 
     @Composable
-    private fun PlayerFixture(events: PlayerEvents, song: Song? = longSong, withSongMenu: Boolean = false) {
+    private fun PlayerFixture(events: PlayerEvents, song: Song? = longSong, withSongMenu: Boolean = true) {
         var menuOpen by remember { mutableStateOf(false) }
         val menu: (@Composable (DesktopMiniPlayerMenuActions) -> Unit)? = if (song != null && withSongMenu) {
             { miniActions ->

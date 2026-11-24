@@ -39,7 +39,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.HighQuality
-import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.Person
@@ -293,7 +292,7 @@ internal fun DesktopSongMenu(
             return@DesktopMenuSurface
         }
 
-        miniPlayerActions?.let { actions ->
+        miniPlayerActions?.takeIf { it.hasOverflow }?.let { actions ->
             DesktopMiniPlayerMenuItems(actions, onDismiss)
             DesktopMenuDivider()
         }
@@ -416,7 +415,7 @@ internal fun DesktopMiniPlayerMenuItems(
             label = "Repeat ${actions.repeatMode.label()}",
             selected = actions.repeatMode != DesktopRepeatMode.OFF,
         ) { dispatch { actions.onRepeatModeChange(actions.repeatMode.next()) } }
-        DesktopMenuDivider()
+        if (actions.panelsInMenu || actions.secondaryInMenu) DesktopMenuDivider()
     }
     if (actions.panelsInMenu) {
         DesktopMenuRow(
@@ -429,22 +428,20 @@ internal fun DesktopMiniPlayerMenuItems(
             label = "Queue",
             selected = actions.sidePanel == DesktopSidePanel.QUEUE,
         ) { dispatch(actions.onOpenQueue) }
-        DesktopMenuDivider()
+        if (actions.secondaryInMenu) DesktopMenuDivider()
     }
-    DesktopMenuRow(
-        icon = Icons.Rounded.PictureInPictureAlt,
-        label = "Picture in picture",
-        enabled = actions.enabled,
-    ) { dispatch(actions.onOpenPip) }
-    DesktopMenuRow(
-        icon = Icons.Rounded.Info,
-        label = "Now playing details",
-        selected = actions.sidePanel == DesktopSidePanel.DETAILS,
-    ) { dispatch(actions.onOpenDetails) }
-    DesktopMenuRow(
-        icon = Icons.Rounded.Headphones,
-        label = DesktopStrings["audio_output", "Audio output"],
-    ) { dispatch(actions.onOpenAudioOutput) }
+    if (actions.secondaryInMenu) {
+        DesktopMenuRow(
+            icon = Icons.Rounded.PictureInPictureAlt,
+            label = "Picture in picture",
+            enabled = actions.enabled,
+        ) { dispatch(actions.onOpenPip) }
+        DesktopMenuRow(
+            icon = Icons.Rounded.Info,
+            label = "Now playing details",
+            selected = actions.sidePanel == DesktopSidePanel.DETAILS,
+        ) { dispatch(actions.onOpenDetails) }
+    }
 }
 
 
