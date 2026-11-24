@@ -767,7 +767,12 @@ internal fun DesktopSettingsScreen(
     }
 
     sections.section(APP_UPDATES) {
-        updater?.let { updateSettingsRows(it) }
+        updater?.let { service ->
+            val state by service.state.collectAsState()
+            val auto by service.autoCheck.collectAsState()
+            val checked by service.lastCheck.collectAsState()
+            updateSettingsRows(service, state, auto, checked)
+        }
     }
 
     val overview = page == MAIN && !searching

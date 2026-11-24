@@ -4945,7 +4945,7 @@ internal fun BitChordDesktopApp(
                         // Settings and its pages stand in for the page, held to the width the
                         // Settings card had. Its prompts are still cards, over the page.
                         overlays.settingsPage != null -> Box(
-                            Modifier.fillMaxSize().padding(bottom = contentPadding.calculateBottomPadding()),
+                            Modifier.fillMaxSize(),
                         ) {
                             val page = requireNotNull(overlays.settingsPage)
                             val stateKey = "$settingsSession:${page.name}"

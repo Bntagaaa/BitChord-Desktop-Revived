@@ -21,11 +21,12 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-@Composable
-internal fun DesktopSettingsRows.updateSettingsRows(service: DesktopUpdateService) {
-    val state by service.state.collectAsState()
-    val auto by service.autoCheck.collectAsState()
-    val checked by service.lastCheck.collectAsState()
+internal fun DesktopSettingsRows.updateSettingsRows(
+    service: DesktopUpdateService,
+    state: DesktopUpdateState,
+    auto: Boolean,
+    checked: Long,
+) {
     val version = DesktopUpdateChecker.currentVersion
     row("Current version", version, "release build") {
         DesktopSettingsRow("Current version", subtitle = version)
