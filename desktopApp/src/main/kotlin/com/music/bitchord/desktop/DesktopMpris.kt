@@ -98,6 +98,8 @@ internal class DesktopMprisController(
     private var publishedLoopStatus = "None"
     private var publishedRate = 1.0
     private var publishedVolume = 1.0
+    private var publishedDurationMs = 0L
+    private var publishedCapabilities: Map<String, Boolean> = emptyMap()
 
     fun start() {
         if (!isLinux() || synchronized(lock) { started }) return
@@ -154,9 +156,18 @@ internal class DesktopMprisController(
             currentConnection = connection ?: return
             val playbackStatus = playbackStatus(state)
             changed = linkedMapOf()
-            if (force || publishedSongId != state.song?.videoId) {
+            // The length arrives after the track opens, so a change of duration re-sends the metadata too.
+            if (force || publishedSongId != state.song?.videoId || publishedDurationMs != state.durationMs) {
                 changed["Metadata"] = variant(metadata(state.song), "a{sv}")
             }
+            // Clients such as Plasma's media widget read the Can* properties once and then rely on
+            // PropertiesChanged, so a player that starts with no track must announce when they flip.
+            val capabilities = capabilities()
+            capabilities.forEach { (name, value) ->
+                if (force || publishedCapabilities[name] != value) changed[name] = variant(value)
+            }
+            publishedCapabilities = capabilities
+            publishedDurationMs = state.durationMs
             if (force || publishedPlaybackStatus != playbackStatus) {
                 changed["PlaybackStatus"] = variant(playbackStatus)
             }
@@ -217,19 +228,23 @@ internal class DesktopMprisController(
                 "Rate" to variant(rate),
                 "Shuffle" to variant(shuffle),
                 "Volume" to variant(state.volume.toDouble().coerceIn(0.0, 1.0)),
-                "Position" to variant(state.positionMs.coerceAtLeast(0L) * 1_000L),
+                "Position" to variant(videoClockPosition(state, rate.toFloat()).coerceAtLeast(0L) * 1_000L),
                 "MinimumRate" to variant(0.25),
                 "MaximumRate" to variant(3.0),
-                "CanGoNext" to variant(state.song != null),
-                "CanGoPrevious" to variant(state.song != null),
-                "CanPlay" to variant(state.song != null && state.error == null),
-                "CanPause" to variant(state.song != null),
-                "CanSeek" to variant(state.song != null && durationMs(state.song, state.durationMs) > 0L),
                 "CanControl" to variant(true),
-            )
+            ).also { properties -> capabilities().forEach { (name, value) -> properties[name] = variant(value) } }
         }
         else -> unknownProperty(interfaceName, "")
     }
+
+    /** The Can* flags that depend on the current track; callers hold [lock]. */
+    private fun capabilities(): Map<String, Boolean> = linkedMapOf(
+        "CanGoNext" to (state.song != null),
+        "CanGoPrevious" to (state.song != null),
+        "CanPlay" to (state.song != null && state.error == null),
+        "CanPause" to (state.song != null),
+        "CanSeek" to (state.song != null && durationMs(state.song, state.durationMs) > 0L),
+    )
 
     private fun setProperty(interfaceName: String, propertyName: String, value: Any?) {
         val unwrapped = (value as? Variant<*>)?.value ?: value
