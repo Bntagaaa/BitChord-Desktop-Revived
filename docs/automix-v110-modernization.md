@@ -32,15 +32,15 @@ The existing canonical hash verifier flagged `AnalysisStore.kt` in the baseline.
 
 | Measurement | Desktop 1.10 | Modernized |
 | --- | ---: | ---: |
-| Linux x86_64 app image, bytes | 499,331,449 | 433,353,444 |
+| Linux x86_64 app image, bytes | 499,331,449 | 433,353,714 |
 | ONNX Runtime JAR on Linux, bytes | 54,400,660 | 11,026,323 |
 | Linux CPU runtime binary, bytes | 28,497,752 | 28,497,752 |
 | First viewable X11 window, median of three fresh profiles | 4.31 s | 3.32 s |
-| Windows MSI workflow artifact, bytes | 340,311,614 | 269,649,968 |
-| Windows setup EXE workflow artifact, bytes | 340,355,929 | 269,692,557 |
-| Windows portable workflow artifact, bytes | 338,675,389 | 268,047,561 |
+| Windows MSI workflow artifact, bytes | 340,311,614 | 269,651,959 |
+| Windows setup EXE workflow artifact, bytes | 340,355,929 | 269,697,012 |
+| Windows portable workflow artifact, bytes | 338,675,389 | 268,049,476 |
 
-The Windows values are the GitHub Actions archive sizes from the baseline and the packaged 129f0858 revision. [Baseline Windows packages](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/45338994376) · [Modernized Windows packages](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/45339680252)
+The Windows values are the GitHub Actions archive sizes from the baseline and the packaged 018c7057 revision. [Baseline Windows packages](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/45338994376) · [Modernized Windows packages](https://github.com/Bntagaaa/BitChord-Desktop-Revived/actions/runs/45341322488)
 
 The two Linux CPU and JNI binary hashes matched between the full and target-only JARs. On the standalone synthetic-tensor probe both model output signatures matched. The retained-memory columns are process RSS. They include the JVM, runtime allocator, and other native allocations.
 
@@ -76,7 +76,7 @@ The comparison used a Linux x86_64 AMD EPYC VM with the test processes restricte
 | First pair plan | 11.66 s | 11.42 s | DJ filter / DJ filter |
 | Median saved-analysis lookup | 2.58 ms | 2.96 ms | — |
 
-The modernized 120 BPM run recorded 239 ms to structurally decode, 106 ms to extract DSP features, 122 ms to decode model regions, and 220 ms for beat resampling. Beat windows took 4,503 ms and vocal windows took 1,096 ms including model front ends. These local inputs required zero HTTP retrieval. The loopback HTTP regression fetched one range for playback, reused it for AutoMix, and fetched again only for a different source key. Release asset HTTP retrieval and hash verification were also exercised independently.
+The modernized 120 BPM run recorded 239 ms to structurally decode, 106 ms to extract DSP features, 122 ms to decode model regions, and 220 ms for beat resampling. Beat windows took 4,503 ms and vocal windows took 1,096 ms including model front ends. These local inputs required zero HTTP retrieval. The loopback HTTP regression fetched one range for playback, reused it for AutoMix, and fetched again only for a different source key. A fresh packaged app with AutoMix enabled installed both pinned release weights in 5.3 s from process launch, verified their hashes, and reopened with an unreachable proxy while keeping both file timestamps unchanged.
 
 The recordings exercise sung vocals, steady instrumental rhythm, tempo variation, and two decoder formats. They have no annotated downbeat ground truth. The native analyser probe found 120.003 BPM with ordered downbeats and valid resampled PCM. Neural head and tail accuracy on real material requires annotated input. The measured CPU bottleneck remains Beat This! inference. Smaller input windows, a different inference profile, or different grid alignment would change planner evidence and need a separate parity test.
 
@@ -84,7 +84,9 @@ The recordings exercise sung vocals, steady instrumental rhythm, tempo variation
 
 The accelerated collecting-sink test processed 30 minutes of PCM through FFmpeg, the native desktop mixer and the overlap handoff. Both revisions produced 49 ordered handoffs, with the same 0.252 peak and 355,250 near-zero equivalent frames across approximately 80 million frames submitted. Baseline final RSS was 218,256 KiB and modernized final RSS was 217,728 KiB. Process CPU usage was 11.6% on each run with one core as 100%. This exercises real decoding and mixing with a synthetic source and injected beat evidence.
 
-Other checks exercise rapid skipping, obsolete queue and network opens, pause/resume, seek, speed and device reconfiguration, six consecutive handoffs, rendered loop seams, digest mismatch, interrupted downloads, cache restoration and Skia masking. The artwork integration test renders the old Canvas snapshot until the audio reveal window, verifies both incoming and outgoing colors during the mask, then checks cancellation restores the live surface.
+The same test at nominal playback speed processed 1,800.1 seconds of PCM in 1,795.4 wall-clock seconds. It completed 49 ordered handoffs at 1.45% process CPU on a one-core scale. Final RSS was 204,140 KiB and peak RSS was 205,344 KiB. JVM Native Memory Tracking reported 179,117 KiB committed after warm-up and 178,933 KiB late in the run, each including 66,560 KiB of committed Java heap. This evidence is scoped to the PCM test and does not isolate third-party native allocations.
+
+Other checks exercise rapid skipping, obsolete queue and network opens, pause/resume, seek, speed and device reconfiguration, six consecutive handoffs, native loop handover position within 2 ms of its model, digest mismatch, interrupted downloads, cache restoration and Skia masking. The artwork integration test renders the old Canvas snapshot until the audio reveal window, verifies both incoming and outgoing colors during the mask, then checks cancellation restores the live surface.
 
 The software Skia probe rendered 49 organic dissolves, 156 frames each, at 320 × 320. Evaluating the noise field in the fragment shader took 31.82 ms median and 36.60 ms at p95. Sampling the same field from a small texture reduced those to 3.23 ms and 3.87 ms. The probe measures draw time on a software canvas. GPU display presentation and full-size video composition have separate costs.
 
@@ -98,6 +100,7 @@ Build the baseline from `acf101ac` and the branch with the same JDK and Gradle c
 
 ```bash
 python tools/automix-validation/verify-upstream.py
+./gradlew -p tools/automix-validation test
 ./gradlew :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test
 ./gradlew :desktopApp:createDistributable
 bash desktopApp/packaging/tests/linux-automix-check.sh
