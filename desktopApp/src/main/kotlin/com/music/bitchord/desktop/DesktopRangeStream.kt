@@ -19,6 +19,7 @@ internal class DesktopRangeStream(
     cacheIdentity: String = "",
     private val cache: DesktopAudioCache = DesktopAudioCache.shared,
     private val cancelled: () -> Boolean = { false },
+    private val networkRead: ((Long) -> Unit)? = null,
 ) {
     init { require(windowBytes in 1..DesktopAudioCache.MAX_SPAN) }
     var unsupportedRange: Boolean = false
@@ -67,12 +68,17 @@ internal class DesktopRangeStream(
         headers.forEach { (name, value) -> runCatching { request.header(name, value) } }
         request.setHeader("Range", "bytes=$start-$end").setHeader("Accept-Encoding", "identity")
         if (cancelled() || Thread.currentThread().isInterrupted) return false
+        val started = if (networkRead != null) System.nanoTime() else 0L
         val response = try {
             client.send(request.GET().build(), boundedBody(windowBytes) { unsupportedRange = true })
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             return false
-        } catch (_: Exception) { return false }
+        } catch (_: Exception) {
+            return false
+        } finally {
+            networkRead?.invoke(System.nanoTime() - started)
+        }
         if (response.statusCode() !in listOf(200, 206)) {
             StreamResolver.onPlaybackRefused(url, response.statusCode())
             return false

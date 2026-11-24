@@ -146,6 +146,7 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         cacheIdentity: String = "",
         cancelled: () -> Boolean = { false },
         trace: DesktopPlaybackTrace? = null,
+        rangeRead: ((Long) -> Unit)? = null,
     ): Result<Unit> = runCatching {
         av_log_set_level(AV_LOG_ERROR)
         ensureNetwork()
@@ -166,7 +167,7 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         av_dict_set(options, "rw_timeout", "15000000", 0)
 
         this.trace = trace
-        val opened = if (windowed) windowedContext(url, headers, cacheIdentity, cancelled) else avformat_alloc_context()
+        val opened = if (windowed) windowedContext(url, headers, cacheIdentity, cancelled, rangeRead) else avformat_alloc_context()
         format = opened
         interrupt = object : AVIOInterruptCB.Callback_Pointer() {
             override fun call(opaque: Pointer?): Int = if (Thread.currentThread().isInterrupted || cancelled()) 1 else 0
@@ -235,7 +236,7 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
             // A large server response ignoring Range must stream through native HTTP, not be
             // buffered as an entire file in the JVM or rejected as an unsupported codec.
             open(url, headers, requested, windowed = false, transport = transport,
-                cacheIdentity = cacheIdentity, cancelled = cancelled, trace = trace).getOrThrow()
+                cacheIdentity = cacheIdentity, cancelled = cancelled, trace = trace, rangeRead = rangeRead).getOrThrow()
         } else throw failure
     }
 
@@ -295,8 +296,11 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
      * A format context reading through [DesktopRangeStream] rather than through FFmpeg's own HTTP
      * client.
      */
-    private fun windowedContext(url: String, headers: Map<String, String>, cacheIdentity: String, cancelled: () -> Boolean): AVFormatContext {
-        val source = DesktopRangeStream(url, headers, cacheIdentity = cacheIdentity, cancelled = cancelled)
+    private fun windowedContext(
+        url: String, headers: Map<String, String>, cacheIdentity: String, cancelled: () -> Boolean,
+        rangeRead: ((Long) -> Unit)?,
+    ): AVFormatContext {
+        val source = DesktopRangeStream(url, headers, cacheIdentity = cacheIdentity, cancelled = cancelled, networkRead = rangeRead)
         val scratch = ByteArray(IO_BUFFER_BYTES)
         val read = object : Read_packet_Pointer_BytePointer_int() {
             override fun call(opaque: Pointer?, buffer: BytePointer?, size: Int): Int {

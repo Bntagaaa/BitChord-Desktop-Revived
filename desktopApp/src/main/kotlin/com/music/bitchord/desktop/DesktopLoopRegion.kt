@@ -6,14 +6,21 @@ import java.util.concurrent.CancellationException
 
 /** Independent region decoder: never seeks or closes the engine's live decoder. */
 internal fun desktopLoopRegion(
-    stream: DesktopStream, from: Double, to: Double, rate: Int, abort: () -> Boolean,
+    stream: DesktopStream,
+    from: Double,
+    to: Double,
+    rate: Int,
+    cacheIdentity: String = "",
+    rangeRead: ((Long) -> Unit)? = null,
+    abort: () -> Boolean,
 ): LoopRegion? {
     if (to <= from || rate <= 0) return null
     if (abort()) throw CancellationException("Loop region preparation cancelled")
     val decoder = DesktopAudioDecoder()
     try {
         decoder.open(stream.url, stream.headers, requested = DesktopPcmFormat(rate, 2, 4, isFloat = true),
-            windowed = stream.windowedReads, transport = stream.transport).getOrThrow()
+            windowed = stream.windowedReads, transport = stream.transport,
+            cacheIdentity = cacheIdentity, cancelled = abort, rangeRead = rangeRead).getOrThrow()
         val start = from.coerceAtLeast(0.0)
         if (start > 0 && !decoder.seek((start * 1_000_000).toLong())) return null
         val actualRate = decoder.outputFormat.sampleRate
