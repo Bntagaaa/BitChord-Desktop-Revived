@@ -6,6 +6,7 @@ import com.sun.jna.NativeLong
 import com.sun.jna.Pointer
 import com.sun.jna.Structure
 import com.sun.jna.ptr.IntByReference
+import java.nio.ByteBuffer
 
 /**
  * An actual PulseAudio playback stream, also supported by PipeWire's pipewire-pulse server.
@@ -28,18 +29,21 @@ internal class DesktopLinuxPulseSink private constructor(
     val bufferBytes: Int get() = format.byteRate / 5 // Requested stream target, server may adjust.
 
     /** Only the desktop playback thread may access this connection. */
-    fun write(buffer: ByteArray, count: Int): Int {
-        if (count <= 0) return 0
-        val error = IntByReference()
-        check(api.pa_simple_write(stream, buffer, NativeLong(count.toLong()), error) >= 0) {
-            "PulseAudio write failed (code ${error.value}, sink=$outputName)"
-        }
+    private val error = IntByReference()
+
+    fun write(buffer: ByteArray, count: Int): Int =
+        if (count <= 0) 0 else recordWrite(api.pa_simple_write(stream, buffer, NativeLong(count.toLong()), error), count)
+
+    fun writeDirect(buffer: ByteBuffer, count: Int): Int =
+        if (count <= 0) 0 else recordWrite(api.pa_simple_write(stream, buffer, NativeLong(count.toLong()), error), count)
+
+    private fun recordWrite(result: Int, count: Int): Int {
+        check(result >= 0) { "PulseAudio write failed (code ${error.value}, sink=$outputName)" }
         submittedFrames += count / format.frameBytes
         return count
     }
 
     fun framesPlayed(): Long {
-        val error = IntByReference()
         val latencyMicros = api.pa_simple_get_latency(stream, error)
         if (latencyMicros >= 0) {
             val queuedFrames = (latencyMicros.toDouble() * format.sampleRate / 1_000_000.0).toLong()
@@ -50,7 +54,6 @@ internal class DesktopLinuxPulseSink private constructor(
 
     fun flush() {
         val heard = framesPlayed()
-        val error = IntByReference()
         check(api.pa_simple_flush(stream, error) >= 0) {
             "PulseAudio flush failed (code ${error.value})"
         }
@@ -60,7 +63,6 @@ internal class DesktopLinuxPulseSink private constructor(
     }
 
     fun drain() {
-        val error = IntByReference()
         check(api.pa_simple_drain(stream, error) >= 0) {
             "PulseAudio drain failed (code ${error.value})"
         }
@@ -83,6 +85,7 @@ internal class DesktopLinuxPulseSink private constructor(
         ): Pointer?
 
         fun pa_simple_write(stream: Pointer, data: ByteArray, bytes: NativeLong, error: IntByReference): Int
+        fun pa_simple_write(stream: Pointer, data: ByteBuffer, bytes: NativeLong, error: IntByReference): Int
         fun pa_simple_get_latency(stream: Pointer, error: IntByReference): Long
         fun pa_simple_flush(stream: Pointer, error: IntByReference): Int
         fun pa_simple_drain(stream: Pointer, error: IntByReference): Int

@@ -39,6 +39,8 @@ import org.jetbrains.skia.Rect
  * known, frames for the backdrop to re-tint off, the portrait fit, the bottom
  * dissolve, and a pause that keeps the last frame on screen.
  */
+internal data class AutoMixCanvasFrame(val generation: Long, val image: androidx.compose.ui.graphics.ImageBitmap)
+
 @Composable
 internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
     val canvas = spec.canvas
@@ -58,6 +60,19 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
 
     val displayingFrame = rendered && submitted.value
     LaunchedEffect(displayingFrame) { reportRendered(displayingFrame) }
+
+    val mix = rememberDesktopAutoMixPair(mini = false)
+    LaunchedEffect(presentation, displayingFrame, mix?.generation, spec.pausedForTransition) {
+        val active = mix ?: return@LaunchedEffect
+        if (!displayingFrame || spec.pausedForTransition || active.outgoing.id != spec.playbackIdentity) {
+            return@LaunchedEffect
+        }
+        // Take one bounded snapshot from the existing decoder before the player changes clips.
+        val image = presentation.sample(384) ?: return@LaunchedEffect
+        if (DesktopPlayerHost.autoMixVisual.value?.pair?.generation == active.generation) {
+            DesktopPlayerHost.autoMixCanvasFrame.value = AutoMixCanvasFrame(active.generation, image)
+        }
+    }
 
     // Sample once for each requested backdrop update. A paused or stalled clip
     // keeps its image and should not allocate a new snapshot of the same frame.

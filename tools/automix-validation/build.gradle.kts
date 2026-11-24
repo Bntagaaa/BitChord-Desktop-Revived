@@ -10,7 +10,9 @@ sourceSets {
             "com/music/bitchord/desktop/DesktopAudioSpeed.kt", "com/music/bitchord/desktop/DesktopTempoBuffer.kt",
             "com/music/bitchord/desktop/DesktopTransitionRide.kt", "com/music/bitchord/desktop/DesktopTransitionEcho.kt",
             "com/music/bitchord/desktop/DesktopPlayhead.kt", "com/music/bitchord/desktop/DesktopPcmWrite.kt")
-        kotlin.exclude("**/AnalysisStore.kt", "**/TrackFeatures.kt", "**/BeatTracker.kt", "**/MelSpectrogram.kt", "**/NativeAnalysisLibrary.kt", "**/VocalTracker.kt")
+        // These runtime adapters are exercised by :shared:jvmTest and :desktopApp:test.
+        kotlin.exclude("**/AnalysisStore.kt", "**/AutoMixSession.kt", "**/TrackFeatures.kt",
+            "**/BeatTracker.kt", "**/MelSpectrogram.kt", "**/NativeAnalysisLibrary.kt", "**/VocalTracker.kt")
     }
     test {
         kotlin.srcDirs("$repo/shared/src/commonTest/kotlin", "$repo/desktopApp/src/test/kotlin")

@@ -2088,21 +2088,24 @@ fun NowPlayingScreen(
                         // each theme its own backdrop, using the existing cached
                         // low-resolution CPU blur for Simple (and the Default fallback).
                         val backdropModifier = backgroundModifier.hazeSource(playerHaze)
-                        when (playerBackdropTheme) {
-                            PlayerTheme.DEFAULT ->
-                                if (artMesh != null) {
-                                    ArtworkMeshBackdrop(
-                                        mesh = artMesh,
-                                        seam = 0.dp,
-                                        modifier = backdropModifier,
-                                    )
-                                } else fullArtworkBlurContent(backdropModifier)
-                            PlayerTheme.LEGACY -> MeshGradientBackground(
-                                palette = rememberArtworkColors(remoteArt, canvasFrame),
-                                trackKey = song.videoId,
-                                modifier = backdropModifier,
-                            )
-                            PlayerTheme.SIMPLE -> fullArtworkBlurContent(backdropModifier)
+                        Box(backdropModifier) {
+                            when (playerBackdropTheme) {
+                                PlayerTheme.DEFAULT ->
+                                    if (artMesh != null) {
+                                        ArtworkMeshBackdrop(
+                                            mesh = artMesh,
+                                            seam = 0.dp,
+                                            modifier = Modifier.matchParentSize(),
+                                        )
+                                    } else fullArtworkBlurContent(Modifier.matchParentSize())
+                                PlayerTheme.LEGACY -> MeshGradientBackground(
+                                    palette = rememberArtworkColors(remoteArt, canvasFrame),
+                                    trackKey = song.videoId,
+                                    modifier = Modifier.matchParentSize(),
+                                )
+                                PlayerTheme.SIMPLE -> fullArtworkBlurContent(Modifier.matchParentSize())
+                            }
+                            PlayerPlatform.host.AutoMixAmbient(song, playerBackdropTheme, Modifier.matchParentSize())
                         }
                     },
                     artwork = { artworkModifier ->
@@ -2122,6 +2125,9 @@ fun NowPlayingScreen(
                             // Let go of on the way to the mini player, whose
                             // cover sits flat in its bar.
                             shadowFraction = dockT,
+                            artworkOverlay = {
+                                if (!dockMoving) PlayerPlatform.host.AutoMixArtwork(song, canvasRendered, Modifier.matchParentSize())
+                            },
                             modifier = artworkModifier
                                 .then(
                                     if (dock != null) {
@@ -2340,6 +2346,10 @@ fun NowPlayingScreen(
                 fullArtworkBlurContent(
                     Modifier.graphicsLayer { alpha = fullArtworkBackdropAlpha },
                 )
+
+                if (!videoMode && !dockMoving) {
+                    PlayerPlatform.host.AutoMixAmbient(song, playerBackdropTheme, Modifier.fillMaxSize())
+                }
 
                 // Mount once, behind the controls. A known portrait aspect changes the
                 // invisible view to full-player bounds before its first frame is shown.
@@ -3367,6 +3377,9 @@ fun NowPlayingScreen(
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                 }
+                            }
+                            if (!dockMoving && !collapsePastHalf) {
+                                PlayerPlatform.host.AutoMixArtwork(song, canvasRendered, Modifier.matchParentSize())
                             }
                         }
 

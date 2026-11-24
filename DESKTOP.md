@@ -22,8 +22,18 @@ running `gradlew.bat :desktopApp:run`.
 ## Installing a release
 
 Every download on the [releases page](https://github.com/kushagrasinghx/BitChord/releases) carries its own Java
-runtime, the FFmpeg and ONNX natives, the Automix analyser and its models.
-Nothing else has to be installed first — no JDK, no codec pack.
+runtime, the FFmpeg and ONNX natives, and the AutoMix analyser. No JDK or codec
+pack is required. AutoMix downloads its two models on first enable or from the
+AutoMix models row in playback settings. The files come from the published
+[BitChord v1.10 release](https://github.com/kushagrasinghx/BitChord/releases/tag/v1.10)
+with pinned byte counts and SHA-256 hashes. The same immutable release serves
+app updates until a new version of the weights is introduced.
+
+Models live in `%LOCALAPPDATA%/bitchord/automix-models` on Windows and
+`${XDG_DATA_HOME:-~/.local/share}/bitchord/automix-models` on Linux, including
+for portable builds. Existing verified weights in the old analysis directory
+are reused. Playback continues offline or while downloads are in progress.
+The playback settings offer Retry and Delete models.
 
 | Platform | Download | Notes |
 |---|---|---|
@@ -32,7 +42,7 @@ Nothing else has to be installed first — no JDK, no codec pack.
 | Linux | `BitChord-<version>-linux-x86_64.rpm` | `sudo dnf install ./BitChord-*.rpm` on Fedora, RHEL and openSUSE. |
 | Windows | `BitChord-<version>-windows-x64-setup.exe` | The ordinary installer. Installs for the current user, so it never asks for an administrator. |
 | Windows | `BitChord-<version>-windows-x64.msi` | The same thing for anyone who deploys by MSI. |
-| Windows | `BitChord-<version>-windows-x64-portable.zip` | Unzip anywhere and run `BitChord.exe`. Writes nothing outside the folder. |
+| Windows | `BitChord-<version>-windows-x64-portable.zip` | Unzip anywhere and run `BitChord.exe`. Stores user data in the OS application data directory. |
 
 The Linux packages are built on Ubuntu 22.04 against its glibc, so they install
 on that release and anything newer.

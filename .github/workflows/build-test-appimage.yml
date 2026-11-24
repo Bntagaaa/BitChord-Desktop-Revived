@@ -31,6 +31,11 @@ on:
         required: false
         type: boolean
         default: true
+      audit_packages:
+        description: "Build and audit Linux DEB and RPM packages"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -294,7 +299,7 @@ jobs:
           dpkg-deb -f desktopApp/build/compose/binaries/main/deb/*.deb Package Version Architecture
           rpm -qp --queryformat '%{NAME} %{VERSION} %{ARCH}\n' desktopApp/build/compose/binaries/main/rpm/*.rpm
 
-      - name: Check native libraries and bundled models
+      - name: Check native libraries and on-demand model packaging
         shell: bash
         run: |
           set -euo pipefail
@@ -303,7 +308,9 @@ jobs:
           test -n "$jar_file"
           jar tf "$jar_file" > "$RUNNER_TEMP/desktop-jar-contents.txt"
           grep -Fq 'native/libbitchord_analysis.so' "$RUNNER_TEMP/desktop-jar-contents.txt"
-          grep -Eq '^models/.*\.onnx$' "$RUNNER_TEMP/desktop-jar-contents.txt"
+          if grep -E '^models/.*\.onnx$' "$RUNNER_TEMP/desktop-jar-contents.txt"; then
+            exit 1
+          fi
 
       - name: Validate packaged AutoMix analyser with real JNI calls
         shell: bash

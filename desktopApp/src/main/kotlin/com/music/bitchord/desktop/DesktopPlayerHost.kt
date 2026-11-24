@@ -55,6 +55,21 @@ internal object DesktopPlayerHost : PlayerHost {
 
     override val settings: DesktopPlayerSettings = DesktopPlayerSettings
     override val mobileTextChrome: Boolean = true
+    override val automixDetailMaxLines: Int = 5
+
+    var autoMixVisual: StateFlow<DesktopAutoMixVisualSample?> = MutableStateFlow(null)
+    val autoMixCanvasFrame = MutableStateFlow<AutoMixCanvasFrame?>(null)
+
+    @Composable
+    override fun AutoMixArtwork(song: Song, canvasVisible: Boolean, modifier: Modifier) {
+        DesktopAutoMixOverlay(song, modifier, com.music.bitchord.data.model.PLAYER_ART_PX,
+            mini = false, canvasVisible = canvasVisible)
+    }
+
+    @Composable
+    override fun AutoMixAmbient(song: Song, theme: PlayerTheme, modifier: Modifier) {
+        DesktopAutoMixAmbient(song, theme, modifier)
+    }
 
     var mixViewOpen: (Boolean) -> Unit = {}
     override fun onMixViewOpen(open: Boolean) = mixViewOpen(open)
@@ -253,6 +268,10 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     override val smartFadeEnabled = MutableStateFlow(false)
     override val smartMixInProgress = MutableStateFlow(false)
     override val automixDetail = MutableStateFlow<String?>(null)
+    val automixArtwork = MutableStateFlow(false)
+    val automixMiniArtwork = MutableStateFlow(false)
+    @Volatile var skipArtworkThrough = 0L
+    @Volatile var skipMiniArtworkThrough = 0L
     override val smartMixView = MutableStateFlow<com.music.bitchord.data.settings.MixTransitionView?>(null)
     override val smartMixProgress = MutableStateFlow(0f)
     override val smartMixBlend = MutableStateFlow<MixBlend?>(null)

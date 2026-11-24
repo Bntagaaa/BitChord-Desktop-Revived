@@ -27,6 +27,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,11 +80,12 @@ class DesktopPlaybackEngine internal constructor(
     val state: StateFlow<DesktopPlaybackState> = _state.asStateFlow()
 
 
-    private fun analysisFor(id: String): TrackAnalysis = analysisSource?.invoke(id) ?: analyzer.analysisFor(id)
+    private fun analysisFor(id: String): TrackAnalysis = analysisSource?.invoke(id) ?: analyzer.playbackAnalysisFor(id)
 
     /** Automix's evidence. */
     private val analyzer = DesktopTrackAnalyzer(
         performance = { automixPerformance },
+        models = DesktopAutomixModels.manager,
         // Automix is off in a party, so whatever was queued for it before the party began is
         // dropped rather than run to completion.
         stopped = { DesktopListenTogether.state.value.inParty },
@@ -144,6 +146,7 @@ class DesktopPlaybackEngine internal constructor(
     private var upgradeJob: Job? = null
     private var nextResolveJob: Job? = null
     private var recoveryJob: Job? = null
+    private var modelRetryJob: Job? = null
 
     @Volatile private var playbackSpeed = 1f
     @Volatile private var volume = 1f
@@ -193,6 +196,7 @@ class DesktopPlaybackEngine internal constructor(
         var preparedTransition: TransitionPlan? = null
         var nextTransitionPlanUs = 0L
         var cachedTransition: TransitionPlan? = null
+        var planningNanos = 0L
         var tempoRate = 1.0
         var tempoEaseStep = 0.0
         var tempoEaseEveryFrames = 0L
@@ -302,7 +306,6 @@ class DesktopPlaybackEngine internal constructor(
     private val thread = Thread(::pump, "BitChord-Audio").apply {
         isDaemon = true
         priority = Thread.NORM_PRIORITY + 2
-        start()
     }
 
     // ---- the surface the application uses -------------------------------
@@ -502,7 +505,7 @@ class DesktopPlaybackEngine internal constructor(
                     requested = DesktopPcmFormat(44_100, 2, bytesPerSample = 4, isFloat = true),
                     windowed = stream.windowedReads,
                     transport = stream.transport,
-                    cacheIdentity = "${song.videoId}|${stream.sourceId}|${stream.format}",
+                    cacheIdentity = stream.rangeCacheIdentity(song.videoId),
                     cancelled = { openingJob?.isCancelled == true || !running.get() },
                     trace = trace,
                 ) }
@@ -790,12 +793,28 @@ class DesktopPlaybackEngine internal constructor(
     fun setAutomixEnabled(enabled: Boolean) {
         if (automixEnabled == enabled) return
         automixEnabled = enabled
+        modelRetryJob?.cancel()
+        if (enabled && analysisSource == null) {
+            val models = DesktopAutomixModels.manager
+            models.download()
+            modelRetryJob = scope.launch {
+                models.state.collectLatest { state ->
+                    if (state is DesktopAutomixModelState.Failed) {
+                        delay(120_000)
+                        if (automixEnabled) models.download()
+                    }
+                }
+            }
+        }
         if (analysisSource == null) analyzer.focusOn(
             if (enabled) _state.value.song?.videoId else null,
             if (enabled) nextSong?.videoId else null,
         )
         commands += Command.TransitionSettingsChanged
-        if (!enabled && crossfadeSeconds == 0) clearUpcoming()
+        if (!enabled) {
+            DesktopPlayerSettings.automixDetail.value = null
+            if (crossfadeSeconds == 0) clearUpcoming()
+        }
     }
 
     /** 0 = adaptive, 8/16 = fixed phrase overlap when the beat grid is reliable. */
@@ -819,14 +838,15 @@ class DesktopPlaybackEngine internal constructor(
                 return
             }
         }
-        // Queue metadata/autoplay updates often nominate the same next song. Do not
-        // cancel its decoder (or a live overlap) merely because the UI recomposed.
-        if (song != null && nextSong?.videoId == song.videoId && nextPreparedQuality == audioQuality) {
+        // The same recording may occupy more than one queue entry.
+        fun Song?.sameEntry(): Boolean = this != null && song != null &&
+            videoId == song.videoId && queueEntryId == song.queueEntryId
+        if (nextSong.sameEntry() && nextPreparedQuality == audioQuality) {
             val prepared = upcoming
-            if ((prepared?.song?.videoId == song.videoId &&
+            if ((prepared != null && prepared.song.sameEntry() &&
                     prepared.decoder.state !in setOf(DesktopDecodeState.FAILED, DesktopDecodeState.CLOSED)) ||
                 nextResolveJob?.isActive == true || nextGeneration.get() in queuedUpcoming ||
-                awaitingArm.get()?.videoId == song.videoId) return
+                awaitingArm.get().sameEntry()) return
         }
         nextGeneration.incrementAndGet()
         nextResolveJob?.cancel()
@@ -1091,10 +1111,13 @@ class DesktopPlaybackEngine internal constructor(
     /** The plan the running fade was started from, for the filter ride. */
     private var activePlan: TransitionPlan? = null
     private var activeSmartTransition = false
+    private val visual = DesktopAutoMixVisualFeed { DesktopPlayerHost.autoMixCanvasFrame.value = null }
     private var mixViewKey: String? = null
+    private var nextStatsNanos = 0L
     private var waveformJob: kotlinx.coroutines.Job? = null
 
     init {
+        DesktopPlayerHost.autoMixVisual = visual.state
         DesktopPlayerHost.mixViewOpen = mixViewOpen@ { open ->
             waveformJob?.cancel()
             if (open) {
@@ -1122,6 +1145,7 @@ class DesktopPlaybackEngine internal constructor(
                 } catch (_: InterruptedException) {
                     break
                 } catch (failure: Exception) {
+                    visual.cancel()
                     DesktopTrackLog.log("audio thread recovered from: ${failure.message}")
                     // A renderer is stateful: after an output failure its block cannot be replayed.
                     if (loopRuntime != null) runCatching { abortLoop(_state.value.positionMs) }
@@ -1134,10 +1158,12 @@ class DesktopPlaybackEngine internal constructor(
 
     private fun step() {
         drainCommands()
+        if (!visualAllowed()) visual.cancel()
         val track = current
         if (track == null || paused) {
             if (paused) sink.pause()
-            loopRuntime?.let(::loopPosition)
+            val loop = loopRuntime
+            if (loop != null) loopPosition(loop) else sampleVisual(playing = false)
             if (paused && fadeRemaining > 0) publishBlend(playing = false)
             java.util.concurrent.locks.LockSupport.parkNanos(20_000_000L)
             return
@@ -1153,6 +1179,7 @@ class DesktopPlaybackEngine internal constructor(
             renderLoop(runtime)
             return
         }
+        sampleVisual(playing = true)
         val block = readCurrent(track)
         val count = currentReadCount
         if (block == null) {
@@ -1213,6 +1240,11 @@ class DesktopPlaybackEngine internal constructor(
                         play(track, block, prefix)
                     }
                     ready.sinkStart = framesWritten
+                    if (visualAllowed()) {
+                        visual.arm(ready.outgoing.song, ready.incoming.song)
+                        val clock = ready.session.clock
+                        visual.begin(framesWritten, clock.handoffAt, clock.releaseAt, ready.session.sampleRate)
+                    }
                     renderLoop(ready)
                     return
                 }
@@ -1346,6 +1378,10 @@ class DesktopPlaybackEngine internal constructor(
         val channels = sink.format.channels.coerceAtLeast(1)
         val plan = activePlan
         val subBlock = TransitionFilter.GLIDE_FRAMES * channels
+        val echo = transitionEcho?.takeIf { plan != null && plan.echoSeconds > 0.0 }
+        val echoAt = if (echo != null) DesktopTransitionRide.echoAt(checkNotNull(plan)) else 0f
+        val echoFrom = if (echo != null) DesktopTransitionRide.echoFrom(checkNotNull(plan)) else 0f
+        val echoKill = if (echo != null) DesktopTransitionRide.echoKill(checkNotNull(plan)) else 1f
 
         var index = 0
         while (index < count) {
@@ -1369,19 +1405,14 @@ class DesktopPlaybackEngine internal constructor(
             } else 1f / kotlin.math.sqrt((outgoingLevel + into).coerceAtLeast(1f))
             val stop = minOf(count, index + subBlock)
             val span = stop - index
+            val delay = echo?.takeIf { progress >= echoFrom }
+            val send = if (delay == null || progress >= echoAt) 0f
+                else ((progress - echoFrom) / (echoAt - echoFrom)).coerceIn(0f, 1f)
+            val dry = if (delay == null) 1f else 1f - ((progress - echoAt) / echoKill).coerceIn(0f, 1f)
             while (index < stop) {
                 val channel = index % channels
-                var leaving = outgoingFilter.filter(channel, block[index])
-                if (plan != null && plan.echoSeconds > 0.0) {
-                    val echoAt = DesktopTransitionRide.echoAt(plan)
-                    val echoFrom = DesktopTransitionRide.echoFrom(plan)
-                    if (progress >= echoFrom) {
-                        val send = if (progress >= echoAt) 0f else ((progress - echoFrom) / (echoAt - echoFrom)).coerceIn(0f, 1f)
-                        val kill = DesktopTransitionRide.echoKill(plan)
-                        val dry = (1f - ((progress - echoAt) / kill).coerceIn(0f, 1f))
-                        leaving = transitionEcho?.process(leaving, send, dry) ?: leaving
-                    }
-                }
+                val filtered = outgoingFilter.filter(channel, block[index])
+                val leaving = delay?.process(filtered, send, dry) ?: filtered
                 val arriving = if (index < otherCount) {
                     incomingFilter.filter(channel, other!![index])
                 } else {
@@ -1701,6 +1732,7 @@ class DesktopPlaybackEngine internal constructor(
         }
         track.finished = true
         sink.drain()
+        visual.cancel()
         current = null
         track.decoder.close()
         _state.update {
@@ -1771,7 +1803,8 @@ class DesktopPlaybackEngine internal constructor(
      */
     private fun switchDisplay(incoming: Track) {
         synchronized(blendLock) { displaySwitched = true }
-        DesktopTrackLog.log("blend midpoint: showing '${incoming.song.title}'")
+        val queuedMs = queuedSourceUs() / 1_000
+        DesktopTrackLog.log("automix handoff '${incoming.song.title}' queued_ms=$queuedMs")
         publishTrack(incoming, isPlaying = !paused, positionUs = incomingHeardUs(incoming))
         onCrossfaded(incoming.song)
     }
@@ -1785,6 +1818,8 @@ class DesktopPlaybackEngine internal constructor(
         DesktopPlayerSettings.smartMixView.value = null
         DesktopPlayerSettings.smartMixProgress.value = 0f
         mixViewKey = null
+        nextStatsNanos = 0L
+        DesktopPlayerSettings.automixDetail.value = null
         DesktopPlayerSettings.smartMixBlend.value = null
         var had = false
         var next: Song? = null
@@ -1821,21 +1856,24 @@ class DesktopPlaybackEngine internal constructor(
         if (!automixEnabled) return
         val track = current ?: return
         val incoming = upcoming ?: return
+        activePlan?.let { publishAutoMixStats(track, incoming.song, it, incoming.tempoRate) }
         val last = DesktopPlayerSettings.smartMixBlend.value
         if (last != null && !playing && !last.playing) return
         val listenerSpeed = playbackSpeed.toDouble().takeIf { it > 0.0 } ?: 1.0
-        val outgoingHeardUs = _state.value.let { state ->
-            if (state.song?.videoId == track.song.videoId) state.positionMs * 1_000 else null
-        } ?: outgoingHeardUs()
-        val sides = listOf(
-            Triple(analysisFor(track.song.videoId), outgoingHeardUs, listenerSpeed * track.tempoRate),
-            Triple(analysisFor(incoming.song.videoId), incomingHeardUs(incoming), listenerSpeed * incoming.tempoRate),
-        ).let { if (displaySwitched) it.reversed() else it }
-        val side = sides.firstOrNull { (analysis, _, _) -> analysis.beatInterval > 0.0 || analysis.bpm > 0.0 }
+        val preferred = if (displaySwitched) incoming else track
+        val other = if (displaySwitched) track else incoming
+        val preferredGrid = analysisFor(preferred.song.videoId)
+        val side = if (preferredGrid.beatInterval > 0.0 || preferredGrid.bpm > 0.0) preferred else other
+        val analysis = if (side === preferred) preferredGrid else analysisFor(other.song.videoId)
         var beatMs = 0f
         var anchor = 0L
-        if (side != null) {
-            val (analysis, heardUs, speed) = side
+        if (analysis.beatInterval > 0.0 || analysis.bpm > 0.0) {
+            val speed = listenerSpeed * side.tempoRate
+            val heardUs = if (side === incoming) incomingHeardUs(incoming) else {
+                _state.value.let { state ->
+                    if (state.song?.videoId == track.song.videoId) state.positionMs * 1_000 else null
+                } ?: outgoingHeardUs()
+            }
             val beat = if (analysis.beatInterval > 0.0) analysis.beatInterval else 60.0 / analysis.bpm
             val sinceBeat = ((heardUs / 1_000_000.0 - analysis.firstBeat) % beat + beat) % beat
             beatMs = (beat * 1000.0 / speed).toFloat()
@@ -1843,6 +1881,15 @@ class DesktopPlaybackEngine internal constructor(
         }
         if (last != null && last.playing == playing && sameGrid(last, beatMs, anchor)) return
         DesktopPlayerSettings.smartMixBlend.value = MixBlend(beatMs = beatMs, beatAnchorNanos = anchor, playing = playing)
+    }
+
+    private fun visualAllowed(): Boolean =
+        automixEnabled && playbackSpeed == 1f && !skipSilenceEnabled &&
+            !DesktopListenTogether.state.value.inParty &&
+            (DesktopPlayerSettings.automixArtwork.value || DesktopPlayerSettings.automixMiniArtwork.value)
+
+    private fun sampleVisual(playing: Boolean) {
+        if ((visual.state.value?.rate ?: 0) > 0) visual.sample(sink.framesPlayed(), framesWritten, playing)
     }
 
     /** The outgoing track's heard position, from the sink's clock — [publishPosition]'s sum. */
@@ -1866,6 +1913,8 @@ class DesktopPlaybackEngine internal constructor(
                 command.track.decoder.close(); continue
             }
             if (command is Command.Select || command is Command.Start || command is Command.SeekTo || command is Command.Reconfigure || command == Command.Flush || command == Command.ClearUpcoming) {
+                if (command == Command.ClearUpcoming && fadeRemaining <= 0 && !wasLoop) visual.cancelArmed()
+                else visual.cancel()
                 val settle = loopRuntime != null && (command is Command.Reconfigure || command == Command.ClearUpcoming)
                 val position = _state.value.positionMs
                 discardLoop()
@@ -1979,6 +2028,7 @@ class DesktopPlaybackEngine internal constructor(
                     if (wasLoop && !hadSwitched) endBlend()
                 }
                 Command.TransitionSettingsChanged -> {
+                    visual.cancelArmed()
                     // An overlap already heard keeps its chosen strategy. Future cues must be
                     // recalculated when Automix or the independent Crossfade setting changes.
                     if (fadeRemaining <= 0) upcoming?.let { incoming ->
@@ -2047,6 +2097,7 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     private fun startTrack(track: Track, playWhenReady: Boolean) {
+        visual.cancel()
         // Never the one being started: a restart of the current track would otherwise close the
         // decoder it is about to read from.
         if (current !== track) current?.decoder?.close()
@@ -2327,8 +2378,10 @@ class DesktopPlaybackEngine internal constructor(
         var plan = incoming.preparedTransition
         if (plan == null) {
             if (incoming.cachedTransition == null || positionUs >= incoming.nextTransitionPlanUs) {
+                val planningStarted = System.nanoTime()
                 incoming.cachedTransition = transitionPlan(track, incoming.song,
                     (incoming.decoder.durationUs ?: 0L) / 1_000, positionMs, duration)
+                incoming.planningNanos = System.nanoTime() - planningStarted
                 incoming.nextTransitionPlanUs = positionUs + 250_000
             }
             plan = incoming.cachedTransition ?: return 0
@@ -2346,6 +2399,7 @@ class DesktopPlaybackEngine internal constructor(
                 incoming.startUs = cueUs
             }
             incoming.preparedTransition = plan
+            if (visualAllowed()) visual.arm(track.song, incoming.song)
         }
         val channels = sink.format.channels.coerceAtLeast(1)
         val prefixFrames = com.music.bitchord.playback.smart.transitionPrefixFrames(
@@ -2357,7 +2411,8 @@ class DesktopPlaybackEngine internal constructor(
             "transition into '${incoming.song.title}': ${"%.1f".format(seconds)}s" +
                 ", ${plan.transitionStyle}" +
                 (if (plan.transitionBeats > 0) ", ${plan.transitionBeats} beats" else "") +
-                (if (plan.incomingCueTime > 0) ", cued at ${"%.1f".format(plan.incomingCueTime)}s" else ""),
+                (if (plan.incomingCueTime > 0) ", cued at ${"%.1f".format(plan.incomingCueTime)}s" else "") +
+                " planning_us=${incoming.planningNanos / 1_000} reason=${plan.diagnosticReason() ?: "planned"}",
         )
         fadeTotal = (seconds * sink.format.sampleRate * sink.format.channels).toInt()
         val echoTail = (echoTailSeconds(plan.echoSeconds) * sink.format.sampleRate * sink.format.channels).toInt()
@@ -2366,6 +2421,11 @@ class DesktopPlaybackEngine internal constructor(
         incomingSourceFrames = 0.0
         activePlan = plan
         activeSmartTransition = automixEnabled
+        if (visualAllowed()) {
+            visual.arm(track.song, incoming.song)
+            visual.begin(framesWritten + prefixFrames, seconds * DesktopTransitionRide.handoffAt(plan),
+                seconds, sink.format.sampleRate)
+        }
         incoming.tempo = if (kotlin.math.abs(plan.incomingPlaybackRate - 1.0) > .0001) {
             DesktopTempoBuffer(sink.format.channels, sink.format.sampleRate).also {
                 it.speed = plan.incomingPlaybackRate.toFloat()
@@ -2405,22 +2465,26 @@ class DesktopPlaybackEngine internal constructor(
         if (kotlin.math.abs(out.duration - duration / 1000.0) > .5 || kotlin.math.abs(inn.duration - incomingDuration) > .5) return
         loopAttemptedPair = pair
         loopAttemptedEvidence = evidence
+        val planningStarted = System.nanoTime()
         val plan = com.music.bitchord.playback.smart.LoopMix.plan(
             out, duration / 1000.0, inn, incomingDuration, positionMs / 1000.0 + 15.0,
             sungOut = outLyrics.spans, sungIn = inLyrics.spans,
             outVideo = track.song.isVideoOrigin || track.song.isVideo,
             inVideo = incoming.song.isVideoOrigin || incoming.song.isVideo,
         ) ?: return
+        val loopPlanUs = (System.nanoTime() - planningStarted) / 1_000
         loopBuildJob?.cancel()
         loopBuildJob = scope.launch {
+            val buildStarted = System.nanoTime()
             var prepared: com.music.bitchord.playback.loopmix.LoopMixSession? = null
             try {
                 val context = kotlinx.coroutines.currentCoroutineContext()
                 prepared = com.music.bitchord.playback.loopmix.LoopMixSession.build(
                     plan, track.song.videoId, incoming.song.videoId, sampleRate, 1f,
                 ) { side, from, to ->
-                    desktopLoopRegion(if (side == com.music.bitchord.playback.smart.LoopMix.Side.OUT) track.stream else incoming.stream,
-                        from, to, sampleRate) { !context.isActive }
+                    val deck = if (side == com.music.bitchord.playback.smart.LoopMix.Side.OUT) track else incoming
+                    desktopLoopRegion(deck.stream, from, to, sampleRate,
+                        cacheIdentity = deck.stream.rangeCacheIdentity(deck.song.videoId)) { !context.isActive }
                 } ?: return@launch
                 val warmup = FloatArray(2048)
                 var frame = prepared.renderer.firstFrame()
@@ -2437,6 +2501,9 @@ class DesktopPlaybackEngine internal constructor(
                 synchronized(loopBuildLock) {
                     if (context.isActive && pendingLoop.compareAndSet(null, ready)) prepared = null
                 } // ownership passes to the audio thread only while this builder is still current
+                if (prepared == null) DesktopTrackLog.log(
+                    "automix loop ready planning_us=$loopPlanUs setup_ms=${(System.nanoTime() - buildStarted) / 1_000_000}",
+                )
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (error: Exception) { DesktopTrackLog.log("loop preparation failed: ${error.javaClass.simpleName}") }
             finally { prepared?.close() }
@@ -2466,6 +2533,7 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     private fun abortLoop(positionMs: Long) {
+        visual.cancel()
         val hadSwitched = displaySwitched
         discardLoop()
         performSeek(positionMs)
@@ -2501,19 +2569,29 @@ class DesktopPlaybackEngine internal constructor(
         waveformJob?.cancel()
         loopRuntime = ready
         DesktopPlayerSettings.smartMixView.value = ready.view
-        DesktopPlayerSettings.automixDetail.value = "Instrumental loop mix · ${ready.session.plan.out.bpm.toInt()} → ${ready.session.plan.targetBpm.toInt()} BPM"
+        nextStatsNanos = 0L
         return true
     }
 
     private fun loopPosition(runtime: LoopPlayback) {
         val clock = runtime.session.clock
-        if (sink.framesPlayed() < runtime.sinkStart) {
-            val position = playhead.at(sink.framesPlayed()) / 1000
+        val played = sink.framesPlayed()
+        visual.sample(played, framesWritten, playing = !paused)
+        if (played < runtime.sinkStart) {
+            val position = playhead.at(played) / 1000
             _state.update { it.copy(positionMs = position, positionSampledAtNanos = System.nanoTime(), mixing = false) }
             return
         }
-        val seconds = ((sink.framesPlayed() - runtime.sinkStart).coerceAtLeast(0L)).toDouble() / runtime.session.sampleRate
+        val seconds = (played - runtime.sinkStart).toDouble() / runtime.session.sampleRate
         val incoming = seconds >= clock.handoffAt
+        if (DesktopPlayerSettings.showNerdStats.value) {
+            val beat = clock.beatAt(seconds).first
+            val rate = clock.plan.let { plan ->
+                val interval = clock.beatTimes.getOrNull(beat + 1)?.minus(clock.beatTimes[beat])
+                if (interval != null && interval > 0) plan.fold * plan.inn.beatSec / interval else 1.0
+            }
+            publishAutoMixStats(runtime.outgoing, runtime.incoming.song, null, rate, runtime)
+        }
         if (incoming && !displaySwitched) switchDisplay(runtime.incoming)
         val position = com.music.bitchord.playback.smart.LoopMix.positionAt(clock,
             if (incoming) com.music.bitchord.playback.smart.LoopMix.Side.IN else com.music.bitchord.playback.smart.LoopMix.Side.OUT, seconds)
@@ -2571,6 +2649,7 @@ class DesktopPlaybackEngine internal constructor(
     private fun publishTransitionWindow(track: Track, plan: TransitionPlan, duration: Long) {
         if (!plan.blocked) prepareLoop(track, _state.value.positionMs, duration)
         val next = upcoming?.song ?: nextSong
+        if (next != null) publishAutoMixStats(track, next, plan)
         if (next != null && !plan.blocked && plan.fadeSeconds > 0) {
             val key = "${track.song.videoId}/${next.videoId}/${plan.transitionStart}/${plan.transitionEnd}"
             if (key != mixViewKey) {
@@ -2640,6 +2719,67 @@ class DesktopPlaybackEngine internal constructor(
         resolveUpcoming(song, race = true)
     }
 
+    private fun TransitionPlan.diagnosticReason(): String? =
+        reason.takeIf(String::isNotBlank) ?: policyReasons.takeIf { it.isNotEmpty() }?.joinToString(", ")
+
+    private fun publishAutoMixStats(
+        outgoing: Track,
+        incoming: Song,
+        plan: TransitionPlan?,
+        rate: Double = plan?.incomingPlaybackRate ?: 1.0,
+        loop: LoopPlayback? = null,
+    ) {
+        if (!automixEnabled || !DesktopPlayerSettings.showNerdStats.value) return
+        val now = System.nanoTime()
+        if (now < nextStatsNanos) return
+        nextStatsNanos = now + 500_000_000
+        fun number(value: Double, places: Int = 1) = "%.${places}f".format(java.util.Locale.ROOT, value)
+        fun describe(id: String, label: String, isIncoming: Boolean): String {
+            val analysis = analysisFor(id)
+            val state = if (analysisSource != null) TrackAnalysisState.ANALYSED else analyzer.stateFor(id)
+            val side = if (isIncoming) analysis.headBeats else analysis.tailBeats
+            val bpm = side?.bpm ?: analysis.bpm
+            val confidence = side?.confidence ?: analysis.beatConfidence
+            val measure = analyzer.measurementFor(id)
+            return buildString {
+                append("$label ${state.name.lowercase()}")
+                if (bpm > 0) append(" ${number(bpm)} BPM (${number(confidence, 2)})")
+                if (measure?.cacheHit == true) append(" · cache hit")
+                if (measure?.cacheHit == false) append(" · cache miss, ${measure.durationMs} ms")
+            }
+        }
+        val modelStatus = when (DesktopAutomixModels.manager.state.value) {
+            DesktopAutomixModelState.Ready -> "ready"
+            is DesktopAutomixModelState.Downloading -> "downloading"
+            is DesktopAutomixModelState.Failed -> "unavailable"
+            DesktopAutomixModelState.NotInstalled -> "missing"
+        }
+        val mixing = when {
+            loop != null -> "Instrumental loop · ${number(loop.session.clock.releaseAt)} s · cue " +
+                "${number(loop.session.plan.inn.loopStart)} s"
+            plan?.blocked == true -> plan.diagnosticReason() ?: "Waiting for transition"
+            plan != null -> "${plan.transitionStyle.name.lowercase().replace('_', ' ')} · " +
+                "${number(plan.fadeSeconds)} s · cue ${number(plan.incomingCueTime)} s"
+            else -> "Waiting for transition"
+        }
+        val loopStatus = when {
+            loop != null -> "loop playing"
+            pendingLoop.get() != null -> "loop ready"
+            loopBuildJob?.isActive == true -> "loop preparing"
+            else -> "no prepared loop"
+        }
+        DesktopPlayerSettings.automixDetail.value = buildString {
+            appendLine(describe(outgoing.song.videoId, "Current", false))
+            append(describe(incoming.videoId, "Next", true))
+            append(" · models $modelStatus\n")
+            append("$mixing · ×${number(rate, 2)} · $loopStatus")
+            if (plan != null && !plan.blocked) {
+                append(" · vocal overlap ${(plan.vocalOverlap * 100).toInt()}%")
+                plan.diagnosticReason()?.let { append(" · $it") }
+            }
+        }
+    }
+
     /** What the shared planner makes of this pair. */
     private fun transitionPlan(
         track: Track,
@@ -2668,6 +2808,7 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     private fun closeEverything() {
+        visual.cancel()
         discardLoop()
         current?.decoder?.close()
         upcoming?.decoder?.close()
@@ -2771,6 +2912,9 @@ class DesktopPlaybackEngine internal constructor(
         val depth = if (isFloat) "32-bit float" else "${bytesPerSample * 8}-bit"
         "$depth · ${sampleRate / 1000.0} kHz · ${if (channels == 2) "stereo" else "$channels ch"}"
     }
+
+    // The pump reads renderer and settings fields initialised below the public playback methods.
+    init { thread.start() }
 
     companion object {
         /** Keep the audio pump responsive to commands while decoder/network I/O is stalled. */

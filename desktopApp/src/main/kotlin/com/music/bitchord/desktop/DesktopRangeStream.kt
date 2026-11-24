@@ -25,6 +25,7 @@ internal class DesktopRangeStream(
     private val cache: DesktopAudioCache = DesktopAudioCache.shared,
     private val cancelled: () -> Boolean = { false },
     private val requestTimeoutMs: Long = 6_000,
+    private val networkRead: ((Long) -> Unit)? = null,
 ) {
     init { require(windowBytes in 1..DesktopAudioCache.MAX_SPAN) }
     @Volatile var unsupportedRange: Boolean = false
@@ -74,7 +75,13 @@ internal class DesktopRangeStream(
         val request = HttpRequest.newBuilder(uri).timeout(Duration.ofMillis(requestTimeoutMs))
         headers.forEach { (name, value) -> runCatching { request.header(name, value) } }
         request.setHeader("Range", "bytes=$start-$end").setHeader("Accept-Encoding", "identity")
-        val response = fetchRange(request.GET().build()) ?: return false
+        if (cancelled() || Thread.currentThread().isInterrupted) return false
+        val started = if (networkRead != null) System.nanoTime() else 0L
+        val response = try {
+            fetchRange(request.GET().build())
+        } finally {
+            networkRead?.invoke(System.nanoTime() - started)
+        } ?: return false
         val status = response.statusCode()
         if (status == 416) {
             val total = response.headers().firstValue("content-range").orElse("")

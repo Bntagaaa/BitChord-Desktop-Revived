@@ -239,11 +239,13 @@ jobs:
           ./gradlew :desktopApp:packageDeb :desktopApp:packageRpm :desktopApp:createDistributable \
             -Pbitchord.version=${{ steps.version.outputs.value }}
 
-      - name: The analyser and models are in the jar
+      - name: The analyser is in the jar and models are on demand
         run: |
           jar=$(ls desktopApp/build/compose/binaries/main/app/BitChord/lib/app/desktopApp*.jar)
           jar tf "$jar" | grep -q 'native/libbitchord_analysis.so'
-          jar tf "$jar" | grep -q 'models/.*\.onnx'
+          if jar tf "$jar" | grep -E '^models/.*\.onnx$'; then
+            exit 1
+          fi
 
       - name: Build the AppImage
         shell: bash
@@ -407,16 +409,18 @@ jobs:
         run: |
           .\gradlew.bat :desktopApp:packageMsi :desktopApp:createDistributable "-Pbitchord.version=${{ steps.version.outputs.value }}"
 
-      - name: Verify Automix native runtime and packaged models
+      - name: Verify Automix native runtime and on-demand model packaging
         shell: pwsh
         run: ./desktopApp/packaging/tests/windows-automix-check.ps1
 
-      - name: The analyser and models are in the jar
+      - name: The analyser is in the jar and models are on demand
         shell: bash
         run: |
           jar=$(ls desktopApp/build/compose/binaries/main/app/BitChord/app/desktopApp*.jar)
           jar tf "$jar" | grep -q 'native/bitchord_analysis.dll'
-          jar tf "$jar" | grep -q 'models/.*\.onnx'
+          if jar tf "$jar" | grep -E '^models/.*\.onnx$'; then
+            exit 1
+          fi
           # WinRT, so only MSVC can build it and only this job ever does.
           jar tf "$jar" | grep -q 'native/bitchord_smtc.dll'
 

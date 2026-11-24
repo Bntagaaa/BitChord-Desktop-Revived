@@ -86,6 +86,15 @@ interface PlayerHost {
     @Composable
     fun rememberRemoteArtworkUrl(song: Song?): String?
 
+    /** Optional audio-clock-driven layers over the platform's normal player presentation. */
+    @Composable
+    fun AutoMixArtwork(song: Song, canvasVisible: Boolean, modifier: Modifier) = Unit
+
+    @Composable
+    fun AutoMixAmbient(song: Song, theme: PlayerTheme, modifier: Modifier) = Unit
+
+    val automixDetailMaxLines: Int get() = 2
+
     /** The system output level the player's volume bar drives, if it drives one. */
     val volume: SystemVolume
 

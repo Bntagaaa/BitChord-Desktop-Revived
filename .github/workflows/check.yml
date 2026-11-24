@@ -44,6 +44,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
 
+      - name: Verify canonical AutoMix files and distributed model hashes
+        run: python3 tools/automix-validation/verify-upstream.py
+
       # Regression coverage for the packaging failure: the app may use a descriptive
       # test label, but native installer metadata must remain a valid numeric version.
       - name: Tests
@@ -69,7 +72,9 @@ jobs:
         run: |
           jar=$(ls desktopApp/build/compose/binaries/main/app/BitChord/lib/app/desktopApp*.jar)
           jar tf "$jar" | grep -q 'native/libbitchord_analysis.so'
-          jar tf "$jar" | grep -q 'models/.*\.onnx'
+          if jar tf "$jar" | grep -E '^models/.*\.onnx$'; then
+            exit 1
+          fi
 
       - name: Upload PiP render evidence
         if: always()
@@ -177,7 +182,9 @@ jobs:
         run: |
           jar=$(ls desktopApp/build/compose/binaries/main/app/BitChord/app/desktopApp*.jar)
           jar tf "$jar" | grep -q 'native/bitchord_analysis.dll'
-          jar tf "$jar" | grep -q 'models/.*\.onnx'
+          if jar tf "$jar" | grep -E '^models/.*\.onnx$'; then
+            exit 1
+          fi
           # WinRT, so only MSVC can build it and only this job ever does.
           jar tf "$jar" | grep -q 'native/bitchord_smtc.dll'
 

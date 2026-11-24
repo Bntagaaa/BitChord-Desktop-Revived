@@ -89,10 +89,26 @@ if ($resources -notcontains "native/bitchord_analysis.dll") {
     throw "Packaged desktopApp jar is missing native/bitchord_analysis.dll"
 }
 $models = @($resources | Where-Object { $_ -match '^models/.+\.onnx$' })
-if ($models.Count -lt 2) {
-    throw "Packaged desktopApp jar is missing Automix ONNX models (found $($models.Count))"
+if ($models.Count -ne 0) {
+    throw "AutoMix models must be delivered on demand (found $($models.Count) bundled)"
 }
-Write-Host "Automix Windows package verified: static runtime imports, loadable JNI DLL, and $($models.Count) models"
+$ortJars = @(Get-ChildItem -LiteralPath $jarDirectory -Filter "onnxruntime-*.jar" -File)
+if ($ortJars.Count -ne 1) {
+    throw "Expected one ONNX Runtime JAR (found $($ortJars.Count))"
+}
+$ortResources = @(& jar tf $ortJars[0].FullName)
+if ($LASTEXITCODE -ne 0) {
+    throw "Cannot inspect the packaged ONNX Runtime JAR"
+}
+foreach ($file in @("onnxruntime.dll", "onnxruntime4j_jni.dll", "onnxruntime_providers_shared.dll")) {
+    if ($ortResources -notcontains "ai/onnxruntime/native/win-x64/$file") {
+        throw "Packaged ONNX Runtime is missing $file"
+    }
+}
+if ($ortJars[0].Name -match '-win-x64[-.]' -and @($ortResources | Where-Object { $_ -match '^ai/onnxruntime/native/(?!win-x64/).+[^/]$' }).Count -gt 0) {
+    throw "Target-only ONNX Runtime has foreign native binaries"
+}
+Write-Host "AutoMix Windows package verified: static runtime imports, loadable JNI DLL, target ONNX Runtime, and on-demand models"
 
 # Load the packaged bytes too, rather than assuming the build-output DLL was included.
 $extracted = Join-Path ([System.IO.Path]::GetTempPath()) ("bitchord-packaged-" + [Guid]::NewGuid())

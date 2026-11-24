@@ -68,13 +68,13 @@ internal class DesktopTrackAnalyzer(
      * and a model pass for a transition that cannot happen. A stopped pass records nothing.
      */
     private val stopped: () -> Boolean = { false },
+    private val models: DesktopAutomixModelManager? = null,
     private val onAnalysed: (String) -> Unit = {},
     private val persistResult: ((String, TrackAnalysis) -> Unit)? = null,
     /**
      * Optional transition windows enrich the DSP result but must never invalidate it.
      */
-    private val loopRegion: (DesktopStream, Double, Double, Int, () -> Boolean) -> LoopRegion? =
-        ::desktopLoopRegion,
+    private val loopRegion: ((DesktopStream, Double, Double, Int, () -> Boolean) -> LoopRegion?)? = null,
 ) {
     /** One analysis at a time, on a thread of this class's own making. */
     private val worker: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
@@ -89,6 +89,8 @@ internal class DesktopTrackAnalyzer(
     // Analyses are persisted to disk. Retain only a small access-order working set in RAM;
     // current/upcoming tracks are read most often and naturally remain hot.
     private val results = synchronizedBoundedMap<String, TrackAnalysis>(MAX_CACHED_ANALYSES)
+    private val measurements = synchronizedBoundedMap<String, DesktopAnalysisMeasurement>(MAX_CACHED_ANALYSES)
+    private val checkedCache = synchronizedBoundedMap<String, Boolean>(MAX_CACHED_ANALYSES)
     private val running = ConcurrentHashMap.newKeySet<String>()
     /** Only one drain is scheduled; only current and next are eligible for queued work. */
     private data class AnalysisJob(val song: Song, val stream: DesktopStream?, val seconds: Double)
@@ -113,8 +115,10 @@ internal class DesktopTrackAnalyzer(
         (Runtime.getRuntime().availableProcessors() - 2).coerceAtLeast(1),
     )
 
+    private fun modelPath(name: String): String = models?.path(name) ?: DesktopAnalysisRuntime.modelPath(name)
+
     private val vocals by lazy {
-        VocalTracker({ DesktopAnalysisRuntime.modelPath(VocalTracker.MODEL_ASSET) }, { inferenceThreads() })
+        VocalTracker({ modelPath(VocalTracker.MODEL_ASSET) }, { inferenceThreads() })
     }
     private var vocalsUsed = false
     private var beatsUsed = false
@@ -127,7 +131,7 @@ internal class DesktopTrackAnalyzer(
 
     private val beats by lazy {
         BeatTracker(
-            modelPath = { DesktopAnalysisRuntime.modelPath(BeatTracker.MODEL_ASSET) },
+            modelPath = { modelPath(BeatTracker.MODEL_ASSET) },
             inferenceThreads = { inferenceThreads() },
         )
     }
@@ -137,13 +141,26 @@ internal class DesktopTrackAnalyzer(
         pending.focus(currentTrackId, nextTrackId)
     }
 
-    /** What is known now, never a computation — the planner asks this every tick. */
+    /** The playback thread reads only in-memory results. */
+    fun playbackAnalysisFor(trackId: String): TrackAnalysis =
+        results[trackId] ?: TrackAnalysis(trackId = trackId)
+
+    /** Read synchronously for callers outside the playback thread. */
     fun analysisFor(trackId: String): TrackAnalysis =
         results[trackId] ?: restored(trackId) ?: TrackAnalysis(trackId = trackId)
 
     /** A stored analysis, promoted into memory on first ask. */
     private fun restored(trackId: String): TrackAnalysis? =
-        store.load(trackId)?.also { results[trackId] = it }
+        store.load(trackId)?.let { cached ->
+            // Older analyses counted the shared portion of the head and tail twice.
+            val unique = cached.downbeats.distinct()
+            val analysis = if (unique.size == cached.downbeats.size) cached else cached.copy(downbeats = unique)
+            measurements[trackId] = DesktopAnalysisMeasurement(cacheHit = true)
+            results[trackId] = analysis
+            analysis
+        }
+
+    fun measurementFor(trackId: String): DesktopAnalysisMeasurement? = measurements[trackId]
 
     fun isAnalysed(trackId: String): Boolean =
         results.containsKey(trackId) || restored(trackId) != null
@@ -151,38 +168,31 @@ internal class DesktopTrackAnalyzer(
     /** How far this track has got, for the player's Automix line. */
     fun stateFor(trackId: String): TrackAnalysisState = when {
         trackId.isBlank() -> TrackAnalysisState.WAITING
-        !DesktopAnalysisRuntime.available -> TrackAnalysisState.FAILED
         // Usable first and a pass in flight second, the order Android settled on.
         results[trackId]?.isUsable == true ->
             if (trackId in running) TrackAnalysisState.REFINING else TrackAnalysisState.ANALYSED
         trackId in running -> TrackAnalysisState.ANALYSING
         // A recorded-but-unusable result is the analyser saying it tried and got nothing, and that
         // it will not try again.
-        trackId in failed || results.containsKey(trackId) -> TrackAnalysisState.FAILED
+        warnedNoAnalyser.get() || trackId in failed || results.containsKey(trackId) -> TrackAnalysisState.FAILED
         else -> TrackAnalysisState.WAITING
     }
 
     /**
      * Asks for [song] to be analysed, if it has not been already.
      *
-     * [stream] is only read when it is a file on this machine. Anything streamed is measured on
-     * the track's YouTube Opus instead — never on the addon, JioSaavn or lossless copy playback
-     * may be using — exactly as Android's analyser reads its own pinned Opus rendition (see
-     * `AutomixAnalysisSource`). That keeps an addon from being asked for a track nobody is
-     * playing yet, and one recording's measurements from being stored under another's id.
+     * The local file or the unrestricted YouTube rendition can supply analysis.
+     * Other playback sources still use the canonical YouTube resolve, so analysis from
+     * a different master or a quality-limited source cannot replace existing evidence.
      */
     fun request(song: Song, stream: DesktopStream?, durationSeconds: Double) {
         val trackId = song.videoId
         if (trackId.isBlank() || durationSeconds <= 0 || cancelled() || !pending.isRelevant(trackId)) return
-        if (!DesktopAnalysisRuntime.available) {
-            if (warnedNoAnalyser.compareAndSet(false, true)) {
-                DesktopTrackLog.log("automix: this build has no analyser, so nothing will be measured")
-            }
-            return
-        }
-        if (results[trackId]?.isUsable == true || restored(trackId)?.isUsable == true) return
+        if (results[trackId]?.isUsable == true) return
+        if (checkedCache[trackId] == true && (warnedNoAnalyser.get() || !modelsReady())) return
         failedAt[trackId]?.let { if (System.currentTimeMillis() - it < RETRY_AFTER_MS) return }
-        val job = AnalysisJob(song, stream?.takeIf { it.isLocalFile }, durationSeconds)
+        val source = stream?.takeIf { it.isLocalFile || it.analysisVideoId == trackId }
+        val job = AnalysisJob(song, source, durationSeconds)
         synchronized(schedulerLock) {
             if (trackId in running || !pending.offer(trackId, job)) return
             if (!drainScheduled) {
@@ -221,22 +231,39 @@ internal class DesktopTrackAnalyzer(
         if (cancelled()) return
         val song = job.song
         val trackId = song.videoId
+        if (checkedCache[trackId] != true) {
+            val indexStart = System.nanoTime()
+            val cached = runCatching { restored(trackId) }
+                .onFailure { DesktopTrackLog.log("automix: cache read failed for '$trackId': ${it.message}") }
+                .getOrNull()
+            if (cached?.isUsable == true) {
+                DesktopTrackLog.log("automix: cache hit '$trackId' lookup_us=${(System.nanoTime() - indexStart) / 1_000}")
+                return
+            }
+            checkedCache[trackId] = true
+        }
+        if (!modelsReady() || cancelled()) return
+        if (!DesktopAnalysisRuntime.available) {
+            if (warnedNoAnalyser.compareAndSet(false, true)) {
+                DesktopTrackLog.log("automix: this build has no analyser, so nothing will be measured")
+            }
+            return
+        }
         Thread.currentThread().priority =
             if (performance().yieldsToPlayback || Runtime.getRuntime().availableProcessors() <= 4)
                 Thread.MIN_PRIORITY else Thread.NORM_PRIORITY
         failed.remove(trackId)
-        DesktopTrackLog.log(
-            "automix: analysing '${song.title}' (${"%.0f".format(job.seconds)}s)" +
-                if (job.stream != null) " from the file" else " from YouTube Opus",
-        )
+        val timings = DesktopAnalysisTimings()
         val analysis = runCatching {
-            val source = job.stream ?: youTubeOpus(song) ?: return@runCatching null
-            analyse(trackId, source, job.seconds)
+            val source = timings.measure(AnalysisStage.RESOLVE) { job.stream ?: youTubeOpus(song) }
+                ?: return@runCatching null
+            analyse(trackId, source, job.seconds, timings)
         }.onFailure {
             if (!cancelled()) DesktopTrackLog.log("analysis of '${song.title}' failed: ${it.message}")
         }.getOrNull()
-        if (cancelled()) return
+        if (cancelled() || !modelsReady()) return
         if (analysis == null) {
+            DesktopTrackLog.log("automix: analysis did not complete for '$trackId' ${timings.summary()}")
             failed += trackId
             failedAt[trackId] = System.currentTimeMillis()
             return
@@ -249,16 +276,18 @@ internal class DesktopTrackAnalyzer(
             else store.save(trackId, analysis)
         }.onFailure { DesktopTrackLog.log("automix: could not persist '$trackId': ${it.message}") }
         if (cancelled()) return
+        measurements[trackId] = DesktopAnalysisMeasurement(cacheHit = false, durationMs = timings.elapsedMs())
         results[trackId] = analysis
         failedAt.remove(trackId)
-        if (!analysis.isUsable) {
+        if (analysis.isUsable) checkedCache.remove(trackId)
+        else {
             failed += trackId
             failedAt[trackId] = System.currentTimeMillis()
         }
         DesktopTrackLog.log(
             "analysed '${song.title}': ${"%.1f".format(analysis.bpm)} bpm" +
                 ", ${analysis.downbeats.size} downbeats" +
-                ", key ${analysis.key.ifBlank { "unknown" }}",
+                ", key ${analysis.key.ifBlank { "unknown" }} ${timings.summary()}",
         )
         runCatching { onAnalysed(trackId) }
             .onFailure { DesktopTrackLog.log("automix: analysis observer failed for '$trackId': ${it.message}") }
@@ -289,11 +318,10 @@ internal class DesktopTrackAnalyzer(
         trackId: String,
         stream: DesktopStream,
         durationSeconds: Double,
+        timings: DesktopAnalysisTimings,
     ): TrackAnalysis? {
-        // Reuse the same range-cache namespace across the independent decodes. Signed YouTube
-        // URLs are not persisted to disk, but local/immutable sources still benefit from reuse.
-        val cacheIdentity = "automix|$trackId|${stream.sourceId.orEmpty()}|${stream.format}"
-        val features = structuralFeatures(stream, durationSeconds, cacheIdentity) ?: return null
+        val cacheIdentity = stream.rangeCacheIdentity(trackId)
+        val features = structuralFeatures(stream, durationSeconds, cacheIdentity, timings) ?: return null
         if (cancelled()) return null
         // Same bounded head/tail model windows, overlap stitching and mask fusion as
         // upstream TrackAnalyzer at b690dc14. Only decoding/transport is desktop-specific.
@@ -304,8 +332,8 @@ internal class DesktopTrackAnalyzer(
         val tailStart = max(0.0, durationSeconds - (3 * span - 2 * WINDOW_OVERLAP_SECONDS))
         val regions = ArrayList<Region>()
         for ((from, to) in modelWindows(headEnd, tailStart, durationSeconds, span)) {
-            if (cancelled()) return null
-            analyseRegion(stream, from, to, features)?.let(regions::add)
+            if (cancelled() || !modelsReady()) return null
+            analyseRegion(stream, from, to, features, cacheIdentity, timings)?.let(regions::add)
         }
         if (cancelled()) return null
         val all = seamBeats(regions)
@@ -328,7 +356,8 @@ internal class DesktopTrackAnalyzer(
             bpm = leading?.bpm ?: features.bpm,
             beatInterval = leading?.beatInterval ?: features.beatInterval,
             beatConfidence = leading?.beatConfidence ?: features.beatConfidence,
-            downbeats = (head?.downbeats.orEmpty() + tail?.downbeats.orEmpty()).ifEmpty { features.downbeats }.sorted(),
+            downbeats = (head?.downbeats.orEmpty() + tail?.downbeats.orEmpty())
+                .ifEmpty { features.downbeats }.distinct().sorted(),
             firstBeat = head?.firstBeat ?: features.firstBeat,
             phraseBoundaries = features.phraseBoundaries, key = features.key, keyConfidence = features.keyConfidence,
             audibleStartTime = features.audibleStartTime, pickupTime = features.pickupTime,
@@ -343,8 +372,14 @@ internal class DesktopTrackAnalyzer(
     }
 
     // Returning only features releases whole-track PCM before any ONNX inference begins.
-    private fun structuralFeatures(stream: DesktopStream, seconds: Double, cacheIdentity: String): TrackFeatures.Features? =
-        decode(stream, TrackFeatures.sampleRate, cacheIdentity)?.let { TrackFeatures.analyze(it, seconds) }
+    private fun structuralFeatures(
+        stream: DesktopStream, seconds: Double, cacheIdentity: String, timings: DesktopAnalysisTimings,
+    ): TrackFeatures.Features? {
+        val samples = timings.measure(AnalysisStage.STRUCTURE_DECODE) {
+            decode(stream, TrackFeatures.sampleRate, cacheIdentity, timings)
+        } ?: return null
+        return timings.measure(AnalysisStage.FEATURES) { TrackFeatures.analyze(samples, seconds) }
+    }
 
     private class Region(val grid: BeatTracker.Grid?, val vocalMask: DoubleArray?, val seconds: Double,
         val start: Double, val vocalWindow: CurveWindow?, val levelWindow: CurveWindow?)
@@ -354,25 +389,44 @@ internal class DesktopTrackAnalyzer(
         return MelSpectrogram.resample(mono, 44100.0, MelSpectrogram.sampleRate)
     }
 
-    private fun analyseRegion(stream: DesktopStream, from: Double, to: Double, features: TrackFeatures.Features): Region? {
-        val stereo = runCatching { loopRegion(stream, from, to, 44100, ::cancelled) }
-            .onFailure { if (it is CancellationException) throw it
-                DesktopTrackLog.log("automix: optional region [$from, $to] failed: ${it.message}") }.getOrNull() ?: return null
+    private fun analyseRegion(
+        stream: DesktopStream, from: Double, to: Double, features: TrackFeatures.Features,
+        cacheIdentity: String, timings: DesktopAnalysisTimings,
+    ): Region? {
+        val stereo = runCatching {
+            timings.measure(AnalysisStage.REGION_DECODE) {
+                val override = loopRegion
+                if (override != null) override(stream, from, to, 44100, ::cancelled)
+                else desktopLoopRegion(stream, from, to, 44100, cacheIdentity, timings::networkRead, ::cancelled)
+            }
+        }.onFailure {
+            if (it is CancellationException) throw it
+            DesktopTrackLog.log("automix: optional region [$from, $to] failed: ${it.message}")
+        }.getOrNull() ?: return null
         if (stereo.left.size < 44100 || stereo.left.size != stereo.right.size) return null
-        val input = modelInput(stereo)
+        val input = timings.measure(AnalysisStage.BEAT_RESAMPLE) { modelInput(stereo) }
         beatsUsed = true
-        val grid = runCatching { input?.let { beats.track(it, offsetSeconds = stereo.start) } }
-            .onFailure { if (it is CancellationException) throw it
-                DesktopTrackLog.log("automix: optional beat pass failed: ${it.message}") }.getOrNull()
+        val grid = runCatching {
+            timings.measure(AnalysisStage.BEAT_WINDOW) { input?.let { beats.track(it, offsetSeconds = stereo.start) } }
+        }.onFailure {
+            if (it is CancellationException) throw it
+            DesktopTrackLog.log("automix: optional beat pass failed: ${it.message}")
+        }.getOrNull()
+        if (cancelled() || !modelsReady()) throw CancellationException("AutoMix analysis cancelled")
         val maxSamples = ((VocalTracker.FIXED_FRAMES - 2) * VocalSpectrogram.hop / VocalSpectrogram.sampleRate * 44100).toInt()
             .coerceAtMost(stereo.left.size)
         vocalsUsed = true
         val vocal = runCatching {
-            if (!VocalSpectrogram.available || maxSamples <= 0) null else vocals.track(
-                if (maxSamples < stereo.left.size) stereo.left.copyOf(maxSamples) else stereo.left,
-                if (maxSamples < stereo.right.size) stereo.right.copyOf(maxSamples) else stereo.right, 44100.0)
-        }.onFailure { if (it is CancellationException) throw it
-            DesktopTrackLog.log("automix: optional vocal pass failed: ${it.message}") }.getOrNull()
+            timings.measure(AnalysisStage.VOCAL_WINDOW) {
+                if (!VocalSpectrogram.available || maxSamples <= 0) null else vocals.track(
+                    if (maxSamples < stereo.left.size) stereo.left.copyOf(maxSamples) else stereo.left,
+                    if (maxSamples < stereo.right.size) stereo.right.copyOf(maxSamples) else stereo.right, 44100.0,
+                )
+            }
+        }.onFailure {
+            if (it is CancellationException) throw it
+            DesktopTrackLog.log("automix: optional vocal pass failed: ${it.message}")
+        }.getOrNull()
         val mask = vocal?.let { values -> DoubleArray(features.energyCurve.size) { index ->
             val at = ((features.energyCurve[index].time - stereo.start) * VocalSpectrogram.frameRate).toInt()
             if (at in values.indices) values[at].toDouble() else NEUTRAL_VOCAL
@@ -467,7 +521,9 @@ internal class DesktopTrackAnalyzer(
     )
 
     /** The whole track as mono float at [rate]. */
-    private fun decode(stream: DesktopStream, rate: Double, cacheIdentity: String): FloatArray? {
+    private fun decode(
+        stream: DesktopStream, rate: Double, cacheIdentity: String, timings: DesktopAnalysisTimings,
+    ): FloatArray? {
         val decoder = DesktopAudioDecoder()
         val opened = decoder.open(
             url = stream.url,
@@ -477,6 +533,7 @@ internal class DesktopTrackAnalyzer(
             transport = stream.transport,
             cacheIdentity = cacheIdentity,
             cancelled = ::cancelled,
+            rangeRead = timings::networkRead,
         )
         if (opened.isFailure) {
             val failure = opened.exceptionOrNull()
@@ -528,6 +585,8 @@ internal class DesktopTrackAnalyzer(
         }
     }
 
+    private fun modelsReady(): Boolean = models == null || models.state.value == DesktopAutomixModelState.Ready
+
     fun release() {
         released.set(true)
         pending.clear()
@@ -540,6 +599,8 @@ internal class DesktopTrackAnalyzer(
             }
         }, "BitChord-Analysis-Cleanup").apply { isDaemon = true; start() }
         results.clear()
+        measurements.clear()
+        checkedCache.clear()
         running.clear()
         failed.clear()
         failedAt.clear()
@@ -562,6 +623,36 @@ internal class DesktopTrackAnalyzer(
 
         /** Stack for the analysis thread. */
         const val ANALYSIS_STACK_BYTES = 64L * 1024 * 1024
+    }
+}
+
+internal data class DesktopAnalysisMeasurement(val cacheHit: Boolean, val durationMs: Long? = null)
+
+private enum class AnalysisStage {
+    RESOLVE, NETWORK_READ, STRUCTURE_DECODE, FEATURES, REGION_DECODE, BEAT_RESAMPLE, BEAT_WINDOW, VOCAL_WINDOW,
+}
+
+private class DesktopAnalysisTimings {
+    private val start = System.nanoTime()
+    private val stageNanos = LongArray(AnalysisStage.entries.size)
+
+    inline fun <T> measure(stage: AnalysisStage, action: () -> T): T {
+        val started = System.nanoTime()
+        return try {
+            action()
+        } finally {
+            stageNanos[stage.ordinal] += System.nanoTime() - started
+        }
+    }
+
+    fun networkRead(nanos: Long) {
+        stageNanos[AnalysisStage.NETWORK_READ.ordinal] += nanos
+    }
+
+    fun elapsedMs(): Long = (System.nanoTime() - start) / 1_000_000
+
+    fun summary(): String = AnalysisStage.entries.joinToString(" ", prefix = "total_ms=${elapsedMs()} ") {
+        "${it.name.lowercase()}_ms=${stageNanos[it.ordinal] / 1_000_000}"
     }
 }
 
