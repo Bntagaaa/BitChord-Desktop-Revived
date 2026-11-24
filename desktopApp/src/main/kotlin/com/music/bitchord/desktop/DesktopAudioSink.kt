@@ -41,6 +41,7 @@ internal class DesktopAudioSink : DesktopAudioOutput {
 
     /** Reused conversion buffer; only the playback thread touches it. */
     private var staging = ByteArray(0)
+    private var pulsePcm: DesktopNativePcm? = null
 
     /** Kept short: enough to distinguish real samples from a pipeline producing silence. */
     private var diagnosticBlocks = 0
@@ -94,6 +95,7 @@ internal class DesktopAudioSink : DesktopAudioOutput {
                 val previousPulse = linuxPulse
                 line = null
                 linuxPulse = opened
+                pulsePcm = DesktopNativePcm.open(requested)
                 openedOn = null
                 openedForSelection = selectedDevice
                 format = requested
@@ -171,6 +173,7 @@ internal class DesktopAudioSink : DesktopAudioOutput {
         val previous = line
         val previousPulse = linuxPulse
         linuxPulse = null
+        pulsePcm = null
         line = opened
         openedOn = mixer?.mixerInfo?.name
         openedForSelection = selectedDevice
@@ -223,10 +226,13 @@ internal class DesktopAudioSink : DesktopAudioOutput {
         val pulse = linuxPulse
         val target = line
         if (pulse == null && target == null) return 0
-        val bytes = convert(samples, count)
         val wanted = count * format.bytesPerSample
-        val written = if (pulse != null) pulse.write(bytes, wanted)
-            else target!!.write(bytes, 0, wanted)
+        val direct = if (pulse != null) pulsePcm?.pack(samples, count, gain) else null
+        val written = when {
+            pulse != null && direct != null -> pulse.writeDirect(direct, wanted)
+            pulse != null -> pulse.write(convert(samples, count), wanted)
+            else -> target!!.write(convert(samples, count), 0, wanted)
+        }
         diagnose(samples, count, written)
         return written
     }
@@ -251,32 +257,8 @@ internal class DesktopAudioSink : DesktopAudioOutput {
         val volume = gain
         val bytes = count * current.bytesPerSample
         if (staging.size < bytes) staging = ByteArray(bytes)
-        val out = staging
-
-        when {
-            current.isFloat -> for (index in 0 until count) {
-                writeIntLe(out, index * 4, (samples[index] * volume).toRawBits())
-            }
-            current.bytesPerSample == 4 -> for (index in 0 until count) {
-                val scaled = (samples[index] * volume).coerceIn(-1f, 1f)
-                writeIntLe(out, index * 4, (scaled * Int.MAX_VALUE).toInt())
-            }
-            else -> for (index in 0 until count) {
-                val scaled = (samples[index] * volume).coerceIn(-1f, 1f)
-                val value = (scaled * 32_767f).toInt()
-                val at = index * 2
-                out[at] = value.toByte()
-                out[at + 1] = (value shr 8).toByte()
-            }
-        }
-        return out
-    }
-
-    private fun writeIntLe(buffer: ByteArray, at: Int, value: Int) {
-        buffer[at] = value.toByte()
-        buffer[at + 1] = (value shr 8).toByte()
-        buffer[at + 2] = (value shr 16).toByte()
-        buffer[at + 3] = (value shr 24).toByte()
+        packDesktopPcm(samples, count, volume, current, staging)
+        return staging
     }
 
     /** Frames the device has actually rendered — the honest playback position. */
@@ -320,6 +302,7 @@ internal class DesktopAudioSink : DesktopAudioOutput {
         val pulse = linuxPulse
         if (pulse != null) {
             linuxPulse = null
+            pulsePcm = null
             openedOn = null
             openedForSelection = null
             diagnosticBlocks = 0
