@@ -230,6 +230,7 @@ internal fun PlayerScrubber(
     // One clock for the bar and the "Mixing" label, so they breathe on the same beat.
     val mixPulse = rememberMixPulse({ mixBlend.value }, enabled = !reduceAnimation)
     Column(Modifier.fillMaxWidth()) {
+        val ink = sliderInk()
         ThinSlider(
             value = shown,
             onValueChange = onScrub,
@@ -238,6 +239,10 @@ internal fun PlayerScrubber(
             mixing = mixing,
             mixPulse = mixPulse,
             transitionWindow = transitionWindow,
+            vibrant = ink != null,
+            activeColor = ink?.active ?: Color.White.copy(alpha = 0.92f),
+            inactiveColor = ink?.inactive ?: Color.White.copy(alpha = 0.26f),
+            markerColor = ink?.marker ?: Color.White.copy(alpha = 0.5f),
         )
         Box(
             modifier = Modifier
@@ -490,6 +495,17 @@ internal fun TransportRow(
     val playSize = if (desktop) 28.dp else if (compact) 58.dp else 74.dp
     val playTouch = if (desktop) 44.dp else if (compact) 76.dp else 92.dp
     val skipSize = if (desktop) 24.dp else if (compact) 44.dp else PLAYER_SKIP_ICON_SIZE
+    val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val animationsActive = LocalPlayerTransportMotionActive.current
+    val previousMotion = rememberPlayerSkipMotion(active = animationsActive, reduceMotion = reduceAnimation)
+    val nextMotion = rememberPlayerSkipMotion(active = animationsActive, reduceMotion = reduceAnimation)
+    val playVector = vectorResource(Res.drawable.ic_player_play)
+    val pauseVector = vectorResource(Res.drawable.ic_player_pause)
+    val playPauseMotion = rememberExpandedPlayPauseMotion(
+        isPlaying = isPlaying,
+        active = animationsActive && !isLoading && playVector.root.size > 0 && pauseVector.root.size > 0,
+        reduceMotion = reduceAnimation,
+    )
     Row(
         modifier = Modifier.fillMaxWidth(),
         // SpaceAround, not SpaceEvenly: the outer margins take half a gap, so
@@ -506,6 +522,8 @@ internal fun TransportRow(
             onClick = onPrevious,
             enabled = previousEnabled,
             haptic = Haptic.SkipPrevious,
+            skipMotion = previousMotion,
+            skipPrevious = true,
         )
         if (isLoading) {
             // Same footprint as the play/pause target — a smaller box here
@@ -525,6 +543,7 @@ internal fun TransportRow(
                 touchSize = playTouch,
                 onClick = onPlayPause,
                 haptic = if (isPlaying) Haptic.Pause else Haptic.Resume,
+                playPauseMotion = playPauseMotion,
             )
         }
         TransportGlyph(
@@ -536,6 +555,7 @@ internal fun TransportRow(
             onClick = onNext,
             enabled = nextEnabled,
             haptic = Haptic.SkipNext,
+            skipMotion = nextMotion,
         )
     }
 }
@@ -559,7 +579,7 @@ internal fun VolumeRow(
     val desktop = PlayerPlatform.host.mobileTextChrome
     val vibrant = desktopVibrantChromeEnabled(LocalPlayerChrome.current)
     val volumeTint = when {
-        vibrant -> VibrantDiscInk
+        vibrant -> if (LocalChromeSoftened.current) Color(0xFFA2A2A2) else Color(0xFFAAAAAA)
         desktop -> playerSecondaryColor(0.5f)
         else -> LocalPlayerTint.current.copy(alpha = 0.5f)
     }
@@ -574,6 +594,7 @@ internal fun VolumeRow(
             modifier = Modifier.size(20.dp).vibrantDiscChrome(vibrant),
         )
         Spacer(Modifier.width(10.dp))
+        val ink = sliderInk()
         ThinSlider(
             value = value(),
             onValueChange = onValueChange,
@@ -581,6 +602,9 @@ internal fun VolumeRow(
             idleHeight = 6.dp,
             activeHeight = 10.dp,
             modifier = Modifier.weight(1f),
+            vibrant = ink != null,
+            activeColor = ink?.active ?: Color.White.copy(alpha = 0.92f),
+            inactiveColor = ink?.inactive ?: Color.White.copy(alpha = 0.26f),
         )
         Spacer(Modifier.width(10.dp))
         Icon(
@@ -736,6 +760,8 @@ internal fun CircleGlyph(
     haptic: Haptic = Haptic.Tap,
 ) {
     val haptics = rememberHaptics()
+    val glass = LocalPlayerGlass.current != null
+    val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val discAlpha by animateFloatAsState(
         targetValue = if (active) 0.34f else 0.18f,
         label = "glyphDisc",
@@ -764,6 +790,8 @@ internal fun CircleGlyph(
                 .background(
                     if (!desktop) {
                         LocalPlayerTint.current.copy(alpha = discAlpha)
+                    } else if (glass && !vibrantDisc) {
+                        Color.White.copy(alpha = discAlpha)
                     } else if (vibrantDisc) {
                         VibrantDiscInk.copy(alpha = playerDiscPaintAlpha(discAlpha, blended = true))
                     } else {
@@ -773,9 +801,10 @@ internal fun CircleGlyph(
                     },
                 ),
         )
+        if (glass) Box(Modifier.matchParentSize().glassRim(CircleShape))
         Crossfade(
             targetState = icon,
-            animationSpec = tween(durationMillis = 180),
+            animationSpec = tween(durationMillis = if (reduceAnimation) 0 else 180),
             label = "playerMenuGlyph",
         ) { glyph ->
             Icon(
@@ -804,8 +833,12 @@ private fun TransportGlyph(
     haptic: Haptic = Haptic.Tap,
     /** Vertical squash of the glyph alone; its width and touch box are untouched. */
     heightScale: Float = 1f,
+    skipMotion: PlayerSkipMotion? = null,
+    skipPrevious: Boolean = false,
+    playPauseMotion: ExpandedPlayPauseMotion? = null,
 ) {
     val haptics = rememberHaptics()
+    val interactionSource = remember { MutableInteractionSource() }
     // Faded rather than hidden: the row keeps its shape at the ends of a queue.
     val alpha by animateFloatAsState(
         targetValue = if (enabled) 1f else 0.3f,
@@ -814,30 +847,71 @@ private fun TransportGlyph(
     Box(
         modifier = Modifier
             .size(touchSize)
+            .then(
+                if (skipMotion != null) Modifier.playerSkipPressCircle(
+                    motion = skipMotion,
+                    interactionSource = interactionSource,
+                    enabled = enabled,
+                    tint = Color.White.copy(alpha = alpha),
+                    glyphSize = size,
+                    diameter = PLAYER_PRESS_CIRCLE_DIAMETER,
+                ) else if (playPauseMotion != null) Modifier.expandedPlayPausePressCircle(
+                    motion = playPauseMotion,
+                    interactionSource = interactionSource,
+                    tint = Color.White.copy(alpha = alpha),
+                    glyphSize = size,
+                    diameter = PLAYER_PRESS_CIRCLE_DIAMETER,
+                ) else Modifier,
+            )
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled,
             ) {
                 haptics.play(haptic)
+                skipMotion?.onTap()
+                playPauseMotion?.onTap()
                 onClick()
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            painter = painterResource(icon),
-            contentDescription = contentDescription,
-            tint = Color.White.copy(alpha = alpha),
-            modifier = Modifier
-                .size(size)
-                .then(if (heightScale != 1f) Modifier.graphicsLayer { scaleY = heightScale } else Modifier),
-        )
+        if (skipMotion != null) {
+            PlayerSkipGlyph(
+                motion = skipMotion,
+                contentDescription = contentDescription,
+                tint = Color.White.copy(alpha = alpha),
+                modifier = Modifier
+                    .size(size)
+                    .then(if (heightScale != 1f) Modifier.graphicsLayer { scaleY = heightScale } else Modifier),
+                previous = skipPrevious,
+            )
+        } else if (playPauseMotion != null) {
+            ExpandedPlayPauseGlyph(
+                motion = playPauseMotion,
+                interactionSource = interactionSource,
+                playPainter = painterResource(Res.drawable.ic_player_play),
+                pausePainter = painterResource(Res.drawable.ic_player_pause),
+                contentDescription = contentDescription,
+                tint = Color.White.copy(alpha = alpha),
+                modifier = Modifier.size(size),
+            )
+        } else {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = contentDescription,
+                tint = Color.White.copy(alpha = alpha),
+                modifier = Modifier
+                    .size(size)
+                    .then(if (heightScale != 1f) Modifier.graphicsLayer { scaleY = heightScale } else Modifier),
+            )
+        }
     }
 }
 
 /** The skip glyphs' width, and their touch box, beside the larger play button. */
 private val PLAYER_SKIP_ICON_SIZE = 53.dp
 private val PLAYER_SKIP_TOUCH_SIZE = 53.dp
+private val PLAYER_PRESS_CIRCLE_DIAMETER = 60.dp
 
 /**
  * The skip glyphs are drawn a little flatter than they are wide, so the pair
@@ -1944,4 +2018,14 @@ private fun TrackAnalysisState.localizedLabel(): String = when (this) {
     TrackAnalysisState.ANALYSING -> stringResource(Res.string.analysis_in_progress)
     TrackAnalysisState.WAITING -> stringResource(Res.string.waiting)
     TrackAnalysisState.FAILED -> stringResource(Res.string.failed)
+}
+
+/** Upstream v1.10 track ink, guarded by the desktop's existing blend-support policy. */
+private data class SliderInk(val active: Color, val inactive: Color, val marker: Color)
+
+@Composable
+private fun sliderInk(): SliderInk? {
+    if (!desktopVibrantChromeEnabled(LocalPlayerChrome.current)) return null
+    val ink = if (LocalChromeSoftened.current) Color(0xFFA8A8A8) else Color(0xFFB0B0B0)
+    return SliderInk(ink, ink.copy(alpha = 0.60f), ink.copy(alpha = 0.75f))
 }
