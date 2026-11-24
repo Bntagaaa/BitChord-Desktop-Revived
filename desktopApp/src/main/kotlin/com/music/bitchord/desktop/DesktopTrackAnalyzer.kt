@@ -90,6 +90,7 @@ internal class DesktopTrackAnalyzer(
     // current/upcoming tracks are read most often and naturally remain hot.
     private val results = synchronizedBoundedMap<String, TrackAnalysis>(MAX_CACHED_ANALYSES)
     private val measurements = synchronizedBoundedMap<String, DesktopAnalysisMeasurement>(MAX_CACHED_ANALYSES)
+    private val checkedCache = synchronizedBoundedMap<String, Boolean>(MAX_CACHED_ANALYSES)
     private val running = ConcurrentHashMap.newKeySet<String>()
     /** Only one drain is scheduled; only current and next are eligible for queued work. */
     private data class AnalysisJob(val song: Song, val stream: DesktopStream?, val seconds: Double)
@@ -125,7 +126,6 @@ internal class DesktopTrackAnalyzer(
     private fun cancelled(): Boolean {
         val active = activeTaskId.get()
         return released.get() || Thread.currentThread().isInterrupted || stopped() ||
-            (models != null && models.state.value != DesktopAutomixModelState.Ready) ||
             (active != null && !pending.isRelevant(active))
     }
 
@@ -141,7 +141,11 @@ internal class DesktopTrackAnalyzer(
         pending.focus(currentTrackId, nextTrackId)
     }
 
-    /** What is known now, never a computation — the planner asks this every tick. */
+    /** The playback thread reads only in-memory results. */
+    fun playbackAnalysisFor(trackId: String): TrackAnalysis =
+        results[trackId] ?: TrackAnalysis(trackId = trackId)
+
+    /** Read synchronously for callers outside the playback thread. */
     fun analysisFor(trackId: String): TrackAnalysis =
         results[trackId] ?: restored(trackId) ?: TrackAnalysis(trackId = trackId)
 
@@ -160,14 +164,13 @@ internal class DesktopTrackAnalyzer(
     /** How far this track has got, for the player's Automix line. */
     fun stateFor(trackId: String): TrackAnalysisState = when {
         trackId.isBlank() -> TrackAnalysisState.WAITING
-        !DesktopAnalysisRuntime.available -> TrackAnalysisState.FAILED
         // Usable first and a pass in flight second, the order Android settled on.
         results[trackId]?.isUsable == true ->
             if (trackId in running) TrackAnalysisState.REFINING else TrackAnalysisState.ANALYSED
         trackId in running -> TrackAnalysisState.ANALYSING
         // A recorded-but-unusable result is the analyser saying it tried and got nothing, and that
         // it will not try again.
-        trackId in failed || results.containsKey(trackId) -> TrackAnalysisState.FAILED
+        warnedNoAnalyser.get() || trackId in failed || results.containsKey(trackId) -> TrackAnalysisState.FAILED
         else -> TrackAnalysisState.WAITING
     }
 
@@ -181,13 +184,8 @@ internal class DesktopTrackAnalyzer(
     fun request(song: Song, stream: DesktopStream?, durationSeconds: Double) {
         val trackId = song.videoId
         if (trackId.isBlank() || durationSeconds <= 0 || cancelled() || !pending.isRelevant(trackId)) return
-        if (!DesktopAnalysisRuntime.available) {
-            if (warnedNoAnalyser.compareAndSet(false, true)) {
-                DesktopTrackLog.log("automix: this build has no analyser, so nothing will be measured")
-            }
-            return
-        }
-        if (results[trackId]?.isUsable == true || restored(trackId)?.isUsable == true) return
+        if (results[trackId]?.isUsable == true) return
+        if (checkedCache[trackId] == true && (warnedNoAnalyser.get() || !modelsReady())) return
         failedAt[trackId]?.let { if (System.currentTimeMillis() - it < RETRY_AFTER_MS) return }
         val source = stream?.takeIf { it.isLocalFile || it.analysisVideoId == trackId }
         val job = AnalysisJob(song, source, durationSeconds)
@@ -229,6 +227,24 @@ internal class DesktopTrackAnalyzer(
         if (cancelled()) return
         val song = job.song
         val trackId = song.videoId
+        if (checkedCache[trackId] != true) {
+            val indexStart = System.nanoTime()
+            val cached = runCatching { restored(trackId) }
+                .onFailure { DesktopTrackLog.log("automix: cache read failed for '$trackId': ${it.message}") }
+                .getOrNull()
+            if (cached?.isUsable == true) {
+                DesktopTrackLog.log("automix: cache hit '$trackId' lookup_us=${(System.nanoTime() - indexStart) / 1_000}")
+                return
+            }
+            checkedCache[trackId] = true
+        }
+        if (!modelsReady() || cancelled()) return
+        if (!DesktopAnalysisRuntime.available) {
+            if (warnedNoAnalyser.compareAndSet(false, true)) {
+                DesktopTrackLog.log("automix: this build has no analyser, so nothing will be measured")
+            }
+            return
+        }
         Thread.currentThread().priority =
             if (performance().yieldsToPlayback || Runtime.getRuntime().availableProcessors() <= 4)
                 Thread.MIN_PRIORITY else Thread.NORM_PRIORITY
@@ -241,7 +257,7 @@ internal class DesktopTrackAnalyzer(
         }.onFailure {
             if (!cancelled()) DesktopTrackLog.log("analysis of '${song.title}' failed: ${it.message}")
         }.getOrNull()
-        if (cancelled()) return
+        if (cancelled() || !modelsReady()) return
         if (analysis == null) {
             DesktopTrackLog.log("automix: analysis did not complete for '$trackId' ${timings.summary()}")
             failed += trackId
@@ -259,7 +275,8 @@ internal class DesktopTrackAnalyzer(
         measurements[trackId] = DesktopAnalysisMeasurement(cacheHit = false, durationMs = timings.elapsedMs())
         results[trackId] = analysis
         failedAt.remove(trackId)
-        if (!analysis.isUsable) {
+        if (analysis.isUsable) checkedCache.remove(trackId)
+        else {
             failed += trackId
             failedAt[trackId] = System.currentTimeMillis()
         }
@@ -311,7 +328,7 @@ internal class DesktopTrackAnalyzer(
         val tailStart = max(0.0, durationSeconds - (3 * span - 2 * WINDOW_OVERLAP_SECONDS))
         val regions = ArrayList<Region>()
         for ((from, to) in modelWindows(headEnd, tailStart, durationSeconds, span)) {
-            if (cancelled()) return null
+            if (cancelled() || !modelsReady()) return null
             analyseRegion(stream, from, to, features, cacheIdentity, timings)?.let(regions::add)
         }
         if (cancelled()) return null
@@ -390,7 +407,7 @@ internal class DesktopTrackAnalyzer(
             if (it is CancellationException) throw it
             DesktopTrackLog.log("automix: optional beat pass failed: ${it.message}")
         }.getOrNull()
-        if (cancelled()) throw CancellationException("AutoMix analysis cancelled")
+        if (cancelled() || !modelsReady()) throw CancellationException("AutoMix analysis cancelled")
         val maxSamples = ((VocalTracker.FIXED_FRAMES - 2) * VocalSpectrogram.hop / VocalSpectrogram.sampleRate * 44100).toInt()
             .coerceAtMost(stereo.left.size)
         vocalsUsed = true
@@ -563,6 +580,8 @@ internal class DesktopTrackAnalyzer(
         }
     }
 
+    private fun modelsReady(): Boolean = models == null || models.state.value == DesktopAutomixModelState.Ready
+
     fun release() {
         released.set(true)
         pending.clear()
@@ -576,6 +595,7 @@ internal class DesktopTrackAnalyzer(
         }, "BitChord-Analysis-Cleanup").apply { isDaemon = true; start() }
         results.clear()
         measurements.clear()
+        checkedCache.clear()
         running.clear()
         failed.clear()
         failedAt.clear()

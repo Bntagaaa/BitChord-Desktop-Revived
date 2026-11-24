@@ -144,8 +144,13 @@ class DesktopAutomixTest {
             // succeed from disk, not from the first analyzer's results map.
             val second = DesktopTrackAnalyzer()
             try {
-                assertTrue(second.isAnalysed(id), "the persisted analysis did not survive")
-                assertEquals(measured.bpm, second.analysisFor(id).bpm, 0.001)
+                assertTrue(!second.playbackAnalysisFor(id).isUsable)
+                second.request(Song(id, id, "Artist", null), DesktopStream(url = file.absolutePath), seconds)
+                kotlinx.coroutines.withTimeout(5_000L) {
+                    while (!second.playbackAnalysisFor(id).isUsable) kotlinx.coroutines.delay(5)
+                }
+                assertTrue(second.measurementFor(id)?.cacheHit == true)
+                assertEquals(measured.bpm, second.playbackAnalysisFor(id).bpm, 0.001)
             } finally {
                 second.release()
             }
