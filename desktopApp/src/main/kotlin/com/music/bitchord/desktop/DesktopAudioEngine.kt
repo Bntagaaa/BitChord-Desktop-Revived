@@ -107,12 +107,8 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     init {
-        // Windows' endpoint watcher bumps the same signal from the OS's own push; Linux asks the
-        // kernel on a poll — see [DesktopLinuxAudioWatcher]. A device change reconfigures a
-        // playing line only when the line was opened on a per-device mixer that is no longer
-        // there; the plain `default` mixer follows the desktop's routing on its own under
-        // PipeWire, so it needs no help.
-        DesktopLinuxAudioWatcher.ensureStarted()
+        // The platform watchers report endpoint changes. The system-default mixer follows
+        // the desktop's routing itself, so only a disappeared named output needs reconfiguring.
         scope.launch {
             DesktopAudioDevices.changes.collect {
                 if (DesktopPlatform.isWindows) return@collect // its native side moves the stream itself
@@ -297,10 +293,22 @@ class DesktopPlaybackEngine internal constructor(
         }
     }
 
-    private val thread = Thread(::pump, "BitChord-Audio").apply {
-        isDaemon = true
-        priority = Thread.NORM_PRIORITY + 2
-        start()
+    private val threadLock = Any()
+    @Volatile private var thread: Thread? = null
+
+    private fun ensureAudioThread(): Boolean = synchronized(threadLock) {
+        if (!running.get()) return@synchronized false
+        if (thread == null) {
+            thread = Thread({
+                DesktopStartupDiagnostics.once(DesktopStartupDiagnostics.Milestone.AUDIO_READY)
+                pump()
+            }, "BitChord-Audio").apply {
+                isDaemon = true
+                priority = Thread.NORM_PRIORITY + 2
+                start()
+            }
+        }
+        true
     }
 
     // ---- the surface the application uses -------------------------------
@@ -383,6 +391,7 @@ class DesktopPlaybackEngine internal constructor(
         priorFailure: Throwable? = null,
         trace: DesktopPlaybackTrace? = null,
     ) {
+        if (!ensureAudioThread()) return
         trace?.mark("engine")
         val requestGeneration = loadGeneration.incrementAndGet()
         nextGeneration.incrementAndGet()
@@ -731,7 +740,7 @@ class DesktopPlaybackEngine internal constructor(
 
     fun setPlaybackSpeed(speed: Float) {
         playbackSpeed = speed.coerceIn(0.25f, 3.0f)
-        commands += Command.TransitionSettingsChanged
+        if (thread != null) commands += Command.TransitionSettingsChanged
     }
 
     fun setVolume(value: Float) {
@@ -749,7 +758,7 @@ class DesktopPlaybackEngine internal constructor(
         val requested = seconds.coerceIn(0, MAX_CROSSFADE_SECONDS)
         if (crossfadeSeconds == requested) return
         crossfadeSeconds = requested
-        commands += Command.TransitionSettingsChanged
+        if (thread != null) commands += Command.TransitionSettingsChanged
         if (crossfadeSeconds == 0 && !automixEnabled) clearUpcoming()
     }
 
@@ -761,7 +770,7 @@ class DesktopPlaybackEngine internal constructor(
             if (enabled) _state.value.song?.videoId else null,
             if (enabled) nextSong?.videoId else null,
         )
-        commands += Command.TransitionSettingsChanged
+        if (thread != null) commands += Command.TransitionSettingsChanged
         if (!enabled && crossfadeSeconds == 0) clearUpcoming()
     }
 
@@ -771,7 +780,7 @@ class DesktopPlaybackEngine internal constructor(
         if (automixPhraseBars == selected) return
         automixPhraseBars = selected
         // Replan the next handoff without tearing down a mix already in progress.
-        commands += Command.TransitionSettingsChanged
+        if (thread != null) commands += Command.TransitionSettingsChanged
     }
 
     /** Resolves and prepares the next queue item without starting it. */
@@ -802,6 +811,7 @@ class DesktopPlaybackEngine internal constructor(
             if (analysisSource == null) analyzer.focusOn(if (automixEnabled) _state.value.song?.videoId else null, null)
             return
         }
+        if (!ensureAudioThread()) return
         nextSong = song
         if (analysisSource == null && automixEnabled) analyzer.focusOn(_state.value.song?.videoId, song.videoId)
         nextPreparedQuality = audioQuality
@@ -947,11 +957,11 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     fun release() {
+        if (!running.compareAndSet(true, false)) return
         loopBuildJob?.cancel()
         waveformJob?.cancel()
         DesktopPlayerHost.mixViewOpen = {}
         analyzer.release()
-        running.set(false)
         resolveJob?.cancel()
         nextResolveJob?.cancel()
         upgradeJob?.cancel()
@@ -959,7 +969,7 @@ class DesktopPlaybackEngine internal constructor(
         recoveryJob = null
         loadGeneration.incrementAndGet()
         nextGeneration.incrementAndGet()
-        thread.interrupt()
+        synchronized(threadLock) { thread?.interrupt() }
         scope.cancel()
     }
 
@@ -972,14 +982,14 @@ class DesktopPlaybackEngine internal constructor(
      */
     fun shutdown(timeoutMs: Long = 2_000) {
         release()
-        runCatching { thread.join(timeoutMs) }
+        runCatching { thread?.join(timeoutMs) }
     }
 
     private fun clearUpcoming() {
         nextSong = null
         nextLocalStream = null
         awaitingArm.set(null)
-        commands += Command.ClearUpcoming
+        if (thread != null) commands += Command.ClearUpcoming
     }
 
     private fun transitionSecondsFor(next: Song?): Int = when {
@@ -2676,7 +2686,7 @@ class DesktopPlaybackEngine internal constructor(
     /** Android's "Skip silence", on the same terms. */
     fun setSkipSilence(enabled: Boolean) {
         skipSilenceEnabled = enabled
-        commands += Command.TransitionSettingsChanged
+        if (thread != null) commands += Command.TransitionSettingsChanged
         if (!enabled) silence?.reset()
     }
 

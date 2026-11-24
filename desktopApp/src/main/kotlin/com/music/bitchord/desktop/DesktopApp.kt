@@ -529,11 +529,20 @@ internal enum class DesktopRepeatMode {
     }
 }
 
+private data class LocalStartupLibrary(
+    val playlists: List<DesktopPlaylist>,
+    val downloads: List<Song>,
+    val likedIds: Set<String>,
+    val dislikedIds: Set<String>,
+    val playlistDownloads: kotlinx.coroutines.flow.StateFlow<List<DesktopPlaylistDownload>>,
+)
+
 @Composable
 internal fun BitChordDesktopApp(
     welcomeLaunch: DesktopWelcomeOnboarding.Launch,
     pipHost: DesktopPipHost,
     playbackService: DesktopPlaybackService,
+    startup: DesktopStartup,
 ) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
@@ -552,6 +561,7 @@ internal fun BitChordDesktopApp(
     var updater by remember { mutableStateOf<DesktopUpdateService?>(null) }
     LaunchedEffect(showFirstLaunchWelcome) {
         if (!showFirstLaunchWelcome && updater == null) {
+            startup.awaitInteractive()
             updater = withContext(Dispatchers.IO) { DesktopUpdateManager.service }
             updater?.startup()
         }
@@ -636,7 +646,8 @@ internal fun BitChordDesktopApp(
     var pageMenu by remember { mutableStateOf<(Song) -> Unit>({}) }
     val homeSeenTitles = remember { HashSet<String>() }
     var homeGeneration by remember { mutableStateOf(0) }
-    var homeIdentity by remember { mutableStateOf<String?>(null) }
+    var homeIdentity by remember { mutableStateOf<DesktopHomeCache.Identity?>(null) }
+    var homeFromCache by remember { mutableStateOf(false) }
     var homeEvicted by remember { mutableStateOf(false) }
     var homeJob by remember { mutableStateOf<Job?>(null) }
     var homeRenderedLogged by remember { mutableStateOf(false) }
@@ -666,22 +677,14 @@ internal fun BitChordDesktopApp(
     // History screen is and what makes a phone and a desktop agree.
     var history by playbackService.history
     var remoteHistory by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var likedIds by remember { mutableStateOf(persistence.likedIds()) }
+    var likedIds by remember { mutableStateOf(emptySet<String>()) }
     // In-flight tail of the Liked Music chain; replaced whenever the library is fetched again.
     var likedSyncJob by remember { mutableStateOf<Job?>(null) }
-    var dislikedIds by remember { mutableStateOf(persistence.dislikedIds()) }
+    var dislikedIds by remember { mutableStateOf(emptySet<String>()) }
     val overlays = remember { DesktopOverlays() }
-    var downloads by remember { mutableStateOf(persistence.downloads()) }
-    val playlistDownloadRecords by DesktopPlaylistDownloads.records.collectAsState()
+    var downloads by remember { mutableStateOf(emptyList<Song>()) }
+    var playlistDownloadRecords by remember { mutableStateOf(emptyList<DesktopPlaylistDownload>()) }
     var stalePlaylistDownloads by remember { mutableStateOf(setOf<String>()) }
-    // Import existing 1.9.3 offline playlist snapshots once; never delete existing audio files.
-    LaunchedEffect(Unit) {
-        val legacy = persistence.downloadedPlaylists()
-        if (legacy.isNotEmpty()) {
-            DesktopPlaylistDownloads.importLegacy(legacy, persistence.downloads())
-            persistence.saveDownloadedPlaylists(emptyList())
-        }
-    }
     var localSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var localMusicLoaded by remember { mutableStateOf(false) }
     var localMusicLoading by remember { mutableStateOf(false) }
@@ -689,10 +692,56 @@ internal fun BitChordDesktopApp(
     var localScanJob by remember { mutableStateOf<Job?>(null) }
     val downloadQueue by DesktopDownloadQueue.active.collectAsState()
     val downloadInProgress = downloadQueue.keys
-    var playlists by remember { mutableStateOf(persistence.playlists()) }
+    var playlists by remember { mutableStateOf(emptyList<DesktopPlaylist>()) }
+    var localLibraryReady by remember { mutableStateOf(false) }
+    val localLibrary = remember {
+        DesktopStartupTask(scope) {
+            val restored = try {
+    withContext(Dispatchers.IO) {
+                    val savedDownloads = persistence.downloads()
+                    // Migrate the older offline playlist records alongside their existing files.
+                    val legacy = persistence.downloadedPlaylists()
+                    if (legacy.isNotEmpty()) {
+                        DesktopPlaylistDownloads.importLegacy(legacy, savedDownloads)
+                        persistence.saveDownloadedPlaylists(emptyList())
+                    }
+                    LocalStartupLibrary(
+                        persistence.playlists(), savedDownloads, persistence.likedIds(),
+                        persistence.dislikedIds(), DesktopPlaylistDownloads.records,
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                DesktopTrackLog.log("local library restoration failed: ${failure.javaClass.simpleName}")
+                return@DesktopStartupTask null
+            }
+            playlists = restored.playlists
+            downloads = restored.downloads
+            likedIds = restored.likedIds
+            dislikedIds = restored.dislikedIds
+            playlistDownloadRecords = restored.playlistDownloads.value
+            localLibraryReady = true
+            restored.playlistDownloads
+        }
+    }
+    LaunchedEffect(localLibrary) {
+        startup.awaitInteractive()
+        playbackService.awaitRestored()
+        localLibrary.await()?.collect { playlistDownloadRecords = it }
+    }
+
+    fun deferUntilLibraryRestored(action: () -> Unit): Boolean {
+        if (localLibraryReady) return false
+        scope.launch {
+            if (localLibrary.await() != null) action()
+            else DesktopPlayerHost.showMessage("Could not restore the local library")
+        }
+        return true
+    }
+
     var statsRevision by remember { mutableStateOf(0L) }
     var replayPeriod by remember { mutableStateOf(DesktopReplayPeriod.ALL_TIME) }
-    val replayHolder = remember { DesktopAccounts.active()?.name.orEmpty() }
     var replaySummary by remember { mutableStateOf(DesktopReplaySummary()) }
     var statsCountedSongs by remember { mutableStateOf<Set<String>>(emptySet()) }
     var playlistTarget by remember { mutableStateOf<Song?>(null) }
@@ -808,6 +857,17 @@ internal fun BitChordDesktopApp(
     var accounts by remember { mutableStateOf(DesktopAccounts.accounts()) }
     var activeAccountId by remember { mutableStateOf(DesktopAccounts.activeAccountId()) }
     var activeProfileId by remember { mutableStateOf(DesktopAccounts.activeProfileId()) }
+    fun selectedHomeIdentity(): DesktopHomeCache.Identity {
+        val account = accounts.firstOrNull { it.accountId == activeAccountId } ?: accounts.firstOrNull()
+        val profile = account?.profiles?.let { profiles ->
+            profiles.firstOrNull { it.profileId == activeProfileId }
+                ?: profiles.firstOrNull { it.profileId == account.activeProfileId }
+                ?: profiles.firstOrNull()
+        }
+        return DesktopHomeCache.Identity(account?.accountId, profile?.profileId)
+    }
+    val selectedHomeIdentity = selectedHomeIdentity()
+    val replayHolder = accounts.firstOrNull { it.accountId == selectedHomeIdentity.accountId }?.name.orEmpty()
     var loadedAccountId by remember { mutableStateOf<String?>(null) }
     var loadedProfileId by remember { mutableStateOf<String?>(null) }
     var signInBusy by remember { mutableStateOf<String?>(null) }
@@ -887,19 +947,41 @@ internal fun BitChordDesktopApp(
         libraryState = UiState.Success(page.copy(shelves = shelves.toList()))
     }
 
-    // Whoever was signed in last is signed in again, before anything asks YouTube for something
-    // that depends on it.
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) { DesktopAccounts.activate() }
-        youtubeSignedIn = DesktopYouTubeAuth.isSignedIn
-        DesktopStartupDiagnostics.record(
-            DesktopStartupDiagnostics.Milestone.ACCOUNT_RESTORED,
-            "Signed in: $youtubeSignedIn",
-        )
-        sessionRevision++
+    // A single restore is shared by Home, the sidebar, and actions that arrive immediately.
+    val restoreAccount = remember {
+        DesktopStartupTask(scope) {
+            val started = System.nanoTime()
+            try {
+                withContext(Dispatchers.IO) { DesktopAccounts.activate() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                DesktopTrackLog.log("account restoration failed: ${failure.javaClass.simpleName}")
+            }
+            youtubeSignedIn = DesktopYouTubeAuth.isSignedIn
+            DesktopStartupDiagnostics.record(
+                DesktopStartupDiagnostics.Milestone.ACCOUNT_RESTORED,
+                durationNanos = System.nanoTime() - started,
+            )
+        }
+    }
+    LaunchedEffect(restoreAccount) {
+        startup.awaitInteractive()
+        restoreAccount.start()
     }
     var audioQuality by remember { mutableStateOf(persistence.audioQuality()) }
     var sourceConfigs by remember { mutableStateOf(persistence.sourceConfigs()) }
+    LaunchedEffect(Unit) {
+        startup.awaitInteractive()
+        playbackService.awaitRestored()
+        restoreAccount.await()
+        if (sourceConfigs.any { it.enabled && it.kind == DesktopSourceKind.YOUTUBE }) {
+            withContext(Dispatchers.IO) {
+                runCatching { DesktopYouTubePlayback.configure() }
+                    .onFailure { DesktopTrackLog.log("YouTube playback preparation failed: ${it.javaClass.simpleName}") }
+            }
+        }
+    }
     var sourceStatus by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     val youtubeSourceEnabled = sourceConfigs.any {
         it.kind == DesktopSourceKind.YOUTUBE && it.enabled
@@ -930,6 +1012,7 @@ internal fun BitChordDesktopApp(
 
     fun canonicalSong(song: Song): Song {
         val homeSong = (homeState as? UiState.Success)?.data.orEmpty()
+            .takeIf { homeIdentity == selectedHomeIdentity() }.orEmpty()
             .asSequence()
             .flatMap { it.items.asSequence() }
             .filter { it.videoId == song.videoId }
@@ -993,6 +1076,7 @@ internal fun BitChordDesktopApp(
 
     /** A song played on its own — from a search row, a shelf card, history. */
     fun playSong(song: Song, startPlaying: Boolean = true, source: DesktopQueueSource? = null) {
+        if (playbackService.deferUntilRestored { playSong(song, startPlaying, source) }) return
         if (partyTrackChangeBlocked()) return
         val tapped = canonicalSong(song).withSource(source)
         val songs = if (DesktopListenTogether.state.value.inParty) {
@@ -1011,6 +1095,7 @@ internal fun BitChordDesktopApp(
         signInError = null
         signInBusy = label
         try {
+            restoreAccount.await()
             val scope = withContext(Dispatchers.IO) { DesktopYouTubeSession.adoptSessionScope(cookie) }
             if (scope == null) {
                 signInError = "$label is not signed in to YouTube Music."
@@ -1039,6 +1124,7 @@ internal fun BitChordDesktopApp(
     }
 
     fun playSongs(songs: List<Song>, startIndex: Int = 0, source: DesktopQueueSource? = null) {
+        if (playbackService.deferUntilRestored { playSongs(songs, startIndex, source) }) return
         if (songs.isEmpty()) return
         val selected = songs.getOrNull(startIndex.coerceIn(songs.indices))
         if (selected?.videoId?.startsWith(SPOTIFY_PENDING_PREFIX) == true ||
@@ -1153,6 +1239,7 @@ internal fun BitChordDesktopApp(
 
     /** Moves within the queue, dropping whatever a forward jump passed over. */
     fun playQueueIndex(target: Int) {
+        if (playbackService.deferUntilRestored { playQueueIndex(target) }) return
         if (target !in liveQueue.songs.indices) return
         if (partyTrackChangeBlocked()) return
         liveQueue = liveQueue.jumpTo(target)
@@ -1174,6 +1261,7 @@ internal fun BitChordDesktopApp(
 
     /** Applies a rating locally and carries it to the account. */
     fun rate(song: Song, status: LikeStatus) {
+        if (deferUntilLibraryRestored { rate(song, status) }) return
         likedIds = if (status == LikeStatus.LIKE) likedIds + song.videoId else likedIds - song.videoId
         dislikedIds = if (status == LikeStatus.DISLIKE) {
             dislikedIds + song.videoId
@@ -1209,6 +1297,7 @@ internal fun BitChordDesktopApp(
      * twenty-five upcoming songs the phone and the server allow.
      */
     fun enqueue(song: Song, next: Boolean) {
+        if (playbackService.deferUntilRestored { enqueue(song, next) }) return
         val party = DesktopListenTogether.state.value
         if (party.controlsLocked) return
         if (party.inParty && liveQueue.upcoming.size >= DesktopPartySync.MAX_PARTY_UPCOMING_QUEUE) {
@@ -1235,6 +1324,7 @@ internal fun BitChordDesktopApp(
      * Preserve ordering and publish one party intent for the entire operation.
      */
     fun enqueueSongs(tracks: List<Song>, next: Boolean) {
+        if (playbackService.deferUntilRestored { enqueueSongs(tracks, next) }) return
         val party = DesktopListenTogether.state.value
         if (party.controlsLocked) return
         val playable = tracks.filter { it.unresolvedSpotifyTrack() == null }
@@ -1443,6 +1533,7 @@ internal fun BitChordDesktopApp(
     }
 
     fun downloadSong(song: Song) {
+        if (deferUntilLibraryRestored { downloadSong(song) }) return
         // A second tap on something already queued or running calls it off.
         if (song.videoId in downloadInProgress) {
             DesktopDownloadQueue.cancel(song.videoId)
@@ -1455,6 +1546,7 @@ internal fun BitChordDesktopApp(
     /** Deletes the file a download saved and forgets the record. */
     fun removeDownload(song: Song) {
         scope.launch {
+            if (localLibrary.await() == null) return@launch
             withContext(Dispatchers.IO) { DesktopDownloadManager.delete(song) }
             downloads = downloads.filterNot { it.videoId == song.videoId }
             persistence.saveDownloads(downloads)
@@ -1463,6 +1555,7 @@ internal fun BitChordDesktopApp(
 
     /** Snapshot the listing into a record and ask for everything not yet in hand. */
     fun rememberPlaylistDownload(listing: DesktopCollection) {
+        if (deferUntilLibraryRestored { rememberPlaylistDownload(listing) }) return
         val record = DesktopPlaylistDownloads.remember(
             listing.copy(songs = listing.songs.filter { it.unresolvedSpotifyTrack() == null }),
             downloads,
@@ -1685,6 +1778,7 @@ internal fun BitChordDesktopApp(
      * already playing rather than being refused as one this seed has been loaded for.
      */
     fun setAutoplay(enabled: Boolean) {
+        if (playbackService.deferUntilRestored { setAutoplay(enabled) }) return
         if (DesktopListenTogether.state.value.controlsLocked) return
         autoplay = enabled
         persistence.saveBoolean("autoplay", enabled)
@@ -1710,6 +1804,7 @@ internal fun BitChordDesktopApp(
     }
 
     fun playNext() {
+        if (playbackService.deferUntilRestored { playNext() }) return
         if (DesktopListenTogether.state.value.controlsLocked) return
         when {
             liveQueue.hasNext -> {
@@ -1726,6 +1821,7 @@ internal fun BitChordDesktopApp(
     }
 
     fun playPrevious() {
+        if (playbackService.deferUntilRestored { playPrevious() }) return
         if (DesktopListenTogether.state.value.controlsLocked) return
         val positionMs = playbackEngine.state.value.positionMs
 
@@ -1747,6 +1843,7 @@ internal fun BitChordDesktopApp(
      * the queue shows stays what plays.
      */
     fun setShuffle(enabled: Boolean) {
+        if (playbackService.deferUntilRestored { setShuffle(enabled) }) return
         if (DesktopListenTogether.state.value.controlsLocked) return
         shuffle = enabled
         persistence.saveBoolean("shuffle", enabled)
@@ -1771,6 +1868,7 @@ internal fun BitChordDesktopApp(
 
     /** Creates a playlist — on the account when there is one, otherwise here. */
     fun createPlaylist(title: String, privacy: PlaylistPrivacy) {
+        if (deferUntilLibraryRestored { createPlaylist(title, privacy) }) return
         val name = title.trim()
         if (name.isBlank()) return
         val seed = playlistTarget
@@ -1853,19 +1951,30 @@ internal fun BitChordDesktopApp(
     // Party reconciliation stays alive in tray/PiP; there is never a second PartySync on restore.
     val partySync = playbackService.partySync
     fun togglePlayPauseFromUser() {
+        if (playbackService.deferUntilRestored { togglePlayPauseFromUser() }) return
         if (partySync.handleLockedPlayPause()) return
-        playbackEngine.togglePlayPause()
-        partySync.onLocalIntent()
+        if (playbackEngine.state.value.song == null) {
+            playCurrent()
+        } else {
+            playbackEngine.togglePlayPause()
+            partySync.onLocalIntent()
+        }
     }
     fun playFromUser() {
+        if (playbackService.deferUntilRestored { playFromUser() }) return
         if (DesktopListenTogether.state.value.controlsLocked) {
             if (!playbackEngine.state.value.isPlaying) partySync.handleLockedPlayPause()
             return
         }
-        playbackEngine.play()
-        partySync.onLocalIntent()
+        if (playbackEngine.state.value.song == null) {
+            playCurrent()
+        } else {
+            playbackEngine.play()
+            partySync.onLocalIntent()
+        }
     }
     fun pauseFromUser() {
+        if (playbackService.deferUntilRestored { pauseFromUser() }) return
         if (DesktopListenTogether.state.value.controlsLocked) {
             if (playbackEngine.state.value.isPlaying) partySync.handleLockedPlayPause()
             return
@@ -2226,6 +2335,7 @@ internal fun BitChordDesktopApp(
                 YtMusicRepository.invalidateHistoryCache()
                 remoteHistory = remoteHistory.filterNot { it.videoId == song.videoId }
             }
+            playbackService.awaitRestored()
             history = history.filterNot { it.videoId == song.videoId }
             persistence.saveHistory(history)
         }
@@ -2426,6 +2536,7 @@ internal fun BitChordDesktopApp(
         searchScrollReset++
         searchJob = scope.launch {
             try {
+                restoreAccount.await()
                 val result = DesktopMusicSources.search(request.query, request.filter)
                 currentCoroutineContext().ensureActive()
                 result.fold(
@@ -2460,6 +2571,7 @@ internal fun BitChordDesktopApp(
         val requestedGeneration = searchRequestGeneration
         delay(SUGGESTION_DEBOUNCE_MS)
         if (!searchTyping || query != requestedQuery) return@LaunchedEffect
+        restoreAccount.await()
         val response = DesktopSearchClient.searchSuggestions(requestedQuery)
         currentCoroutineContext().ensureActive()
         response
@@ -2478,6 +2590,7 @@ internal fun BitChordDesktopApp(
         val requestedGeneration = searchRequestGeneration
         delay(TYPEAHEAD_MEDIA_DEBOUNCE_MS)
         if (!searchTyping || query != requestedQuery) return@LaunchedEffect
+        restoreAccount.await()
         val response = DesktopSearchClient.searchTypeahead(requestedQuery)
         currentCoroutineContext().ensureActive()
         response
@@ -2728,8 +2841,9 @@ internal fun BitChordDesktopApp(
         stationJob?.cancel()
         topPicks = null
     }
-    LaunchedEffect(activeAccountId, activeProfileId, sessionRevision, homeState) {
+    LaunchedEffect(activeAccountId, activeProfileId, sessionRevision, homeState, history) {
         val shelves = (homeState as? UiState.Success)?.data ?: return@LaunchedEffect
+        if (homeIdentity != selectedHomeIdentity()) return@LaunchedEffect
         topPicksLoading = true
         try {
             topPicks = TopPicks.build(shelves, TopPicks.LocalTaste(songs = history))
@@ -2750,59 +2864,89 @@ internal fun BitChordDesktopApp(
         topPicks = null
         topPicksLoading = false
         homeIdentity = null
+        homeFromCache = false
         homeRenderedLogged = false
         homeEvicted = true
         homeVisit++ // Dispose the previous LazyListState and its scroll position.
     }
 
     fun loadHome() {
+        val generation = ++homeGeneration
+        homeJob?.cancel()
         topPicks = null
+        val identity = selectedHomeIdentity()
+        homeIdentity = identity
+        homeFromCache = false
+        homeContinuation = null
+        homeSeenTitles.clear()
+        homeLoadingMore = false
+        homeRecentsLoading = false
+        homeRenderedLogged = false
         if (!youtubeSourceEnabled) {
             homeState = UiState.Error("YouTube Music is disabled")
             return
         }
-        val generation = ++homeGeneration
-        val signedIn = DesktopYouTubeAuth.isSignedIn
-        homeIdentity = "$signedIn/${DesktopAccounts.activeAccountId()}"
         homeState = UiState.Loading
-        homeContinuation = null
-        homeSeenTitles.clear()
-        homeLoadingMore = false
-        homeRecentsLoading = signedIn
-        homeRenderedLogged = false
-        DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.HOME_FEED_REQUESTED)
-        homeJob?.cancel()
         homeJob = scope.launch {
+            startup.awaitInteractive()
+            val cache = withContext(Dispatchers.IO) {
+                DesktopHomeCache(DesktopMediaCache.directory.resolve("home-v1.json"))
+            }
+            val cached = withContext(Dispatchers.IO) { cache.read(identity) }
+            fun current() = generation == homeGeneration && identity == selectedHomeIdentity()
+            if (!current()) return@launch
+            if (cached.isNotEmpty()) {
+                homeFromCache = true
+                homeState = UiState.Success(cached)
+            }
+            restoreAccount.await()
+            if (!current()) return@launch
+            val session = DesktopYouTubeAuth.session
+            // Keep the selected account's offline page if its credentials cannot be renewed.
+            if (session == null && identity.accountId != null && cached.isNotEmpty()) return@launch
+            DesktopStartupDiagnostics.once(DesktopStartupDiagnostics.Milestone.HOME_FEED_REQUESTED)
+            fun publishFresh(shelves: List<HomeShelf>, prepend: Boolean = false) {
+                if (!current() || session != DesktopYouTubeAuth.session || shelves.none { it.items.isNotEmpty() }) return
+                if (homeFromCache) {
+                    homeFromCache = false
+                    homeState = UiState.Loading
+                }
+                publishHomeShelves(shelves, prepend)
+            }
+            homeRecentsLoading = session != null
             launch {
                 DesktopSearchClient.home().fold(
                     onSuccess = { feed ->
-                        if (generation != homeGeneration) return@fold
+                        if (!current() || session != DesktopYouTubeAuth.session) return@fold
                         homeContinuation = feed.continuation
-                        publishHomeShelves(feed.shelves)
+                        publishFresh(feed.shelves)
+                        if ((session == null) == (identity.accountId == null)) {
+                            withContext(Dispatchers.IO) {
+                                cache.write(identity, feed.shelves)
+                            }
+                        }
                     },
                     onFailure = {
-                        if (generation == homeGeneration && homeState !is UiState.Success) {
+                        if (current() && homeState !is UiState.Success) {
                             homeState = UiState.Error(it.message ?: "Could not load Home")
                         }
                     },
                 )
             }
-            if (signedIn) {
+            if (session != null) {
                 launch {
                     YtMusicRepository.homeRecentlyPlayed()
                         .onSuccess { shelf ->
-                            if (generation != homeGeneration) return@onSuccess
+                            if (!current()) return@onSuccess
                             homeRecentsLoading = false
-                            shelf?.let { publishHomeShelves(listOf(it), prepend = true) }
+                            shelf?.let { publishFresh(listOf(it), prepend = true) }
                         }
-                        .onFailure { if (generation == homeGeneration) homeRecentsLoading = false }
+                        .onFailure { if (current()) homeRecentsLoading = false }
                 }
             }
             DesktopSearchClient.HOME_SUPPLEMENT_BROWSE_IDS.forEach { browseId ->
                 launch {
-                    DesktopSearchClient.homeSupplement(browseId).onSuccess { shelves ->
-                        if (generation == homeGeneration) publishHomeShelves(shelves)
-                    }
+                    DesktopSearchClient.homeSupplement(browseId).onSuccess { publishFresh(it) }
                 }
             }
         }
@@ -2833,27 +2977,28 @@ internal fun BitChordDesktopApp(
     SideEffect { DesktopWindowVisibility.configureTray(trayIconEnabled, closeToTray) }
 
     LaunchedEffect(Unit) {
-        // Unpacks the analyser and its models on first run in background scope
-        scope.launch(Dispatchers.IO) {
-            DesktopAnalysisRuntime.ensureStarted()
-            DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.ANALYSIS_RUNTIME_INIT)
-        }
+        startup.awaitInteractive()
         DesktopHorizontalScroll.install()
-        // Run download verification in background so startup UI isn't blocked
-        scope.launch(Dispatchers.IO) {
-            val onDisk = DesktopDownloadManager.verified(downloads)
-            if (onDisk.size != downloads.size) {
-                DesktopTrackLog.log(
-                    "downloads: ${downloads.size - onDisk.size} recorded file(s) are gone; forgetting them",
-                )
-                withContext(Dispatchers.Main) {
-                    downloads = onDisk
-                    persistence.saveDownloads(onDisk)
-                }
+        playbackService.awaitRestored()
+        if (localLibrary.await() == null) return@LaunchedEffect
+        val beforeVerification = downloads
+        if (beforeVerification.isNotEmpty()) {
+            val started = System.nanoTime()
+            val onDisk = withContext(Dispatchers.IO) { DesktopDownloadManager.verified(beforeVerification) }
+            val validIds = onDisk.mapTo(HashSet(), Song::videoId)
+            val missing = beforeVerification.filterNot { it.videoId in validIds }.associateBy(Song::videoId)
+            val current = downloads
+            // A download finished during verification can replace a previously missing record.
+            val verified = current.filterNot { song -> missing[song.videoId] === song }
+            if (verified.size != current.size) {
+                downloads = verified
+                persistence.saveDownloads(verified)
             }
-            DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.DOWNLOAD_VERIFY)
+            DesktopStartupDiagnostics.record(
+                DesktopStartupDiagnostics.Milestone.DOWNLOAD_VERIFY,
+                durationNanos = System.nanoTime() - started,
+            )
         }
-        loadHome()
     }
 
     // No inactive Home cache, even below 650 MiB. This also covers artist/album/playlist
@@ -2868,24 +3013,17 @@ internal fun BitChordDesktopApp(
         moodGridOpen = showMoodGrid,
         nowPlayingOpen = overlays.nowPlaying,
     )
-    LaunchedEffect(homeVisible) {
+    LaunchedEffect(homeVisible, selectedHomeIdentity, sessionRevision, youtubeSourceEnabled) {
         if (!homeVisible) {
             if (!homeEvicted) {
                 discardHome()
                 DesktopImageLoader.trimMemory()
                 DesktopTrackLog.log("memory: discarded Home feed after leaving the page")
             }
-        } else if (homeEvicted) {
+        } else {
             homeEvicted = false
-            loadHome() // Refresh from page one, not the old continuation token.
+            loadHome()
         }
-    }
-
-    // The feed is the account's: signing in, out or across to another channel is a different Home,
-    // and Recently Played only exists with an account behind it.
-    LaunchedEffect(youtubeSignedIn, activeAccountId) {
-        val identity = "${DesktopYouTubeAuth.isSignedIn}/${DesktopAccounts.activeAccountId()}"
-        if (homeVisible && homeIdentity != null && identity != homeIdentity) loadHome()
     }
 
     // The mark on a downloaded row, for the shared pages.
@@ -2898,6 +3036,7 @@ internal fun BitChordDesktopApp(
     // snapshot itself can play offline without asking the library.
     LaunchedEffect(Unit) {
         DesktopDownloadQueue.finished.collect { saved ->
+            if (localLibrary.await() == null) return@collect
             downloads = (listOf(saved) + downloads.filterNot { it.videoId == saved.videoId }).take(2000)
             persistence.saveDownloads(downloads)
             DesktopPlaylistDownloads.hydrate(saved)
@@ -3174,6 +3313,8 @@ internal fun BitChordDesktopApp(
      * Account switches, playlist-picker refreshes and explicit retries still reload it.
      */
     LaunchedEffect(activeAccountId, activeProfileId, sessionRevision, destination == DesktopDestination.LIBRARY, overlays.playlistDialog) {
+        startup.awaitInteractive()
+        restoreAccount.await()
         youtubeSignedIn = DesktopYouTubeAuth.isSignedIn
         if (!DesktopYouTubeAuth.isSignedIn) {
             libraryState = UiState.Success(LibraryPage(emptyList(), emptyList(), emptyList()))
@@ -3203,6 +3344,7 @@ internal fun BitChordDesktopApp(
                     "library: ${page.likedSongs.size} liked, ${page.librarySongs.size} added, " +
                         "shelves ${page.shelves.joinToString { "${it.title}=${it.items.size}" }}",
                 )
+                if (localLibrary.await() == null) return@fold
                 val fromAccount = page.likedSongs.mapTo(HashSet(), Song::videoId)
                 if (!likedIds.containsAll(fromAccount)) {
                     likedIds = likedIds + fromAccount
@@ -3561,6 +3703,7 @@ internal fun BitChordDesktopApp(
     // Clears what the listener queued by hand, as the phone's Clear does; the album and AutoPlay
     // stay where they are.
     fun clearQueue() {
+        if (playbackService.deferUntilRestored { clearQueue() }) return
         if (DesktopListenTogether.state.value.controlsLocked) return
         val edited = liveQueue.withoutUserQueue()
         if (edited === liveQueue) return
@@ -3627,6 +3770,7 @@ internal fun BitChordDesktopApp(
                     }
                     libraryStale = true
                 } else {
+                    check(localLibrary.await() != null) { "Could not restore the local library" }
                     playlists = playlists + DesktopPlaylist(title = title, songs = matched)
                     persistence.savePlaylists(playlists)
                 }
@@ -3826,6 +3970,16 @@ internal fun BitChordDesktopApp(
                     }
                 },
                 modifier = Modifier
+                    .drawWithContent {
+                        drawContent()
+                        startup.shellDrawn()
+                        if (homeVisible && homeIdentity == selectedHomeIdentity && homeState is UiState.Success) {
+                            DesktopStartupDiagnostics.once(
+                                if (homeFromCache) DesktopStartupDiagnostics.Milestone.HOME_CACHE_RENDERED
+                                else DesktopStartupDiagnostics.Milestone.HOME_FRESH_RENDERED,
+                            )
+                        }
+                    }
                     .focusRequester(shortcutRootFocusRequester)
                     // Global desktop shortcuts live in the preview phase. Focusable Compose
                     // controls activate themselves from Space/Enter during the bubble phase;
@@ -3974,7 +4128,7 @@ internal fun BitChordDesktopApp(
                             DesktopShortcut.QUICK_SEARCH -> openQuickSearch()
                             DesktopShortcut.SEARCH_PAGE -> selectDestination(DesktopDestination.SEARCH)
                             DesktopShortcut.SHOW_SHORTCUTS -> overlays.shortcuts = !overlays.shortcuts
-                            DesktopShortcut.PLAY_PAUSE -> if (selectedSong != null) togglePlayPauseFromUser()
+                            DesktopShortcut.PLAY_PAUSE -> togglePlayPauseFromUser()
                             DesktopShortcut.PREVIOUS -> playPrevious()
                             DesktopShortcut.NEXT -> playNext()
                             DesktopShortcut.SEEK_BACKWARD ->
@@ -4040,7 +4194,7 @@ internal fun BitChordDesktopApp(
                 topBar = { _ ->
                     if (oldTopPlayerEnabled) {
                         DesktopTopBar(
-                            song = selectedSong,
+                            song = selectedSong ?: liveQueue.current,
                             isPlaying = playback.isPlaying,
                             isLoading = playback.isLoading,
                             previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,
@@ -4048,7 +4202,7 @@ internal fun BitChordDesktopApp(
                             volume = playback.volume,
                             shuffle = shuffle,
                             repeatMode = repeatMode,
-                            onPlayPause = { if (selectedSong != null) togglePlayPauseFromUser() },
+                            onPlayPause = ::togglePlayPauseFromUser,
                             onPrevious = ::playPrevious,
                             onNext = ::playNext,
                             onShuffleChange = ::setShuffle,
@@ -4083,7 +4237,7 @@ internal fun BitChordDesktopApp(
                     }
                 },
                 bottomBar = { compact ->
-                    val current = selectedSong
+                    val current = selectedSong ?: liveQueue.current
                     DesktopBottomChrome(
                         compact = compact,
                         destination = destination,
@@ -4103,7 +4257,7 @@ internal fun BitChordDesktopApp(
                             releaseShortcutTextFocus()
                             overlays.nowPlaying = true
                         },
-                        onPlayPause = { if (selectedSong != null) togglePlayPauseFromUser() },
+                        onPlayPause = ::togglePlayPauseFromUser,
                         onPrevious = ::playPrevious,
                         onNext = ::playNext,
                         onShuffleChange = ::setShuffle,
@@ -4381,13 +4535,17 @@ internal fun BitChordDesktopApp(
                             activeProfileId = activeProfileId,
                             busy = signInBusy != null,
                             onSelect = { account, profile ->
-                                DesktopAccounts.select(account.accountId, profile.profileId)
-                                activeAccountId = account.accountId
-                                activeProfileId = profile.profileId
+                                scope.launch {
+                                    restoreAccount.await()
+                                    DesktopAccounts.select(account.accountId, profile.profileId)
+                                    activeAccountId = account.accountId
+                                    activeProfileId = profile.profileId
+                                }
                             },
                             onAddAccount = { overlays.accounts = false; overlays.signIn = true },
                             onRemoveAccount = { account ->
                                 scope.launch {
+                                    restoreAccount.await()
                                     accounts = withContext(Dispatchers.IO) {
                                         DesktopAccounts.remove(account.accountId)
                                         DesktopAccounts.accounts()
@@ -4634,12 +4792,12 @@ internal fun BitChordDesktopApp(
                     // events and makes View update appear unresponsive.
                         updater?.let { service ->
                             DesktopUpdateDialog(service) {
+                                playbackService.awaitRestored()
                                 val ownQueue = if (DesktopListenTogether.state.value.inParty) null else liveQueue.songs.toList() to liveQueue.index
                                 val savedHistory = history.toList()
                                 desktopUpdateShutdown.finish {
                                     ownQueue?.let { (songs, index) ->
-                                        persistence.saveQueue(songs)
-                                        persistence.saveString("queue_index", index.toString())
+                                        persistence.saveQueue(songs, index)
                                     }
                                     persistence.saveHistory(savedHistory)
                                     persistence.preferences.flush()
@@ -5073,9 +5231,11 @@ internal fun BitChordDesktopApp(
                             )
                         }
                         destination == DesktopDestination.LISTEN_NOW -> HomeScreen(
-                            topPicks = if (DesktopContentPreferences.hideTopPicks) null else topPicks,
+                            topPicks = topPicks.takeIf {
+                                !DesktopContentPreferences.hideTopPicks && homeIdentity == selectedHomeIdentity
+                            },
                             topPicksLoading = topPicksLoading && !DesktopContentPreferences.hideTopPicks,
-                            listenerName = DesktopAccounts.active()?.name,
+                            listenerName = accounts.firstOrNull { it.accountId == selectedHomeIdentity.accountId }?.name,
                             onTopPickClick = if (DesktopContentPreferences.hideTopPicks) null else ::openTopPick,
                             onMoodClick = if (DesktopContentPreferences.hideHomeMoods) null else { mood, label -> openTopPick(TopPicks.moodStation(mood), label) },
                             onMoodsShowAll = { showMoodGrid = true },
@@ -5083,7 +5243,8 @@ internal fun BitChordDesktopApp(
                             // flip the underlying artwork mode when it opens or closes: doing so
                             // can recreate visible artwork and look like the feed refreshed.
                             artworkMotion = !shortcutBlockedByModal && overlays.settingsPage == null && shortcutWindowInfo.isWindowFocused && !DesktopAppearanceSettings.reduceAnimation.value,
-                            state = (homeState as? UiState.Success<List<HomeShelf>>)?.let { loaded ->
+                            state = if (homeIdentity != selectedHomeIdentity) UiState.Loading
+                            else (homeState as? UiState.Success<List<HomeShelf>>)?.let { loaded ->
                                 val prefs = DesktopContentPreferences
                                 val trimmed = loaded.data.mapNotNull { shelf ->
                                     if (prefs.hideRecents && (shelf.title.equals("Recents", ignoreCase = true) || shelf.title.equals("Recently played", ignoreCase = true))) return@mapNotNull null

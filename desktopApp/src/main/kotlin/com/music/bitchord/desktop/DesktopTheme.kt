@@ -30,7 +30,10 @@ internal object DesktopTheme {
     )
         private set
 
-    private var systemDark: Boolean by mutableStateOf(DesktopSystemTheme.isDark())
+    private var systemDark: Boolean by mutableStateOf(mode == DesktopThemeMode.SYSTEM && DesktopSystemTheme.isDark())
+
+    // Trigger the initial appearance read outside the Swing render path.
+    fun initialize() = Unit
 
     /** Saved independently of the system/light/dark choice; defaults to classic dark. */
     var pitchBlack: Boolean by mutableStateOf(DesktopPersistence().boolean(KEY_PITCH_BLACK, false))

@@ -26,6 +26,9 @@ cp -a "$APP_DIR_SRC/." "$APPDIR/usr/"
 # The mount point differs every run, so nothing may be hard-coded.
 cat > "$APPDIR/AppRun" <<'APPRUN'
 #!/bin/sh
+case "${BITCHORD_PERF_DIAGNOSTICS:-}" in
+    1|[Tt][Rr][Uu][Ee]) export BITCHORD_APPRUN_EPOCH_MS="$(date +%s%3N)" ;;
+esac
 HERE="$(dirname "$(readlink -f "$0")")"
 
 # Java AWT can keep rendering at the old surface size after niri maximizes an

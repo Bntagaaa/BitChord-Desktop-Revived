@@ -54,6 +54,7 @@ internal data class DesktopStream(
 internal object DesktopStreamClient {
     suspend fun resolve(song: Song, maxKbps: Int = Int.MAX_VALUE): Result<DesktopStream> = runCatching {
         val url = withContext(Dispatchers.IO) {
+            DesktopYouTubePlayback.configure()
             ceiling.set(maxKbps)
             try {
                 StreamResolver.resolve(song.videoId)
