@@ -194,29 +194,29 @@ internal fun DesktopMiniPlayer(
                 ) {
                     if (!compact) DesktopToolbarButton(onClick = { onShuffleChange(!shuffle) }, size = buttonSize) {
                         Icon(painterResource(Res.drawable.player_transport_shuffle), "Shuffle",
-                            tint = if (shuffle) DesktopAccent else DesktopSecondary, modifier = Modifier.size(18.dp))
+                            tint = if (shuffle) DesktopAccent else DesktopSecondary, modifier = Modifier.size(30.dp))
                     }
                     DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = buttonSize) {
                         Icon(painterResource(Res.drawable.player_transport_previous), "Previous",
                             tint = if (previousEnabled) foreground else DesktopSecondary.copy(alpha = 0.4f),
-                            modifier = Modifier.size(24.dp))
+                            modifier = Modifier.size(28.dp))
                     }
                     DesktopToolbarButton(onClick = onPlayPause, enabled = song != null, size = buttonSize) {
                         if (isLoading) {
                             CircularProgressIndicator(Modifier.size(18.dp), color = foreground, strokeWidth = 2.dp)
                         } else {
                             Icon(painterResource(if (isPlaying) Res.drawable.player_transport_pause else Res.drawable.player_transport_play),
-                                if (isPlaying) "Pause" else "Play", tint = foreground, modifier = Modifier.size(23.dp))
+                                if (isPlaying) "Pause" else "Play", tint = foreground, modifier = Modifier.size(32.dp))
                         }
                     }
                     DesktopToolbarButton(onClick = onNext, enabled = song != null, size = buttonSize) {
-                        Icon(painterResource(Res.drawable.player_transport_next), "Next", tint = foreground, modifier = Modifier.size(24.dp))
+                        Icon(painterResource(Res.drawable.player_transport_next), "Next", tint = foreground, modifier = Modifier.size(28.dp))
                     }
                     if (!compact) DesktopToolbarButton(onClick = { onRepeatModeChange(repeatMode.next()) }, size = buttonSize) {
                         Icon(painterResource(if (repeatMode == DesktopRepeatMode.ONE) Res.drawable.player_transport_repeat_one
                             else Res.drawable.player_transport_repeat), "Repeat ${repeatMode.label()}",
                             tint = if (repeatMode == DesktopRepeatMode.OFF) DesktopSecondary else DesktopAccent,
-                            modifier = Modifier.size(18.dp))
+                            modifier = Modifier.size(32.dp))
                     }
                 }
                 Spacer(Modifier.width(if (compact) 8.dp else 22.dp))
@@ -364,7 +364,7 @@ private fun DesktopMiniPlayerTools(
                         DesktopToolbarButton(onClick = actions.onOpenQueue, size = buttonSize) {
                             Icon(painterResource(Res.drawable.player_transport_up_next), "Queue",
                                 tint = if (actions.sidePanel == DesktopSidePanel.QUEUE) DesktopAccent else foreground.copy(alpha = 0.82f),
-                                modifier = Modifier.size(18.dp))
+                                modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -397,7 +397,7 @@ private fun DesktopMiniPlayerTools(
                 .testTag("mini-player-volume-button"),
         ) {
             Icon(if (volume <= 0f) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp,
-                DesktopStrings["audio_output", "Audio output"], tint = foreground.copy(alpha = 0.88f), modifier = Modifier.size(21.dp))
+                DesktopStrings["audio_output", "Audio output"], tint = foreground.copy(alpha = 0.88f), modifier = Modifier.size(24.dp))
         }
     }
 }

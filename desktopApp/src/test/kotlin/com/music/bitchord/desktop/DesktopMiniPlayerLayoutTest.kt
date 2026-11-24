@@ -28,6 +28,8 @@ import com.music.bitchord.data.model.Song
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import kotlin.math.roundToInt
 import kotlin.test.assertEquals
@@ -36,15 +38,39 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class DesktopMiniPlayerLayoutTest {
+    private var originalTheme = DesktopTheme.mode
+    private var originalPitchBlack = DesktopTheme.pitchBlack
+    private var hoverArtwork: File? = null
+
+    @Before
+    fun useDeterministicDarkTheme() {
+        originalTheme = DesktopTheme.mode
+        originalPitchBlack = DesktopTheme.pitchBlack
+        DesktopTheme.selectMode(DesktopThemeMode.DARK)
+        DesktopTheme.updatePitchBlack(false)
+    }
+
+    @After
+    fun restoreAppearanceAndDeleteFixture() {
+        try {
+            hoverArtwork?.delete()
+        } finally {
+            DesktopTheme.selectMode(originalTheme)
+            DesktopTheme.updatePitchBlack(originalPitchBlack)
+        }
+    }
+
     @Test
     fun volumeHoverKeepsTheTrackFixedAndItsControlsDoNotExpandThePlayer() =
         runDesktopComposeUiTest(width = 840, height = 160) {
             mainClock.autoAdvance = false
             val events = PlayerEvents()
+            val artwork = DesktopPipUiTest.fixtureArtwork().also { hoverArtwork = it }
+            val song = longSong.copy(thumbnailUrl = artwork.toURI().toString())
             setContent {
                 MaterialTheme(colorScheme = desktopColorScheme(), typography = desktopTypography()) {
-                    Box(Modifier.fillMaxSize().testTag("scene"), contentAlignment = Alignment.Center) {
-                        PlayerFixture(events)
+                    Box(Modifier.fillMaxSize().background(DesktopBackground).testTag("scene"), contentAlignment = Alignment.Center) {
+                        PlayerFixture(events, song)
                     }
                 }
             }
@@ -113,7 +139,7 @@ class DesktopMiniPlayerLayoutTest {
                 setContent {
                     MaterialTheme(colorScheme = desktopColorScheme(), typography = desktopTypography()) {
                         CompositionLocalProvider(LocalDesktopMenuPortal provides portal) {
-                            Box(Modifier.fillMaxSize().desktopMenuPointer(portal),
+                            Box(Modifier.fillMaxSize().background(DesktopBackground).desktopMenuPointer(portal),
                                 contentAlignment = Alignment.BottomCenter) {
                                 PlayerFixture(events, withSongMenu = withSongMenu)
                                 DesktopMenuPortal(portal)
