@@ -9336,10 +9336,21 @@ private fun DesktopCollectionPage(
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item {
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = 36.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                // A compact web-player-scale detail header for BOTH albums and playlists.
+                // Preserve the app's font family, theme, artwork renderer and menu behavior.
+                val compactCollectionHeader =
+                    collection.type == BrowseType.PLAYLIST || collection.type == BrowseType.ALBUM
+                BoxWithConstraints(
+                    Modifier.fillMaxWidth().padding(
+                        start = if (compactCollectionHeader) 4.dp else 0.dp,
+                        top = if (compactCollectionHeader) 10.dp else 0.dp,
+                        bottom = if (compactCollectionHeader) 12.dp else 36.dp,
+                    ),
                 ) {
+                    val stacked = compactCollectionHeader && maxWidth < 360.dp
+                    // At desktop UI scale 1.25, 112.dp renders near the 140px cover in
+                    // the reference; 236.dp rendered near 295px in the rejected layout.
+                    val artworkSize = if (compactCollectionHeader) 112.dp else 286.dp
                     // The services hang motion artwork off the release, so a page for one asks for
                     // it directly rather than picking a track and hoping it sits on the right
                     // edition.
@@ -9355,59 +9366,104 @@ private fun DesktopCollectionPage(
                             }
                         }
                     }
-                    Box(Modifier.size(286.dp).clip(RoundedCornerShape(8.dp))) {
-                        DesktopArtwork(
-                            collection.thumbnailUrl ?: songs.firstOrNull()?.thumbnailUrl,
-                            Modifier.fillMaxSize(),
-                        )
-                        albumCanvas?.let {
-                            DesktopCanvasView(it.url, Modifier.fillMaxSize(), fallbackUrl = it.fallbackUrl)
+                    val artwork: @Composable () -> Unit = {
+                        Box(Modifier.size(artworkSize).clip(RoundedCornerShape(8.dp))) {
+                            DesktopArtwork(
+                                collection.thumbnailUrl ?: songs.firstOrNull()?.thumbnailUrl,
+                                Modifier.fillMaxSize(),
+                            )
+                            albumCanvas?.let {
+                                DesktopCanvasView(it.url, Modifier.fillMaxSize(), fallbackUrl = it.fallbackUrl)
+                            }
                         }
                     }
-                    Spacer(Modifier.width(30.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            typeLabel.uppercase(),
-                            color = DesktopSecondary,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.2.sp,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            collection.title,
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (credit.isNotBlank()) {
-                            Spacer(Modifier.height(6.dp))
+                    val headline: @Composable () -> Unit = {
+                        Column {
+                            // Album/playlist type remains in the metadata line; don't duplicate
+                            // the large eyebrow above the compact title.
+                            if (!compactCollectionHeader) {
+                                Text(
+                                    typeLabel.uppercase(),
+                                    color = DesktopSecondary,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.2.sp,
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
                             Text(
-                                credit,
-                                color = DesktopAccent,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
+                                collection.title,
+                                style = if (compactCollectionHeader) {
+                                    MaterialTheme.typography.titleMedium.copy(
+                                        fontSize = 16.sp,
+                                        lineHeight = 20.sp,
+                                    )
+                                } else MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (credit.isNotBlank()) {
+                                Spacer(Modifier.height(if (compactCollectionHeader) 2.dp else 6.dp))
+                                Text(
+                                    credit,
+                                    color = DesktopAccent,
+                                    style = if (compactCollectionHeader) {
+                                        MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, lineHeight = 12.sp)
+                                    } else MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (metadata.isNotBlank()) {
+                                Spacer(Modifier.height(if (compactCollectionHeader) 4.dp else 8.dp))
+                                Text(
+                                    metadata,
+                                    color = DesktopSecondary,
+                                    style = if (compactCollectionHeader) {
+                                        MaterialTheme.typography.bodySmall.copy(fontSize = 8.sp, lineHeight = 11.sp)
+                                    } else MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                    val description = collection.description?.trim()?.takeIf { it.isNotBlank() }
+                    val blurb: @Composable () -> Unit = {
+                        if (compactCollectionHeader && description != null) {
+                            Text(
+                                description,
+                                color = DesktopSecondary,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 9.sp,
+                                    lineHeight = 12.sp,
+                                ),
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        if (metadata.isNotBlank()) {
-                            Spacer(Modifier.height(8.dp))
-                            Text(metadata, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        // The phone's release controls, in its order: Shuffle, Play, search this
-                        // list, and everything else behind the overflow — downloading a release is
-                        // done once, finding a track on it is done while reading the page.
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                    }
+                    // Keep the original Shuffle / Search / More handlers and menu anchor.
+                    // Scale only the compact header controls; other screens stay untouched.
+                    val actions: @Composable () -> Unit = {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(if (compactCollectionHeader) 6.dp else 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            DesktopCircleButton(BitChordIcons.Shuffle, DesktopStrings["shuffle", "Shuffle"], onClick = { onShuffle(songs) })
+                            val buttonSize = if (compactCollectionHeader) 28.dp else 50.dp
+                            DesktopCircleButton(
+                                BitChordIcons.Shuffle,
+                                DesktopStrings["shuffle", "Shuffle"],
+                                onClick = { onShuffle(songs) },
+                                size = buttonSize,
+                            )
                             DesktopPlayPill(
                                 label = DesktopStrings["play", "Play"],
                                 onClick = { if (songs.isNotEmpty()) onPlaySongs(songs, 0) },
-                                iconOnly = true,
+                                iconOnly = !compactCollectionHeader,
+                                size = buttonSize,
+                                compact = compactCollectionHeader,
                             )
                             DesktopCircleButton(
                                 if (searching) Icons.Rounded.Close else BitChordIcons.Search,
@@ -9416,9 +9472,15 @@ private fun DesktopCollectionPage(
                                     searching = !searching
                                     if (!searching) listQuery = ""
                                 },
+                                size = buttonSize,
                             )
                             Box {
-                                DesktopCircleButton(Icons.Rounded.MoreHoriz, DesktopStrings["more", "More"], onClick = { moreOpen = true })
+                                DesktopCircleButton(
+                                    Icons.Rounded.MoreHoriz,
+                                    DesktopStrings["more", "More"],
+                                    onClick = { moreOpen = true },
+                                    size = buttonSize,
+                                )
                                 if (moreOpen) {
                                     DesktopCollectionContextMenu(
                                         actions = DesktopCollectionMenuActions(
@@ -9471,6 +9533,53 @@ private fun DesktopCollectionPage(
                                         ),
                                         onDismiss = { moreOpen = false },
                                     )
+                                }
+                            }
+                        }
+                    }
+                    if (stacked) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                artwork()
+                                Column(Modifier.weight(1f).padding(top = 6.dp)) { headline() }
+                            }
+                            if (description != null) {
+                                Spacer(Modifier.height(8.dp))
+                                blurb()
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            actions()
+                        }
+                    } else {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = if (compactCollectionHeader) Alignment.Top else Alignment.CenterVertically,
+                        ) {
+                            artwork()
+                            Spacer(Modifier.width(if (compactCollectionHeader) 22.dp else 30.dp))
+                            Column(
+                                modifier = Modifier.weight(1f).then(
+                                    if (compactCollectionHeader) Modifier.heightIn(min = artworkSize) else Modifier
+                                ),
+                                verticalArrangement = if (compactCollectionHeader) Arrangement.SpaceBetween else Arrangement.Top,
+                            ) {
+                                Column(Modifier.padding(top = if (compactCollectionHeader) 16.dp else 0.dp)) {
+                                    headline()
+                                }
+                                Column {
+                                    if (compactCollectionHeader) {
+                                        if (description != null) {
+                                            blurb()
+                                            Spacer(Modifier.height(6.dp))
+                                        }
+                                    } else {
+                                        Spacer(Modifier.height(24.dp))
+                                    }
+                                    actions()
                                 }
                             }
                         }

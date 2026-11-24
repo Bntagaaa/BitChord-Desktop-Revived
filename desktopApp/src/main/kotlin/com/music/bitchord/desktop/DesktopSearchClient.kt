@@ -74,6 +74,7 @@ object DesktopSearchClient {
                 type = fallback?.type?.takeIf { it != BrowseType.OTHER } ?: browseTypeOf(browseId),
                 songs = page.songs,
                 continuation = page.continuation,
+                description = page.description,
                 owned = page.owned,
             )
         }
@@ -175,6 +176,8 @@ data class DesktopCollection(
      * does not say, or when it is not a playlist at all.
      */
     val owned: Boolean? = null,
+    /** Editorial description returned by the browse response, if present. */
+    val description: String? = null,
     /**
      * A page opened before its tracks have arrived: the id and whatever the card that opened it
      * knew, drawn as a loader until the browse answers.
