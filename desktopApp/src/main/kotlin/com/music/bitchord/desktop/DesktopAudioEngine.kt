@@ -1060,10 +1060,12 @@ class DesktopPlaybackEngine internal constructor(
     /** The plan the running fade was started from, for the filter ride. */
     private var activePlan: TransitionPlan? = null
     private var activeSmartTransition = false
+    private val visual = DesktopAutoMixVisualFeed { DesktopPlayerHost.autoMixCanvasFrame.value = null }
     private var mixViewKey: String? = null
     private var waveformJob: kotlinx.coroutines.Job? = null
 
     init {
+        DesktopPlayerHost.autoMixVisual = visual.state
         DesktopPlayerHost.mixViewOpen = mixViewOpen@ { open ->
             waveformJob?.cancel()
             if (open) {
@@ -1103,15 +1105,18 @@ class DesktopPlaybackEngine internal constructor(
 
     private fun step() {
         drainCommands()
+        if (!visualAllowed()) visual.cancel()
         val track = current
         if (track == null || paused) {
             if (paused) sink.pause()
+            sampleVisual(playing = false)
             loopRuntime?.let(::loopPosition)
             if (paused && fadeRemaining > 0) publishBlend(playing = false)
             java.util.concurrent.locks.LockSupport.parkNanos(20_000_000L)
             return
         }
         sink.resume()
+        sampleVisual(playing = true)
 
         loopRuntime?.let { runtime ->
             if (!automixEnabled || DesktopListenTogether.state.value.inParty || playbackSpeed != 1f || skipSilenceEnabled || !loopWordsClear(runtime)) {
@@ -1179,6 +1184,11 @@ class DesktopPlaybackEngine internal constructor(
                         play(track, block, prefix)
                     }
                     ready.sinkStart = framesWritten
+                    if (visualAllowed()) {
+                        visual.arm(ready.outgoing.song, ready.incoming.song)
+                        val clock = ready.session.clock
+                        visual.begin(framesWritten, clock.handoffAt, clock.releaseAt, ready.session.sampleRate)
+                    }
                     renderLoop(ready)
                     return
                 }
@@ -1651,6 +1661,7 @@ class DesktopPlaybackEngine internal constructor(
         }
         track.finished = true
         sink.drain()
+        visual.cancel()
         current = null
         track.decoder.close()
         _state.update {
@@ -1795,6 +1806,15 @@ class DesktopPlaybackEngine internal constructor(
         DesktopPlayerSettings.smartMixBlend.value = MixBlend(beatMs = beatMs, beatAnchorNanos = anchor, playing = playing)
     }
 
+    private fun visualAllowed(): Boolean =
+        automixEnabled && playbackSpeed == 1f && !skipSilenceEnabled &&
+            !DesktopListenTogether.state.value.inParty &&
+            (DesktopPlayerSettings.automixArtwork.value || DesktopPlayerSettings.automixMiniArtwork.value)
+
+    private fun sampleVisual(playing: Boolean) {
+        if (visual.state.value != null) visual.sample(sink.framesPlayed(), framesWritten, playing)
+    }
+
     /** The outgoing track's heard position, from the sink's clock — [publishPosition]'s sum. */
     private fun outgoingHeardUs(): Long = playhead.at(sink.framesPlayed())
 
@@ -1816,6 +1836,8 @@ class DesktopPlaybackEngine internal constructor(
                 command.track.decoder.close(); continue
             }
             if (command is Command.Select || command is Command.Start || command is Command.SeekTo || command is Command.Reconfigure || command == Command.Flush || command == Command.ClearUpcoming) {
+                if (command == Command.ClearUpcoming && fadeRemaining <= 0 && !wasLoop) visual.cancelArmed()
+                else visual.cancel()
                 val settle = loopRuntime != null && (command is Command.Reconfigure || command == Command.ClearUpcoming)
                 val position = _state.value.positionMs
                 discardLoop()
@@ -1929,6 +1951,7 @@ class DesktopPlaybackEngine internal constructor(
                     if (wasLoop && !hadSwitched) endBlend()
                 }
                 Command.TransitionSettingsChanged -> {
+                    visual.cancelArmed()
                     // An overlap already heard keeps its chosen strategy. Future cues must be
                     // recalculated when Automix or the independent Crossfade setting changes.
                     if (fadeRemaining <= 0) upcoming?.let { incoming ->
@@ -1997,6 +2020,7 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     private fun startTrack(track: Track, playWhenReady: Boolean) {
+        visual.cancel()
         // Never the one being started: a restart of the current track would otherwise close the
         // decoder it is about to read from.
         if (current !== track) current?.decoder?.close()
@@ -2296,6 +2320,7 @@ class DesktopPlaybackEngine internal constructor(
                 incoming.startUs = cueUs
             }
             incoming.preparedTransition = plan
+            if (visualAllowed()) visual.arm(track.song, incoming.song)
         }
         val channels = sink.format.channels.coerceAtLeast(1)
         val prefixFrames = com.music.bitchord.playback.smart.transitionPrefixFrames(
@@ -2316,6 +2341,11 @@ class DesktopPlaybackEngine internal constructor(
         incomingSourceFrames = 0.0
         activePlan = plan
         activeSmartTransition = automixEnabled
+        if (visualAllowed()) {
+            visual.arm(track.song, incoming.song)
+            visual.begin(framesWritten + prefixFrames, seconds * DesktopTransitionRide.handoffAt(plan),
+                seconds, sink.format.sampleRate)
+        }
         incoming.tempo = if (kotlin.math.abs(plan.incomingPlaybackRate - 1.0) > .0001) {
             DesktopTempoBuffer(sink.format.channels, sink.format.sampleRate).also {
                 it.speed = plan.incomingPlaybackRate.toFloat()
@@ -2416,6 +2446,7 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     private fun abortLoop(positionMs: Long) {
+        visual.cancel()
         val hadSwitched = displaySwitched
         discardLoop()
         performSeek(positionMs)
@@ -2618,6 +2649,7 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     private fun closeEverything() {
+        visual.cancel()
         discardLoop()
         current?.decoder?.close()
         upcoming?.decoder?.close()

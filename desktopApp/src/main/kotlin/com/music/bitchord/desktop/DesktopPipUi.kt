@@ -74,6 +74,9 @@ internal fun DesktopPipUi(
         val layout = DesktopPipLayout.at(maxWidth.value, maxHeight.value)
         val art = rememberPipArtwork(state.song?.thumbnailUrl)
         PipBackground(state.song?.thumbnailUrl, art, reduceBlur, reduceAnimation)
+        if (!reduceBlur && !reduceAnimation) state.song?.let {
+            DesktopAutoMixAmbient(it, com.music.bitchord.data.settings.PlayerTheme.SIMPLE, Modifier.fillMaxSize(), mini = true)
+        }
         CompositionLocalProvider(LocalContentColor provides Color.White,
             LocalMinimumInteractiveComponentSize provides 0.dp) {
             Column(Modifier.fillMaxSize().padding(layout.padding.dp), verticalArrangement = Arrangement.spacedBy(layout.gap.dp)) {
@@ -178,6 +181,8 @@ private fun PipCover(image: ImageBitmap?, song: com.music.bitchord.data.model.So
         if (song?.isVideo == true) {
             DesktopMusicVideoSurface(song.videoId, fit = true, onRendered = {}, modifier = Modifier.fillMaxSize(),
                 showFailure = false)
+        } else if (song != null) {
+            DesktopAutoMixOverlay(song, Modifier.matchParentSize(), CARD_ART_PX, mini = true, contentScale = ContentScale.Fit)
         }
     }
 }

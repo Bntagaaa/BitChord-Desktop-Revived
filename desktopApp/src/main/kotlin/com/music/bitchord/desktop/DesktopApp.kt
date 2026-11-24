@@ -723,6 +723,8 @@ internal fun BitChordDesktopApp(
     var autoplaySeed by remember { mutableStateOf<String?>(null) }
     var autoplayJob by remember { mutableStateOf<Job?>(null) }
     var automix by remember { mutableStateOf(persistence.boolean("automix", false)) }
+    var automixArtwork by remember { mutableStateOf(persistence.boolean("automix_artwork", false)) }
+    var automixMiniArtwork by remember { mutableStateOf(persistence.boolean("automix_mini_artwork", false)) }
     var automixPerformance by remember {
         mutableStateOf(
             runCatching { AutomixPerformanceMode.valueOf(persistence.string("automix_performance", "BALANCED")) }
@@ -3475,6 +3477,8 @@ internal fun BitChordDesktopApp(
         DesktopPlayerSettings.syncedLyrics.value = syncedLyrics
         DesktopPlayerSettings.showNerdStats.value = showNerdStats
         DesktopPlayerSettings.smartFadeEnabled.value = automix
+        DesktopPlayerSettings.automixArtwork.value = automixArtwork
+        DesktopPlayerSettings.automixMiniArtwork.value = automixMiniArtwork
         DesktopPlayerSettings.smartAnalysis.value = playback.smartAnalysis
         DesktopPlayerSettings.smartMixInProgress.value = playback.mixing
         DesktopPlayerSettings.smartTransitionWindow.value = playback.transitionWindow
@@ -4705,6 +4709,20 @@ internal fun BitChordDesktopApp(
                                         automix = it
                                         persistence.saveBoolean("automix", it)
                                     },
+                                    automixArtwork = automixArtwork,
+                                    onAutomixArtworkChange = {
+                                        DesktopPlayerSettings.skipArtworkThrough =
+                                            DesktopPlayerHost.autoMixVisual.value?.pair?.generation ?: 0
+                                        automixArtwork = it
+                                        persistence.saveBoolean("automix_artwork", it)
+                                    },
+                                    automixMiniArtwork = automixMiniArtwork,
+                                    onAutomixMiniArtworkChange = {
+                                        DesktopPlayerSettings.skipMiniArtworkThrough =
+                                            DesktopPlayerHost.autoMixVisual.value?.pair?.generation ?: 0
+                                        automixMiniArtwork = it
+                                        persistence.saveBoolean("automix_mini_artwork", it)
+                                    },
                                     automixDuration = automixDuration,
                                     onAutomixDurationChange = {
                                         automixDuration = it
@@ -5594,10 +5612,9 @@ internal fun DesktopTopBar(
                                     }
                                 } else {
                                     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                                        DesktopArtwork(
-                                            song.thumbnailUrl,
+                                        DesktopAutoMixArtwork(
+                                            song, ROW_ART_PX,
                                             Modifier.size(44.dp).clip(RoundedCornerShape(3.dp)),
-                                            px = ROW_ART_PX,
                                         )
                                         Column(
                                             Modifier.weight(1f).padding(start = 12.dp, end = 56.dp),
@@ -5704,10 +5721,9 @@ internal fun DesktopTopBar(
                         } else {
                             Box(Modifier.fillMaxSize()) {
                                 Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                                    DesktopArtwork(
-                                        song.thumbnailUrl,
+                                    DesktopAutoMixArtwork(
+                                        song, ROW_ART_PX,
                                         Modifier.size(44.dp).clip(RoundedCornerShape(3.dp)),
-                                        px = ROW_ART_PX,
                                     )
                                     Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                                         Text(
@@ -6364,7 +6380,7 @@ internal fun DesktopMiniPlayer(
                     if (showArtwork) {
                         Spacer(Modifier.width(if (compactControls) 2.dp else 8.dp))
                         val artworkHeight = if (compactControls) 34.dp else 42.dp
-                        DesktopArtwork(song.thumbnailUrl, Modifier.trackArtSize(artworkHeight, song.isVideo).clip(RoundedCornerShape(7.dp)), px = ROW_ART_PX)
+                        DesktopAutoMixArtwork(song, ROW_ART_PX, Modifier.trackArtSize(artworkHeight, song.isVideo).clip(RoundedCornerShape(7.dp)))
                     }
                     Column(Modifier.weight(1f).padding(start = 8.dp, end = 8.dp)) {
                         Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
@@ -7958,6 +7974,10 @@ private fun DesktopSettingsScreen(
     onAutoplayChange: (Boolean) -> Unit,
     automix: Boolean,
     onAutomixChange: (Boolean) -> Unit,
+    automixArtwork: Boolean,
+    onAutomixArtworkChange: (Boolean) -> Unit,
+    automixMiniArtwork: Boolean,
+    onAutomixMiniArtworkChange: (Boolean) -> Unit,
     automixDuration: DesktopAutomixDuration,
     onAutomixDurationChange: (DesktopAutomixDuration) -> Unit,
     automixPerformance: AutomixPerformanceMode,
@@ -8163,6 +8183,18 @@ private fun DesktopSettingsScreen(
                             )
                         }
                     }
+                    SettingsToggle(
+                        "AutoMix artwork transition",
+                        "Dissolve artwork and blend the background during AutoMix",
+                        automixArtwork,
+                        onAutomixArtworkChange,
+                    )
+                    SettingsToggle(
+                        "AutoMix mini-player artwork transition",
+                        "Dissolve artwork in compact and floating players",
+                        automixMiniArtwork,
+                        onAutomixMiniArtworkChange,
+                    )
                     if (settingsRowVisible("AutoMix models", "Download or delete analysis models")) {
                         DesktopAutomixModelControls(onDelete = { onAutomixChange(false) })
                     }

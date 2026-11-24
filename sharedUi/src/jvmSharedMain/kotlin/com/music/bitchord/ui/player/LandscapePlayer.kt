@@ -223,6 +223,7 @@ internal fun LandscapeArtwork(
     sleeveShape: () -> Shape = { LandscapeArtShape },
     /** How much of the sleeve's shadow is cast, 1 at rest. */
     shadowFraction: () -> Float = { 1f },
+    artworkOverlay: @Composable BoxScope.() -> Unit = {},
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val casts = artLoaded || canvasRendered
@@ -273,6 +274,7 @@ internal fun LandscapeArtwork(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+            artworkOverlay()
         }
         overlay()
     }
