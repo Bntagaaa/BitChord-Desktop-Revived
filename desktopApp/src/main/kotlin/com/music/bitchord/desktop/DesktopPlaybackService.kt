@@ -3,11 +3,17 @@ package com.music.bitchord.desktop
 import androidx.compose.runtime.mutableStateOf
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.playback.PlaybackPosition
+import java.awt.EventQueue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.swing.Swing
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -38,13 +44,10 @@ internal class DesktopPlaybackService(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val selectedSong = mutableStateOf<Song?>(null)
-    val liveQueue = mutableStateOf(
-        DesktopQueue.restored(
-            persistence.queue(),
-            persistence.string("queue_index", "0").toIntOrNull() ?: 0,
-        ),
-    )
-    val history = mutableStateOf(persistence.history())
+    val liveQueue = mutableStateOf(DesktopQueue())
+    val history = mutableStateOf<List<Song>>(emptyList())
+    private val pendingActions = ArrayDeque<() -> Unit>()  // AWT event thread
+    private var restored = false
     val position = PlaybackPosition()
     val pipPlayback = mutableStateOf(DesktopPlaybackState())
     val shuffleState = mutableStateOf(persistence.boolean("shuffle", false))
@@ -113,7 +116,58 @@ internal class DesktopPlaybackService(
         },
     )
 
-    init { partySync.start() }
+    private val restoration = scope.async(Dispatchers.Swing, start = CoroutineStart.LAZY) {
+        val started = System.nanoTime()
+        val restoredSession = try {
+            withContext(Dispatchers.IO) {
+                DesktopQueue.restored(
+                    persistence.queue(),
+                    persistence.string("queue_index", "0").toIntOrNull() ?: 0,
+                ) to persistence.history()
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            DesktopTrackLog.log("playback restoration failed: ${failure.javaClass.simpleName}")
+            null
+        }
+        if (closed.get()) return@async
+        restoredSession?.let { (queue, savedHistory) ->
+            liveQueue.value = queue
+            history.value = savedHistory
+        }
+        restored = true
+        partySync.start()
+        DesktopLinuxAudioWatcher.ensureStarted()
+        DesktopStartupDiagnostics.record(
+            DesktopStartupDiagnostics.Milestone.PLAYBACK_RESTORED,
+            "Queue entries: ${liveQueue.value.songs.size}, history entries: ${history.value.size}",
+            durationNanos = System.nanoTime() - started,
+        )
+        while (!closed.get() && pendingActions.isNotEmpty()) pendingActions.removeFirst().invoke()
+    }
+
+    fun startRestoring() { restoration.start() }
+
+    suspend fun awaitRestored() { restoration.await() }
+
+    /** UI queue mutations must see the real saved timeline before applying or persisting edits. */
+    fun deferUntilRestored(action: () -> Unit): Boolean {
+        if (closed.get()) return true
+        if (restored) return false
+        pendingActions.addLast(action)
+        startRestoring()
+        return true
+    }
+
+    /** Native media callbacks can arrive from D-Bus, SMTC or the Swing tray. */
+    private fun transport(action: () -> Unit) {
+        if (!EventQueue.isDispatchThread()) {
+            EventQueue.invokeLater { transport(action) }
+        } else if (!deferUntilRestored(action)) {
+            action()
+        }
+    }
 
     fun attach(callbacks: UiCallbacks) { activeUi = callbacks }
     fun detach(callbacks: UiCallbacks) {
@@ -187,30 +241,40 @@ internal class DesktopPlaybackService(
         }
     }
 
-    fun play() {
-        if (DesktopListenTogether.state.value.controlsLocked) return
-        activeUi?.onPlay?.invoke() ?: engine.play()
+    fun play() = transport {
+        if (DesktopListenTogether.state.value.controlsLocked) return@transport
+        activeUi?.onPlay?.invoke() ?: playHeadless(toggle = false)
     }
 
-    fun pause() {
-        if (DesktopListenTogether.state.value.controlsLocked) return
+    fun pause() = transport {
+        if (DesktopListenTogether.state.value.controlsLocked) return@transport
         activeUi?.onPause?.invoke() ?: engine.pause()
     }
 
-    fun togglePlayPause() {
-        if (DesktopListenTogether.state.value.controlsLocked) return
-        activeUi?.onPlayPause?.invoke() ?: engine.togglePlayPause()
+    fun togglePlayPause() = transport {
+        if (DesktopListenTogether.state.value.controlsLocked) return@transport
+        activeUi?.onPlayPause?.invoke() ?: playHeadless(toggle = true)
     }
 
-    fun next() { activeUi?.onNext?.invoke() ?: nextHeadless() }
-    fun previous() { activeUi?.onPrevious?.invoke() ?: previousHeadless() }
+    private fun playHeadless(toggle: Boolean) {
+        if (engine.state.value.song == null) {
+            liveQueue.value.current?.let { adopt(it) }
+        } else if (toggle) {
+            engine.togglePlayPause()
+        } else {
+            engine.play()
+        }
+    }
 
-    fun seek(positionMs: Long) {
-        if (DesktopListenTogether.state.value.controlsLocked) return
+    fun next() = transport { activeUi?.onNext?.invoke() ?: nextHeadless() }
+    fun previous() = transport { activeUi?.onPrevious?.invoke() ?: previousHeadless() }
+
+    fun seek(positionMs: Long) = transport {
+        if (DesktopListenTogether.state.value.controlsLocked) return@transport
         activeUi?.onSeek?.invoke(positionMs) ?: engine.seekTo(positionMs.coerceAtLeast(0L))
     }
 
-    fun shuffle(enabled: Boolean) {
+    fun shuffle(enabled: Boolean) = transport {
         val cb = activeUi
         if (cb != null) cb.onShuffleChanged(enabled)
         else {

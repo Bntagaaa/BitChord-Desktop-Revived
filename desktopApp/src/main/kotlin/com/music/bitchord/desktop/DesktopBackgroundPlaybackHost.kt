@@ -190,6 +190,7 @@ internal fun DesktopBackgroundPlaybackHost(
                 onStop = service::pause,
             ),
         )
+        DesktopStartupDiagnostics.once(DesktopStartupDiagnostics.Milestone.BACKGROUND_STARTED)
         onDispose {
             if (pipHost.session === session) pipHost.session = null
             DesktopWindowVisibility.onMainShown = {}

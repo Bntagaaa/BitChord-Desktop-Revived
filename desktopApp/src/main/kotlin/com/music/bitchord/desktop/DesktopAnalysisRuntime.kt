@@ -5,12 +5,9 @@ import com.music.bitchord.playback.smart.NativeAnalysisLibrary
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** Unpacks what the analyser needs out of the jar, once per install. */
 internal object DesktopAnalysisRuntime {
-
-    private val started = AtomicBoolean(false)
 
     /** Where unpacked resources live, alongside the desktop log. */
     private val home: Path by lazy {
@@ -27,8 +24,10 @@ internal object DesktopAnalysisRuntime {
     /** True once the native analyser is loaded and usable. */
     val available: Boolean get() = ensureStarted().let { NativeAnalysisLibrary.available }
 
-    fun ensureStarted() {
-        if (!started.compareAndSet(false, true)) return
+    fun ensureStarted() { installation.value }
+
+    private val installation = lazy {
+        val started = System.nanoTime()
         AnalysisLog.install { message, error ->
             DesktopTrackLog.log(
                 when {
@@ -43,6 +42,10 @@ internal object DesktopAnalysisRuntime {
             val fileName = System.mapLibraryName(NativeAnalysisLibrary.LIBRARY_NAME)
             System.load(unpack("/native/$fileName", fileName).toString())
         }
+        DesktopStartupDiagnostics.record(
+            DesktopStartupDiagnostics.Milestone.ANALYSIS_RUNTIME_INIT,
+            durationNanos = System.nanoTime() - started,
+        )
     }
 
     /** A sentence worth adding to a failure whose real cause is off-screen. */

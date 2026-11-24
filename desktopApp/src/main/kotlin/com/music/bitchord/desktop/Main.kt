@@ -7,16 +7,17 @@ import com.music.bitchord.ui.ProvideDesktopPresentationLifecycle
 import com.music.bitchord.ui.player.PlayerPlatform
 import com.music.bitchord.data.DebugLog
 import com.music.bitchord.data.TrackLog
-import com.music.bitchord.data.innertube.InnerTubeXResolver
-import com.music.bitchord.data.innertube.StreamResolver
-import com.music.bitchord.data.innertube.potoken.PoTokenGenerator
 import com.music.bitchord.data.lyrics.LyricsTranslation
 import com.music.bitchord.data.spotify.SpotifyLibrary
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import java.awt.event.HierarchyEvent
+import java.awt.event.HierarchyListener
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
@@ -36,8 +37,10 @@ import kotlinx.coroutines.swing.Swing
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
+    DesktopStartupDiagnostics.processEntry()
+    val bootstrapStarted = System.nanoTime()
+    DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.BOOTSTRAP_START)
     DesktopApplicationResources.installShutdownHook()
-    DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.PROCESS_ENTRY)
     DesktopImageLoader.install()
     // Read the per-install welcome marker before services initialize or write preferences.
     val welcomeLaunch = DesktopWelcomeOnboarding.inspectStartup()
@@ -61,26 +64,19 @@ fun main() {
     TrackLog.echo = { level, tag, message, error ->
         DesktopTrackLog.log("$tag/$level: $message" + (error?.let { " (${it.message})" } ?: ""))
     }
-    StreamResolver.maxKbps = {
-        DesktopStreamClient.ceiling.get() ?: DesktopSourceRegistry.ceiling(null).maxKbps
-    }
-    InnerTubeXResolver.init(
-        filesDir = DesktopMediaCache.directory.toFile(),
-        store = DesktopInnerTubeXStore,
-        poTokenProvider = PoTokenGenerator(
-            createMinter = { DesktopPoTokenWebView.getNewPoTokenGenerator() },
-            available = { DesktopPoTokenWebView.available },
-        ).asTokenProvider(),
-    )
-    // The public "apps open right now" count; see Presence.
-    DesktopPresence.install(DesktopApplicationResources.owner)
     val preferences = DesktopPersistence()
     DesktopWindowVisibility.configureTray(
         preferences.boolean("tray_icon", true),
         preferences.boolean("close_to_tray", true),
     )
     // Unlike the main Window, this service survives tray/PiP transitions.
-    val playbackService = DesktopPlaybackService()
+    val playbackService = DesktopPlaybackService(preferences)
+    // Resolve System mode before Compose paints so the initial palette is correct.
+    DesktopTheme.initialize()
+    DesktopStartupDiagnostics.record(
+        DesktopStartupDiagnostics.Milestone.BOOTSTRAP_COMPLETE,
+        durationNanos = System.nanoTime() - bootstrapStarted,
+    )
     try { desktopMain(welcomeLaunch, playbackService) } finally {
         playbackService.close()
         DesktopApplicationResources.close()
@@ -92,7 +88,19 @@ private fun desktopMain(
     welcomeLaunch: DesktopWelcomeOnboarding.Launch,
     playbackService: DesktopPlaybackService,
 ) = application {
+    val startup = remember { DesktopStartup() }
+    var backgroundReady by remember { mutableStateOf(false) }
+    DesktopStartupDiagnostics.once(DesktopStartupDiagnostics.Milestone.AWT_READY)
     DisposableEffect(Unit) { onDispose { DesktopApplicationResources.close() } }
+    LaunchedEffect(startup) {
+        startup.awaitInteractive()
+        playbackService.startRestoring()
+        backgroundReady = true
+        withContext(Dispatchers.IO) {
+            runCatching { DesktopPresence.install(DesktopApplicationResources.owner) }
+                .onFailure { DesktopTrackLog.log("presence initialization failed: ${it.javaClass.simpleName}") }
+        }
+    }
     // Closing puts the window away rather than ending the process, while there is a tray icon to
     // bring it back from — see [DesktopWindowVisibility].
     val visible by DesktopWindowVisibility.visible.collectAsState()
@@ -143,7 +151,7 @@ private fun desktopMain(
         }
     }
     // Background transport services and PiP stay independent of main-window visibility.
-    DesktopBackgroundPlaybackHost(playbackService, pipHost)
+    if (backgroundReady) DesktopBackgroundPlaybackHost(playbackService, pipHost)
     DesktopPipHostWindow(pipHost)
     // Keep the main Window IN composition when hidden to tray or PiP, just like 1.9.3.
     // Its Compose page state, Home scroll and native peer survive show/hide cycles.
@@ -161,6 +169,22 @@ private fun desktopMain(
         resizable = true,
     ) {
         val composeWindow = window
+        DisposableEffect(composeWindow) {
+            DesktopStartupDiagnostics.once(DesktopStartupDiagnostics.Milestone.WINDOW_CREATED)
+            if (DesktopStartupDiagnostics.isEnabled) {
+                composeWindow.onRenderApiChanged {
+                    DesktopStartupDiagnostics.once(DesktopStartupDiagnostics.Milestone.SKIKO_READY)
+                }
+            }
+            val listener = HierarchyListener { event ->
+                if (event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L && composeWindow.isShowing) {
+                    startup.nativeWindowShowing()
+                }
+            }
+            composeWindow.addHierarchyListener(listener)
+            if (composeWindow.isShowing) startup.nativeWindowShowing()
+            onDispose { composeWindow.removeHierarchyListener(listener) }
+        }
         // Remember the ordinary floating bounds across launches. A maximised, fullscreen or
         // minimised window has no size or place of its own worth keeping, so the last floating
         // ones are what the next launch restores — quitting while maximised still opens at the
@@ -307,9 +331,10 @@ private fun desktopMain(
         val isDarkTheme = DesktopTheme.isDark
         // System mode follows changes while the app remains open. Native probes run off the UI thread.
         LaunchedEffect(Unit) {
+            startup.awaitInteractive()
             while (true) {
-                DesktopTheme.updateSystemDark(withContext(Dispatchers.IO) { DesktopSystemTheme.isDark() })
                 delay(2_500)
+                DesktopTheme.updateSystemDark(withContext(Dispatchers.IO) { DesktopSystemTheme.isDark() })
             }
         }
         // Update both the opaque AWT surface and Windows' system caption without remounting UI.
@@ -360,13 +385,11 @@ private fun desktopMain(
                 repeat(10) {
                     if (DesktopWindowsCaptionAppearance.attach(composeWindow)) {
                         DesktopWindowBackdrop.apply()
-                        DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.WINDOW_CREATED)
                         return@LaunchedEffect
                     }
                     delay(50)
                 }
                 DesktopWindowBackdrop.apply()
-                DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.WINDOW_CREATED)
             } else {
                 // Linux AWT/JVM already reports window dimensions in scaled logical units.
                 // Applying the graphics transform again doubles HiDPI/fractional scaling
@@ -382,7 +405,6 @@ private fun desktopMain(
                     (openingSize.width.value * scaleX).roundToInt(),
                     (openingSize.height.value * scaleY).roundToInt(),
                 )
-                DesktopStartupDiagnostics.record(DesktopStartupDiagnostics.Milestone.WINDOW_CREATED)
             }
         }
         // Apply app-wide UI scale inside Compose, preserving native window frame sizing
@@ -408,7 +430,7 @@ private fun desktopMain(
         ) {
             ProvideDesktopPresentationLifecycle(visible && !state.isMinimized) {
                 DesktopFlyoutHost {
-                    BitChordDesktopApp(welcomeLaunch, pipHost, playbackService)
+                    BitChordDesktopApp(welcomeLaunch, pipHost, playbackService, startup)
                 }
             }
         }

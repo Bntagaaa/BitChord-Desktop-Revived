@@ -210,16 +210,19 @@ internal object DesktopWebSignIn {
  */
 internal object DesktopWebCookies : CookieHandler() {
     @Volatile
-    private var jar: CookieHandler = com.sun.webkit.network.CookieManager()
+    private var jar: CookieHandler? = null
+
+    private fun currentJar(): CookieHandler = jar ?: synchronized(this) {
+        jar ?: com.sun.webkit.network.CookieManager().also { jar = it }
+    }
 
     fun install() = setDefault(this)
 
-    fun reset() {
-        jar = com.sun.webkit.network.CookieManager()
-    }
+    @Synchronized
+    fun reset() { jar = null }
 
     override fun get(uri: URI, requestHeaders: Map<String, List<String>>): Map<String, List<String>> =
-        jar.get(uri, requestHeaders)
+        currentJar().get(uri, requestHeaders)
 
-    override fun put(uri: URI, responseHeaders: Map<String, List<String>>) = jar.put(uri, responseHeaders)
+    override fun put(uri: URI, responseHeaders: Map<String, List<String>>) = currentJar().put(uri, responseHeaders)
 }

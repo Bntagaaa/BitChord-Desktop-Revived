@@ -1,0 +1,189 @@
+{
+  "platform": "Linux-7.3.5-2-cachyos-x86_64-with-glibc2.44",
+  "scenario": "fresh-profile/warm-filesystem",
+  "observation_seconds": 23.0,
+  "results": [
+    {
+      "ready_ms": 9865.28,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 663564288,
+      "last_rss_bytes": 744652800,
+      "cpu_at_ready_ms": 24300.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 15,
+        "Window created": 4847,
+        "Native analyzer initialization completed": 4926,
+        "Home feed request started": 4924,
+        "Download verification completed": 4932,
+        "Account / session restored": 4964,
+        "Home feed first content rendered": 7900
+      }
+    },
+    {
+      "ready_ms": 8832.35,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 609206272,
+      "last_rss_bytes": 743268352,
+      "cpu_at_ready_ms": 21970.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 12,
+        "Window created": 3852,
+        "Download verification completed": 3896,
+        "Home feed request started": 3897,
+        "Native analyzer initialization completed": 3903,
+        "Account / session restored": 3916,
+        "Home feed first content rendered": 6777
+      }
+    },
+    {
+      "ready_ms": 8682.77,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 591822848,
+      "last_rss_bytes": 739160064,
+      "cpu_at_ready_ms": 22470.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 42,
+        "Window created": 3988,
+        "Home feed request started": 4011,
+        "Native analyzer initialization completed": 4011,
+        "Download verification completed": 4015,
+        "Account / session restored": 4023,
+        "Home feed first content rendered": 6259
+      }
+    },
+    {
+      "ready_ms": 10427.41,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 639414272,
+      "last_rss_bytes": 755716096,
+      "cpu_at_ready_ms": 25820.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 37,
+        "Window created": 5477,
+        "Home feed request started": 5557,
+        "Native analyzer initialization completed": 5553,
+        "Download verification completed": 5565,
+        "Account / session restored": 5595,
+        "Home feed first content rendered": 8296
+      }
+    },
+    {
+      "ready_ms": 9997.92,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 620376064,
+      "last_rss_bytes": 745811968,
+      "cpu_at_ready_ms": 25290.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 15,
+        "Window created": 4213,
+        "Home feed request started": 4255,
+        "Native analyzer initialization completed": 4256,
+        "Download verification completed": 4262,
+        "Account / session restored": 4290,
+        "Home feed first content rendered": 7283
+      }
+    },
+    {
+      "ready_ms": 9538.67,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 622133248,
+      "last_rss_bytes": 762908672,
+      "cpu_at_ready_ms": 23530.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 45,
+        "Window created": 4474,
+        "Home feed request started": 4500,
+        "Native analyzer initialization completed": 4505,
+        "Download verification completed": 4504,
+        "Account / session restored": 4514,
+        "Home feed first content rendered": 7005
+      }
+    },
+    {
+      "ready_ms": 11746.23,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 617086976,
+      "last_rss_bytes": 749166592,
+      "cpu_at_ready_ms": 28730.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 17,
+        "Window created": 4924,
+        "Native analyzer initialization completed": 5036,
+        "Home feed request started": 5041,
+        "Download verification completed": 5044,
+        "Account / session restored": 5083,
+        "Home feed first content rendered": 9131
+      }
+    },
+    {
+      "ready_ms": 10192.62,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 649564160,
+      "last_rss_bytes": 746930176,
+      "cpu_at_ready_ms": 25630.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 25,
+        "Window created": 4679,
+        "Home feed request started": 4747,
+        "Download verification completed": 4753,
+        "Native analyzer initialization completed": 4760,
+        "Account / session restored": 4773,
+        "Home feed first content rendered": 7899
+      }
+    },
+    {
+      "ready_ms": 9998.05,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 624947200,
+      "last_rss_bytes": 739844096,
+      "cpu_at_ready_ms": 25220.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 18,
+        "Window created": 4909,
+        "Home feed request started": 5009,
+        "Download verification completed": 5024,
+        "Native analyzer initialization completed": 5022,
+        "Account / session restored": 5039,
+        "Home feed first content rendered": 8031
+      }
+    },
+    {
+      "ready_ms": 10461.41,
+      "early_exit_code": null,
+      "peak_startup_rss_bytes": 633364480,
+      "last_rss_bytes": 716828672,
+      "cpu_at_ready_ms": 25520.0,
+      "milestones": {
+        "Process entry and bootstrap initialization": 12,
+        "Window created": 4463,
+        "Home feed request started": 4513,
+        "Download verification completed": 4513,
+        "Native analyzer initialization completed": 4516,
+        "Account / session restored": 4544,
+        "Home feed first content rendered": 8169
+      }
+    }
+  ],
+  "summary": {
+    "ready_ms": {
+      "samples": 10,
+      "median": 9997.985,
+      "p95": 11746.23
+    },
+    "peak_startup_rss_bytes": {
+      "samples": 10,
+      "median": 623540224.0,
+      "p95": 663564288
+    },
+    "last_rss_bytes": {
+      "samples": 10,
+      "median": 745232384.0,
+      "p95": 762908672
+    },
+    "cpu_at_ready_ms": {
+      "samples": 10,
+      "median": 25255.0,
+      "p95": 28730.0
+    }
+  }
+}

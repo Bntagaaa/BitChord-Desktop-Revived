@@ -58,6 +58,7 @@ internal fun DesktopStream.rangeCacheIdentity(trackId: String): String = "$track
 internal object DesktopStreamClient {
     suspend fun resolve(song: Song, maxKbps: Int = Int.MAX_VALUE): Result<DesktopStream> = runCatching {
         val url = withContext(Dispatchers.IO) {
+            DesktopYouTubePlayback.configure()
             ceiling.set(maxKbps)
             try {
                 // Reserve time for NewPipe if the primary client walk gets stuck.

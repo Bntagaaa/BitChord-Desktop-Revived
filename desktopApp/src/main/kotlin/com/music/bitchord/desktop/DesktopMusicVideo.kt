@@ -253,7 +253,12 @@ internal object DesktopMusicVideo {
     @Volatile var speed = 1f
     private val session = resources.own("music-video") {
         DesktopVideoSession(scope, clock, { speed },
-            resolve = InnerTubeXResolver::extractVideo,
+            resolve = { id, height ->
+                withContext(Dispatchers.IO) {
+                    DesktopYouTubePlayback.configure()
+                    InnerTubeXResolver.extractVideo(id, height)
+                }
+            },
             decoderFactory = UnifiedVideoEngine::musicDecoder,
             onError = { DesktopTrackLog.log("music video: ${it.javaClass.simpleName}") },
             enabled = DesktopVideoBeta.enabled,

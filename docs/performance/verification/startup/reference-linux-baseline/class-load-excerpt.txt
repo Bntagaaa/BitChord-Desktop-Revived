@@ -1,0 +1,14 @@
+[105ms][28730][class,load     ] com.music.bitchord.desktop.MainKt source: file:/tmp/bitchord-startup-baseline/lib/app/desktopApp-c959dce029dff63f5be46c83869235c3.jar
+[493ms][28730][class,load     ] com.sun.webkit.network.CookieManager source: file:/tmp/bitchord-startup-baseline/lib/app/javafx-web-21.0.10-linux-111188eef0fe67fcbe26badaac74157e.jar
+[578ms][28730][class,load     ] com.music.bitchord.data.innertube.InnerTubeXResolver source: file:/tmp/bitchord-startup-baseline/lib/app/shared-jvm-c846ec623e1258dfdb9bdc123f16bc7.jar
+[1290ms][28730][class,load     ] com.music.bitchord.desktop.DesktopPlaybackService source: file:/tmp/bitchord-startup-baseline/lib/app/desktopApp-c959dce029dff63f5be46c83869235c3.jar
+[1322ms][28730][class,load     ] com.music.bitchord.desktop.DesktopPlaybackEngine source: file:/tmp/bitchord-startup-baseline/lib/app/desktopApp-c959dce029dff63f5be46c83869235c3.jar
+[1431ms][28730][class,load     ] sun.awt.X11.XToolkit source: jrt:/java.desktop
+[1980ms][28730][class,load     ] java.awt.EventDispatchThread source: jrt:/java.desktop
+[2318ms][28781][class,load     ] androidx.compose.ui.awt.ComposeWindow source: file:/tmp/bitchord-startup-baseline/lib/app/ui-desktop-1.12.0-c7e12ceabbe9ad2921953e527c30ea.jar
+[2377ms][28784][class,load     ] org.freedesktop.dbus.connections.impl.DBusConnection source: file:/tmp/bitchord-startup-baseline/lib/app/dbus-java-core-5.2.0-69e6ae56e44ade6b3ec1dea435386fe.jar
+[2628ms][28781][class,load     ] org.jetbrains.skiko.SkiaLayer source: file:/tmp/bitchord-startup-baseline/lib/app/skiko-awt-0.150.1-68b78f48c75f4f82c8e747df5df4883a.jar
+[4052ms][28781][class,load     ] com.music.bitchord.desktop.DesktopAppKt source: file:/tmp/bitchord-startup-baseline/lib/app/desktopApp-c959dce029dff63f5be46c83869235c3.jar
+[4435ms][28754][class,load     ] com.sun.javafx.application.PlatformImpl source: file:/tmp/bitchord-startup-baseline/lib/app/javafx-graphics-21.0.10-linux-bdedc61ff28333c6e92abe58d8f02731.jar
+[6449ms][28826][class,load     ] javafx.scene.web.WebView source: file:/tmp/bitchord-startup-baseline/lib/app/javafx-web-21.0.10-linux-111188eef0fe67fcbe26badaac74157e.jar
+[7870ms][28781][class,load     ] org.jetbrains.skia.Surface source: file:/tmp/bitchord-startup-baseline/lib/app/skiko-awt-0.150.1-68b78f48c75f4f82c8e747df5df4883a.jar
