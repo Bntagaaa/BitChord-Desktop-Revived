@@ -2715,6 +2715,13 @@ internal fun BitChordDesktopApp(
         if (overlays.settingsPage == null) settingsSession++
         overlays.settingsPage = DesktopSettingsPage.MAIN
     }
+
+    fun openSettingsPage(page: DesktopSettingsPage) {
+        // A focused search field disappears when a result opens a page. Return focus to the
+        // shortcut host before that happens so Back and keyboard traversal work immediately.
+        releaseShortcutTextFocus()
+        overlays.settingsPage = page
+    }
     // A tray Settings request remounts the main Window first, then opens a fresh settings page.
     val openSettingsRequest by DesktopWindowVisibility.settingsRequest.collectAsState()
     LaunchedEffect(openSettingsRequest) {
@@ -3448,6 +3455,9 @@ internal fun BitChordDesktopApp(
     fun goBack() {
         val entry = navHistory.removeLastOrNull() ?: return
         if (entry.key == here().key) return
+        if (overlays.settingsPage != null && overlays.settingsPage != entry.settings) {
+            releaseShortcutTextFocus()
+        }
         navRestoring[0] = true
         destination = if (entry.destination == DesktopDestination.EXPLORE) DesktopDestination.SEARCH else entry.destination
         overlays.replay = entry.replay
@@ -4992,7 +5002,7 @@ internal fun BitChordDesktopApp(
                                                 onOpenYouTube = { overlays.accounts = true },
                                                 song = playback.song,
                                                 spotifyConnected = spotifyCanvasCookie.isNotBlank(),
-                                                onOpenSpotify = { overlays.settingsPage = DesktopSettingsPage.SPOTIFY_CANVAS },
+                                                onOpenSpotify = { openSettingsPage(DesktopSettingsPage.SPOTIFY_CANVAS) },
                                                 onDisconnectSpotify = {
                                                     DesktopSpotifyToken.setCookie("")
                                                     DesktopSpotifyLibraryAuth.invalidate()
@@ -5015,7 +5025,7 @@ internal fun BitChordDesktopApp(
                                             DesktopSettingsPage.LICENSES -> DesktopLicensesPage()
                                             else -> DesktopSettingsScreen(
                                                 page = page,
-                                                onOpenPage = { overlays.settingsPage = it },
+                                                onOpenPage = ::openSettingsPage,
                                                 onBack = ::goBack,
                                                 scroll = settingsScroll,
                                                 updater = updater,
