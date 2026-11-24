@@ -3621,7 +3621,7 @@ internal fun BitChordDesktopApp(
     )
 
     @Composable
-    fun playerTrackMenu(song: Song, onDismiss: () -> Unit) {
+    fun playerTrackMenu(song: Song, onDismiss: () -> Unit, miniPlayerActions: DesktopMiniPlayerMenuActions? = null) {
         DesktopSongMenuFor(
             song = playerSongWithLinks(song),
             liked = song.videoId in likedIds,
@@ -3641,6 +3641,7 @@ internal fun BitChordDesktopApp(
                 playbackEngine.reloadCurrent(forceSourceRefresh = true)
             }.takeIf { DesktopOriginalVersion.isPinned(song.videoId) },
             onDismiss = onDismiss,
+            miniPlayerActions = miniPlayerActions,
         )
     }
 
@@ -4325,11 +4326,11 @@ internal fun BitChordDesktopApp(
                         onToggleLike = current?.takeIf { youtubeSignedIn || it.localUri != null }
                             ?.let { song -> { toggleLike(song) } },
                         songMenu = if (current != null) {
-                            {
+                            { miniPlayerActions ->
                                 Box {
                                     DesktopMoreButton(onClick = { miniPlayerMenuOpen = true })
                                     if (miniPlayerMenuOpen) {
-                                        playerTrackMenu(current, onDismiss = { miniPlayerMenuOpen = false })
+                                        playerTrackMenu(current, onDismiss = { miniPlayerMenuOpen = false }, miniPlayerActions = miniPlayerActions)
                                     }
                                 }
                             }
@@ -6429,7 +6430,7 @@ private fun DesktopBottomChrome(
     onOpenDetails: () -> Unit,
     liked: Boolean,
     onToggleLike: (() -> Unit)?,
-    songMenu: (@Composable () -> Unit)?,
+    songMenu: (@Composable (DesktopMiniPlayerMenuActions) -> Unit)?,
 ) {
     Column(
         Modifier
@@ -6525,186 +6526,6 @@ private fun DesktopFloatingNavigation(
                     Text(iconAndLabel.second, color = if (isSelected) DesktopForeground else DesktopSecondary, style = MaterialTheme.typography.labelSmall)
                 }
             }
-        }
-    }
-}
-
-@Composable
-internal fun DesktopMiniPlayer(
-    song: Song?,
-    isPlaying: Boolean,
-    isLoading: Boolean,
-    previousEnabled: Boolean,
-    progress: Float,
-    volume: Float,
-    shuffle: Boolean,
-    repeatMode: DesktopRepeatMode,
-    sidePanel: DesktopSidePanel?,
-    onExpand: () -> Unit,
-    onPlayPause: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onShuffleChange: (Boolean) -> Unit,
-    onRepeatModeChange: (DesktopRepeatMode) -> Unit,
-    onVolumeChange: (Float) -> Unit,
-    onOpenAudioOutput: (Rect) -> Unit,
-    onOpenLyrics: () -> Unit,
-    onOpenPip: () -> Unit,
-    onOpenQueue: () -> Unit,
-    onOpenDetails: () -> Unit,
-    liked: Boolean = false,
-    onToggleLike: (() -> Unit)? = null,
-    songMenu: (@Composable () -> Unit)? = null,
-) {
-    val shape = RoundedCornerShape(16.dp)
-    val dockSurface = if (DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.FLOATING_PLAYER)) {
-        Modifier.desktopBarGlass(shape, DesktopBlurArea.FLOATING_PLAYER)
-    } else {
-        Modifier
-            .background(DesktopTheme.palette.floatingPlayerSurface, shape)
-            .border(0.5.dp, DesktopBarEdge, shape)
-    }
-    Surface(
-        modifier = Modifier
-            .widthIn(max = 760.dp)
-            .fillMaxWidth()
-            .clip(shape)
-            .then(dockSurface),
-        shape = shape,
-        color = Color.Transparent,
-        tonalElevation = 0.dp,
-    ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            // A side panel can narrow the dock even in a full-size window.
-            val compactControls = maxWidth < 560.dp
-            val hideSecondaryTools = maxWidth < 450.dp
-            val showArtwork = maxWidth >= 380.dp
-            val showVolume = maxWidth >= 650.dp
-            val transportSize = if (compactControls) 28.dp else 34.dp
-            val toolSize = if (compactControls) 28.dp else 32.dp
-            // Both playing and empty states share the original dock height:
-            // 42.dp artwork + 8.dp vertical padding on each side = 58.dp.
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(58.dp)
-                    .clickable(enabled = song != null, onClick = onExpand)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (!compactControls) DesktopToolbarButton(onClick = { onShuffleChange(!shuffle) }, size = transportSize) {
-                    Icon(painterResource(Res.drawable.player_transport_shuffle), "Shuffle", tint = if (shuffle) DesktopAccent else DesktopSecondary, modifier = Modifier.size(18.dp))
-                }
-                DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = transportSize) {
-                    Icon(painterResource(Res.drawable.player_transport_previous), "Previous", tint = if (previousEnabled) DesktopForeground else DesktopSecondary.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
-                }
-                DesktopToolbarButton(onClick = onPlayPause, enabled = song != null, size = transportSize + 2.dp) {
-                    if (isLoading) {
-                        CircularProgressIndicator(Modifier.size(18.dp), color = DesktopForeground, strokeWidth = 2.dp)
-                    } else {
-                        Icon(painterResource(if (isPlaying) Res.drawable.player_transport_pause else Res.drawable.player_transport_play), if (isPlaying) "Pause" else "Play", tint = DesktopForeground, modifier = Modifier.size(23.dp))
-                    }
-                }
-                DesktopToolbarButton(onClick = onNext, enabled = song != null, size = transportSize) {
-                    Icon(painterResource(Res.drawable.player_transport_next), "Next", tint = DesktopForeground, modifier = Modifier.size(20.dp))
-                }
-                if (!compactControls) DesktopToolbarButton(onClick = { onRepeatModeChange(repeatMode.next()) }, size = transportSize) {
-                    val tint = if (repeatMode == DesktopRepeatMode.OFF) DesktopSecondary else DesktopAccent
-                    Icon(
-                        painterResource(
-                            if (repeatMode == DesktopRepeatMode.ONE) {
-                                Res.drawable.player_transport_repeat_one
-                            } else {
-                                Res.drawable.player_transport_repeat
-                            },
-                        ),
-                        "Repeat ${repeatMode.label()}",
-                        tint = tint,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                if (song == null) {
-                    // Empty state has no artwork or title: keep the side controls in place
-                    // and let the brand mark float at the actual center of the dock.
-                    Spacer(Modifier.weight(1f))
-                } else {
-                    if (showArtwork) {
-                        Spacer(Modifier.width(if (compactControls) 2.dp else 8.dp))
-                        val artworkHeight = if (compactControls) 34.dp else 42.dp
-                        DesktopAutoMixArtwork(song, ROW_ART_PX, Modifier.trackArtSize(artworkHeight, song.isVideo).clip(RoundedCornerShape(7.dp)))
-                    }
-                    Column(Modifier.weight(1f).padding(start = 8.dp, end = 8.dp)) {
-                        Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                        Text(song.artist, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    if (onToggleLike != null) {
-                        Box(
-                            Modifier
-                                .size(toolSize)
-                                .clip(CircleShape)
-                                .desktopHoverWash()
-                                .toggleable(value = liked, role = Role.Checkbox, onValueChange = { onToggleLike() }),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
-                                contentDescription = if (liked) DesktopStrings["remove_from_liked", "Remove from Liked Music"]
-                                    else DesktopStrings["like", "Like"],
-                                tint = if (liked) DesktopAccent else DesktopSecondary,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                    songMenu?.invoke()
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-                    DesktopToolbarButton(onClick = onOpenLyrics, size = toolSize) {
-                        Icon(painterResource(Res.drawable.player_transport_lyrics), "Lyrics", tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
-                    }
-                    if (!hideSecondaryTools) DesktopPipLauncher(onOpenPip, enabled = song != null)
-                    DesktopToolbarButton(onClick = onOpenQueue, size = toolSize) {
-                        Icon(painterResource(Res.drawable.player_transport_up_next), "Queue", tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
-                    }
-                    if (!hideSecondaryTools) DesktopToolbarButton(onClick = onOpenDetails, size = toolSize) {
-                        Icon(Icons.Rounded.Info, "Now playing details", tint = if (sidePanel == DesktopSidePanel.DETAILS) DesktopForeground else DesktopSecondary, modifier = Modifier.size(18.dp))
-                    }
-                    if (!hideSecondaryTools) DesktopAudioOutputButton(onOpenAudioOutput)
-                    if (showVolume) DesktopThinSlider(
-                        value = volume,
-                        onValueChange = onVolumeChange,
-                        idleHeight = 4.dp,
-                        activeHeight = 7.dp,
-                        modifier = Modifier.width(72.dp),
-                    )
-                }
-            }
-            if (song == null) {
-                // Render over the dock rather than in its Row, so unequal button groups
-                // cannot push the supplied gray SVG logo away from the true center.
-                Image(
-                    painter = painterResource(Res.drawable.bitchord_no_music),
-                    contentDescription = "BitChord",
-                    // Keep the 48.dp logo inside the fixed 58.dp dock rather than resizing the player.
-                    modifier = Modifier.align(Alignment.Center).size(48.dp),
-                )
-            }
-            Box(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .drawBehind {
-                        drawRect(
-                            color = DesktopForeground.copy(alpha = 0.12f),
-                            size = size,
-                        )
-                        drawRect(
-                            color = DesktopAccent.copy(alpha = 0.92f),
-                            size = Size(size.width * progress.coerceIn(0f, 1f), size.height),
-                        )
-                    },
-            )
         }
     }
 }

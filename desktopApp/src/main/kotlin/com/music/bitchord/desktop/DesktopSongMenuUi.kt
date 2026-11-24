@@ -39,10 +39,16 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.HighQuality
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material.icons.rounded.ThumbDownOffAlt
 import androidx.compose.material3.CircularProgressIndicator
@@ -147,6 +153,7 @@ internal fun DesktopSongMenuFor(
     onRevertToOriginal: (() -> Unit)?,
     onUpgradeQuality: (() -> Unit)?,
     onDismiss: () -> Unit,
+    miniPlayerActions: DesktopMiniPlayerMenuActions? = null,
 ) {
     val close = onDismiss
     DesktopSongMenu(
@@ -181,6 +188,7 @@ internal fun DesktopSongMenuFor(
         onSwitchMediaVersion = actions.onSwitchMediaVersion?.let { { it(); close() } },
         onDismiss = close,
         onRemoveHistory = actions.onRemoveHistory?.let { remove -> { remove(song); close() } },
+        miniPlayerActions = miniPlayerActions,
     )
 }
 
@@ -214,6 +222,7 @@ internal fun DesktopSongMenu(
     onDismiss: () -> Unit,
     onRemoveHistory: (() -> Unit)? = null,
     onSwitchMediaVersion: (() -> Unit)? = null,
+    miniPlayerActions: DesktopMiniPlayerMenuActions? = null,
 ) {
     var pickingSleepTimer by remember { mutableStateOf(false) }
     var customTimer by remember { mutableStateOf(false) }
@@ -281,6 +290,11 @@ internal fun DesktopSongMenu(
                 DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, DesktopStrings["d_turn_off", "Turn off"]) { onSleepTimer(null) }
             }
             return@DesktopMenuSurface
+        }
+
+        miniPlayerActions?.takeIf { it.hasOverflow }?.let { actions ->
+            DesktopMiniPlayerMenuItems(actions, onDismiss)
+            DesktopMenuDivider()
         }
 
         onRemoveHistory?.let { remove ->
@@ -376,6 +390,57 @@ internal fun DesktopSongMenu(
             label = DesktopStrings["sleep_timer", "Sleep timer"],
             value = sleepTimerLabel(sleepTimerMinutes, sleepAfterTrack),
         ) { pickingSleepTimer = true }
+    }
+}
+
+/** Keeps the floating player's desktop tools available without crowding its compact action row. */
+@Composable
+internal fun DesktopMiniPlayerMenuItems(
+    actions: DesktopMiniPlayerMenuActions,
+    onDismiss: () -> Unit,
+) {
+    fun dispatch(action: () -> Unit) {
+        onDismiss()
+        action()
+    }
+
+    if (actions.transportInMenu) {
+        DesktopMenuRow(
+            icon = Icons.Rounded.Shuffle,
+            label = "Shuffle",
+            selected = actions.shuffle,
+        ) { dispatch { actions.onShuffleChange(!actions.shuffle) } }
+        DesktopMenuRow(
+            icon = if (actions.repeatMode == DesktopRepeatMode.ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+            label = "Repeat ${actions.repeatMode.label()}",
+            selected = actions.repeatMode != DesktopRepeatMode.OFF,
+        ) { dispatch { actions.onRepeatModeChange(actions.repeatMode.next()) } }
+        if (actions.panelsInMenu || actions.secondaryInMenu) DesktopMenuDivider()
+    }
+    if (actions.panelsInMenu) {
+        DesktopMenuRow(
+            icon = Icons.Rounded.Lyrics,
+            label = "Lyrics",
+            selected = actions.sidePanel == DesktopSidePanel.LYRICS,
+        ) { dispatch(actions.onOpenLyrics) }
+        DesktopMenuRow(
+            icon = Icons.AutoMirrored.Rounded.QueueMusic,
+            label = "Queue",
+            selected = actions.sidePanel == DesktopSidePanel.QUEUE,
+        ) { dispatch(actions.onOpenQueue) }
+        if (actions.secondaryInMenu) DesktopMenuDivider()
+    }
+    if (actions.secondaryInMenu) {
+        DesktopMenuRow(
+            icon = Icons.Rounded.PictureInPictureAlt,
+            label = "Picture in picture",
+            enabled = actions.enabled,
+        ) { dispatch(actions.onOpenPip) }
+        DesktopMenuRow(
+            icon = Icons.Rounded.Info,
+            label = "Now playing details",
+            selected = actions.sidePanel == DesktopSidePanel.DETAILS,
+        ) { dispatch(actions.onOpenDetails) }
     }
 }
 
