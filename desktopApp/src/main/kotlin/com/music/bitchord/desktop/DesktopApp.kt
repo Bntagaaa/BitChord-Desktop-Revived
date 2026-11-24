@@ -8163,6 +8163,9 @@ private fun DesktopSettingsScreen(
                             )
                         }
                     }
+                    if (settingsRowVisible("AutoMix models", "Download or delete analysis models")) {
+                        DesktopAutomixModelControls(onDelete = { onAutomixChange(false) })
+                    }
                     val eqOn by DesktopEqualizerSettings.enabled.collectAsState()
                     SettingsToggle(
                         DesktopStrings["skip_silence", "Skip silence"],

@@ -69,7 +69,9 @@ jobs:
         run: |
           jar=$(ls desktopApp/build/compose/binaries/main/app/BitChord/lib/app/desktopApp*.jar)
           jar tf "$jar" | grep -q 'native/libbitchord_analysis.so'
-          jar tf "$jar" | grep -q 'models/.*\.onnx'
+          if jar tf "$jar" | grep -E '^models/.*\.onnx$'; then
+            exit 1
+          fi
 
       - name: Upload PiP render evidence
         if: always()
@@ -177,7 +179,9 @@ jobs:
         run: |
           jar=$(ls desktopApp/build/compose/binaries/main/app/BitChord/app/desktopApp*.jar)
           jar tf "$jar" | grep -q 'native/bitchord_analysis.dll'
-          jar tf "$jar" | grep -q 'models/.*\.onnx'
+          if jar tf "$jar" | grep -E '^models/.*\.onnx$'; then
+            exit 1
+          fi
           # WinRT, so only MSVC can build it and only this job ever does.
           jar tf "$jar" | grep -q 'native/bitchord_smtc.dll'
 

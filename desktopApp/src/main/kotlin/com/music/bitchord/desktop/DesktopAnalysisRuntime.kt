@@ -19,6 +19,8 @@ internal object DesktopAnalysisRuntime {
         Path.of(base, "bitchord", "analysis")
     }
 
+    fun legacyHome(): Path = home
+
     /** Where unpacked resources and cached analyses live. */
     fun analysisHome(): java.io.File = home.toFile().also { Files.createDirectories(home) }
 

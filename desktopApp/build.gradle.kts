@@ -397,7 +397,10 @@ tasks.named<ProcessResources>("processResources") {
         include("*.dll")
         into("native")
     }
-    // The Automix models, taken from the Android module rather than copied into this one.
+}
+
+tasks.named<ProcessResources>("processTestResources") {
+    // Offline fixtures for inference tests. Release packages fetch these on demand.
     from(rootProject.file("app/src/main/assets")) {
         include("*.onnx")
         into("models")

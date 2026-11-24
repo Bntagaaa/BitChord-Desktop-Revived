@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate the actual analyser and models inside a Linux jpackage tree or extracted AppImage.
+# Validate the actual analyser and on-demand model packaging inside a Linux jpackage tree or extracted AppImage.
 set -euo pipefail
 app_root=${1:-desktopApp/build/compose/binaries/main/app/BitChord}
 repo_root=$(cd "$(dirname "$0")/../../.." && pwd)
@@ -14,10 +14,10 @@ if len(jars) != 1:
     raise SystemExit(f'Expected one application JAR, found {len(jars)} in {app}')
 with zipfile.ZipFile(jars[0]) as jar:
     models = [n for n in jar.namelist() if n.startswith('models/') and n.endswith('.onnx')]
-    if len(models) < 2:
-        raise SystemExit(f'Expected two or more Automix models, found {len(models)}')
+    if models:
+        raise SystemExit(f'AutoMix models must be delivered on demand, found {models}')
     (output / 'libbitchord_analysis.so').write_bytes(jar.read('native/libbitchord_analysis.so'))
-print(f'Packaged analyser and {len(models)} ONNX models found')
+print('Packaged analyser found. AutoMix weights are delivered on demand.')
 PY
 ldd "$tmp_dir/libbitchord_analysis.so" > "$tmp_dir/imports.txt"
 cat "$tmp_dir/imports.txt"

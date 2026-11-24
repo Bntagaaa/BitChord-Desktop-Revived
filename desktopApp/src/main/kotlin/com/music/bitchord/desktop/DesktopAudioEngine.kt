@@ -82,6 +82,7 @@ class DesktopPlaybackEngine internal constructor(
     /** Automix's evidence. */
     private val analyzer = DesktopTrackAnalyzer(
         performance = { automixPerformance },
+        models = DesktopAutomixModels.manager,
         // Automix is off in a party, so whatever was queued for it before the party began is
         // dropped rather than run to completion.
         stopped = { DesktopListenTogether.state.value.inParty },
@@ -757,6 +758,7 @@ class DesktopPlaybackEngine internal constructor(
     fun setAutomixEnabled(enabled: Boolean) {
         if (automixEnabled == enabled) return
         automixEnabled = enabled
+        if (enabled && analysisSource == null) DesktopAutomixModels.manager.download()
         if (analysisSource == null) analyzer.focusOn(
             if (enabled) _state.value.song?.videoId else null,
             if (enabled) nextSong?.videoId else null,

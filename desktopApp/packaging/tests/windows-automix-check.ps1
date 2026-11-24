@@ -89,10 +89,10 @@ if ($resources -notcontains "native/bitchord_analysis.dll") {
     throw "Packaged desktopApp jar is missing native/bitchord_analysis.dll"
 }
 $models = @($resources | Where-Object { $_ -match '^models/.+\.onnx$' })
-if ($models.Count -lt 2) {
-    throw "Packaged desktopApp jar is missing Automix ONNX models (found $($models.Count))"
+if ($models.Count -ne 0) {
+    throw "AutoMix models must be delivered on demand (found $($models.Count) bundled)"
 }
-Write-Host "Automix Windows package verified: static runtime imports, loadable JNI DLL, and $($models.Count) models"
+Write-Host "Automix Windows package verified: static runtime imports, loadable JNI DLL, and on-demand models"
 
 # Load the packaged bytes too, rather than assuming the build-output DLL was included.
 $extracted = Join-Path ([System.IO.Path]::GetTempPath()) ("bitchord-packaged-" + [Guid]::NewGuid())

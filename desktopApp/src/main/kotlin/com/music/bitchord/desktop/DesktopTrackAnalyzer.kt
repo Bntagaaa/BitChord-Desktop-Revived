@@ -68,6 +68,7 @@ internal class DesktopTrackAnalyzer(
      * and a model pass for a transition that cannot happen. A stopped pass records nothing.
      */
     private val stopped: () -> Boolean = { false },
+    private val models: DesktopAutomixModelManager? = null,
     private val onAnalysed: (String) -> Unit = {},
     private val persistResult: ((String, TrackAnalysis) -> Unit)? = null,
     /**
@@ -113,8 +114,10 @@ internal class DesktopTrackAnalyzer(
         (Runtime.getRuntime().availableProcessors() - 2).coerceAtLeast(1),
     )
 
+    private fun modelPath(name: String): String = models?.path(name) ?: DesktopAnalysisRuntime.modelPath(name)
+
     private val vocals by lazy {
-        VocalTracker({ DesktopAnalysisRuntime.modelPath(VocalTracker.MODEL_ASSET) }, { inferenceThreads() })
+        VocalTracker({ modelPath(VocalTracker.MODEL_ASSET) }, { inferenceThreads() })
     }
     private var vocalsUsed = false
     private var beatsUsed = false
@@ -122,12 +125,13 @@ internal class DesktopTrackAnalyzer(
     private fun cancelled(): Boolean {
         val active = activeTaskId.get()
         return released.get() || Thread.currentThread().isInterrupted || stopped() ||
+            (models != null && models.state.value != DesktopAutomixModelState.Ready) ||
             (active != null && !pending.isRelevant(active))
     }
 
     private val beats by lazy {
         BeatTracker(
-            modelPath = { DesktopAnalysisRuntime.modelPath(BeatTracker.MODEL_ASSET) },
+            modelPath = { modelPath(BeatTracker.MODEL_ASSET) },
             inferenceThreads = { inferenceThreads() },
         )
     }
