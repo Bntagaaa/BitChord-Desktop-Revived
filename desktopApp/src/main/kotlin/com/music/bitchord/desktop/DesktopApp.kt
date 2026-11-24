@@ -3809,6 +3809,7 @@ internal fun BitChordDesktopApp(
                 onSidebarDrawerOpenChange = { sidebarDrawerOpen = it },
                 hasFloatingPlayer = !oldTopPlayerEnabled,
                 homePanelOverlay = homePanelOverlaysFeed,
+                homeQueueGlass = homePanelOverlaysFeed && overlays.sidePanel == DesktopSidePanel.QUEUE,
                 menuPortal = menuPortal,
                 onMenuClosed = { runCatching { shortcutRootFocusRequester.requestFocus() } },
                 // Only Replay dresses itself; everywhere else the chrome sits on the plain surface.
@@ -6570,15 +6571,34 @@ internal fun DesktopFrame(
     /** The column on the far side of the page — the lyrics or the queue, when one is open. */
     trailing: @Composable () -> Unit = {},
     overlay: @Composable () -> Unit = {},
+    homeQueueGlass: Boolean = false,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val haze = remember { HazeState() }
     val menuHaze = remember { HazeState() }
+    // Capture the live Home page only for the Queue experiment. Keep the source
+    // through the existing 260 ms exit animation; release it on leaving Home or
+    // enabling Reduce Blur. The queue, floating player and menus are not sources.
+    val queueBlurAllowed = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.SIDE_PANELS)
+    val queueCaptureRequested = homePanelOverlay && homeQueueGlass && queueBlurAllowed
+    var queueCaptureHeld by remember { mutableStateOf(false) }
+    LaunchedEffect(queueCaptureRequested, homePanelOverlay, queueBlurAllowed) {
+        if (queueCaptureRequested) {
+            queueCaptureHeld = true
+        } else {
+            if (homePanelOverlay && queueBlurAllowed && queueCaptureHeld) delay(260)
+            queueCaptureHeld = false
+        }
+    }
+    val queueGlassBackdrop = if (homePanelOverlay && queueBlurAllowed &&
+        (queueCaptureRequested || queueCaptureHeld)
+    ) rememberHomeQueueGlassBackdrop() else null
     menuPortal.onClosed = onMenuClosed
     val oldTopPlayerEnabled by DesktopAppearanceSettings.enableOldTopMusicPlayerStyle.collectAsState()
     CompositionLocalProvider(
         LocalDesktopHaze provides haze,
         LocalDesktopMenuPortal provides menuPortal,
+        LocalHomeQueueGlassBackdrop provides queueGlassBackdrop,
     ) {
         Box(modifier.fillMaxSize().background(containerColor).desktopMenuPointer(menuPortal)) {
             // Preserve blur for the floating player; the sidebar itself remains opaque.
@@ -6617,7 +6637,14 @@ internal fun DesktopFrame(
                                     panel = trailing,
                                 ) {
                                     Box(Modifier.fillMaxSize()) {
-                                        Box(Modifier.fillMaxSize().hazeSource(haze)) {
+                                        Box(
+                                            Modifier.fillMaxSize().hazeSource(haze).then(
+                                                if (queueGlassBackdrop != null) {
+                                                    Modifier.captureHomeQueueGlassBackdrop(queueGlassBackdrop)
+                                                        .background(containerColor)
+                                                } else Modifier,
+                                            ),
+                                        ) {
                                             content(
                                                 PaddingValues(
                                                     start = 0.dp,

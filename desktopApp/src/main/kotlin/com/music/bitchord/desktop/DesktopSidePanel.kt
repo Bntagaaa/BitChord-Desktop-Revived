@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
@@ -37,15 +35,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.music.bitchord.ui.components.optimizedHazeEffect
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 
@@ -64,43 +57,6 @@ internal fun desktopSidePanelMaterial(
     panel == DesktopSidePanel.QUEUE -> DesktopSidePanelMaterial.QUEUE_GLASS
     else -> DesktopSidePanelMaterial.FROSTED
 }
-
-/**
- * Adapt BitChord v1.10's glass material (OptimizedHaze.kt and PlayerControls.kt)
- * to a large desktop pane: one downsampled backdrop, theme-aware tint and
- * a thin gradient rim. The content stays outside the sampling pass.
- * This is frosted glass, not an optical refraction shader.
- */
-internal fun Modifier.homeQueueLiquidGlass(haze: HazeState, fill: Color): Modifier =
-    clip(HOME_QUEUE_GLASS_SHAPE)
-        .optimizedHazeEffect(
-            state = haze,
-            style = HazeStyle(
-                backgroundColor = fill,
-                tints = listOf(HazeTint(fill.copy(alpha = HOME_QUEUE_GLASS_TINT))),
-                blurRadius = 36.dp,
-                noiseFactor = 0f,
-                fallbackTint = HazeTint(fill),
-            ),
-        )
-        .background(
-            Brush.verticalGradient(
-                0f to Color.White.copy(alpha = 0.07f),
-                0.50f to Color.Transparent,
-                1f to Color.Black.copy(alpha = 0.06f),
-            ),
-        )
-        .border(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                0f to Color.White.copy(alpha = 0.42f),
-                1f to Color.White.copy(alpha = 0.14f),
-            ),
-            shape = HOME_QUEUE_GLASS_SHAPE,
-        )
-
-private val HOME_QUEUE_GLASS_SHAPE = RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp)
-private const val HOME_QUEUE_GLASS_TINT = 0.45f
 
 /**
  * Apple Music's right-hand sidebar: the lyrics or the queue in a column beside the page, while the
@@ -133,7 +89,7 @@ internal fun DesktopSidePanelColumn(
     ) {
         val glass = when (material) {
             DesktopSidePanelMaterial.QUEUE_GLASS -> Modifier.homeQueueLiquidGlass(
-                haze = requireNotNull(haze),
+                backdrop = LocalHomeQueueGlassBackdrop.current,
                 fill = panelFill,
             )
             DesktopSidePanelMaterial.FROSTED -> Modifier.hazeEffect(state = requireNotNull(haze)) {
@@ -145,8 +101,15 @@ internal fun DesktopSidePanelColumn(
             DesktopSidePanelMaterial.SOLID -> Modifier.background(panelFill)
         }
         Box(Modifier.width(SIDE_PANEL_WIDTH).fillMaxHeight()) {
-            Row(Modifier.matchParentSize().then(glass)) {
-                // Keep the same content inset; the pilot's gradient rim replaces the flat divider.
+            Row(
+                Modifier.matchParentSize()
+                    .then(
+                        if (material == DesktopSidePanelMaterial.QUEUE_GLASS) Modifier.padding(8.dp)
+                        else Modifier,
+                    )
+                    .then(glass),
+            ) {
+                // Keep the content inset; the shader lights the bevel instead of drawing a border.
                 Box(
                     Modifier.width(1.dp).fillMaxHeight().background(
                         if (material == DesktopSidePanelMaterial.QUEUE_GLASS) Color.Transparent else DesktopDivider,
