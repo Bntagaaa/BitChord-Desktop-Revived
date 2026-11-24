@@ -184,6 +184,72 @@ class DesktopAutomixTest {
         } finally { analyzer.release() }
     }
 
+
+    @Test
+    fun `profile cold and cached AutoMix analysis`() = runBlocking {
+        val enabled = System.getenv("BITCHORD_AUTOMIX_BENCHMARK") == "1"
+        org.junit.Assume.assumeTrue("Set BITCHORD_AUTOMIX_BENCHMARK=1 to measure", enabled)
+        assertTrue(DesktopAnalysisRuntime.available)
+        val fixtures = listOf(
+            clickTrackFile(120.0, 65.0) to 65.0,
+            clickTrackFile(124.0, 65.0) to 65.0,
+            clickTrackFile(172.0, 65.0) to 65.0,
+        ) + System.getenv("BITCHORD_AUTOMIX_AUDIO_FIXTURES").orEmpty()
+            .split(File.pathSeparatorChar).filter(String::isNotBlank).map { entry ->
+                val file = File(entry).absoluteFile
+                assertTrue(file.isFile, file.path)
+                val probe = DesktopAudioDecoder()
+                val duration = try {
+                    probe.open(file.path, requested = DesktopPcmFormat(44_100, 2, 4, isFloat = true)).getOrThrow()
+                    requireNotNull(probe.durationUs) / 1_000_000.0
+                } finally {
+                    probe.close()
+                }
+                file to duration
+            }
+        val ids = fixtures.indices.map { "automix-benchmark-${System.nanoTime()}-$it" }
+        val ready = kotlinx.coroutines.channels.Channel<String>(fixtures.size)
+        val analyzer = DesktopTrackAnalyzer(onAnalysed = { ready.trySend(it) })
+        val cold = mutableListOf<com.music.bitchord.playback.smart.TrackAnalysis>()
+        val pairStart = System.nanoTime()
+        try {
+            fixtures.forEachIndexed { index, (file, duration) ->
+                val id = ids[index]
+                val start = System.nanoTime()
+                analyzer.request(Song(id, if (index < 3) "click-$index" else file.name, "benchmark", null),
+                    DesktopStream(file.absolutePath), duration)
+                assertEquals(id, kotlinx.coroutines.withTimeout(180_000) { ready.receive() })
+                val result = analyzer.analysisFor(id)
+                println("AUTOMIX_ANALYSIS fixture=$index cold_ms=${(System.nanoTime() - start) / 1e6} " +
+                    "bpm=${result.bpm} confidence=${result.beatConfidence} downbeats=${result.downbeats.size}")
+                cold += result
+                if (index == 1) {
+                    val plan = planTransition(cold[0], cold[1],
+                        Song(ids[0], "first", "benchmark", null).transitionInfo(65_000),
+                        Song(ids[1], "next", "benchmark", null).transitionInfo(65_000),
+                        currentTime = 50.0, duration = 65.0, fadeSeconds = 6.0,
+                        mode = CrossfadeMode.SMART, advanced = true)
+                    assertTrue(plan.fadeSeconds > 0)
+                    println("AUTOMIX_PLAN first_pair_ms=${(System.nanoTime() - pairStart) / 1e6} " +
+                        "style=${plan.transitionStyle} cue_s=${plan.incomingCueTime}")
+                }
+            }
+        } finally {
+            analyzer.release()
+        }
+        val cache = DesktopTrackAnalyzer()
+        try {
+            ids.forEachIndexed { index, id ->
+                val start = System.nanoTime()
+                val restored = cache.analysisFor(id)
+                println("AUTOMIX_ANALYSIS fixture=$index disk_cache_ms=${(System.nanoTime() - start) / 1e6}")
+                assertEquals(cold[index].bpm, restored.bpm, 0.001)
+            }
+        } finally {
+            cache.release()
+        }
+    }
+
     private suspend fun analyse(
         analyzer: DesktopTrackAnalyzer,
         id: String,
