@@ -17,7 +17,21 @@ with zipfile.ZipFile(jars[0]) as jar:
     if models:
         raise SystemExit(f'AutoMix models must be delivered on demand, found {models}')
     (output / 'libbitchord_analysis.so').write_bytes(jar.read('native/libbitchord_analysis.so'))
-print('Packaged analyser found. AutoMix weights are delivered on demand.')
+runtime = list((app / 'lib/app').glob('onnxruntime-*.jar'))
+if len(runtime) != 1:
+    raise SystemExit(f'Expected one ONNX Runtime JAR, found {len(runtime)}')
+with zipfile.ZipFile(runtime[0]) as jar:
+    prefix = 'ai/onnxruntime/native/linux-x64/'
+    present = set(jar.namelist())
+    expected = {prefix + 'libonnxruntime.so', prefix + 'libonnxruntime4j_jni.so'}
+    if not expected <= present:
+        raise SystemExit(f'Packaged ONNX Runtime is missing {expected - present}')
+    if '-linux-x64-' in runtime[0].name and any(
+        name.startswith('ai/onnxruntime/native/') and not name.startswith(prefix) and not name.endswith('/')
+        for name in present
+    ):
+        raise SystemExit('Target-only ONNX Runtime has foreign native binaries')
+print('Packaged analyser and Linux ONNX Runtime found. Weights are delivered on demand.')
 PY
 ldd "$tmp_dir/libbitchord_analysis.so" > "$tmp_dir/imports.txt"
 cat "$tmp_dir/imports.txt"
