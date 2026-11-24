@@ -495,7 +495,7 @@ internal fun TransportRow(
     val playSize = if (desktop) 28.dp else if (compact) 58.dp else 74.dp
     val playTouch = if (desktop) 44.dp else if (compact) 76.dp else 92.dp
     val skipSize = if (desktop) 24.dp else if (compact) 44.dp else PLAYER_SKIP_ICON_SIZE
-    val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val reduceAnimation = LocalPlayerReduceMotion.current
     val animationsActive = LocalPlayerTransportMotionActive.current
     val previousMotion = rememberPlayerSkipMotion(active = animationsActive, reduceMotion = reduceAnimation)
     val nextMotion = rememberPlayerSkipMotion(active = animationsActive, reduceMotion = reduceAnimation)
@@ -761,7 +761,7 @@ internal fun CircleGlyph(
 ) {
     val haptics = rememberHaptics()
     val glass = LocalPlayerGlass.current != null
-    val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val reduceAnimation = LocalPlayerReduceMotion.current
     val discAlpha by animateFloatAsState(
         targetValue = if (active) 0.34f else 0.18f,
         label = "glyphDisc",
