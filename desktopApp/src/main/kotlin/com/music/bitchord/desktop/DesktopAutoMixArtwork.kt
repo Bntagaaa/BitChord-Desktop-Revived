@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.artworkAt
+import com.music.bitchord.ui.LocalDesktopPresentationVisible
 import com.music.bitchord.ui.player.ArtworkMeshBackdrop
 import com.music.bitchord.ui.player.FullArtworkBlurBackdrop
 import com.music.bitchord.ui.player.MeshGradientBackground
@@ -152,6 +153,7 @@ internal fun DesktopAutoMixAmbient(song: Song, theme: PlayerTheme, modifier: Mod
 
 @Composable
 internal fun rememberDesktopAutoMixPair(mini: Boolean): DesktopAutoMixArtworkPair? {
+    if (!LocalDesktopPresentationVisible.current) return null
     val enabled by (if (mini) DesktopPlayerSettings.automixMiniArtwork else DesktopPlayerSettings.automixArtwork)
         .collectAsState()
     val reduceMotion by DesktopPlayerSettings.reduceAnimation.collectAsState()

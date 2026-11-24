@@ -20,6 +20,7 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.ui.ProvideDesktopPresentationLifecycle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -101,6 +102,7 @@ class DesktopAutoMixVisualTest {
         val previousCanvasEnabled = preferences.animatedCanvas.value
         val visual = DesktopAutoMixVisualFeed()
         val song = mutableStateOf(out)
+        val visible = mutableStateOf(true)
         val oldFrame = ImageBitmap(96, 96).also { bitmap -> draw(bitmap) { drawRect(Color.Red) } }
         try {
             host.autoMixVisual = visual.state
@@ -112,8 +114,10 @@ class DesktopAutoMixVisualTest {
             visual.begin(0, 1.0, 6.0, 1_000, now = 2_000_000_001)
             runDesktopComposeUiTest(width = 96, height = 96) {
                 setContent {
-                    Box(Modifier.fillMaxSize().background(Color.Blue).testTag("canvas-artwork")) {
-                        DesktopAutoMixOverlay(song.value, Modifier.matchParentSize(), 96, mini = false, canvasVisible = true)
+                    ProvideDesktopPresentationLifecycle(visible.value) {
+                        Box(Modifier.fillMaxSize().background(Color.Blue).testTag("canvas-artwork")) {
+                            DesktopAutoMixOverlay(song.value, Modifier.matchParentSize(), 96, mini = false, canvasVisible = true)
+                        }
                     }
                 }
                 runOnIdle {
@@ -125,7 +129,12 @@ class DesktopAutoMixVisualTest {
                 runOnIdle { visual.sample(2_900, 6_000, false, now = 4_000_000_000) }
                 val mixed = countEndpoints(sleeve.captureToImage().toPixelMap())
                 assertTrue(mixed.first > 100 && mixed.second > 100)
-                runOnIdle { visual.cancel() }
+                runOnIdle { visible.value = false }
+                assertTrue(sleeve.captureToImage().toPixelMap()[32, 32].blue > .99f)
+                runOnIdle {
+                    visible.value = true
+                    visual.cancel()
+                }
                 assertTrue(sleeve.captureToImage().toPixelMap()[32, 32].blue > .99f)
             }
         } finally {
