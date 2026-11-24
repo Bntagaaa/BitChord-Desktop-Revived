@@ -35,6 +35,7 @@ import kotlin.math.max
 import kotlin.random.Random
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.skia.FilterMipmap
 import org.jetbrains.skia.FilterMode
 import org.jetbrains.skia.FilterTileMode
@@ -71,7 +72,17 @@ internal fun DesktopAutoMixOverlay(
     val active = rememberDesktopAutoMixPair(mini) ?: return
     val showingIncoming = active.incoming.matches(song)
     if (!showingIncoming && !active.outgoing.matches(song)) return
-    if (active.outgoing == active.incoming) return
+    if (active.outgoing.matches(active.incoming.id, active.incoming.entry)) return
+
+    if (!mini) {
+        val canvasEnabled by DesktopPlayerSettings.animatedCanvas.collectAsState()
+        LaunchedEffect(active.generation, canvasEnabled) {
+            // Warm the metadata only. The selected track owns the existing video decoder.
+            if (canvasEnabled && !showingIncoming) withTimeoutOrNull(4_000) {
+                DesktopPlayerHost.canvasFor(active.incoming.canvasCandidate())
+            }
+        }
+    }
 
     // Prime the same bounded image cache used by the mini player while the outgoing art is visible.
     val outgoingUrl = active.outgoing.url.artworkAt(px)
@@ -112,7 +123,7 @@ internal fun DesktopAutoMixAmbient(song: Song, theme: PlayerTheme, modifier: Mod
     if (reduceBlur) return
     val pair = rememberDesktopAutoMixPair(mini) ?: return
     val showingIncoming = pair.incoming.matches(song)
-    if ((!showingIncoming && !pair.outgoing.matches(song)) || pair.outgoing == pair.incoming) return
+    if ((!showingIncoming && !pair.outgoing.matches(song)) || pair.outgoing.matches(pair.incoming.id, pair.incoming.entry)) return
     val url = pair.outgoing.url ?: return
     val progress = if (showingIncoming) rememberDesktopAutoMixProgress(pair.generation) else { { 0f } }
     val fade = modifier.graphicsLayer { alpha = 1f - progress() }

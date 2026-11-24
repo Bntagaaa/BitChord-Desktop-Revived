@@ -55,6 +55,7 @@ internal object DesktopPlayerHost : PlayerHost {
 
     override val settings: DesktopPlayerSettings = DesktopPlayerSettings
     override val mobileTextChrome: Boolean = true
+    override val automixDetailMaxLines: Int = 5
 
     var autoMixVisual: StateFlow<DesktopAutoMixVisualSample?> = MutableStateFlow(null)
     val autoMixCanvasFrame = MutableStateFlow<AutoMixCanvasFrame?>(null)

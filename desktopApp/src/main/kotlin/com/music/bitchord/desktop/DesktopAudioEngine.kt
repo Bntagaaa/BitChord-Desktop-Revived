@@ -27,6 +27,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -77,7 +78,7 @@ class DesktopPlaybackEngine internal constructor(
     val state: StateFlow<DesktopPlaybackState> = _state.asStateFlow()
 
 
-    private fun analysisFor(id: String): TrackAnalysis = analysisSource?.invoke(id) ?: analyzer.analysisFor(id)
+    private fun analysisFor(id: String): TrackAnalysis = analysisSource?.invoke(id) ?: analyzer.playbackAnalysisFor(id)
 
     /** Automix's evidence. */
     private val analyzer = DesktopTrackAnalyzer(
@@ -143,6 +144,7 @@ class DesktopPlaybackEngine internal constructor(
     private var upgradeJob: Job? = null
     private var nextResolveJob: Job? = null
     private var recoveryJob: Job? = null
+    private var modelRetryJob: Job? = null
 
     @Volatile private var playbackSpeed = 1f
     @Volatile private var volume = 1f
@@ -758,7 +760,19 @@ class DesktopPlaybackEngine internal constructor(
     fun setAutomixEnabled(enabled: Boolean) {
         if (automixEnabled == enabled) return
         automixEnabled = enabled
-        if (enabled && analysisSource == null) DesktopAutomixModels.manager.download()
+        modelRetryJob?.cancel()
+        if (enabled && analysisSource == null) {
+            val models = DesktopAutomixModels.manager
+            models.download()
+            modelRetryJob = scope.launch {
+                models.state.collectLatest { state ->
+                    if (state is DesktopAutomixModelState.Failed) {
+                        delay(120_000)
+                        if (automixEnabled) models.download()
+                    }
+                }
+            }
+        }
         if (analysisSource == null) analyzer.focusOn(
             if (enabled) _state.value.song?.videoId else null,
             if (enabled) nextSong?.videoId else null,
@@ -2700,8 +2714,7 @@ class DesktopPlaybackEngine internal constructor(
             else -> "no prepared loop"
         }
         DesktopPlayerSettings.automixDetail.value = buildString {
-            append(describe(outgoing.song.videoId, "Current", false))
-            append(" · ")
+            appendLine(describe(outgoing.song.videoId, "Current", false))
             append(describe(incoming.videoId, "Next", true))
             append(" · models $modelStatus\n")
             append("$mixing · ×${number(rate, 2)} · $loopStatus")

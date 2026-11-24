@@ -1,5 +1,10 @@
 package com.music.bitchord.desktop
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
@@ -7,6 +12,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.music.bitchord.data.model.Song
@@ -77,6 +87,52 @@ class DesktopAutoMixVisualTest {
                     }
                 }
             }
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun coverOverlayRetainsTheCanvasFrameThroughHandoffAndClearsOnCancellation() {
+        val host = DesktopPlayerHost
+        val previousFeed = host.autoMixVisual
+        val previousCanvas = host.autoMixCanvasFrame.value
+        val preferences = DesktopPlayerSettings
+        val previousArtwork = preferences.automixArtwork.value
+        val previousCanvasEnabled = preferences.animatedCanvas.value
+        val visual = DesktopAutoMixVisualFeed()
+        val song = mutableStateOf(out)
+        val oldFrame = ImageBitmap(96, 96).also { bitmap -> draw(bitmap) { drawRect(Color.Red) } }
+        try {
+            host.autoMixVisual = visual.state
+            preferences.automixArtwork.value = true
+            preferences.animatedCanvas.value = false
+            visual.arm(out, incoming, now = 1)
+            val pair = visual.state.value!!.pair
+            host.autoMixCanvasFrame.value = AutoMixCanvasFrame(pair.generation, oldFrame)
+            visual.begin(0, 1.0, 6.0, 1_000, now = 2_000_000_001)
+            runDesktopComposeUiTest(width = 96, height = 96) {
+                setContent {
+                    Box(Modifier.fillMaxSize().background(Color.Blue).testTag("canvas-artwork")) {
+                        DesktopAutoMixOverlay(song.value, Modifier.matchParentSize(), 96, mini = false, canvasVisible = true)
+                    }
+                }
+                runOnIdle {
+                    song.value = incoming
+                    visual.sample(1_000, 6_000, false, now = 3_000_000_000)
+                }
+                val sleeve = onNodeWithTag("canvas-artwork")
+                assertTrue(sleeve.captureToImage().toPixelMap()[32, 32].red > .99f)
+                runOnIdle { visual.sample(2_900, 6_000, false, now = 4_000_000_000) }
+                val mixed = countEndpoints(sleeve.captureToImage().toPixelMap())
+                assertTrue(mixed.first > 100 && mixed.second > 100)
+                runOnIdle { visual.cancel() }
+                assertTrue(sleeve.captureToImage().toPixelMap()[32, 32].blue > .99f)
+            }
+        } finally {
+            host.autoMixVisual = previousFeed
+            host.autoMixCanvasFrame.value = previousCanvas
+            preferences.automixArtwork.value = previousArtwork
+            preferences.animatedCanvas.value = previousCanvasEnabled
         }
     }
 

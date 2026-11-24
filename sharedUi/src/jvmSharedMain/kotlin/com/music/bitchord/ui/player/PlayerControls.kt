@@ -455,7 +455,7 @@ internal fun SleeveNerdStats(song: Song, modifier: Modifier = Modifier) {
                 color = Color.White.copy(alpha = 0.5f),
                 // The detailed line runs long on a phone: a second line rather
                 // than an ellipsis through the part that says what the mix is.
-                maxLines = 2,
+                maxLines = PlayerPlatform.host.automixDetailMaxLines,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )

@@ -93,6 +93,8 @@ interface PlayerHost {
     @Composable
     fun AutoMixAmbient(song: Song, theme: PlayerTheme, modifier: Modifier) = Unit
 
+    val automixDetailMaxLines: Int get() = 2
+
     /** The system output level the player's volume bar drives, if it drives one. */
     val volume: SystemVolume
 

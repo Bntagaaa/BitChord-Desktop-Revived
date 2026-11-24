@@ -5,8 +5,18 @@ import kotlin.math.roundToLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-internal data class DesktopAutoMixArtworkTrack(val id: String, val entry: String?, val url: String?) {
-    constructor(song: Song) : this(song.videoId, song.queueEntryId, song.thumbnailUrl)
+internal data class DesktopAutoMixArtworkTrack(
+    val id: String,
+    val entry: String?,
+    val url: String?,
+    private val title: String,
+    private val artist: String,
+    private val album: String?,
+) {
+    constructor(song: Song) : this(song.videoId, song.queueEntryId, song.thumbnailUrl,
+        song.title, song.artist, song.albumName)
+
+    fun canvasCandidate() = Song(id, title, artist, url, albumName = album)
 
     fun matches(song: Song) = matches(song.videoId, song.queueEntryId)
     fun matches(id: String, entry: String?) = this.id == id && this.entry == entry

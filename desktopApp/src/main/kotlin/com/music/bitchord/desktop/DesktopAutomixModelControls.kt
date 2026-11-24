@@ -47,5 +47,11 @@ internal fun DesktopAutomixModelControls(onDelete: () -> Unit) {
                     Text(if (current is DesktopAutomixModelState.Failed) "Retry" else "Download models")
                 }
         }
+        if (current is DesktopAutomixModelState.Failed) {
+            TextButton(onClick = {
+                onDelete()
+                manager.delete()
+            }) { Text("Delete model files") }
+        }
     }
 }
