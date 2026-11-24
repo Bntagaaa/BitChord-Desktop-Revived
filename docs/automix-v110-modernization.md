@@ -1,0 +1,21 @@
+# Desktop AutoMix and upstream v1.10
+
+## Baseline audit
+
+Desktop 1.10 at `acf101ac9390f42c4a219e2d0e96e2b54400f67a` was compared with upstream v1.9.1, v1.10 (`7448b92e032af7e5666c93b0e04c6b9fa3abf898`) and its Web Player. Artwork behavior comes from upstream PR #1870 (`541adcdadbb0bc98dc808445c3a69250a166f14d`).
+
+| Area | Upstream change or Web behavior | Desktop baseline and disposition |
+| --- | --- | --- |
+| Planner and loops | Phrase-aware planning, instrumental loop selection, vocal protection, bass and filter gestures | `TransitionPlanner.kt`, `LoopMix.kt` and the native loop renderer have the same Git blobs in all three Kotlin trees. Preserve shared algorithms and desktop PCM handoff. |
+| Transition clock | Android smooths coarse ExoPlayer position reports and supplies an artwork feed. Web uses clocked decks and a media-element position servo. | `DesktopAudioEngine` mixes PCM by frame and `DesktopAudioSink.framesPlayed()` reports played frames for WASAPI, PulseAudio and Java Sound. Feed artwork from those frames. Retain desktop tempo stretch and device routing. |
+| Runtime | Android uses a reduced 1.28.0 runtime with its official JNI component, a config including optimized operators, and a native parity harness. | Desktop ships ONNX Runtime 1.29.0. The upstream AAR is Android-specific. A desktop reduced runtime requires same-version JNI and operator/output checks on both targets. |
+| Inference | Android tries ALL_OPT then BASIC_OPT. | Both desktop trackers only try ALL_OPT. Their tensor outputs and tensors already close per run. Sessions are reused across windows; options need deterministic disposal. |
+| Delivery | Android requests weights on enable and downloads a pair of release assets. | Desktop extracts weights from the app JAR and its legacy analysis directory can contain valid copies. Use a pinned verified source and retain the existing analysis cache. |
+| Beat model | Web's historical broken-model note refers to `beat_this_int8.onnx`. | Desktop, upstream Android and Web already ship the same final0 model (`7801f9c1adfd5ff193f37ececa3320bf1fda1ddee2bf7de341cea4c25ffd0acd`) and vocal model (`a2be987b55a29bc149d3a6ae99b08175d81f85ee292a8ea21f96c3a473bc94cb`). |
+| Beat front end | Web ports the phone's 22,050 Hz, 1024-point FFT, 441-hop, 128-bin filterbank. Both use reflect padding, periodic Hann with square-root FFT normalization, peak-normalized Slaney mel filters and log compression. | The native desktop front end is unchanged across tags. Both paths handle separate beat and downbeat logits and confidence from regularity and peak strength. No model/preprocessing change calls for a cache invalidation. |
+| Scheduling | v1.10 Android changes model loading and keeps the previous model-window algorithm. Web workers measure only current and upcoming tracks, with a separate media download and IndexedDB cache. | Desktop already has a single worker, two pending slots, duplicate suppression, relevance cancellation, persistent cache, bounded negative-cache hints and CPU-aware inference thread caps. Profile transport, FFmpeg and inference before changing musical inputs. |
+| Artwork | `AutoMixVisualState`, `AutoMixVisualFeed`, artwork preferences, reveal clock, cover and ambient helpers, and Android-specific shader/Canvas integration are new. | Desktop has existing still art, player and motion-video surfaces. Adapt the reveal timing and shader to Compose/Skia and retain existing resource limits. |
+| Web experiments | Phase-coherence grids, beat-accurate loop deck, Signalsmith Stretch, master tempo ramps, fallback strategies and browser timing corrections. | Web AutoMix implementation is unchanged between the tags. Desktop already uses the Beat This! outputs, native loop phase/tempo control, filter fallback and shared phrase policy. The reported Web timings do not establish a native improvement. Keep a stretch replacement or grid-policy change independent of parity work. |
+| Diagnostics | The Web player reports source, analysis and fallback details. | Existing desktop current/next states and loop summary can carry measured timing and planner evidence. |
+
+The existing canonical hash verifier flagged `AnalysisStore.kt` in the baseline. The desktop file intentionally bounds the negative disk lookup cache. That behavior is useful on long sessions and will be retained.
