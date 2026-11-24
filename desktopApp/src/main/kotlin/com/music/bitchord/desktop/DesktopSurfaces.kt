@@ -205,11 +205,8 @@ internal fun DesktopFlyoutCard(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(20.dp)
-    val decoration = if (frosted) {
-        modifier.clip(shape).desktopBarGlass(shape, DesktopBlurArea.QUICK_SEARCH)
-    } else {
-        modifier.desktopCard(shape)
-    }
+    // The parameter remains source-compatible; popup elevation is independent of blur.
+    val decoration = modifier.desktopPopupSurface(shape)
     Box(decoration) {
         // A separate pointer-only sibling: clicking content cannot dismiss the backdrop or leave
         // keyboard focus on a decorative panel that will be removed when the flyout closes.
@@ -290,6 +287,8 @@ internal fun DesktopDropdownMenu(
         modifier = modifier.desktopMenuGlass(shape),
         shape = shape,
         containerColor = Color.Transparent,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         content = content,
     )
 }

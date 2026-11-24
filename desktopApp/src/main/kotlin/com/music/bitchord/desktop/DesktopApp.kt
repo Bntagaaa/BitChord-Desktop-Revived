@@ -44,7 +44,6 @@ import com.music.bitchord.playback.QueueTimeline.asQueueEntry
 import com.music.bitchord.data.listentogether.partyQueueIndexOf
 import com.music.bitchord.data.listentogether.partyUpcomingAfter
 import com.music.bitchord.ui.LyricsProviderState
-import com.music.bitchord.ui.player.DesktopMenuGlassStyle
 import com.music.bitchord.ui.player.LyricsSidePanel
 import com.music.bitchord.ui.player.NowPlayingScreen
 import com.music.bitchord.ui.player.QueueSidePanel
@@ -5818,7 +5817,7 @@ internal fun DesktopToolbarButton(
     Box(
         modifier
             .size(size)
-            .clip(CircleShape)
+            .desktopQuietButtonSurface(CircleShape, enabled)
             .desktopHoverWash()
             .clickable(
                 enabled = enabled,
@@ -9665,20 +9664,9 @@ internal fun Modifier.desktopBarGlass(
         allowBlur = DesktopAppearanceSettings.blurEnabled(area),
     ).border(0.5.dp, DesktopBarEdge, shape)
 
-/**
- * Menu glass shares Quick Search's exact frosted material, including tint,
- * noise, blur radius and edge. Keep its separate MENUS_POPUPS blur preference:
- * disabling Quick Search's blur must not unexpectedly disable every menu.
- * DesktopMenuGlass owns only the visual surface, never menu dimensions.
- */
+/** Opaque elevated popup surface; the legacy name is retained for callers. */
 @Composable
-internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier =
-    clip(shape).desktopFrosted(
-        DesktopBarGlass,
-        tintAlpha = DesktopMenuGlassStyle.TINT_ALPHA,
-        allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.MENUS_POPUPS),
-        blurRadius = DesktopMenuGlassStyle.BLUR_RADIUS_DP.dp,
-    ).border(0.5.dp, DesktopBarEdge, shape)
+internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier = desktopPopupSurface(shape)
 
 /** The edge of a chrome pane that meets the page, and so has to dissolve into it. */
 internal enum class DesktopChromeEdge { NONE, BOTTOM, END }
@@ -10331,7 +10319,7 @@ private fun DesktopActionButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    Row(modifier.clip(CircleShape).background(DesktopAccent).clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.desktopFilledButtonSurface(CircleShape, DesktopAccent).desktopHoverFill().clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = DesktopOnAccent, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text(label, color = DesktopOnAccent, fontWeight = FontWeight.SemiBold)

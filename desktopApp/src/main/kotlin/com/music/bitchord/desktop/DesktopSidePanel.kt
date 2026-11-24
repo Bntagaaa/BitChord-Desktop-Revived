@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,15 +40,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
 
 /** What the column beside the page is showing. */
 internal enum class DesktopSidePanel { LYRICS, QUEUE, DETAILS }
 
 /**
  * Apple Music's right-hand sidebar: the lyrics or the queue in a column beside the page, while the
- * player itself stays closed. Home extends beneath the glass; other pages reserve a solid column.
+ * player itself stays closed. Home extends beneath the panel; other pages reserve a column.
  */
 @Composable
 internal fun DesktopSidePanelColumn(
@@ -59,11 +58,8 @@ internal fun DesktopSidePanelColumn(
     // Held through the exit, so the column slides out with what it had in it rather than empty.
     var shown by remember { mutableStateOf(panel) }
     if (panel != null) shown = panel
-    val haze = LocalDesktopHaze.current
-    val glassActive = blurBackground && haze != null &&
-        DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.SIDE_PANELS)
-    // Lyrics, Queue and Details share the same material even while crossfading.
-    val panelFill = DesktopTheme.palette.lyricsSurface
+    // The existing Home overlay/reserved-column geometry stays unchanged.
+    // All three side panels use the same material, independent of Reduce Blur.
     AnimatedVisibility(
         visible = panel != null,
         enter = expandHorizontally(tween(SLIDE_MS, easing = FastOutSlowInEasing), expandFrom = Alignment.Start) +
@@ -71,26 +67,19 @@ internal fun DesktopSidePanelColumn(
         exit = shrinkHorizontally(tween(SLIDE_MS, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Start) +
             fadeOut(tween(SLIDE_MS / 2)),
     ) {
-        val glass = if (glassActive) {
-            Modifier.hazeEffect(state = requireNotNull(haze)) {
-                blurEnabled = true
-                blurRadius = 40.dp
-                backgroundColor = panelFill
-                tints = listOf(HazeTint(panelFill.copy(alpha = 0.73f)))
-            }
-        } else Modifier.background(panelFill)
         Box(Modifier.width(SIDE_PANEL_WIDTH).fillMaxHeight()) {
-            Row(Modifier.matchParentSize().then(glass)) {
-                Box(Modifier.width(1.dp).fillMaxHeight().background(DesktopDivider))
+            Row(
+                Modifier.matchParentSize()
+                    .padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 10.dp)
+                    .desktopPopupSurface(RoundedCornerShape(16.dp), DesktopTheme.palette.lyricsSurface),
+            ) {
                 Crossfade(
                     targetState = shown ?: return@Row,
                     animationSpec = tween(CROSSFADE_MS),
                     label = "sidePanel",
                 ) { which ->
                     Box(
-                        Modifier.fillMaxSize().background(
-                            if (glassActive) Color.Transparent else panelFill,
-                        ),
+                        Modifier.fillMaxSize(),
                     ) {
                         // Keep the existing panel geometry independent from its background material.
                         Column(Modifier.fillMaxSize()) {

@@ -62,7 +62,7 @@ internal fun DesktopAccountButton(
     onClick: () -> Unit,
 ) {
     Box(
-        Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onClick),
+        Modifier.size(36.dp).desktopQuietButtonSurface(CircleShape).desktopHoverWash().clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (avatar != null) {
@@ -134,7 +134,6 @@ internal fun DesktopAccountSelector(
                 .padding(start = 24.dp, bottom = 64.dp)
                 .widthIn(max = 292.dp)
                 .fillMaxWidth()
-                .clip(shape)
                 .desktopMenuGlass(shape),
         ) {
             Row(
@@ -358,7 +357,6 @@ internal fun DesktopSignInDialog(
             Modifier
                 .widthIn(max = 520.dp)
                 .fillMaxWidth()
-                .clip(shape)
                 .desktopMenuGlass(shape)
                 .padding(bottom = 8.dp),
         ) {

@@ -769,7 +769,7 @@ internal fun DesktopMoreButton(onClick: () -> Unit, modifier: Modifier = Modifie
     Box(
         modifier
             .size(34.dp)
-            .clip(RoundedCornerShape(17.dp))
+            .desktopQuietButtonSurface(RoundedCornerShape(17.dp))
             .background(hoverColor)
             .hoverable(interaction)
             .clickable(role = Role.Button, onClick = onClick)
