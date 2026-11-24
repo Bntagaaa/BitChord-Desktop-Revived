@@ -42,6 +42,7 @@ object DesktopStartupDiagnostics {
         FIRST_FRAME("First shell draw completed"),
         INTERACTIVE("Shell drawn and AWT input queue reached"),
         PLAYBACK_RESTORED("Playback metadata and queue restored"),
+        LOCAL_LIBRARY_RESTORED("Local library restored"),
         AUDIO_READY("Audio processing thread ready"),
         ACCOUNT_RESTORED("Account / session restored"),
         BACKGROUND_STARTED("Background playback host mounted"),

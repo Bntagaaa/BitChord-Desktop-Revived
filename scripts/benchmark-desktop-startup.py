@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Benchmark a packaged BitChord launcher from the current GUI session."""
 import argparse
+import base64
+import hashlib
 import json
 import math
 import os
@@ -12,16 +14,68 @@ import shutil
 import statistics
 import subprocess
 import time
+import xml.etree.ElementTree as xml
 
 import psutil
 
 
-def measure(launcher, root, duration, fixture, jvm_options):
+def seed_synthetic_library(profile):
+    """Create the same old-format local library and guest Home page for either checkout."""
+    def encode(value):
+        return base64.urlsafe_b64encode(value.encode()).decode().rstrip("=")
+
+    def song(index):
+        return "|".join(map(encode, (f"fixture-{index}", f"Track {index}", "Fixture Artist", "", "3:00",
+                                     "", "", "Fixture Album", "", "")))
+
+    entries = xml.Element("map", {"MAP_XML_VERSION": "1.0"})
+
+    def put(key, value):
+        xml.SubElement(entries, "entry", {"key": key, "value": value})
+
+    def chunks(key, value):
+        for offset in range(0, len(value), 4096):
+            put(f"{key}.{offset // 4096}", value[offset:offset + 4096])
+
+    chunks("queue", "\n".join(map(song, range(200))))
+    put("queue_index", "17")
+    chunks("history", "\n".join(map(song, range(50))))
+    chunks("playlists", "\n".join(
+        "#".join((encode(f"playlist-{number}"), encode(f"Playlist {number}"),
+                  ";".join(song(number * 80 + index) for index in range(80))))
+        for number in range(80)
+    ))
+    chunks("liked_ids", "\n".join(f"fixture-{index}" for index in range(1200)))
+    put("automix", "true")
+    prefs = profile / "preferences" / ".java" / ".userPrefs" / "com.music.bitchord.desktop"
+    prefs.mkdir(parents=True)
+    (prefs / "prefs.xml").write_bytes(
+        b'<?xml version="1.0" encoding="UTF-8"?>\n'
+        b'<!DOCTYPE map SYSTEM "http://java.sun.com/dtd/preferences.dtd">\n' +
+        xml.tostring(entries, encoding="utf-8")
+    )
+    cache = profile / "cache" / "bitchord" / "media"
+    cache.mkdir(parents=True)
+    (cache / "home-v1.json").write_text(json.dumps({
+        "version": 1, "identity": hashlib.sha256(b"0:0:").hexdigest(),
+        "shelves": [{
+            "title": "Cached Home fixture", "subtitle": "", "moreBrowseId": None,
+            "moreParams": None, "layout": "CARDS", "items": [{
+                "title": "Fixture track", "subtitle": "Fixture Artist", "thumbnailUrl": None,
+                "videoId": "fixture-1", "browseId": None, "isVideo": False,
+            }],
+        }],
+    }), encoding="utf-8")
+
+
+def measure(launcher, root, duration, fixture, jvm_options, synthetic_library):
     profile = root / "profile"
     if fixture:
         shutil.copytree(fixture, profile)
     else:
         profile.mkdir()
+    if synthetic_library:
+        seed_synthetic_library(profile)
     for directory in ("preferences", "cache", "state", "data", "local-app-data"):
         (profile / directory).mkdir(exist_ok=True)
     token = secrets.token_hex(16)
@@ -157,7 +211,10 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--duration", type=float, default=25, help="Total observation seconds per launch")
-    parser.add_argument("--fixture", type=Path, help="Sanitized profile template copied for each launch")
+    profiles = parser.add_mutually_exclusive_group()
+    profiles.add_argument("--fixture", type=Path, help="Sanitized profile template copied for each launch")
+    profiles.add_argument("--synthetic-library", action="store_true",
+                          help="Populate a Linux test library with playlists, history, ratings, and a saved queue")
     parser.add_argument("--scenario", default="fresh-profile/warm-filesystem")
     parser.add_argument("--before-run", help="Optional local conditioning command, such as cache eviction")
     parser.add_argument("--java-option", action="append", default=[])
@@ -170,6 +227,8 @@ def main():
         parser.error("runs and duration must be positive")
     if os.name == "nt" and not args.disposable_windows_user:
         parser.error("Windows Java Preferences use the registry. Use a disposable user and pass --disposable-windows-user.")
+    if os.name == "nt" and args.synthetic_library:
+        parser.error("The synthetic profile uses Linux Java Preferences.")
     output.mkdir(parents=True)
     os.environ["BITCHORD_UPDATE_EXPECTED_VERSION"] = args.version
     results = []
@@ -178,7 +237,7 @@ def main():
             subprocess.run(args.before_run, shell=True, check=True)
         root = output / f"run-{index + 1:02d}"
         root.mkdir()
-        result = measure(launcher, root, args.duration, args.fixture, args.java_option)
+        result = measure(launcher, root, args.duration, args.fixture, args.java_option, args.synthetic_library)
         results.append(result)
         print(f"{index + 1}/{args.runs} readiness={result['ready_ms']} ms", flush=True)
         # A copied profile can contain personal data. Keep it out of measurement artifacts.

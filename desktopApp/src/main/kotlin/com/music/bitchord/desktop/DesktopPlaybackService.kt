@@ -141,6 +141,7 @@ internal class DesktopPlaybackService(
         DesktopLinuxAudioWatcher.ensureStarted()
         DesktopStartupDiagnostics.record(
             DesktopStartupDiagnostics.Milestone.PLAYBACK_RESTORED,
+            "Queue entries: ${liveQueue.value.songs.size}, history entries: ${history.value.size}",
             durationNanos = System.nanoTime() - started,
         )
         while (!closed.get() && pendingActions.isNotEmpty()) pendingActions.removeFirst().invoke()

@@ -696,6 +696,7 @@ internal fun BitChordDesktopApp(
     var localLibraryReady by remember { mutableStateOf(false) }
     val localLibrary = remember {
         DesktopStartupTask(scope) {
+            val started = System.nanoTime()
             val restored = try {
     withContext(Dispatchers.IO) {
                     val savedDownloads = persistence.downloads()
@@ -722,6 +723,11 @@ internal fun BitChordDesktopApp(
             dislikedIds = restored.dislikedIds
             playlistDownloadRecords = restored.playlistDownloads.value
             localLibraryReady = true
+            DesktopStartupDiagnostics.record(
+                DesktopStartupDiagnostics.Milestone.LOCAL_LIBRARY_RESTORED,
+                "Playlists: ${playlists.size}, downloads: ${downloads.size}",
+                durationNanos = System.nanoTime() - started,
+            )
             restored.playlistDownloads
         }
     }
@@ -2841,9 +2847,11 @@ internal fun BitChordDesktopApp(
         stationJob?.cancel()
         topPicks = null
     }
-    LaunchedEffect(activeAccountId, activeProfileId, sessionRevision, homeState, history) {
+    LaunchedEffect(activeAccountId, activeProfileId, sessionRevision, homeState, homeFromCache, history, DesktopContentPreferences.hideTopPicks) {
         val shelves = (homeState as? UiState.Success)?.data ?: return@LaunchedEffect
-        if (homeIdentity != selectedHomeIdentity()) return@LaunchedEffect
+        if (homeFromCache || DesktopContentPreferences.hideTopPicks || homeIdentity != selectedHomeIdentity()) {
+            return@LaunchedEffect
+        }
         topPicksLoading = true
         try {
             topPicks = TopPicks.build(shelves, TopPicks.LocalTaste(songs = history))
@@ -2905,13 +2913,25 @@ internal fun BitChordDesktopApp(
             // Keep the selected account's offline page if its credentials cannot be renewed.
             if (session == null && identity.accountId != null && cached.isNotEmpty()) return@launch
             DesktopStartupDiagnostics.once(DesktopStartupDiagnostics.Milestone.HOME_FEED_REQUESTED)
-            fun publishFresh(shelves: List<HomeShelf>, prepend: Boolean = false) {
+            var primaryPending = true
+            val pendingShelves = mutableListOf<Pair<List<HomeShelf>, Boolean>>()
+            fun publishFresh(shelves: List<HomeShelf>, mainPage: Boolean = false, prepend: Boolean = false) {
                 if (!current() || session != DesktopYouTubeAuth.session || shelves.none { it.items.isNotEmpty() }) return
-                if (homeFromCache) {
+                if (!mainPage && homeFromCache && primaryPending) {
+                    pendingShelves += shelves to prepend
+                    return
+                }
+                if (mainPage && homeFromCache) {
                     homeFromCache = false
                     homeState = UiState.Loading
+                    homeSeenTitles.clear()
                 }
                 publishHomeShelves(shelves, prepend)
+            }
+            fun finishPrimary() {
+                primaryPending = false
+                pendingShelves.forEach { (shelves, prepend) -> publishFresh(shelves, prepend = prepend) }
+                pendingShelves.clear()
             }
             homeRecentsLoading = session != null
             launch {
@@ -2919,7 +2939,8 @@ internal fun BitChordDesktopApp(
                     onSuccess = { feed ->
                         if (!current() || session != DesktopYouTubeAuth.session) return@fold
                         homeContinuation = feed.continuation
-                        publishFresh(feed.shelves)
+                        publishFresh(feed.shelves, mainPage = true)
+                        finishPrimary()
                         if ((session == null) == (identity.accountId == null)) {
                             withContext(Dispatchers.IO) {
                                 cache.write(identity, feed.shelves)
@@ -2927,6 +2948,7 @@ internal fun BitChordDesktopApp(
                         }
                     },
                     onFailure = {
+                        finishPrimary()
                         if (current() && homeState !is UiState.Success) {
                             homeState = UiState.Error(it.message ?: "Could not load Home")
                         }
