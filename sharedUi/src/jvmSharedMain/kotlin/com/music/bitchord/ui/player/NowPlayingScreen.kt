@@ -1798,11 +1798,13 @@ fun NowPlayingScreen(
     // scoped to the player and avoid extra graphics layers when Reduce Blur is on
     // or a full-screen music video is the backdrop.
     val chrome = mobileTextChrome && !reduceBlur && !videoMode
+    val reducePlayerMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     CompositionLocalProvider(
         LocalPlayerTint provides playerTint,
         LocalPlayerChrome provides chrome,
         LocalChromeSoftened provides (landscape && playerBackdropTheme != PlayerTheme.SIMPLE && !spotifyCanvasPresentation),
         LocalPlayerTransportMotionActive provides (!dockMoving && !queueDragging),
+        LocalPlayerReduceMotion provides reducePlayerMotion,
         LocalPlayerGlass provides if (mobileTextChrome) PlayerGlassMaterial(
             // The landscape backdrop is a dedicated Haze source, never the controls themselves.
             // Use a flat slab when another overlay already samples it or during a live mix.
@@ -1814,7 +1816,6 @@ fun NowPlayingScreen(
             },
         ) else null,
     ) {
-        val reducePlayerMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
         val landscapeTrackHeader: @Composable (Boolean, Boolean) -> Unit = { compact, active ->
             LandscapeTrackHeader(
                 compact = compact,
