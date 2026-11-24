@@ -337,6 +337,7 @@ import com.music.bitchord.data.model.SubscriptionState
 import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.UserPlaylist
 import com.music.bitchord.data.model.artworkAt
+import com.music.bitchord.data.bestpart.BestPart
 import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.model.isSameTrackAs
 import com.music.bitchord.data.model.withoutRepeatsOf
@@ -761,6 +762,8 @@ internal fun BitChordDesktopApp(
     var spotifyReloads by remember { mutableStateOf(0) }
     var spotifyLoadedCookie by remember { mutableStateOf<String?>(null) }
     var spotifyPlaybackResolving by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showBestPart by remember { mutableStateOf(persistence.boolean("show_best_part", true)) }
+    val bestPartLookup = remember { DesktopBestPart() }
     var showNerdStats by remember { mutableStateOf(persistence.boolean("show_nerd_stats", false)) }
     LaunchedEffect(destination, spotifyCanvasCookie, spotifyReloads) {
         if (destination != DesktopDestination.SPOTIFY) return@LaunchedEffect
@@ -4242,6 +4245,31 @@ internal fun BitChordDesktopApp(
                     ) { windowWidth, windowHeight ->
                         val current = selectedSong ?: return@DesktopPlayerSheet
                         val playerSong = playerSongWithLinks(current)
+                        val bestPartTrack = current.videoId to current.queueEntryId
+                        val bestPartDuration = playback.song?.takeIf {
+                            (it.videoId to it.queueEntryId) == bestPartTrack
+                        }?.let { playback.durationMs } ?: 0L
+                        val bestPartStart = if (
+                            overlays.nowPlaying && showBestPart && !partyState.controlsLocked &&
+                            !(videoBetaEnabled && current.isVideo) &&
+                            bestPartDuration >= BestPart.MIN_SONG_MS
+                        ) {
+                            // The result state is replaced synchronously on a track change. A late
+                            // curve can never light up the new track's button. Lyrics reuse the
+                            // existing provider request and are only read for this track.
+                            val answer = remember(bestPartTrack, current.localUri, current.localPath) {
+                                mutableStateOf<BestPartLookupResult?>(null)
+                            }
+                            LaunchedEffect(answer) {
+                                answer.value = BestPartLookupResult(bestPartLookup.heatmap(current, bestPartDuration))
+                            }
+                            val lines = if (syncedLyrics && lyricsSnapshot.trackId == current.videoId) {
+                                sharedLyrics.orEmpty()
+                            } else emptyList()
+                            remember(answer.value, lines, bestPartDuration) {
+                                answer.value?.let { BestPart.startMs(it.heat, lines, bestPartDuration) }
+                            }
+                        } else null
                         NowPlayingScreen(
                             song = playerSong,
                             isPlaying = playback.isPlaying,
@@ -4342,6 +4370,16 @@ internal fun BitChordDesktopApp(
                             onDismissLyricsOffset = {},
                             windowWidth = windowWidth,
                             windowHeight = windowHeight,
+                            bestPartStartMs = bestPartStart,
+                            onBestPartSeek = { target ->
+                                val active = playbackEngine.state.value.song
+                                // A queued click and engine hand-off can cross before composition
+                                // catches up. Never send this track's timestamp to its successor.
+                                if (active != null &&
+                                    (active.videoId to active.queueEntryId) == bestPartTrack &&
+                                    selectedSong?.let { (it.videoId to it.queueEntryId) == bestPartTrack } == true
+                                ) seekPlayer(target)
+                            },
                         )
                         if (playerMenuOpen) {
                             // Where the player's "…" sits: the right column's credits row, at
@@ -4759,6 +4797,11 @@ internal fun BitChordDesktopApp(
                                     },
                                     animatedCanvas = animatedCanvas,
                                     showNerdStats = showNerdStats,
+                                    showBestPart = showBestPart,
+                                    onShowBestPartChange = {
+                                        showBestPart = it
+                                        persistence.saveBoolean("show_best_part", it)
+                                    },
                                     fullBleedArtwork = fullBleedArtwork,
                                     onAnimatedCanvasChange = {
                                         animatedCanvas = it
@@ -8021,6 +8064,8 @@ private fun DesktopSettingsScreen(
     onOpenListenTogether: () -> Unit,
     showNerdStats: Boolean,
     onShowNerdStatsChange: (Boolean) -> Unit,
+    showBestPart: Boolean,
+    onShowBestPartChange: (Boolean) -> Unit,
     fullBleedArtwork: Boolean,
     onFullBleedArtworkChange: (Boolean) -> Unit,
     trayIconEnabled: Boolean,
@@ -8423,6 +8468,12 @@ private fun DesktopSettingsScreen(
             }
             if (section == DesktopSettingsSection.APPEARANCE) item {
                 SettingsGroup(DesktopStrings["appearance", "Appearance"]) {
+                    SettingsToggle(
+                        DesktopStrings["show_best_part", "Show Best Part"],
+                        DesktopStrings["show_best_part_subtitle", "Show a shortcut to the most replayed part or chorus on the player artwork"],
+                        showBestPart,
+                        onShowBestPartChange,
+                    )
                     val themeTitle = "Theme"
                     val themeSubtitle = "Follow your device appearance by default, or choose a theme."
                     if (settingsRowVisible(themeTitle, themeSubtitle)) {

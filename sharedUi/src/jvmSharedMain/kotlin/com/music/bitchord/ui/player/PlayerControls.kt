@@ -102,6 +102,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -373,6 +374,25 @@ internal fun PlaybackQualityLabel(
         nerdStats = nerdStats,
         modifier = modifier,
     )
+}
+
+/** A compact overlay that stays readable on both light and dark album covers. */
+@Composable
+internal fun BestPartButton(onClick: () -> Unit) {
+    val label = stringResource(Res.string.best_part)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.62f))
+            .border(1.dp, Color.White.copy(alpha = 0.24f), CircleShape)
+            .clickable(role = Role.Button, onClickLabel = stringResource(Res.string.best_part_description), onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    ) {
+        Icon(BitChordIcons.MusicNote, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = Color.White)
+    }
 }
 
 /**

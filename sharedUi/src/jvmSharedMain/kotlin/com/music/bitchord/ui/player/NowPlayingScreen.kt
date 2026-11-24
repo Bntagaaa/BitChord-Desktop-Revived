@@ -44,6 +44,7 @@ import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
@@ -750,6 +751,8 @@ fun NowPlayingScreen(
      */
     windowHeight: Dp,
     modifier: Modifier = Modifier,
+    bestPartStartMs: Long? = null,
+    onBestPartSeek: (Long) -> Unit = onSeek,
 ) {
     val density = LocalDensity.current
     val haptics = rememberHaptics()
@@ -828,6 +831,28 @@ fun NowPlayingScreen(
     // track" check lives.
     val spotifyCanvasAutoHide by PlayerSettings.spotifyCanvasAutoHide.collectAsStateWithLifecycle()
     val mixing by PlayerSettings.smartMixInProgress.collectAsStateWithLifecycle()
+    var bestPartHeard by remember(song.videoId, song.queueEntryId) { mutableStateOf(false) }
+    val bestPartAhead by remember(bestPartStartMs, position) {
+        derivedStateOf { bestPartStartMs != null && position.positionMs < bestPartStartMs - 400L }
+    }
+    val atBestPart by remember(bestPartStartMs, position) {
+        derivedStateOf {
+            bestPartStartMs != null &&
+                position.positionMs in (bestPartStartMs - 400L)..(bestPartStartMs + 20_000L)
+        }
+    }
+    LaunchedEffect(song.videoId, song.queueEntryId, atBestPart) {
+        if (atBestPart) bestPartHeard = true
+    }
+    val showBestPart = bestPartAhead && !bestPartHeard && !controlsLocked && !mixing &&
+        !isLoading && !audioVersionSwitching
+    val seekBestPart = {
+        val start = bestPartStartMs
+        if (showBestPart && start != null && !bestPartHeard) {
+            bestPartHeard = true
+            onBestPartSeek(start)
+        }
+    }
     // A music video plays its own picture where the sleeve is — see
     // [MusicVideoSurface] — and takes the place of any animated cover.
     val videoMode = videoEnabled && showsMusicVideo(song)
@@ -2150,15 +2175,21 @@ fun NowPlayingScreen(
                         ) {
                             // The stats belong to the player, not to the sleeve, so
                             // they leave it along with the rest of the player.
-                            SleeveNerdStats(
-                                song = song,
+                            Column(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .padding(horizontal = 10.dp, vertical = 8.dp)
                                     // Faded with the player rather than flown with
                                     // the sleeve: the cover in the bar has none.
                                     .graphicsLayer { alpha = if (panelOpen) 0f else dockFade() },
-                            )
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                SleeveNerdStats(song)
+                                if (showBestPart && !panelOpen && !docking()) {
+                                    BestPartButton(onClick = seekBestPart)
+                                }
+                            }
                         }
                     },
                     actions = playerActions,
@@ -3394,15 +3425,21 @@ fun NowPlayingScreen(
                             // fade away with Spotify's lower control deck rather than
                             // following the compact credits to the bottom edge.
                             WhileShown({ !collapsePastHalf }) {
-                                SleeveNerdStats(
-                                    song = song,
+                                Column(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(horizontal = 10.dp, vertical = 8.dp)
                                         .graphicsLayer {
                                             alpha = (1f - p() * 2f) * spotifyChromeAlpha
                                         },
-                                )
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    SleeveNerdStats(song)
+                                    if (showBestPart && !videoMode && !queueOpen && !lyricsOpen && !docking()) {
+                                        BestPartButton(onClick = seekBestPart)
+                                    }
+                                }
                             }
                         }
 

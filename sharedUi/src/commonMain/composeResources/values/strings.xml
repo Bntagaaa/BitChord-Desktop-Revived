@@ -277,4 +277,6 @@
 
     <string name="switch_to_grid_view">Switch to grid view</string>
     <string name="switch_to_list_view">Switch to list view</string>
+    <string name="best_part">Best Part</string>
+    <string name="best_part_description">Skip to the best part of the song</string>
 </resources>
