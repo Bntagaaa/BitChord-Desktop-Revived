@@ -47,7 +47,14 @@ def seed_synthetic_library(profile):
     ))
     chunks("liked_ids", "\n".join(f"fixture-{index}" for index in range(1200)))
     put("automix", "true")
-    prefs = profile / "preferences" / ".java" / ".userPrefs" / "com.music.bitchord.desktop"
+    # Linux FileSystemPreferences encodes node names that contain dots. Its
+    # alternate Base64 alphabet avoids characters that are unsafe in a directory.
+    java_alphabet = "!\"#$%&'(),-.:;<>@[]^`_{|}~abcdefghijklmnopqrstuvwxyz0123456789+?"
+    standard_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    name = base64.b64encode("com.music.bitchord.desktop".encode("utf-16-be")).decode()
+    prefs = profile / "preferences" / ".java" / ".userPrefs" / (
+        "_" + name.translate(str.maketrans(standard_alphabet, java_alphabet))
+    )
     prefs.mkdir(parents=True)
     (prefs / "prefs.xml").write_bytes(
         b'<?xml version="1.0" encoding="UTF-8"?>\n'
