@@ -151,9 +151,13 @@ internal class DesktopTrackAnalyzer(
 
     /** A stored analysis, promoted into memory on first ask. */
     private fun restored(trackId: String): TrackAnalysis? =
-        store.load(trackId)?.also {
+        store.load(trackId)?.let { cached ->
+            // Older analyses counted the shared portion of the head and tail twice.
+            val unique = cached.downbeats.distinct()
+            val analysis = if (unique.size == cached.downbeats.size) cached else cached.copy(downbeats = unique)
             measurements[trackId] = DesktopAnalysisMeasurement(cacheHit = true)
-            results[trackId] = it
+            results[trackId] = analysis
+            analysis
         }
 
     fun measurementFor(trackId: String): DesktopAnalysisMeasurement? = measurements[trackId]
@@ -352,7 +356,8 @@ internal class DesktopTrackAnalyzer(
             bpm = leading?.bpm ?: features.bpm,
             beatInterval = leading?.beatInterval ?: features.beatInterval,
             beatConfidence = leading?.beatConfidence ?: features.beatConfidence,
-            downbeats = (head?.downbeats.orEmpty() + tail?.downbeats.orEmpty()).ifEmpty { features.downbeats }.sorted(),
+            downbeats = (head?.downbeats.orEmpty() + tail?.downbeats.orEmpty())
+                .ifEmpty { features.downbeats }.distinct().sorted(),
             firstBeat = head?.firstBeat ?: features.firstBeat,
             phraseBoundaries = features.phraseBoundaries, key = features.key, keyConfidence = features.keyConfidence,
             audibleStartTime = features.audibleStartTime, pickupTime = features.pickupTime,

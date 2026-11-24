@@ -45,6 +45,10 @@ class DesktopAutomixTest {
         assertTrue(current.isUsable, "the outgoing track was not analysed: ${current.status}")
         assertTrue(next.isUsable, "the incoming track was not analysed: ${next.status}")
         assertTrue(current.bpm > 0 && next.bpm > 0, "no tempo: ${current.bpm} / ${next.bpm}")
+        for (measured in listOf(current, next)) {
+            assertEquals(measured.downbeats.distinct().sorted(), measured.downbeats,
+                "Overlapping head and tail grids must contribute each timestamp only once")
+        }
 
         val song = Song("current", "Current", "Artist", null)
         val other = Song("next", "Next", "Artist", null)
