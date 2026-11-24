@@ -41,8 +41,12 @@ class DesktopLandscapePlayerTest {
 
     @Test fun expandedOutputPillAndCaptionOpenTheDesktopPortal() = verify(1360, 800, verifyOutputMenu = true)
 
+    @Test fun bestPartSeeksOnceAndDoesNotCarryTheOldTargetToTheNextSong() =
+        verify(1360, 800, verifyBestPart = true)
+
     private fun verify(width: Int, height: Int, density: Float = 1f, reduceBlur: Boolean = true,
-        verifyTrackChange: Boolean = false, verifyScroll: Boolean = true, verifyOutputMenu: Boolean = false) = runDesktopComposeUiTest(width = width, height = height) {
+        verifyTrackChange: Boolean = false, verifyScroll: Boolean = true, verifyOutputMenu: Boolean = false,
+        verifyBestPart: Boolean = false) = runDesktopComposeUiTest(width = width, height = height) {
         mainClock.autoAdvance = false
         val lastScreen = MutableStateFlow(LastPlayerScreen.MAIN)
         val host = object : PlayerHost by DesktopPlayerHost {
@@ -68,6 +72,7 @@ class DesktopLandscapePlayerTest {
             Song("landscape-b", "Landscape Track B", "Test Artist B", null),
         )
         val index = mutableStateOf(0)
+        val bestPartSeeks = mutableListOf<Long>()
         val playhead = PlaybackPosition().apply { report(28_000) }
         try {
             setContent {
@@ -91,7 +96,9 @@ class DesktopLandscapePlayerTest {
                                         (4..15).map { LyricLine(it * 20_000L, "Later lyric $it") },
                                     lyricsSource = LyricsSource.KUGOU, lyricsProviderStates = emptyMap(),
                                     onSelectLyricsProvider = {}, lyricsUnavailable = false, lyricsOffsetOpen = false,
-                                    onDismissLyricsOffset = {}, windowWidth = windowWidth, windowHeight = windowHeight)
+                                    onDismissLyricsOffset = {}, windowWidth = windowWidth, windowHeight = windowHeight,
+                                    bestPartStartMs = if (verifyBestPart && index.value == 0) 90_000L else null,
+                                    onBestPartSeek = { bestPartSeeks.add(it) })
                             }
                         }
                         if (verifyOutputMenu) {
@@ -118,6 +125,20 @@ class DesktopLandscapePlayerTest {
             }
             mainClock.advanceTimeBy(2500)
             waitForIdle()
+            if (verifyBestPart) {
+                val button = onNodeWithText("Best Part", ignoreCase = true)
+                button.assertIsDisplayed().performClick()
+                mainClock.advanceTimeBy(500)
+                button.assertDoesNotExist()
+                runOnIdle {
+                    assertEquals(listOf(90_000L), bestPartSeeks)
+                    index.value = 1
+                }
+                mainClock.advanceTimeBy(500)
+                button.assertDoesNotExist()
+                runOnIdle { assertEquals(listOf(90_000L), bestPartSeeks) }
+                return@runDesktopComposeUiTest
+            }
             if (verifyOutputMenu) {
                 val title = DesktopStrings["audio_output", "Audio output"]
                 val menu = onNodeWithText(title)
