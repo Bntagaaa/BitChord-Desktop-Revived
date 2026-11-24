@@ -1,0 +1,85 @@
+name: Desktop startup benchmark
+
+on:
+  pull_request:
+    branches: ['1.10']
+    paths:
+      - 'desktopApp/**'
+      - 'desktopRuntime/**'
+      - 'desktopUi/**'
+      - 'scripts/benchmark-desktop-startup.py'
+      - '.github/workflows/desktop-startup-benchmark.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: startup-benchmark-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  linux-launch:
+    name: Linux packaged launch comparison
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      BITCHORD_DESKTOP_ONLY: 'true'
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+        with:
+          path: candidate
+          persist-credentials: false
+      - name: Check out baseline
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install test display and benchmark dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth libgl1 libgl1-mesa-dri libgtk-3-0 libxtst6 python3-psutil
+      - name: Build both release launchers
+        run: |
+          set -euo pipefail
+          for checkout in baseline candidate; do
+            (
+              cd "$checkout"
+              bash ./gradlew :desktopApp:createReleaseDistributable -Pbitchord.version=1.10-startup-ci --build-cache
+            )
+          done
+          mkdir -p verification
+          {
+            git -C baseline rev-parse HEAD
+            git -C candidate rev-parse HEAD
+            java -version
+            lscpu
+          } >verification/environment.txt 2>&1
+      - name: Measure both launchers in the same virtual display
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          xvfb-run -a -s '-screen 0 1440x900x24' dbus-run-session -- bash -c '
+            set -uo pipefail
+            status=0
+            for checkout in baseline candidate; do
+              /usr/bin/python3 candidate/scripts/benchmark-desktop-startup.py \
+                --launcher "$checkout/desktopApp/build/compose/binaries/main-release/app/BitChord/bin/BitChord" \
+                --version 1.10-startup-ci --output "verification/$checkout" \
+                --scenario fresh-profile/hosted-Xvfb --runs 10 --duration 20 || status=1
+            done
+            exit "$status"
+          '
+      - name: Upload raw timings and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-startup-linux
+          path: verification/
+          if-no-files-found: warn

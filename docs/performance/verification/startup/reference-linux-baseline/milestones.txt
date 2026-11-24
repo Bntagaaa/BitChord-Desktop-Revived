@@ -1,0 +1,90 @@
+run-01
+[PERF_DIAGNOSTICS] [+15 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 44MB
+BitChord: 13:11:36  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+4847 ms] Window created | JVM Heap: 84MB / 512MB, Process RSS: 351MB
+[PERF_DIAGNOSTICS] [+4924 ms] Home feed request started | JVM Heap: 86MB / 512MB, Process RSS: 353MB
+[PERF_DIAGNOSTICS] [+4926 ms] Native analyzer initialization completed | JVM Heap: 86MB / 512MB, Process RSS: 353MB
+[PERF_DIAGNOSTICS] [+4932 ms] Download verification completed | JVM Heap: 86MB / 512MB, Process RSS: 353MB
+[PERF_DIAGNOSTICS] [+4964 ms] Account / session restored - Signed in: false | JVM Heap: 87MB / 512MB, Process RSS: 353MB
+[PERF_DIAGNOSTICS] [+7900 ms] Home feed first content rendered | JVM Heap: 121MB / 512MB, Process RSS: 576MB
+run-02
+[PERF_DIAGNOSTICS] [+12 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 46MB
+[PERF_DIAGNOSTICS] [+3852 ms] Window created | JVM Heap: 43MB / 512MB, Process RSS: 294MB
+[PERF_DIAGNOSTICS] [+3896 ms] Download verification completed | JVM Heap: 44MB / 512MB, Process RSS: 295MB
+[PERF_DIAGNOSTICS] [+3897 ms] Home feed request started | JVM Heap: 44MB / 512MB, Process RSS: 295MB
+[PERF_DIAGNOSTICS] [+3903 ms] Native analyzer initialization completed | JVM Heap: 44MB / 512MB, Process RSS: 295MB
+[PERF_DIAGNOSTICS] [+3916 ms] Account / session restored - Signed in: false | JVM Heap: 45MB / 512MB, Process RSS: 295MB
+BitChord: 13:12:00  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+6777 ms] Home feed first content rendered | JVM Heap: 91MB / 512MB, Process RSS: 458MB
+run-03
+[PERF_DIAGNOSTICS] [+42 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 45MB
+[PERF_DIAGNOSTICS] [+3988 ms] Window created | JVM Heap: 42MB / 512MB, Process RSS: 297MB
+[PERF_DIAGNOSTICS] [+4011 ms] Home feed request started | JVM Heap: 44MB / 512MB, Process RSS: 297MB
+[PERF_DIAGNOSTICS] [+4011 ms] Native analyzer initialization completed | JVM Heap: 44MB / 512MB, Process RSS: 297MB
+[PERF_DIAGNOSTICS] [+4015 ms] Download verification completed | JVM Heap: 44MB / 512MB, Process RSS: 297MB
+[PERF_DIAGNOSTICS] [+4023 ms] Account / session restored - Signed in: false | JVM Heap: 44MB / 512MB, Process RSS: 298MB
+BitChord: 13:12:24  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+6259 ms] Home feed first content rendered | JVM Heap: 104MB / 512MB, Process RSS: 446MB
+run-04
+[PERF_DIAGNOSTICS] [+37 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 46MB
+BitChord: 13:12:47  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+5477 ms] Window created | JVM Heap: 107MB / 512MB, Process RSS: 380MB
+[PERF_DIAGNOSTICS] [+5557 ms] Home feed request started | JVM Heap: 109MB / 512MB, Process RSS: 383MB
+[PERF_DIAGNOSTICS] [+5553 ms] Native analyzer initialization completed | JVM Heap: 109MB / 512MB, Process RSS: 382MB
+[PERF_DIAGNOSTICS] [+5565 ms] Download verification completed | JVM Heap: 109MB / 512MB, Process RSS: 383MB
+[PERF_DIAGNOSTICS] [+5595 ms] Account / session restored - Signed in: false | JVM Heap: 110MB / 512MB, Process RSS: 384MB
+[PERF_DIAGNOSTICS] [+8296 ms] Home feed first content rendered | JVM Heap: 77MB / 512MB, Process RSS: 566MB
+run-05
+[PERF_DIAGNOSTICS] [+15 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 45MB
+[PERF_DIAGNOSTICS] [+4213 ms] Window created | JVM Heap: 40MB / 512MB, Process RSS: 289MB
+[PERF_DIAGNOSTICS] [+4256 ms] Native analyzer initialization completed | JVM Heap: 42MB / 512MB, Process RSS: 289MB
+[PERF_DIAGNOSTICS] [+4255 ms] Home feed request started | JVM Heap: 42MB / 512MB, Process RSS: 289MB
+[PERF_DIAGNOSTICS] [+4262 ms] Download verification completed | JVM Heap: 42MB / 512MB, Process RSS: 290MB
+[PERF_DIAGNOSTICS] [+4290 ms] Account / session restored - Signed in: false | JVM Heap: 43MB / 512MB, Process RSS: 290MB
+BitChord: 13:13:11  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+7283 ms] Home feed first content rendered | JVM Heap: 108MB / 512MB, Process RSS: 506MB
+run-06
+[PERF_DIAGNOSTICS] [+45 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 48MB
+[PERF_DIAGNOSTICS] [+4474 ms] Window created | JVM Heap: 43MB / 512MB, Process RSS: 292MB
+[PERF_DIAGNOSTICS] [+4500 ms] Home feed request started | JVM Heap: 45MB / 512MB, Process RSS: 292MB
+[PERF_DIAGNOSTICS] [+4505 ms] Native analyzer initialization completed | JVM Heap: 45MB / 512MB, Process RSS: 293MB
+[PERF_DIAGNOSTICS] [+4504 ms] Download verification completed | JVM Heap: 45MB / 512MB, Process RSS: 293MB
+[PERF_DIAGNOSTICS] [+4514 ms] Account / session restored - Signed in: false | JVM Heap: 45MB / 512MB, Process RSS: 293MB
+BitChord: 13:13:36  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+7005 ms] Home feed first content rendered | JVM Heap: 137MB / 512MB, Process RSS: 465MB
+run-07
+[PERF_DIAGNOSTICS] [+17 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 48MB
+BitChord: 13:13:58  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+4924 ms] Window created | JVM Heap: 62MB / 512MB, Process RSS: 327MB
+[PERF_DIAGNOSTICS] [+5036 ms] Native analyzer initialization completed | JVM Heap: 72MB / 512MB, Process RSS: 331MB
+[PERF_DIAGNOSTICS] [+5041 ms] Home feed request started | JVM Heap: 73MB / 512MB, Process RSS: 331MB
+[PERF_DIAGNOSTICS] [+5044 ms] Download verification completed | JVM Heap: 73MB / 512MB, Process RSS: 331MB
+[PERF_DIAGNOSTICS] [+5083 ms] Account / session restored - Signed in: false | JVM Heap: 70MB / 512MB, Process RSS: 333MB
+[PERF_DIAGNOSTICS] [+9131 ms] Home feed first content rendered | JVM Heap: 68MB / 512MB, Process RSS: 535MB
+run-08
+[PERF_DIAGNOSTICS] [+25 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 47MB
+BitChord: 13:14:22  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+4679 ms] Window created | JVM Heap: 57MB / 512MB, Process RSS: 328MB
+[PERF_DIAGNOSTICS] [+4747 ms] Home feed request started | JVM Heap: 59MB / 512MB, Process RSS: 330MB
+[PERF_DIAGNOSTICS] [+4753 ms] Download verification completed | JVM Heap: 60MB / 512MB, Process RSS: 330MB
+[PERF_DIAGNOSTICS] [+4760 ms] Native analyzer initialization completed | JVM Heap: 60MB / 512MB, Process RSS: 330MB
+[PERF_DIAGNOSTICS] [+4773 ms] Account / session restored - Signed in: false | JVM Heap: 61MB / 512MB, Process RSS: 330MB
+[PERF_DIAGNOSTICS] [+7899 ms] Home feed first content rendered | JVM Heap: 85MB / 512MB, Process RSS: 570MB
+run-09
+[PERF_DIAGNOSTICS] [+18 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 48MB
+BitChord: 13:14:45  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+4909 ms] Window created | JVM Heap: 79MB / 512MB, Process RSS: 323MB
+[PERF_DIAGNOSTICS] [+5009 ms] Home feed request started | JVM Heap: 83MB / 512MB, Process RSS: 327MB
+[PERF_DIAGNOSTICS] [+5022 ms] Native analyzer initialization completed | JVM Heap: 83MB / 512MB, Process RSS: 329MB
+[PERF_DIAGNOSTICS] [+5024 ms] Download verification completed | JVM Heap: 84MB / 512MB, Process RSS: 328MB
+[PERF_DIAGNOSTICS] [+5039 ms] Account / session restored - Signed in: false | JVM Heap: 84MB / 512MB, Process RSS: 329MB
+[PERF_DIAGNOSTICS] [+8031 ms] Home feed first content rendered | JVM Heap: 90MB / 512MB, Process RSS: 543MB
+run-10
+[PERF_DIAGNOSTICS] [+12 ms] Process entry and bootstrap initialization | JVM Heap: 12MB / 512MB, Process RSS: 48MB
+[PERF_DIAGNOSTICS] [+4463 ms] Window created | JVM Heap: 58MB / 512MB, Process RSS: 296MB
+[PERF_DIAGNOSTICS] [+4513 ms] Home feed request started | JVM Heap: 65MB / 512MB, Process RSS: 302MB
+[PERF_DIAGNOSTICS] [+4513 ms] Download verification completed | JVM Heap: 65MB / 512MB, Process RSS: 302MB
+[PERF_DIAGNOSTICS] [+4516 ms] Native analyzer initialization completed | JVM Heap: 65MB / 512MB, Process RSS: 302MB
+[PERF_DIAGNOSTICS] [+4544 ms] Account / session restored - Signed in: false | JVM Heap: 71MB / 512MB, Process RSS: 307MB
+BitChord: 13:15:09  PoTokenWebView/I: Initializing JavaFX platform on demand for BotGuard PoToken/WebView
+[PERF_DIAGNOSTICS] [+8169 ms] Home feed first content rendered | JVM Heap: 91MB / 512MB, Process RSS: 552MB
