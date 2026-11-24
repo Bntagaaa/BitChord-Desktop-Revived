@@ -133,4 +133,15 @@ class DesktopStartupTest {
             Files.deleteIfExists(directory)
         }
     }
+
+    @Test fun `Home cache only accepts a page from its expected authenticated identity`() {
+        val account = DesktopHomeCache.Identity("account", "personal")
+        val session = DesktopYouTubeAuth.Session(cookie = "fixture", dataSyncId = "account")
+        assertTrue(account.matchesSession(session, null))
+        assertFalse(account.matchesSession(session.copy(dataSyncId = "another-account"), null))
+        assertFalse(account.matchesSession(session.copy(pageId = "another-channel"), null))
+        val brand = DesktopYouTubeProfile(profileId = "brand", name = "Brand", pageId = "brand-page")
+        assertTrue(account.copy(profileId = "brand").matchesSession(session.copy(pageId = "brand-page"), brand))
+        assertFalse(account.copy(profileId = "brand").matchesSession(session, brand))
+    }
 }

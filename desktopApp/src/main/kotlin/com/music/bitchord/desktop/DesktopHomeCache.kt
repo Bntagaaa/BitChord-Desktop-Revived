@@ -14,6 +14,18 @@ import kotlinx.serialization.json.Json
 /** One bounded first page of Home. No session credentials or continuation tokens are persisted. */
 internal class DesktopHomeCache(private val path: Path) {
     data class Identity(val accountId: String?, val profileId: String?) {
+        fun matchesSession(session: DesktopYouTubeAuth.Session?, selectedProfile: DesktopYouTubeProfile?): Boolean {
+            if (accountId == null) return session == null
+            if (session == null) return false
+            val page = selectedProfile?.pageId?.takeIf(String::isNotBlank)
+            if (page != null) return session.pageId == page
+            // Browser renewal may return a different login from the same browser profile.
+            // Only associate a personalized page with a saved identity the session identifies.
+            val sessionAccount = session.dataSyncId?.takeIf(String::isNotBlank) ?: return false
+            return session.pageId.isNullOrBlank() &&
+                (sessionAccount == accountId || sessionAccount == selectedProfile?.dataSyncId)
+        }
+
         fun fingerprint(): String {
             val key = listOf(accountId.orEmpty(), profileId.orEmpty()).joinToString("") { "${it.length}:$it" }
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(key.toByteArray()))

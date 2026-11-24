@@ -2910,6 +2910,8 @@ internal fun BitChordDesktopApp(
             restoreAccount.await()
             if (!current()) return@launch
             val session = DesktopYouTubeAuth.session
+            val selectedProfile = accounts.firstOrNull { it.accountId == identity.accountId }
+                ?.profiles?.firstOrNull { it.profileId == identity.profileId }
             // Keep the selected account's offline page if its credentials cannot be renewed.
             if (session == null && identity.accountId != null && cached.isNotEmpty()) return@launch
             DesktopStartupDiagnostics.once(DesktopStartupDiagnostics.Milestone.HOME_FEED_REQUESTED)
@@ -2941,7 +2943,7 @@ internal fun BitChordDesktopApp(
                         homeContinuation = feed.continuation
                         publishFresh(feed.shelves, mainPage = true)
                         finishPrimary()
-                        if ((session == null) == (identity.accountId == null)) {
+                        if (identity.matchesSession(session, selectedProfile)) {
                             withContext(Dispatchers.IO) {
                                 cache.write(identity, feed.shelves)
                             }
