@@ -21,6 +21,15 @@ import androidx.compose.ui.graphics.layer.drawLayer
  */
 internal val LocalPlayerChrome = compositionLocalOf { false }
 
+/** Softer dodge ink over the already bright album mesh. */
+internal val LocalChromeSoftened = compositionLocalOf { false }
+
+/** The expanded player can precompose controls while its dock is moving. */
+internal val LocalPlayerTransportMotionActive = compositionLocalOf { true }
+
+/** Visual-only policy supplied by the owning player; standalone glyphs need no settings host. */
+internal val LocalPlayerReduceMotion = compositionLocalOf { false }
+
 internal const val CHROME_FULL_ALPHA = 0.73f
 
 /** Desktop's direct-rendered equivalent of mobile's bright, blended grab handle. */
