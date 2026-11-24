@@ -31,15 +31,20 @@ import com.music.bitchord.data.settings.PlayerTheme
 import com.music.bitchord.ui.player.rememberArtworkColors
 import com.music.bitchord.ui.player.rememberArtworkMesh
 import com.music.bitchord.ui.player.rememberFullArtworkBlurImage
+import kotlin.math.floor
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeoutOrNull
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.FilterMipmap
 import org.jetbrains.skia.FilterMode
 import org.jetbrains.skia.FilterTileMode
 import org.jetbrains.skia.Image as SkiaImage
+import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.Matrix33
 import org.jetbrains.skia.MipmapMode
 import org.jetbrains.skia.Paint
@@ -189,10 +194,12 @@ private const val AMBIENT_PX = 128
 internal class DesktopOrganicDissolve private constructor(
     private val image: SkiaImage,
     private val builder: RuntimeShaderBuilder,
-    generation: Long,
+    private val field: SkiaImage,
     private val fit: Boolean,
 ) : AutoCloseable {
     private val paint = Paint()
+    private val sampling = FilterMipmap(FilterMode.LINEAR, MipmapMode.NONE)
+    private val fieldShader = field.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, sampling)
     private var imageShader: Shader? = null
     private var width = 0f
     private var height = 0f
@@ -201,8 +208,7 @@ internal class DesktopOrganicDissolve private constructor(
     private var lastProgress = Float.NaN
 
     init {
-        val random = Random(generation)
-        builder.uniform("seedOffset", random.nextFloat() * 32f, random.nextFloat() * 32f)
+        builder.child("field", fieldShader)
     }
 
     fun draw(scope: DrawScope, progress: Float) = with(scope) {
@@ -228,8 +234,7 @@ internal class DesktopOrganicDissolve private constructor(
         val left = (width - image.width * scale) / 2f
         val top = (height - image.height * scale) / 2f
         val matrix = Matrix33.makeTranslate(left, top).makePreScale(scale, scale)
-        val next = image.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP,
-            FilterMipmap(FilterMode.LINEAR, MipmapMode.NONE), matrix)
+        val next = image.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, sampling, matrix)
         builder.child("cover", next)
         imageShader?.close()
         imageShader = next
@@ -244,6 +249,8 @@ internal class DesktopOrganicDissolve private constructor(
         shader?.close()
         builder.close()
         imageShader?.close()
+        fieldShader.close()
+        field.close()
         image.close()
     }
 
@@ -257,46 +264,67 @@ internal class DesktopOrganicDissolve private constructor(
         fun make(bitmap: ImageBitmap, generation: Long, fit: Boolean): DesktopOrganicDissolve? {
             val runtimeEffect = effect ?: return null
             return DesktopOrganicDissolve(SkiaImage.makeFromBitmap(bitmap.asSkiaBitmap()),
-                RuntimeShaderBuilder(runtimeEffect), generation, fit)
+                RuntimeShaderBuilder(runtimeEffect), organicField(generation), fit)
         }
     }
 }
 
+private const val FIELD_SIZE = 96
+
+/** The three-octave field is static for a transition. Sample it from a tiny alpha texture. */
+private fun organicField(generation: Long): SkiaImage {
+    val random = Random(generation)
+    val seedX = random.nextFloat() * 32f
+    val seedY = random.nextFloat() * 32f
+    val alpha = ByteArray(FIELD_SIZE * FIELD_SIZE)
+    for (y in 0 until FIELD_SIZE) for (x in 0 until FIELD_SIZE) {
+        var px = (x + .5f) * 2.6f / FIELD_SIZE + seedX
+        var py = (y + .5f) * 2.6f / FIELD_SIZE + seedY
+        var noise = 0f
+        var weight = .5f
+        repeat(3) {
+            noise += valueNoise(px, py) * weight
+            px = px * 2f + 3.9f
+            py = py * 2f + 5.1f
+            weight *= .5f
+        }
+        val field = ((noise / .875f - .18f) / .64f).coerceIn(0f, 1f)
+        alpha[y * FIELD_SIZE + x] = (field * 255f).roundToInt().toByte()
+    }
+    val info = ImageInfo(FIELD_SIZE, FIELD_SIZE, ColorType.ALPHA_8, ColorAlphaType.PREMUL)
+    return SkiaImage.makeRaster(info, alpha, FIELD_SIZE)
+}
+
+private fun valueNoise(x: Float, y: Float): Float {
+    val left = floor(x).toInt()
+    val top = floor(y).toInt()
+    val fx = x - left
+    val fy = y - top
+    val sx = fx * fx * (3f - 2f * fx)
+    val sy = fy * fy * (3f - 2f * fy)
+    fun blend(a: Float, b: Float, progress: Float) = a + (b - a) * progress
+    val row1 = blend(hashCell(left, top), hashCell(left + 1, top), sx)
+    val row2 = blend(hashCell(left, top + 1), hashCell(left + 1, top + 1), sx)
+    return blend(row1, row2, sy)
+}
+
+private fun hashCell(x: Int, y: Int): Float {
+    var n = (x * 127 + y * 197) % 251
+    n = (n * (n + 73) + x * 97 + y * 53) % 251
+    n = (n * (n + 37) + x * 31 + y * 109) % 251
+    return n / 251f
+}
+
 private val organicDissolveShader = """
     uniform shader cover;
+    uniform shader field;
     uniform float2 bounds;
     uniform float progress;
-    uniform float2 seedOffset;
-
-    float hashCell(float2 cell) {
-        float n = mod(cell.x * 127.0 + cell.y * 197.0, 251.0);
-        n = mod(n * (n + 73.0) + cell.x * 97.0 + cell.y * 53.0, 251.0);
-        n = mod(n * (n + 37.0) + cell.x * 31.0 + cell.y * 109.0, 251.0);
-        return n / 251.0;
-    }
-
-    float valueNoise(float2 point) {
-        float2 cell = floor(point);
-        float2 f = fract(point);
-        f = f * f * (3.0 - 2.0 * f);
-        return mix(mix(hashCell(cell), hashCell(cell + float2(1.0, 0.0)), f.x),
-                   mix(hashCell(cell + float2(0.0, 1.0)), hashCell(cell + float2(1.0)), f.x), f.y);
-    }
 
     half4 main(float2 xy) {
-        float2 point = xy / bounds * 2.6 + seedOffset;
-        float noise = 0.0;
-        float weight = 0.5;
-        float total = 0.0;
-        for (int i = 0; i < 3; ++i) {
-            noise += valueNoise(point) * weight;
-            total += weight;
-            point = point * 2.0 + float2(3.9, 5.1);
-            weight *= 0.5;
-        }
         float threshold = mix(1.2, -0.2, progress);
-        float field = clamp((noise / total - 0.18) / 0.64, 0.0, 1.0);
-        float coverage = smoothstep(threshold - 0.2, threshold + 0.2, field);
+        float noise = field.eval(xy / bounds * ${FIELD_SIZE.toFloat()}).a;
+        float coverage = smoothstep(threshold - 0.2, threshold + 0.2, noise);
         return cover.eval(xy) * (1.0 - coverage);
     }
 """.trimIndent()

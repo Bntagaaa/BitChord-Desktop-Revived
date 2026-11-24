@@ -136,6 +136,46 @@ class DesktopAutoMixVisualTest {
         }
     }
 
+    @Test
+    fun measureSoftwareMaskFrameTimesAndResidency() {
+        val rounds = System.getenv("BITCHORD_AUTOMIX_ARTWORK_ROUNDS")?.toIntOrNull()
+        org.junit.Assume.assumeTrue("Set BITCHORD_AUTOMIX_ARTWORK_ROUNDS to measure the software mask", rounds != null)
+        val total = requireNotNull(rounds).coerceIn(1, 200)
+        val side = 320
+        val outgoing = ImageBitmap(side, side).also { bitmap -> draw(bitmap) { drawRect(Color.Red) } }
+        val output = ImageBitmap(side, side)
+        val canvas = Canvas(output)
+        val scope = CanvasDrawScope()
+        val size = Size(side.toFloat(), side.toFloat())
+        val density = Density(1f)
+        val framesPerReveal = 156
+        val draws = LongArray(total * framesPerReveal)
+        val resident = java.io.File("/proc/self/status")
+        fun reportRss(label: String) {
+            if (resident.isFile) println("AUTOMIX_ARTWORK $label " + resident.readLines()
+                .filter { it.startsWith("VmRSS:") || it.startsWith("VmHWM:") }.joinToString(" "))
+        }
+        repeat(total) { generation ->
+            val mask = assertNotNull(DesktopOrganicDissolve.make(outgoing, generation.toLong(), fit = false))
+            mask.use {
+                repeat(framesPerReveal) { frame ->
+                    val started = System.nanoTime()
+                    scope.draw(density, LayoutDirection.Ltr, canvas, size) {
+                        drawRect(Color.Blue)
+                        mask.draw(this, frame.toFloat() / (framesPerReveal - 1))
+                    }
+                    draws[generation * framesPerReveal + frame] = System.nanoTime() - started
+                }
+            }
+            if (generation == 0 || generation == total / 2 || generation == total - 1) {
+                reportRss("completed=${generation + 1}")
+            }
+        }
+        draws.sort()
+        println("AUTOMIX_ARTWORK frames=${draws.size} width=$side " +
+            "median_ms=${draws[draws.size / 2] / 1e6} p95_ms=${draws[(draws.size * .95).toInt()] / 1e6}")
+    }
+
     private fun countEndpoints(pixels: PixelMap): Pair<Int, Int> {
         var red = 0
         var blue = 0
