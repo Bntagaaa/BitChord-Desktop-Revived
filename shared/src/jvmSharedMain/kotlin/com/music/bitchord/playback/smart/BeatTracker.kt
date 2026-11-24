@@ -24,7 +24,6 @@ package com.music.bitchord.playback.smart
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
-import java.io.File
 import java.nio.FloatBuffer
 import kotlin.math.abs
 import kotlin.math.exp
@@ -52,8 +51,7 @@ class BeatTracker(
      *
      * A path rather than a [Context]: this is the only thing the tracker ever
      * wanted the platform for, and each application already knows how to put
-     * its own copy of the weights somewhere readable — unpacked from assets on
-     * Android, from the jar's resources on the desktop.
+     * its own copy of the weights somewhere readable.
      */
     private val modelPath: () -> String,
     /** How many threads inference may use; the beat and downbeat pass is the expensive one. */
@@ -83,19 +81,7 @@ class BeatTracker(
             runCatching { session?.close() }
             session = null
             return runCatching {
-                val file = File(modelPath())
-                val options = OrtSession.SessionOptions().apply {
-                    setIntraOpNumThreads(threads)
-                    setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-                    // ORT's arena allocator keeps every block it has ever needed, which for this
-                    // graph is tens of megabytes of native heap retained for the life of the
-                    // session, far past the model's own size, on a process that also has to
-                    // survive in the background. Analysis runs a handful of times per track, so
-                    // allocating per run is the right trade.
-                    setCPUArenaAllocator(false)
-                    setMemoryPatternOptimization(false)
-                }
-                OrtEnvironment.getEnvironment().createSession(file.absolutePath, options)
+                openAutoMixSession("Beat", modelPath(), threads)
                     .also {
                         session = it
                         sessionThreads = threads

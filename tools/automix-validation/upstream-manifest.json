@@ -2,7 +2,12 @@
   "repository": "https://github.com/kushagrasinghx/BitChord",
   "commit": "b690dc146009d4815825fa4a20815ef2e4ee8898",
   "source_line_endings": "LF",
-  "platform_adapter_exceptions": [],
+  "platform_adapter_exceptions": {
+    "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/AnalysisStore.kt": "77732073ebbd10289018dfd65e876a34e2289df98006294c99699dd993bc9c1d",
+    "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/BeatTracker.kt": "08cbdf541d35eb77c36f17ea40cbc6a83a16c190821b33633c6a22c729929c93",
+    "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/VocalTracker.kt": "cee4476fbb70fb0ac238f89c0d31bec314a20fbef12ad826633f065f3476d682",
+    "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/AutoMixSession.kt": "b4b399eb7c691c4f809caffd24b607dc97c810f2e82e6a6ede8bfeea820d4f34"
+  },
   "files": {
     "app/src/main/assets/beat_this_final0_q8.onnx": "7801f9c1adfd5ff193f37ececa3320bf1fda1ddee2bf7de341cea4c25ffd0acd",
     "app/src/main/assets/vocals_umxhq_int8.onnx": "a2be987b55a29bc149d3a6ae99b08175d81f85ee292a8ea21f96c3a473bc94cb",
@@ -23,11 +28,8 @@
     "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/TrackAnalysis.kt": "b4b61d8975904a5ff65ef96abd179ca260d1c108800ca088972c4a3630351ed8",
     "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/TransitionPlanner.kt": "26b6316901f950001578a49ff7771dd6285f5b2dd310eee1c2d9db05abfc9e99",
     "shared/src/commonMain/kotlin/com/music/bitchord/playback/smart/TransitionPolicy.kt": "5369860876566d7ccc92f041a299dd47a5437dc5c80b53a2a7420b6b841cd089",
-    "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/AnalysisStore.kt": "3b4ade20175d9196203f24c30a0ca2951371660032884116cfa78a885317ed9f",
-    "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/BeatTracker.kt": "af07fc4fea10427d7319502ce0a78d348f3e437d175b569b599b8cc4c168bf8b",
     "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/MelSpectrogram.kt": "bb930c4797433a5089ebe3ecb9cbc528ee8d9bf3f14c4759584bcb641f1889f0",
     "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/NativeAnalysisLibrary.kt": "15e9eb16f43d5fa797c6eb67ad912c886f0bb3df976c6aa8fc7a7545d150e1fd",
-    "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/TrackFeatures.kt": "28a380a933d84fa5740362ee89bddc80d1f2a8c6ffc1a18ff808cb895f2728ee",
-    "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/VocalTracker.kt": "a9880bb69335d8d394f8da2aa94c6dd3138bb7b6f670a5b89cb266b8f3fbab6b"
+    "shared/src/jvmSharedMain/kotlin/com/music/bitchord/playback/smart/TrackFeatures.kt": "28a380a933d84fa5740362ee89bddc80d1f2a8c6ffc1a18ff808cb895f2728ee"
   }
 }

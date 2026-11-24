@@ -24,7 +24,6 @@ package com.music.bitchord.playback.smart
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
-import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -95,8 +94,7 @@ class VocalTracker(
      *
      * A path rather than a [Context]: this is the only thing the tracker ever
      * wanted the platform for, and each application already knows how to put
-     * its own copy of the weights somewhere readable — unpacked from assets on
-     * Android, from the jar's resources on the desktop.
+     * its own copy of the weights somewhere readable.
      */
     private val modelPath: () -> String,
     /** How many threads inference may use; the vocal-activity pass is the expensive one. */
@@ -115,16 +113,7 @@ class VocalTracker(
             runCatching { session?.close() }
             session = null
             return runCatching {
-                val file = File(modelPath())
-                val options = OrtSession.SessionOptions().apply {
-                    setIntraOpNumThreads(threads)
-                    setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-                    // Same reasoning as BeatTracker: the arena retains every block it allocates for
-                    // the life of the session, which a backgrounded music player cannot justify.
-                    setCPUArenaAllocator(false)
-                    setMemoryPatternOptimization(false)
-                }
-                OrtEnvironment.getEnvironment().createSession(file.absolutePath, options)
+                openAutoMixSession("Vocal", modelPath(), threads)
                     .also {
                         session = it
                         sessionThreads = threads
