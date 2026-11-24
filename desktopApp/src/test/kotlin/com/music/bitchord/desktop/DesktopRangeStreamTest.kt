@@ -2,10 +2,13 @@ package com.music.bitchord.desktop
 
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -50,6 +53,63 @@ class DesktopRangeStreamTest {
         server.start()
         try {
             block("http://127.0.0.1:${server.address.port}/media", requested)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `stalled response body retries the same range`() {
+        val requests = AtomicInteger()
+        val executor = Executors.newCachedThreadPool()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply { this.executor = executor }
+        server.createContext("/audio") { exchange ->
+            try {
+                val attempt = requests.incrementAndGet()
+                val slice = body.copyOfRange(0, 4096)
+                exchange.responseHeaders.add("Content-Range", "bytes 0-4095/${body.size}")
+                exchange.sendResponseHeaders(206, slice.size.toLong())
+                if (attempt == 1) {
+                    exchange.responseBody.write(slice, 0, 1)
+                    exchange.responseBody.flush()
+                    Thread.sleep(3_000)
+                } else exchange.responseBody.use { it.write(slice) }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } finally {
+                exchange.close()
+            }
+        }
+        server.start()
+        try {
+            val stream = DesktopRangeStream("http://127.0.0.1:${server.address.port}/audio",
+                windowBytes = 4096, requestTimeoutMs = 800)
+            val buffer = ByteArray(16)
+            assertEquals(buffer.size, stream.read(buffer, buffer.size))
+            assertContentEquals(body.copyOf(16), buffer)
+            assertEquals(2, requests.get())
+            assertNull(stream.failure)
+        } finally {
+            server.stop(0)
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `persistent gateway errors are retained as read failures`() {
+        val requests = AtomicInteger()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/audio") { exchange ->
+            requests.incrementAndGet()
+            exchange.sendResponseHeaders(503, -1)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val stream = DesktopRangeStream("http://127.0.0.1:${server.address.port}/audio")
+            assertEquals(-1, stream.read(ByteArray(16), 16))
+            assertEquals(2, requests.get())
+            assertEquals("Audio range request returned HTTP 503", stream.failure?.message)
         } finally {
             server.stop(0)
         }

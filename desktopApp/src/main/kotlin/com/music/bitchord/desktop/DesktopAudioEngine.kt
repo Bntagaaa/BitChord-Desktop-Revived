@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -63,6 +64,7 @@ class DesktopPlaybackEngine internal constructor(
     private val onCrossfaded: (Song) -> Unit,
     private val sink: DesktopAudioOutput,
     private val analysisSource: ((String) -> TrackAnalysis)? = null,
+    private val sourceTimeoutMs: Long = 28_000L,
     private val resolveSource: suspend (Song, String, String?, Boolean) -> Result<DesktopLiveResolution>,
 ) {
     constructor(onEnded: () -> Unit, onCrossfaded: (Song) -> Unit = {}) : this(
@@ -408,7 +410,7 @@ class DesktopPlaybackEngine internal constructor(
             // sitting right there.
             val localUrl = DesktopDownloadManager.savedFile(song)?.toAbsolutePath()?.toString()
             val resolved = localUrl?.let { Result.success(DesktopLiveResolution(DesktopStream(it))) }
-                ?: resolveSource(song, audioQuality, excludedSourceId, true)
+                ?: resolveForPlayback(song, excludedSourceId, sourceTimeoutMs)
             resolved.fold(
                 onSuccess = { live ->
                     currentCoroutineContext()[Job]?.invokeOnCompletion { cause -> if (cause != null) live.pendingSubstitute?.cancel() }
@@ -427,10 +429,9 @@ class DesktopPlaybackEngine internal constructor(
                             }
                         },
                         onFailure = { failure ->
+                            live.pendingSubstitute?.cancel()
                             if (requestGeneration == loadGeneration.get()) {
                                 retryAfterFailure(song, playWhenReady, live.stream, failure)
-                            } else {
-                                live.pendingSubstitute?.cancel()
                             }
                         },
                     )
@@ -455,6 +456,28 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     /** Opens a decoder on [stream], off the audio thread, with cancellation-safe ownership. */
+    private suspend fun resolveForPlayback(
+        song: Song,
+        excludedSourceId: String?,
+        timeoutMs: Long,
+    ): Result<DesktopLiveResolution> {
+        var live: DesktopLiveResolution? = null
+        try {
+            val resolved = withTimeoutOrNull(timeoutMs) {
+                resolveSource(song, audioQuality, excludedSourceId, true).also { live = it.getOrNull() }
+            }
+            if (resolved != null) return resolved
+            live?.pendingSubstitute?.cancel()
+            return Result.failure(java.io.IOException("Timed out finding a playable stream"))
+        } catch (cancelled: CancellationException) {
+            live?.pendingSubstitute?.cancel()
+            throw cancelled
+        } catch (failure: Exception) {
+            live?.pendingSubstitute?.cancel()
+            return Result.failure(failure)
+        }
+    }
+
     private suspend fun openTrack(
         song: Song,
         stream: DesktopStream,
@@ -707,10 +730,20 @@ class DesktopPlaybackEngine internal constructor(
     }
 
     fun togglePlayPause() {
-        if (paused) play() else pause()
+        if (paused || _state.value.canRetryPlayback()) play() else pause()
     }
 
+    private fun DesktopPlaybackState.canRetryPlayback(): Boolean =
+        error != null && !isPlaying && !isLoading
+
     fun play() {
+        val state = _state.value
+        val failedSong = state.song
+        if (failedSong != null && state.canRetryPlayback()) {
+            refusedSources.remove(failedSong.videoId)
+            load(failedSong, startAtMs = state.positionMs)
+            return
+        }
         paused = false
         _state.update { it.copy(isPlaying = true) }
     }
@@ -1129,6 +1162,9 @@ class DesktopPlaybackEngine internal constructor(
             // like "buffering" forever. Keep the timed poll, now against an explicit lifecycle.
             if (decodeState == DesktopDecodeState.RUNNING) {
                 val stalledFor = track.decoder.underrunMillis
+                if (stalledFor >= BUFFERING_NOTICE_MS && !_state.value.awaitingAudio) {
+                    _state.update { it.copy(awaitingAudio = true) }
+                }
                 if (stalledFor >= DECODE_STALL_RECOVERY_MS) {
                     requestDecoderRecovery(
                         track,
@@ -1515,10 +1551,16 @@ class DesktopPlaybackEngine internal constructor(
         recoveryJob?.cancel()
         recoveryJob = scope.launch {
             try {
-                DesktopMusicSources.resolveLive(
-                    track.song, audioQuality, excludedSourceId = brokenLosslessSource,
-                ).fold(
+                val resolved = if (track.stream.sourceId == null) {
+                    Result.success(DesktopLiveResolution(track.stream))
+                } else {
+                    resolveForPlayback(track.song, brokenLosslessSource, RECOVERY_SOURCE_TIMEOUT_MS)
+                }
+                resolved.fold(
                     onSuccess = { live ->
+                        currentCoroutineContext()[Job]?.invokeOnCompletion { cause ->
+                            if (cause != null) live.pendingSubstitute?.cancel()
+                        }
                         openTrack(
                             song = track.song,
                             stream = live.stream,
@@ -1526,15 +1568,25 @@ class DesktopPlaybackEngine internal constructor(
                             recoveryAttempt = attempt,
                         ).fold(
                             onSuccess = { replacement ->
-                                // Opening an FFmpeg context does not guarantee its first PCM frame.
-                                // Reject an unresponsive replacement before touching the audible deck.
-                                if (replacement.decoder.awaitBuffered(UPGRADE_PRIME_SAMPLES, UPGRADE_PRIME_TIMEOUT_MS)) {
-                                    commands += Command.RecoverCurrent(track, replacement, live.pendingSubstitute)
-                                } else {
-                                    replacement.decoder.close()
-                                    live.pendingSubstitute?.cancel()
-                                    replacement.stream.sourceId?.let { refusedSources[track.song.videoId] = it }
-                                    commands += Command.RecoveryFailed(track, "replacement provided no decoded audio")
+                                var queued = false
+                                try {
+                                    // Verify that the replacement produces PCM before switching decks.
+                                    val ready = runInterruptible {
+                                        replacement.decoder.awaitBuffered(UPGRADE_PRIME_SAMPLES, UPGRADE_PRIME_TIMEOUT_MS)
+                                    }
+                                    currentCoroutineContext().ensureActive()
+                                    if (ready) {
+                                        commands += Command.RecoverCurrent(track, replacement, live.pendingSubstitute)
+                                        queued = true
+                                    } else {
+                                        replacement.stream.sourceId?.let { refusedSources[track.song.videoId] = it }
+                                        commands += Command.RecoveryFailed(track, "replacement provided no decoded audio")
+                                    }
+                                } finally {
+                                    if (!queued) {
+                                        replacement.decoder.close()
+                                        live.pendingSubstitute?.cancel()
+                                    }
                                 }
                             },
                             onFailure = { failure ->
@@ -2729,7 +2781,9 @@ class DesktopPlaybackEngine internal constructor(
          * Longer than both FFmpeg's 15s rw_timeout and the custom range reader's 20s request
          * timeout: only a worker that outlived its own transport timeout is force-reopened.
          */
-        private const val DECODE_STALL_RECOVERY_MS = 22_000L
+        private const val BUFFERING_NOTICE_MS = 600L
+        private const val DECODE_STALL_RECOVERY_MS = 13_000L
+        private const val RECOVERY_SOURCE_TIMEOUT_MS = 15_000L
         private const val MAX_DECODE_RECOVERY_ATTEMPTS = 2
 
         /** How many times a lossy substitute is asked to be beaten before the question is closed. */

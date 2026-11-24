@@ -181,10 +181,13 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         val status = try {
             avformat_open_input(opened, if (windowed) null as String? else url, inputFormat, options)
         } finally { av_dict_free(options) }
+        if (status < 0) rangeSource?.failure?.let { throw it }
         check(status >= 0) { "could not open stream (${describe(status)})" }
         trace?.mark("input")
         format = opened
-        check(avformat_find_stream_info(opened, null as AVDictionary?) >= 0) { "no stream info" }
+        val infoStatus = avformat_find_stream_info(opened, null as AVDictionary?)
+        rangeSource?.failure?.let { throw it }
+        check(infoStatus >= 0) { "no stream info" }
         trace?.mark("probe")
 
         streamIndex = bestRendition(opened)
@@ -302,7 +305,7 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
             override fun call(opaque: Pointer?, buffer: BytePointer?, size: Int): Int {
                 if (buffer == null) return AVERROR_EOF
                 val taken = source.read(scratch, minOf(size, scratch.size))
-                if (taken <= 0) return AVERROR_EOF
+                if (taken <= 0) return if (source.failure != null) AVERROR_IO else AVERROR_EOF
                 buffer.put(scratch, 0, taken)
                 return taken
             }
@@ -411,6 +414,8 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         if (drained) return false
         val read = av_read_frame(container, pkt)
         if (read < 0) {
+            rangeSource?.failure?.let { throw it }
+            if (read != AVERROR_EOF) throw java.io.IOException("Could not read audio: ${describe(read)}")
             avcodec_send_packet(context, null as AVPacket?)
             drained = true
             return true
@@ -531,6 +536,9 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
     internal companion object {
         /** Shared with the canvas decoder, which needs the same one-time init. */
         fun ensureNetworkReady() = ensureNetwork()
+
+        // AVERROR(EIO) in FFmpeg's AVIO callback contract.
+        private const val AVERROR_IO = -5
 
         /** How much FFmpeg buffers between calls into [DesktopRangeStream]. */
         const val IO_BUFFER_BYTES = 64 * 1024

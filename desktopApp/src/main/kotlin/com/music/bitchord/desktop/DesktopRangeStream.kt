@@ -10,6 +10,11 @@ import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Flow
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.net.http.HttpTimeoutException
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /** Reads/caches bounded windows. FFmpeg's native HTTP remains responsible for HLS/DASH/add-ons. */
 internal class DesktopRangeStream(
@@ -19,9 +24,12 @@ internal class DesktopRangeStream(
     cacheIdentity: String = "",
     private val cache: DesktopAudioCache = DesktopAudioCache.shared,
     private val cancelled: () -> Boolean = { false },
+    private val requestTimeoutMs: Long = 6_000,
 ) {
     init { require(windowBytes in 1..DesktopAudioCache.MAX_SPAN) }
-    var unsupportedRange: Boolean = false
+    @Volatile var unsupportedRange: Boolean = false
+        private set
+    var failure: IOException? = null
         private set
     var length: Long = -1L
         private set
@@ -63,28 +71,37 @@ internal class DesktopRangeStream(
         }
         DesktopPlaybackDiagnostics.cacheMiss.incrementAndGet()
         val end = start + windowBytes - 1
-        val request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(20))
+        val request = HttpRequest.newBuilder(uri).timeout(Duration.ofMillis(requestTimeoutMs))
         headers.forEach { (name, value) -> runCatching { request.header(name, value) } }
         request.setHeader("Range", "bytes=$start-$end").setHeader("Accept-Encoding", "identity")
-        if (cancelled() || Thread.currentThread().isInterrupted) return false
-        val response = try {
-            client.send(request.GET().build(), boundedBody(windowBytes) { unsupportedRange = true })
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            return false
-        } catch (_: Exception) { return false }
-        if (response.statusCode() !in listOf(200, 206)) {
-            StreamResolver.onPlaybackRefused(url, response.statusCode())
+        val response = fetchRange(request.GET().build()) ?: return false
+        val status = response.statusCode()
+        if (status == 416) {
+            val total = response.headers().firstValue("content-range").orElse("")
+                .removePrefix("bytes */").toLongOrNull()
+            if (total != null && at >= total) {
+                length = total
+                return false
+            }
+        }
+        if (status != 200 && status != 206) {
+            StreamResolver.onPlaybackRefused(url, status)
+            failure = IOException("Audio range request returned HTTP $status")
             return false
         }
         val body = response.body()
         val stated = response.headers().firstValue("content-range").orElse("")
         val range = Regex("bytes (\\d+)-(\\d+)/(\\d+)").matchEntire(stated)
         if (response.statusCode() == 206) {
-            val (from, to, total) = range?.destructured ?: return false
-            windowStart = from.toLongOrNull() ?: return false
-            length = total.toLongOrNull() ?: return false
-            if (windowStart != start || to.toLongOrNull() != start + body.size - 1 || length < start + body.size) return false
+            val from = range?.groupValues?.get(1)?.toLongOrNull()
+            val to = range?.groupValues?.get(2)?.toLongOrNull()
+            val total = range?.groupValues?.get(3)?.toLongOrNull()
+            if (from != start || to != start + body.size - 1 || total == null || total < start + body.size) {
+                failure = IOException("Audio server returned an invalid byte range")
+                return false
+            }
+            windowStart = start
+            length = total
         } else {
             windowStart = 0; length = body.size.toLong()
         }
@@ -98,6 +115,29 @@ internal class DesktopRangeStream(
             cache.write(key, windowStart, body, length, expiry)
         }
         return holds(at)
+    }
+
+    private fun fetchRange(request: HttpRequest): HttpResponse<ByteArray>? {
+        repeat(2) { attempt ->
+            if (cancelled() || Thread.currentThread().isInterrupted) return null
+            val call = client.sendAsync(request, boundedBody(windowBytes) { unsupportedRange = true })
+            try {
+                // HttpRequest.timeout can stop at the headers. Bound the body as well.
+                val response = call.get(requestTimeoutMs, TimeUnit.MILLISECONDS)
+                if (attempt == 1 || response.statusCode() !in 502..504) return response
+            } catch (_: InterruptedException) {
+                call.cancel(true)
+                Thread.currentThread().interrupt()
+                return null
+            } catch (_: TimeoutException) {
+                call.cancel(true)
+                if (attempt == 1) failure = HttpTimeoutException("Audio range body timed out")
+            } catch (e: ExecutionException) {
+                if (unsupportedRange) return null
+                if (attempt == 1) failure = IOException("Audio range request failed", e.cause)
+            }
+        }
+        return null
     }
 
     companion object {

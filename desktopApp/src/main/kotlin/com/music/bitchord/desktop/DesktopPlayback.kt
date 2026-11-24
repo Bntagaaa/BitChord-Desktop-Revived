@@ -56,7 +56,8 @@ internal object DesktopStreamClient {
         val url = withContext(Dispatchers.IO) {
             ceiling.set(maxKbps)
             try {
-                StreamResolver.resolve(song.videoId)
+                // Reserve time for NewPipe if the primary client walk gets stuck.
+                StreamResolver.resolve(song.videoId, clientWalkTimeoutMs = 12_000L)
             } finally {
                 ceiling.remove()
             }
