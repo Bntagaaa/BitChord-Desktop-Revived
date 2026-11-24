@@ -108,9 +108,9 @@ class DesktopPanelMenuTest {
         assertEquals(0, disposed, "Changing panel placement must not remount the feed")
     }
 
-    @Test fun `menu preserves the page and blurs the expanded player at the clicked position`() = menuScene(1f)
+    @Test fun `menu preserves the page and draws an opaque elevated surface at the clicked position`() = menuScene(1f)
 
-    @Test fun `menu anchor and blur follow desktop scaling`() = menuScene(1.5f)
+    @Test fun `menu anchor and elevated surface follow desktop scaling`() = menuScene(1.5f)
 
     @Test fun `menu stays inside the window at the bottom right and Escape restores focus`() = menuScene(1f, edge = true)
 
@@ -219,7 +219,7 @@ class DesktopPanelMenuTest {
         lastOutput.assertIsDisplayed()
     }
 
-    @Test fun `Home panel blurs its live feed while other pages keep a solid panel`() {
+    @Test fun `Home and other pages keep an opaque elevated panel while the feed changes`() {
         val home = mutableStateOf(true)
         val swapped = mutableStateOf(false)
         val oldReduce = DesktopAppearanceSettings.reduceDynamicBlur.value
@@ -232,7 +232,7 @@ class DesktopPanelMenuTest {
                         home = home.value,
                         panel = {
                             DesktopSidePanelColumn(DesktopSidePanel.QUEUE, {}, blurBackground = home.value) {
-                                Box(Modifier.fillMaxSize().testTag("glass"))
+                                Box(Modifier.fillMaxSize().testTag("elevated-panel"))
                             }
                         },
                         overlay = {},
@@ -246,21 +246,27 @@ class DesktopPanelMenuTest {
                     )
                 }
             }
-            val glass = compose.onNodeWithTag("glass")
-            val pixels = glass.captureToImage().toPixelMap()
+            val panel = compose.onNodeWithTag("elevated-panel")
+            val pixels = panel.captureToImage().toPixelMap()
             val left = pixels[20, pixels.height / 2]
             val right = pixels[pixels.width - 20, pixels.height / 2]
-            assertTrue(left.red > left.blue + 0.1f, "Home red must be visible through glass: $left")
-            assertTrue(right.blue > right.red + 0.1f, "Home blue must be visible through glass: $right")
+            assertSurfacePixel(left, right, "Home surface must not show the red/blue feed split")
+            assertTrue(
+                pixels[pixels.width / 2, pixels.height / 5].red >
+                    pixels[pixels.width / 2, pixels.height * 4 / 5].red + 0.005f,
+                "Home surface must have a visible, subtle vertical gradient",
+            )
             compose.runOnIdle { swapped.value = true }
-            val updated = glass.captureToImage().toPixelMap()
-            val live = updated[20, updated.height / 2]
-            assertTrue(live.blue > live.red + 0.1f, "Glass must update with the live feed instead of retaining a screenshot: $live")
+            val updated = panel.captureToImage().toPixelMap()
+            assertSurfacePixel(left, updated[20, updated.height / 2], "Changing the feed must not tint the panel")
+            assertSurfacePixel(right, updated[updated.width - 20, updated.height / 2], "Changing the feed must not tint either side")
             compose.runOnIdle { home.value = false }
-            val solid = glass.captureToImage().toPixelMap()
-            val a = solid[20, solid.height / 2]
-            val b = solid[solid.width - 20, solid.height / 2]
-            assertTrue(abs(a.red - b.red) < 0.01f && abs(a.blue - b.blue) < 0.01f, "Other pages must use a solid panel: $a vs $b")
+            val reserved = panel.captureToImage().toPixelMap()
+            assertSurfacePixel(left, reserved[20, reserved.height / 2], "Other pages keep the same material")
+            assertSurfacePixel(right, reserved[reserved.width - 20, reserved.height / 2], "Reserved column must also be opaque")
+            compose.runOnIdle { DesktopAppearanceSettings.setReduceDynamicBlur(true) }
+            val reduced = panel.captureToImage().toPixelMap()
+            assertSurfacePixel(left, reduced[20, reduced.height / 2], "The elevated panel does not depend on dynamic blur")
         } finally {
             DesktopAppearanceSettings.setReduceDynamicBlur(oldReduce)
         }
@@ -269,6 +275,7 @@ class DesktopPanelMenuTest {
     @OptIn(ExperimentalTestApi::class)
     private fun menuScene(scale: Float, edge: Boolean = false) {
         val open = mutableStateOf(false)
+        val swapped = mutableStateOf(false)
         var actions = 0
         var restored = 0
         val oldReduce = DesktopAppearanceSettings.reduceDynamicBlur.value
@@ -282,8 +289,9 @@ class DesktopPanelMenuTest {
                             overlay = {
                                 Box(Modifier.fillMaxSize().testTag("player")) {
                                     Canvas(Modifier.fillMaxSize()) {
-                                        drawRect(Color.Red)
-                                        drawRect(Color.Blue, Offset(size.width * 0.6f, 0f), Size(size.width * 0.4f, size.height))
+                                        drawRect(if (swapped.value) Color.Blue else Color.Red)
+                                        drawRect(if (swapped.value) Color.Red else Color.Blue,
+                                            Offset(size.width * 0.6f, 0f), Size(size.width * 0.4f, size.height))
                                     }
                                     Box(Modifier.offset(if (edge) 540.dp else 240.dp, if (edge) 340.dp else 140.dp)
                                         .size(32.dp).testTag("anchor").clickable { open.value = true }) {
@@ -315,18 +323,19 @@ class DesktopPanelMenuTest {
             } else assertTrue(abs(menu.left - anchor.center.x) < 2f, "Menu $menu must open by the clicked anchor $anchor")
             assertTrue(menu.bottom <= after.bottom && menu.right <= after.right)
 
-            val pixels = compose.onNodeWithTag("menu").captureToImage().toPixelMap()
-            val split = (after.width * 0.6f - menu.left).toInt()
-            val redSide = pixels[20, pixels.height / 2]
-            val blueSide = pixels[pixels.width - 20, pixels.height / 2]
-            assertTrue(redSide.red > redSide.blue + 0.1f, "Player red must contribute to the menu: $redSide")
-            assertTrue(blueSide.blue > blueSide.red + 0.1f, "Player blue must contribute to the menu: $blueSide")
-            // A translucent unblurred menu has a hard red/blue edge. Blur mixes both sides
-            // several pixels away from that edge, independently of the dark menu tint.
-            for (x in listOf(split - (5 * scale).toInt(), split + (5 * scale).toInt())) {
-                val mixed = pixels[x, pixels.height / 2]
-                assertTrue(mixed.red > 0.04f && mixed.blue > 0.04f, "Expected real blur at $x: $mixed")
-            }
+            val menuNode = compose.onNodeWithTag("menu")
+            val pixels = menuNode.captureToImage().toPixelMap()
+            val left = pixels[20, pixels.height / 2]
+            val right = pixels[pixels.width - 20, pixels.height / 2]
+            assertSurfacePixel(left, right, "The opaque menu must not inherit the player's red/blue split")
+            val x = pixels.width / 2
+            val upper = pixels[x, pixels.height / 5]
+            val lower = pixels[x, pixels.height * 4 / 5]
+            assertTrue(upper.red > lower.red + 0.005f, "Menu needs its own subtle vertical gradient: $upper vs $lower")
+            compose.runOnIdle { swapped.value = true }
+            val updated = menuNode.captureToImage().toPixelMap()
+            assertSurfacePixel(left, updated[20, updated.height / 2], "Changing artwork must not tint the popup")
+            assertSurfacePixel(right, updated[updated.width - 20, updated.height / 2], "Both sides remain opaque")
             if (edge) compose.onNodeWithTag("menu").performKeyInput { pressKey(Key.Escape) }
             else compose.onNodeWithText("Action").performMouseInput { click(center) }
             compose.mainClock.advanceTimeBy(240)
@@ -339,6 +348,17 @@ class DesktopPanelMenuTest {
         } finally {
             DesktopAppearanceSettings.setReduceDynamicBlur(oldReduce)
         }
+    }
+
+    private fun assertSurfacePixel(expected: Color, actual: Color, message: String) {
+        val tolerance = 0.015f
+        assertTrue(
+            abs(expected.red - actual.red) <= tolerance &&
+                abs(expected.green - actual.green) <= tolerance &&
+                abs(expected.blue - actual.blue) <= tolerance &&
+                abs(expected.alpha - actual.alpha) <= tolerance,
+            "$message: $expected vs $actual",
+        )
     }
 
     @Composable
