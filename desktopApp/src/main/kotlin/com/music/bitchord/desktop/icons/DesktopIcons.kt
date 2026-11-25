@@ -70,7 +70,7 @@ object DesktopIcons {
         val Infinity: ImageVector get() = BitChordIcons.Infinity
         val Queue: ImageVector get() = BitChordIcons.Queue
         val QueueMusic: ImageVector get() = SfStyleIcons.QueueMusic
-        val Lyrics: ImageVector get() = BitChordIcons.LyricsQuote
+        val Lyrics: ImageVector get() = SfStyleIcons.Notes
         val LyricsOutline: ImageVector get() = BitChordIcons.Lyrics
         val Favorite: ImageVector get() = BitChordIcons.Heart
         val FavoriteFilled: ImageVector get() = BitChordIcons.HeartFilled
