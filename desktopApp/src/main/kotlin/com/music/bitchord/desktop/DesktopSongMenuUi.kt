@@ -249,21 +249,21 @@ internal fun DesktopSongMenu(
             DesktopMenuDivider()
             DesktopSleepTimer.presets.forEach { minutes ->
                 DesktopMenuRow(
-                    icon = DesktopPhoneMenuIcons.SleepTimer,
+                    icon = DesktopIcons.Player.SleepTimer,
                     label = "$minutes minutes",
                     selected = sleepTimerMinutes == minutes && !sleepAfterTrack,
                 ) { onSleepTimer(minutes) }
             }
-            DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, "Custom duration…") { customTimer = true }
+            DesktopMenuRow(DesktopIcons.Player.SleepTimer, "Custom duration…") { customTimer = true }
             DesktopMenuRow(
-                icon = DesktopPhoneMenuIcons.SleepTimer,
+                icon = DesktopIcons.Player.SleepTimer,
                 label = DesktopStrings["d_end_of_this_track", "End of this track"],
                 selected = sleepAfterTrack,
                 onClick = onSleepAfterTrack,
             )
             if (sleepTimerMinutes != null || sleepAfterTrack) {
                 DesktopMenuDivider()
-                DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, DesktopStrings["d_turn_off", "Turn off"]) { onSleepTimer(null) }
+                DesktopMenuRow(DesktopIcons.Player.SleepTimer, DesktopStrings["d_turn_off", "Turn off"]) { onSleepTimer(null) }
             }
             return@DesktopMenuSurface
         }
@@ -274,7 +274,7 @@ internal fun DesktopSongMenu(
         }
 
         onRemoveHistory?.let { remove ->
-            DesktopMenuRow(DesktopPhoneMenuIcons.SleepTimer, "Remove from history", onClick = remove)
+            DesktopMenuRow(DesktopIcons.Player.SleepTimer, "Remove from history", onClick = remove)
             DesktopMenuDivider()
         }
         onSwitchMediaVersion?.let { switch ->
@@ -299,32 +299,32 @@ internal fun DesktopSongMenu(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (signedIn) {
                     DesktopMenuQuickAction(
-                        if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
+                        if (liked) DesktopIcons.Player.LikeFilled else DesktopIcons.Player.Like,
                         "Like", liked, Modifier.weight(1f), onToggleLike)
                     DesktopMenuQuickAction(
-                        if (disliked) DesktopPhoneMenuIcons.BrokenHeartFilled else DesktopPhoneMenuIcons.BrokenHeart,
+                        if (disliked) DesktopIcons.Player.DislikeFilled else DesktopIcons.Player.Dislike,
                         "Dislike", disliked, Modifier.weight(1f), onToggleDislike)
                 }
                 DesktopMenuQuickAction(
-                    DesktopPhoneMenuIcons.Share, "Share", false, Modifier.weight(1f), onShare)
+                    DesktopIcons.Actions.Share, "Share", false, Modifier.weight(1f), onShare)
             }
             DesktopMenuDivider()
         }
         run {
-            DesktopMenuRow(DesktopPhoneMenuIcons.AddToPlaylist, DesktopStrings["add_to_playlist", "Add to playlist"], onClick = onAddToPlaylist)
+            DesktopMenuRow(DesktopIcons.Actions.AddToPlaylist, DesktopStrings["add_to_playlist", "Add to playlist"], onClick = onAddToPlaylist)
         }
         if (signedIn || !isOffline) DesktopMenuDivider()
 
-        DesktopMenuRow(DesktopPhoneMenuIcons.Radio, DesktopStrings["start_radio", "Start radio"], onClick = onStartRadio)
-        DesktopMenuRow(DesktopPhoneMenuIcons.PlayNext, DesktopStrings["play_next", "Play next"], onClick = onPlayNext)
-        DesktopMenuRow(DesktopPhoneMenuIcons.AddToQueue, DesktopStrings["add_to_queue", "Add to queue"], onClick = onAddToQueue)
+        DesktopMenuRow(DesktopIcons.Player.StartRadio, DesktopStrings["start_radio", "Start radio"], onClick = onStartRadio)
+        DesktopMenuRow(DesktopIcons.Actions.PlayNext, DesktopStrings["play_next", "Play next"], onClick = onPlayNext)
+        DesktopMenuRow(DesktopIcons.Actions.PlayLast, DesktopStrings["add_to_queue", "Add to queue"], onClick = onAddToQueue)
 
         // A saved copy is offered its own way out whatever the track is playing from — a download
         // being played *is* a local file, and hiding the row there left no way to remove it.
         // Only starting a new download needs a YouTube identity behind it.
         when {
             downloadInProgress -> DesktopMenuRow(
-                icon = DesktopPhoneMenuIcons.Download,
+                icon = DesktopIcons.Actions.Download,
                 label = DesktopStrings["cancel_download", "Cancel download"],
                 busy = true,
                 onClick = onDownload,
@@ -337,7 +337,7 @@ internal fun DesktopSongMenu(
                 onClick = onRemoveDownload,
             )
             !isOffline -> DesktopMenuRow(
-                icon = DesktopPhoneMenuIcons.Download,
+                icon = DesktopIcons.Actions.Download,
                 label = DesktopStrings["download", "Download"],
                 onClick = onDownload,
             )
@@ -347,22 +347,22 @@ internal fun DesktopSongMenu(
         if ((albumId != null && onOpenAlbum != null) || (artistId != null && onOpenArtist != null)) {
             DesktopMenuDivider()
             if (albumId != null && onOpenAlbum != null) {
-                DesktopMenuRow(DesktopPhoneMenuIcons.Album, DesktopStrings["open_album", "Open album"], description = song.albumName) { onOpenAlbum(albumId) }
+                DesktopMenuRow(DesktopIcons.Actions.ViewAlbum, DesktopStrings["open_album", "Open album"], description = song.albumName) { onOpenAlbum(albumId) }
             }
             if (artistId != null && onOpenArtist != null) {
-                DesktopMenuRow(DesktopPhoneMenuIcons.Artist, DesktopStrings["open_artist", "Open artist"], description = song.artist) { onOpenArtist(artistId) }
+                DesktopMenuRow(DesktopIcons.Actions.ViewArtist, DesktopStrings["open_artist", "Open artist"], description = song.artist) { onOpenArtist(artistId) }
             }
         }
 
         DesktopMenuDivider()
         DesktopMenuRow(
-            icon = DesktopPhoneMenuIcons.Info,
+            icon = DesktopIcons.Status.Info,
             label = "Song Info",
             onClick = { showingSongInfo = true },
         )
         DesktopMenuDivider()
         DesktopMenuRow(
-            icon = DesktopPhoneMenuIcons.SleepTimer,
+            icon = DesktopIcons.Player.SleepTimer,
             label = DesktopStrings["sleep_timer", "Sleep timer"],
             value = sleepTimerLabel(sleepTimerMinutes, sleepAfterTrack),
         ) { pickingSleepTimer = true }
@@ -456,14 +456,14 @@ internal fun DesktopCollectionContextMenu(
         DesktopMenuRow(BitChordIcons.Shuffle, "Shuffle") { onDismiss(); actions.onShuffle() }
         DesktopMenuRow(BitChordIcons.Search, "Find in playlist") { onDismiss(); actions.onFind() }
         actions.onStartMix?.let { mix ->
-            DesktopMenuRow(DesktopPhoneMenuIcons.Radio, "Start mix") { onDismiss(); mix() }
+            DesktopMenuRow(DesktopIcons.Player.StartRadio, "Start mix") { onDismiss(); mix() }
         }
         DesktopMenuDivider()
         actions.onPlayNext?.let { next ->
-            DesktopMenuRow(DesktopPhoneMenuIcons.PlayNext, "Play next") { onDismiss(); next() }
+            DesktopMenuRow(DesktopIcons.Actions.PlayNext, "Play next") { onDismiss(); next() }
         }
         actions.onAddToQueue?.let { queue ->
-            DesktopMenuRow(DesktopPhoneMenuIcons.AddToQueue, "Add to queue") { onDismiss(); queue() }
+            DesktopMenuRow(DesktopIcons.Actions.PlayLast, "Add to queue") { onDismiss(); queue() }
         }
         actions.onSaveToLibrary?.let { save ->
             DesktopMenuRow(
@@ -482,7 +482,7 @@ internal fun DesktopCollectionContextMenu(
         actions.onDownloadAll?.let { download ->
             val progress = actions.playlistProgress
             when {
-                progress == null -> DesktopMenuRow(DesktopPhoneMenuIcons.Download, "Download all") { onDismiss(); download() }
+                progress == null -> DesktopMenuRow(DesktopIcons.Actions.Download, "Download all") { onDismiss(); download() }
                 progress.downloading -> DesktopMenuRow(BitChordIcons.Clock, "Downloading · ${progress.done + progress.active} of ${progress.total}") { onDismiss(); download() }
                 actions.playlistStale -> DesktopMenuRow(DesktopIcons.Actions.Refresh, "Update download") { onDismiss(); download() }
                 else -> DesktopMenuRow(BitChordIcons.Check, "Downloaded") { onDismiss(); download() }
