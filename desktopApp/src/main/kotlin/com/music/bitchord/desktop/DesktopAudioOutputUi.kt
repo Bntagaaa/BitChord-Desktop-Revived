@@ -56,7 +56,11 @@ import com.music.bitchord.ui.player.ThinSlider
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-internal fun DesktopAudioOutputButton(onOpen: (Rect) -> Unit, iconSize: Dp = 18.dp) {
+internal fun DesktopAudioOutputButton(
+    onOpen: (Rect) -> Unit,
+    iconSize: Dp = 18.dp,
+    tint: Color = DesktopSecondary,
+) {
     var anchor by remember { mutableStateOf<Rect?>(null) }
     DesktopToolbarButton(
         onClick = { anchor?.let(onOpen) },
@@ -66,7 +70,7 @@ internal fun DesktopAudioOutputButton(onOpen: (Rect) -> Unit, iconSize: Dp = 18.
         Icon(
             DesktopIcons.Audio.Headphones,
             DesktopStrings["audio_output", "Audio output"],
-            tint = DesktopSecondary,
+            tint = tint,
             modifier = Modifier.size(iconSize),
         )
     }

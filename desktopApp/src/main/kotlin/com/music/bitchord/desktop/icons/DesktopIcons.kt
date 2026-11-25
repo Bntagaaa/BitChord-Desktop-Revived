@@ -74,8 +74,8 @@ object DesktopIcons {
         val LyricsOutline: ImageVector get() = BitChordIcons.Lyrics
         val Favorite: ImageVector get() = BitChordIcons.Heart
         val FavoriteFilled: ImageVector get() = BitChordIcons.HeartFilled
-        val Like: ImageVector get() = BitChordIcons.Star
-        val LikeFilled: ImageVector get() = BitChordIcons.StarFilled
+        val Like: ImageVector get() = SfStyleIcons.Star
+        val LikeFilled: ImageVector get() = SfStyleIcons.StarFilled
         val Dislike: ImageVector get() = DesktopPhoneMenuIcons.BrokenHeart
         val DislikeFilled: ImageVector get() = DesktopPhoneMenuIcons.BrokenHeartFilled
         val MusicNote: ImageVector get() = BitChordIcons.MusicNote

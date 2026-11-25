@@ -252,6 +252,7 @@ import bitchord.desktopapp.generated.resources.logo
 import bitchord.desktopapp.generated.resources.bitchord_logo_original
 import bitchord.desktopapp.generated.resources.bitchord_no_music
 import bitchord.desktopapp.generated.resources.bitchord_wordmark
+import bitchord.desktopapp.generated.resources.player_transport_lyrics
 import bitchord.desktopapp.generated.resources.player_transport_next
 import bitchord.desktopapp.generated.resources.player_transport_pause
 import bitchord.desktopapp.generated.resources.player_transport_play
@@ -5738,8 +5739,8 @@ internal fun DesktopTopBar(
                             Icon(
                                 DesktopIcons.Player.Shuffle,
                                 DesktopStrings["shuffle", "Shuffle"],
-                                tint = if (shuffle) DesktopAccent else DesktopSecondary,
-                                modifier = Modifier.size(18.dp),
+                                tint = if (shuffle) DesktopAccent else DesktopForeground,
+                                modifier = Modifier.size(19.dp),
                             )
                         }
                         DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = 32.dp) {
@@ -5778,7 +5779,7 @@ internal fun DesktopTopBar(
                             onClick = { onRepeatModeChange(repeatMode.next()) },
                             size = 32.dp,
                         ) {
-                            val tint = if (repeatMode != DesktopRepeatMode.OFF) DesktopAccent else DesktopSecondary
+                            val tint = if (repeatMode != DesktopRepeatMode.OFF) DesktopAccent else DesktopForeground
                             Icon(
                                 if (repeatMode == DesktopRepeatMode.ONE) {
                                     DesktopIcons.Player.RepeatOne
@@ -5787,7 +5788,7 @@ internal fun DesktopTopBar(
                                 },
                                 "Repeat ${repeatMode.label()}",
                                 tint = tint,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(19.dp),
                             )
                         }
                     }
@@ -5977,8 +5978,8 @@ internal fun DesktopTopBar(
                     Icon(
                         DesktopIcons.Audio.VolumeUp,
                         DesktopStrings["d_volume", "Volume"],
-                        tint = DesktopSecondary,
-                        modifier = Modifier.size(17.dp),
+                        tint = DesktopForeground,
+                        modifier = Modifier.size(19.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     DesktopThinSlider(
@@ -5989,23 +5990,23 @@ internal fun DesktopTopBar(
                         modifier = Modifier.width(78.dp),
                     )
                     Spacer(Modifier.width(5.dp))
-                    DesktopAudioOutputButton(onOpenAudioOutput, iconSize = 19.dp)
+                    DesktopAudioOutputButton(onOpenAudioOutput, iconSize = 19.dp, tint = DesktopForeground)
                     }
                     if (fullControls || showCompactPanels) {
                     DesktopToolbarButton(onClick = onOpenLyrics, size = 32.dp) {
                         Icon(
-                            DesktopIcons.Player.Lyrics,
+                            painterResource(Res.drawable.player_transport_lyrics),
                             DesktopStrings["lyrics", "Lyrics"],
-                            tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopForeground else DesktopSecondary,
+                            tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopAccent else DesktopForeground,
                             modifier = Modifier.size(19.dp),
                         )
                     }
-                    DesktopPipLauncher(onOpenPip, enabled = song != null)
+                    DesktopPipLauncher(onOpenPip, enabled = song != null, tint = DesktopForeground, iconSize = 19.dp)
                     DesktopToolbarButton(onClick = onOpenQueue, size = 32.dp) {
                         Icon(
                             DesktopIcons.Player.Queue,
                             DesktopStrings["queue", "Queue"],
-                            tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopForeground else DesktopSecondary,
+                            tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopAccent else DesktopForeground,
                             modifier = Modifier.size(19.dp),
                         )
                     }
@@ -6013,7 +6014,7 @@ internal fun DesktopTopBar(
                         Icon(
                             DesktopIcons.Status.Info,
                             "Now playing details",
-                            tint = if (sidePanel == DesktopSidePanel.DETAILS) DesktopForeground else DesktopSecondary,
+                            tint = if (sidePanel == DesktopSidePanel.DETAILS) DesktopAccent else DesktopForeground,
                             modifier = Modifier.size(19.dp),
                         )
                     }

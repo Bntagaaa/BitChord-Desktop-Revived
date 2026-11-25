@@ -288,11 +288,16 @@ private fun PipLyrics(state: DesktopPipState, position: PlaybackPosition, fontSi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DesktopPipLauncher(onClick: () -> Unit, enabled: Boolean = true, tint: Color = DesktopSecondary) {
+internal fun DesktopPipLauncher(
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    tint: Color = DesktopSecondary,
+    iconSize: Dp = 18.dp,
+) {
     TooltipBox(TooltipDefaults.rememberPlainTooltipPositionProvider(),
         tooltip = { PlainTooltip { Text("Picture in picture") } }, state = rememberTooltipState(), focusable = false) {
         DesktopToolbarButton(onClick, enabled, size = 32.dp) {
-            Icon(DesktopIcons.Window.PictureInPicture, "Picture in picture", tint = tint, modifier = Modifier.size(18.dp))
+            Icon(DesktopIcons.Window.PictureInPicture, "Picture in picture", tint = tint, modifier = Modifier.size(iconSize))
         }
     }
 }
