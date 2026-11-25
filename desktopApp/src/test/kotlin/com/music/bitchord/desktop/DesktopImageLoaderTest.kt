@@ -2,6 +2,7 @@ package com.music.bitchord.desktop
 
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.annotation.DelicateCoilApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -25,13 +26,24 @@ class DesktopImageLoaderTest {
         assertEquals(64L * 1024 * 1024, diskCache.maxSize)
     }
 
+    @OptIn(DelicateCoilApi::class)
     @Test
     fun installRegistersSingletonAndTrimCompletes() {
-        DesktopImageLoader.install()
-        val singleton = SingletonImageLoader.get(PlatformContext.INSTANCE)
-        assertNotNull(singleton)
-        assertNotNull(singleton.memoryCache)
-        DesktopImageLoader.trimMemory()
-        assertEquals(0L, singleton.memoryCache?.size)
+        val context = PlatformContext.INSTANCE
+        val previous = SingletonImageLoader.get(context)
+        SingletonImageLoader.reset()
+        try {
+            DesktopImageLoader.install()
+            val singleton = SingletonImageLoader.get(context)
+            try {
+                assertEquals(DesktopImageLoader.MAX_MEMORY_CACHE_BYTES, assertNotNull(singleton.memoryCache).maxSize)
+                DesktopImageLoader.trimMemory()
+                assertEquals(0L, singleton.memoryCache?.size)
+            } finally {
+                singleton.shutdown()
+            }
+        } finally {
+            SingletonImageLoader.setUnsafe(previous)
+        }
     }
 }
