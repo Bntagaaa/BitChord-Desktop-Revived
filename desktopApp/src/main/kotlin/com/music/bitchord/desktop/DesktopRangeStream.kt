@@ -41,7 +41,7 @@ internal class DesktopRangeStream(
     private val networkRead: ((Long) -> Unit)? = null,
     private val prefetchNext: Boolean = false,
 ) {
-    init { require(windowBytes in 1..DesktopAudioCache.MAX_SPAN) }
+    init { require(windowBytes >= 1 && (cache == null || windowBytes <= DesktopAudioCache.MAX_SPAN)) }
     @Volatile var unsupportedRange: Boolean = false
         private set
     var failure: IOException? = null

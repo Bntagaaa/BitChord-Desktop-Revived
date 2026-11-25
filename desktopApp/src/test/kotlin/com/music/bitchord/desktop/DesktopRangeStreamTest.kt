@@ -252,4 +252,15 @@ class DesktopRangeStreamTest {
             stream.close()
         }
     }
+
+    @Test
+    fun `null cache accepts 1 MiB video window`() {
+        val stream = DesktopRangeStream(
+            "http://127.0.0.1:1/video",
+            windowBytes = DesktopWindowedAvio.VIDEO_WINDOW_BYTES,
+            cache = null,
+            prefetchNext = true,
+        )
+        stream.close()
+    }
 }
