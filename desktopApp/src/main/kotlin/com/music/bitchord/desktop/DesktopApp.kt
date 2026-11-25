@@ -8553,13 +8553,38 @@ internal fun Modifier.desktopBarGlass(
  * DesktopMenuGlass owns only the visual surface, never menu dimensions.
  */
 @Composable
-internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier =
-    clip(shape).desktopFrosted(
-        DesktopBarGlass,
-        tintAlpha = DesktopMenuGlassStyle.TINT_ALPHA,
-        allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.MENUS_POPUPS),
-        blurRadius = DesktopMenuGlassStyle.BLUR_RADIUS_DP.dp,
-    ).border(0.5.dp, DesktopBarEdge, shape)
+internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier {
+    val isDark = DesktopTheme.isDark
+    val rimBrush = Brush.verticalGradient(
+        0.0f to if (isDark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.70f),
+        0.35f to if (isDark) Color.White.copy(alpha = 0.10f) else Color(0x221D2636),
+        1.0f to if (isDark) Color.White.copy(alpha = 0.045f) else Color(0x2E1D2636),
+    )
+    val surfaceSheen = Brush.verticalGradient(
+        listOf(
+            Color.White.copy(alpha = if (isDark) 0.03f else 0.18f),
+            Color.Transparent,
+            Color.Black.copy(alpha = if (isDark) 0.05f else 0.02f),
+        ),
+    )
+    return this
+        .shadow(
+            elevation = 20.dp,
+            shape = shape,
+            clip = false,
+            ambientColor = Color.Black.copy(alpha = if (isDark) 0.45f else 0.16f),
+            spotColor = Color.Black.copy(alpha = if (isDark) 0.55f else 0.22f),
+        )
+        .clip(shape)
+        .desktopFrosted(
+            DesktopBarGlass,
+            tintAlpha = DesktopMenuGlassStyle.TINT_ALPHA,
+            allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.MENUS_POPUPS),
+            blurRadius = DesktopMenuGlassStyle.BLUR_RADIUS_DP.dp,
+        )
+        .background(surfaceSheen)
+        .border(0.75.dp, rimBrush, shape)
+}
 
 /** The edge of a chrome pane that meets the page, and so has to dissolve into it. */
 internal enum class DesktopChromeEdge { NONE, BOTTOM, END }

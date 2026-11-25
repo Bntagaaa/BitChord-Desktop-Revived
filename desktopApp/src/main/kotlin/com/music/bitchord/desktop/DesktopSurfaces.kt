@@ -288,6 +288,8 @@ internal fun DesktopDropdownMenu(
         modifier = modifier.desktopMenuGlass(shape),
         shape = shape,
         containerColor = Color.Transparent,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         content = content,
     )
 }
