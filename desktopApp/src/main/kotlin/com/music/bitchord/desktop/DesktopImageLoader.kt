@@ -3,10 +3,14 @@ package com.music.bitchord.desktop
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.decode.DataSource
+import coil3.decode.Decoder
+import coil3.decode.SkiaImageDecoder
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.music.bitchord.data.Http
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import okio.Path.Companion.toOkioPath
 import java.nio.file.Path
@@ -44,12 +48,33 @@ internal object DesktopImageLoader {
         context: PlatformContext,
         cacheDir: Path = DesktopMediaCache.directory.resolve("coil_cache"),
     ): ImageLoader {
+        val disk = lazy {
+            DiskCache.Builder()
+                .directory(cacheDir.toOkioPath())
+                .maxSizeBytes(MAX_DISK_CACHE_BYTES)
+                .build()
+        }
         return ImageLoader.Builder(context)
             .interceptorCoroutineContext(Dispatchers.IO)
             .decoderCoroutineContext(Dispatchers.Default.limitedParallelism(3))
             .components {
-                add(DesktopArtworkRequests(trace = trace))
+                add(DesktopArtworkRequests(
+                    invalidateDisk = { disk.value.remove(it) },
+                    trace = trace,
+                ))
                 add(OkHttpNetworkFetcherFactory(callFactory = { imageHttpClient }))
+                add(Decoder.Factory { result, options, _ ->
+                    val decoder = SkiaImageDecoder(result.source, options)
+                    Decoder {
+                        try {
+                            decoder.decode()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            throw ArtworkDecodeException(result.dataSource == DataSource.DISK, failure)
+                        }
+                    }
+                })
             }
             .memoryCache {
                 MemoryCache.Builder()
@@ -58,12 +83,7 @@ internal object DesktopImageLoader {
                     .weakReferencesEnabled(false)
                     .build()
             }
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(cacheDir.toOkioPath())
-                    .maxSizeBytes(MAX_DISK_CACHE_BYTES)
-                    .build()
-            }
+            .diskCache { disk.value }
             .build()
     }
 
