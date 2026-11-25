@@ -780,7 +780,6 @@ internal fun CircleGlyph(
     haptic: Haptic = Haptic.Tap,
 ) {
     val haptics = rememberHaptics()
-    val glass = LocalPlayerGlass.current != null
     val reduceAnimation = LocalPlayerReduceMotion.current
     val discAlpha by animateFloatAsState(
         targetValue = if (active) 0.34f else 0.18f,
@@ -810,8 +809,6 @@ internal fun CircleGlyph(
                 .background(
                     if (!desktop) {
                         LocalPlayerTint.current.copy(alpha = discAlpha)
-                    } else if (glass && !vibrantDisc) {
-                        Color.White.copy(alpha = discAlpha)
                     } else if (vibrantDisc) {
                         VibrantDiscInk.copy(alpha = playerDiscPaintAlpha(discAlpha, blended = true))
                     } else {
@@ -821,7 +818,6 @@ internal fun CircleGlyph(
                     },
                 ),
         )
-        if (glass) Box(Modifier.matchParentSize().glassRim(CircleShape))
         Crossfade(
             targetState = icon,
             animationSpec = tween(durationMillis = if (reduceAnimation) 0 else 180),
