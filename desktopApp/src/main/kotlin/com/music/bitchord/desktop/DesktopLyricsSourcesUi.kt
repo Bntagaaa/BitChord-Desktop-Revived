@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import com.music.bitchord.ui.screens.desktopTopScrollFade
 
 import androidx.compose.foundation.background
@@ -23,8 +25,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -185,7 +185,7 @@ private fun ReorderableSourceList(
                             onClick = { onToggle(name) },
                             leading = {
                                 Icon(
-                                    Icons.Rounded.DragHandle,
+                                    DesktopIcons.Actions.DragHandle,
                                     DesktopStrings["drag_to_reorder", "Drag to reorder"],
                                     tint = DesktopSecondary,
                                     modifier = Modifier

@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.geometry.Rect
@@ -57,15 +59,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeDown
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.CastConnected
-import androidx.compose.material.icons.rounded.DirectionsCar
-import androidx.compose.material.icons.rounded.Headphones
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Tv
-import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -608,7 +601,7 @@ internal fun VolumeRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            Icons.AutoMirrored.Rounded.VolumeDown,
+            SfStyleIcons.VolumeDown,
             contentDescription = null,
             tint = volumeTint,
             modifier = Modifier.size(20.dp).vibrantDiscChrome(vibrant),
@@ -628,7 +621,7 @@ internal fun VolumeRow(
         )
         Spacer(Modifier.width(10.dp))
         Icon(
-            Icons.AutoMirrored.Rounded.VolumeUp,
+            SfStyleIcons.VolumeUp,
             contentDescription = null,
             tint = volumeTint,
             modifier = Modifier.size(20.dp).vibrantDiscChrome(vibrant),
@@ -1066,7 +1059,7 @@ private fun OutputPartyPill(
             // Person rather than Groups: the three-person glyph is drawn half
             // the height of Headphones and wider than the segment holding it,
             // so the two halves of the capsule never looked like a pair.
-            icon = Icons.Rounded.Person,
+            icon = SfStyleIcons.Person,
             iconSize = PILL_PARTY_SIZE,
             // The count is here and nowhere else: spoken, it is the whole
             // point of the control; drawn, it would cost the capsule its
@@ -1100,8 +1093,8 @@ private fun rememberOutputGlyph(): OutputGlyph {
     val watch by PlayerPlatform.host.watchOutput.collectAsStateWithLifecycle()
     val active = rememberAudioOutputs().firstOrNull { it.isActive }
     return when {
-        cast.connectedName != null -> OutputGlyph(Icons.Rounded.CastConnected, PILL_OUTPUT_WIDE_SIZE)
-        watch.active -> OutputGlyph(Icons.Rounded.Watch, PILL_OUTPUT_TALL_SIZE)
+        cast.connectedName != null -> OutputGlyph(SfStyleIcons.CastConnected, PILL_OUTPUT_WIDE_SIZE)
+        watch.active -> OutputGlyph(SfStyleIcons.Watch, PILL_OUTPUT_TALL_SIZE)
         else -> when (active?.kind) {
             // No active row is the phone too — the caption under the pill
             // says "This phone" in the same case.
@@ -1109,13 +1102,13 @@ private fun rememberOutputGlyph(): OutputGlyph {
             AudioOutputKind.BLUETOOTH -> when (active.form) {
                 BluetoothForm.BUDS -> OutputGlyph(vectorResource(Res.drawable.ic_output_buds))
                 BluetoothForm.SPEAKER -> OutputGlyph(vectorResource(Res.drawable.ic_output_speaker))
-                BluetoothForm.CAR -> OutputGlyph(Icons.Rounded.DirectionsCar)
+                BluetoothForm.CAR -> OutputGlyph(SfStyleIcons.Car)
                 // Headphones doubles as the neutral "some audio device" glyph:
                 // a device that won't say what it is gets that, not a guess.
-                BluetoothForm.HEADPHONES, BluetoothForm.UNKNOWN -> OutputGlyph(Icons.Rounded.Headphones)
+                BluetoothForm.HEADPHONES, BluetoothForm.UNKNOWN -> OutputGlyph(SfStyleIcons.Headphones)
             }
-            AudioOutputKind.WIRED, AudioOutputKind.USB -> OutputGlyph(Icons.Rounded.Headphones)
-            AudioOutputKind.HDMI -> OutputGlyph(Icons.Rounded.Tv, PILL_OUTPUT_WIDE_SIZE)
+            AudioOutputKind.WIRED, AudioOutputKind.USB -> OutputGlyph(SfStyleIcons.Headphones)
+            AudioOutputKind.HDMI -> OutputGlyph(SfStyleIcons.Tv, PILL_OUTPUT_WIDE_SIZE)
             AudioOutputKind.OTHER -> OutputGlyph(vectorResource(Res.drawable.ic_output_speaker))
         }
     }
@@ -1842,7 +1835,7 @@ private fun LosslessOrStats(
         nerdStats?.isHiQuality == true -> LosslessLabel(
             text = stringResource(Res.string.high_quality),
             animated = false,
-            iconPainter = rememberVectorPainter(Icons.Rounded.Headphones),
+            iconPainter = rememberVectorPainter(SfStyleIcons.Headphones),
             // A Material glyph's own size is 24dp; the badge's are drawn small.
             iconSize = 13.dp,
             modifier = modifier,

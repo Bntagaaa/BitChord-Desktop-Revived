@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.music.bitchord.ui.components.trackArtSize
@@ -40,10 +42,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.DragHandle
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -777,7 +775,7 @@ private fun InlineQueueRow(
     ) {
         if (draggable) {
             Icon(
-                Icons.Rounded.DragHandle,
+                SfStyleIcons.DragHandle,
                 contentDescription = stringResource(Res.string.drag_to_reorder),
                 tint = colors.muted,
                 modifier = Modifier
@@ -830,7 +828,7 @@ private fun InlineQueueRow(
         }
         if (isCurrent) {
             Icon(
-                Icons.Rounded.GraphicEq,
+                SfStyleIcons.GraphicEq,
                 contentDescription = stringResource(Res.string.now_playing),
                 tint = colors.primary,
                 modifier = Modifier.size(18.dp),
@@ -846,7 +844,7 @@ private fun InlineQueueRow(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.Close,
+                    SfStyleIcons.Close,
                     contentDescription = stringResource(Res.string.remove_from_queue),
                     tint = colors.secondary,
                     modifier = Modifier.size(18.dp),

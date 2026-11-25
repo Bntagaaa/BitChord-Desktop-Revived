@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -13,12 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Lyrics
-import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -83,12 +79,12 @@ internal fun DesktopPipUi(
                 Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("BitChord", fontWeight = FontWeight.SemiBold, fontSize = 11.sp,
                         color = Color.White.copy(alpha = .6f), modifier = Modifier.weight(1f), maxLines = 1)
-                    PipAction("Return to main window", Icons.AutoMirrored.Rounded.OpenInNew, onRestore)
-                    PipAction(if (preferences.pinned) "Disable always on top" else "Always on top", Icons.Rounded.PushPin,
+                    PipAction("Return to main window", DesktopIcons.Navigation.OpenInNew, onRestore)
+                    PipAction(if (preferences.pinned) "Disable always on top" else "Always on top", DesktopIcons.Actions.Pin,
                         onPin, selected = preferences.pinned, enabled = pinSupported)
-                    PipAction(if (preferences.lyrics) "Hide lyrics" else "Show lyrics", Icons.Rounded.Lyrics,
+                    PipAction(if (preferences.lyrics) "Hide lyrics" else "Show lyrics", DesktopIcons.Player.Lyrics,
                         onLyrics, selected = preferences.lyrics)
-                    PipAction("Close picture in picture", Icons.Rounded.Close, onClose)
+                    PipAction("Close picture in picture", DesktopIcons.Actions.Close, onClose)
                 }
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     val bodyWidth = maxWidth
@@ -296,7 +292,7 @@ internal fun DesktopPipLauncher(onClick: () -> Unit, enabled: Boolean = true, ti
     TooltipBox(TooltipDefaults.rememberPlainTooltipPositionProvider(),
         tooltip = { PlainTooltip { Text("Picture in picture") } }, state = rememberTooltipState(), focusable = false) {
         DesktopToolbarButton(onClick, enabled, size = 32.dp) {
-            Icon(Icons.Rounded.PictureInPictureAlt, "Picture in picture", tint = tint, modifier = Modifier.size(18.dp))
+            Icon(DesktopIcons.Window.PictureInPicture, "Picture in picture", tint = tint, modifier = Modifier.size(18.dp))
         }
     }
 }

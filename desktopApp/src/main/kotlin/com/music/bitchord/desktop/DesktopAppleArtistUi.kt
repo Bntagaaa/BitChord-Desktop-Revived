@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -12,9 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -166,7 +165,7 @@ internal fun DesktopAppleArtistHeader(
             }
             Box(Modifier.align(Alignment.TopEnd).padding(top = 11.dp, end = 12.dp)) {
                 DesktopAppleArtistButton(30, "More", onClick = { menu = true }) {
-                    Icon(Icons.Rounded.MoreHoriz, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(DesktopIcons.Actions.More, null, tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 DesktopDropdownMenu(menu, { menu = false }) {
                     DropdownMenuItem(text = { Text(DesktopStrings["play", "Play"]) }, onClick = { menu = false; onPlay() })
@@ -266,7 +265,7 @@ internal fun DesktopAppleSongRow(
             }
             Box(Modifier.size(30.dp)) {
                 if (hovered) DesktopToolbarButton(onOpenMenu, size = 30.dp) {
-                    Icon(Icons.Rounded.MoreHoriz, "Song menu", tint = DesktopAppleSecondary, modifier = Modifier.size(18.dp))
+                    Icon(DesktopIcons.Actions.More, "Song menu", tint = DesktopAppleSecondary, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -347,7 +346,7 @@ private fun AppleSongGridLine(
             DesktopArtwork(artworkUrl, Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)), px = 160)
             if (hovered) {
                 Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(DesktopIcons.Player.Play, null, tint = Color.White, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -356,7 +355,7 @@ private fun AppleSongGridLine(
             Text(subtitle, color = DesktopAppleSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Icon(
-            Icons.Rounded.MoreHoriz,
+            DesktopIcons.Actions.More,
             "Song menu",
             tint = DesktopAppleSecondary,
             modifier = Modifier.size(18.dp).clickable(onClick = onOpenMenu),

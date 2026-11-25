@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -19,8 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -114,7 +114,7 @@ internal fun DesktopSidePanelColumn(
                                 )
                                 DesktopToolbarButton(onClick = onClose, size = 28.dp) {
                                     Icon(
-                                        Icons.Rounded.Close,
+                                        DesktopIcons.Actions.Close,
                                         DesktopStrings["close", "Close"],
                                         tint = DesktopSecondary,
                                         modifier = Modifier.size(16.dp),

@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -18,20 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.rounded.VolumeOff
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.Bluetooth
-import androidx.compose.material.icons.rounded.Cast
-import androidx.compose.material.icons.rounded.CastConnected
-import androidx.compose.material.icons.rounded.ExpandLess
-import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Headphones
-import androidx.compose.material.icons.rounded.Speaker
-import androidx.compose.material.icons.rounded.Tv
-import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -76,7 +64,7 @@ internal fun DesktopAudioOutputButton(onOpen: (Rect) -> Unit, iconSize: Dp = 18.
         modifier = Modifier.onGloballyPositioned { anchor = it.boundsInRoot() },
     ) {
         Icon(
-            Icons.Rounded.Headphones,
+            DesktopIcons.Audio.Headphones,
             DesktopStrings["audio_output", "Audio output"],
             tint = DesktopSecondary,
             modifier = Modifier.size(iconSize),
@@ -111,7 +99,7 @@ internal fun DesktopAudioOutputMenu(
         AudioOutputMenuRow(
             name = DesktopStrings["d_system_default", "System default"],
             description = if (selected == DesktopAudioDevices.SYSTEM_DEFAULT) stringResource(Res.string.audio_output_playing) else "",
-            icon = Icons.Rounded.Speaker,
+            icon = DesktopIcons.Audio.Speaker,
             chosen = selected == DesktopAudioDevices.SYSTEM_DEFAULT,
         ) {
             DesktopAudioDevices.select(DesktopAudioDevices.SYSTEM_DEFAULT)
@@ -136,13 +124,13 @@ internal fun DesktopAudioOutputMenu(
             AudioOutputMenuDivider()
             AudioOutputMenuRow(
                 name = if (showAdvanced) "Hide advanced audio devices" else "Show advanced audio devices ($advanced)",
-                icon = if (showAdvanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                icon = if (showAdvanced) DesktopIcons.Window.ExpandLess else DesktopIcons.Window.ExpandMore,
             ) { showAdvanced = !showAdvanced }
         }
         if (onOpenCast != null && cast.supported) {
             AudioOutputMenuRow(
                 name = cast.connectedName ?: stringResource(Res.string.cast),
-                icon = if (cast.connectedName != null) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
+                icon = if (cast.connectedName != null) DesktopIcons.Audio.CastConnected else DesktopIcons.Audio.Cast,
                 arrow = true,
             ) {
                 onDismiss()
@@ -152,7 +140,7 @@ internal fun DesktopAudioOutputMenu(
         if (onOpenPipeline != null) {
             AudioOutputMenuDivider()
             AudioOutputVolume()
-            AudioOutputMenuRow(name = stringResource(Res.string.audio_pipeline), icon = Icons.Rounded.GraphicEq, arrow = true) {
+            AudioOutputMenuRow(name = stringResource(Res.string.audio_pipeline), icon = DesktopIcons.Audio.GraphicEq, arrow = true) {
                 onDismiss()
                 onOpenPipeline()
             }
@@ -183,7 +171,7 @@ private fun AudioOutputVolume() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            if (level > 0f) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff,
+            if (level > 0f) DesktopIcons.Audio.VolumeUp else DesktopIcons.Audio.VolumeOff,
             contentDescription = null,
             tint = DesktopSecondary,
             modifier = Modifier.size(18.dp),
@@ -273,7 +261,7 @@ private fun AudioOutputMenuRow(
             Spacer(Modifier.width(8.dp))
             Icon(BitChordIcons.Check, null, tint = DesktopForeground, modifier = Modifier.size(18.dp))
         } else if (arrow) {
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = DesktopSecondary, modifier = Modifier.size(17.dp))
+            Icon(DesktopIcons.Navigation.ChevronRight, null, tint = DesktopSecondary, modifier = Modifier.size(17.dp))
         }
     }
 }
@@ -281,10 +269,10 @@ private fun AudioOutputMenuRow(
 private fun audioOutputIcon(name: String): ImageVector {
     val n = name.lowercase()
     return when {
-        "bluetooth" in n || "buds" in n || "airpods" in n -> Icons.Rounded.Bluetooth
-        "headphone" in n || "headset" in n || "earpods" in n -> Icons.Rounded.Headphones
-        "usb" in n || "dac" in n -> Icons.Rounded.Usb
-        "hdmi" in n || "display" in n -> Icons.Rounded.Tv
-        else -> Icons.Rounded.Speaker
+        "bluetooth" in n || "buds" in n || "airpods" in n -> DesktopIcons.Audio.Bluetooth
+        "headphone" in n || "headset" in n || "earpods" in n -> DesktopIcons.Audio.Headphones
+        "usb" in n || "dac" in n -> DesktopIcons.Audio.Usb
+        "hdmi" in n || "display" in n -> DesktopIcons.Audio.Tv
+        else -> DesktopIcons.Audio.Speaker
     }
 }

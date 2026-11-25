@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,11 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.material.icons.automirrored.rounded.Sort
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -216,7 +214,7 @@ internal fun DesktopLibrarySortMenu() {
     var open by remember { mutableStateOf(false) }
     Box {
         DesktopToolbarButton(onClick = { open = true }) {
-            Icon(Icons.AutoMirrored.Rounded.Sort, DesktopStrings["sort_library", "Sort library"], tint = DesktopForeground)
+            Icon(DesktopIcons.Navigation.Sort, DesktopStrings["sort_library", "Sort library"], tint = DesktopForeground)
         }
         DesktopDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             LibrarySort.entries.forEach { option ->
@@ -231,7 +229,7 @@ internal fun DesktopLibrarySortMenu() {
                         )
                     },
                     trailingIcon = if (option == sort) {
-                        { Icon(Icons.Rounded.Check, contentDescription = null) }
+                        { Icon(DesktopIcons.Actions.Check, contentDescription = null) }
                     } else {
                         null
                     },

@@ -1,5 +1,9 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.ui.icons.BitChordIcons
+
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -20,10 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Fullscreen
-import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.height
@@ -247,7 +247,7 @@ internal fun VideoCornerControls(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
+                imageVector = if (fullscreen) SfStyleIcons.FullscreenExit else SfStyleIcons.Fullscreen,
                 contentDescription = if (fullscreen) "Exit fullscreen" else "Fullscreen",
                 tint = Color.White,
                 modifier = Modifier.size(22.dp),
@@ -382,7 +382,7 @@ private fun QualityRow(name: String, detail: String?, active: Boolean, onSelect:
         Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
             if (active) {
                 Icon(
-                    imageVector = Icons.Rounded.Check,
+                    imageVector = BitChordIcons.Check,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(20.dp),

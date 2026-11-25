@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -29,12 +31,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeOff
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.OpenInFull
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -77,15 +73,10 @@ import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.Song
 import bitchord.desktopapp.generated.resources.Res
 import bitchord.desktopapp.generated.resources.bitchord_no_music
-import bitchord.desktopapp.generated.resources.player_transport_lyrics
 import bitchord.desktopapp.generated.resources.player_transport_next
 import bitchord.desktopapp.generated.resources.player_transport_pause
 import bitchord.desktopapp.generated.resources.player_transport_play
 import bitchord.desktopapp.generated.resources.player_transport_previous
-import bitchord.desktopapp.generated.resources.player_transport_repeat
-import bitchord.desktopapp.generated.resources.player_transport_repeat_one
-import bitchord.desktopapp.generated.resources.player_transport_shuffle
-import bitchord.desktopapp.generated.resources.player_transport_up_next
 import com.music.bitchord.ui.components.trackArtSize
 import com.music.bitchord.ui.icons.BitChordIcons
 import kotlinx.coroutines.delay
@@ -201,8 +192,8 @@ internal fun DesktopMiniPlayer(
                     horizontalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp),
                 ) {
                     if (!compact) DesktopToolbarButton(onClick = { onShuffleChange(!shuffle) }, size = transportSize) {
-                        Icon(painterResource(Res.drawable.player_transport_shuffle), "Shuffle",
-                            tint = if (shuffle) DesktopAccent else DesktopSecondary, modifier = Modifier.size(30.dp))
+                        Icon(DesktopIcons.Player.Shuffle, "Shuffle",
+                            tint = if (shuffle) DesktopAccent else DesktopSecondary, modifier = Modifier.size(20.dp))
                     }
                     DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = transportSize) {
                         Icon(painterResource(Res.drawable.player_transport_previous), "Previous",
@@ -221,10 +212,10 @@ internal fun DesktopMiniPlayer(
                         Icon(painterResource(Res.drawable.player_transport_next), "Next", tint = foreground, modifier = Modifier.size(28.dp))
                     }
                     if (!compact) DesktopToolbarButton(onClick = { onRepeatModeChange(repeatMode.next()) }, size = transportSize) {
-                        Icon(painterResource(if (repeatMode == DesktopRepeatMode.ONE) Res.drawable.player_transport_repeat_one
-                            else Res.drawable.player_transport_repeat), "Repeat ${repeatMode.label()}",
+                        Icon(if (repeatMode == DesktopRepeatMode.ONE) DesktopIcons.Player.RepeatOne
+                            else DesktopIcons.Player.Repeat, "Repeat ${repeatMode.label()}",
                             tint = if (repeatMode == DesktopRepeatMode.OFF) DesktopSecondary else DesktopAccent,
-                            modifier = Modifier.size(32.dp))
+                            modifier = Modifier.size(20.dp))
                     }
                 }
                 Spacer(Modifier.width(if (compact) 8.dp else 14.dp))
@@ -276,7 +267,7 @@ private fun DesktopMiniPlayerTrack(
                     DesktopAutoMixArtwork(song, ROW_ART_PX, Modifier.fillMaxSize())
                     if (dockHovered || focused) {
                         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Rounded.OpenInFull, null, tint = Color.White, modifier = Modifier.size(17.dp))
+                            Icon(DesktopIcons.Navigation.OpenInFull, null, tint = Color.White, modifier = Modifier.size(17.dp))
                         }
                     }
                 }
@@ -343,7 +334,7 @@ private fun DesktopMiniPlayerTools(
         if (!actions.secondaryInMenu) {
             DesktopPipLauncher(actions.onOpenPip, enabled = song != null)
             DesktopToolbarButton(onClick = actions.onOpenDetails, size = 32.dp) {
-                Icon(Icons.Rounded.Info, "Now playing details",
+                Icon(DesktopIcons.Status.Info, "Now playing details",
                     tint = if (actions.sidePanel == DesktopSidePanel.DETAILS) DesktopAccent else DesktopSecondary,
                     modifier = Modifier.size(18.dp))
             }
@@ -372,12 +363,12 @@ private fun DesktopMiniPlayerTools(
                     }
                     if (!actions.panelsInMenu) {
                         DesktopToolbarButton(onClick = actions.onOpenLyrics, size = buttonSize) {
-                            Icon(painterResource(Res.drawable.player_transport_lyrics), "Lyrics",
+                            Icon(DesktopIcons.Player.Lyrics, "Lyrics",
                                 tint = if (actions.sidePanel == DesktopSidePanel.LYRICS) DesktopAccent else foreground.copy(alpha = 0.82f),
                                 modifier = Modifier.size(19.dp))
                         }
                         DesktopToolbarButton(onClick = actions.onOpenQueue, size = buttonSize) {
-                            Icon(painterResource(Res.drawable.player_transport_up_next), "Queue",
+                            Icon(DesktopIcons.Player.Queue, "Queue",
                                 tint = if (actions.sidePanel == DesktopSidePanel.QUEUE) DesktopAccent else foreground.copy(alpha = 0.82f),
                                 modifier = Modifier.size(20.dp))
                         }
@@ -429,7 +420,7 @@ private fun DesktopMiniPlayerTools(
                 .onFocusChanged { speakerFocused = it.isFocused }
                 .testTag("mini-player-volume-button"),
         ) {
-            Icon(if (volume <= 0f) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp,
+            Icon(if (volume <= 0f) DesktopIcons.Audio.VolumeOff else DesktopIcons.Audio.VolumeUp,
                 "Volume control", tint = foreground.copy(alpha = 0.88f), modifier = Modifier.size(24.dp))
         }
     }
@@ -443,7 +434,7 @@ private fun DesktopMiniPlayerFallbackMenu(hasSong: Boolean, actions: DesktopMini
             DesktopMoreButton(onClick = { open = true }, modifier = Modifier.size(buttonSize))
         } else {
             DesktopToolbarButton(onClick = { open = true }, size = buttonSize) {
-                Icon(Icons.Rounded.Tune, "Player options", tint = DesktopSecondary, modifier = Modifier.size(18.dp))
+                Icon(DesktopIcons.Settings.Tune, "Player options", tint = DesktopSecondary, modifier = Modifier.size(18.dp))
             }
         }
         if (open) DesktopMenuSurface(onDismiss = { open = false }) {

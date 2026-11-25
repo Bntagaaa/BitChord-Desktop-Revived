@@ -47,6 +47,9 @@ jobs:
       - name: Verify canonical AutoMix files and distributed model hashes
         run: python3 tools/automix-validation/verify-upstream.py
 
+      - name: Enforce unified non-Material icon system
+        run: python3 .github/scripts/check-icon-system.py
+
       # Regression coverage for the packaging failure: the app may use a descriptive
       # test label, but native installer metadata must remain a valid numeric version.
       - name: Tests

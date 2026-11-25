@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.screens
 
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import com.music.bitchord.data.settings.LibraryViewType
 
 import com.music.bitchord.ui.components.trackArtSize
@@ -72,12 +74,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Cached
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.LibraryMusic
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Storage
 import com.music.bitchord.ui.icons.BitChordIcons
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.CARD_ART_PX
@@ -1306,25 +1302,25 @@ internal fun ShelfCard(
             "local:all" -> ServiceCard(
                 colors = listOf(Color(0xFF134E5E), Color(0xFF71B280)),
                 trackKey = "local:all",
-                icon = Icons.Rounded.LibraryMusic,
+                icon = SfStyleIcons.LibraryMusic,
                 hovered = cardHovered,
             )
             "local:cache" -> ServiceCard(
                 colors = listOf(Color(0xFF42275A), Color(0xFF734B6D)),
                 trackKey = "local:cache",
-                icon = Icons.Rounded.Cached,
+                icon = SfStyleIcons.Cached,
                 hovered = cardHovered,
             )
             "local:webdav" -> ServiceCard(
                 colors = listOf(Color(0xFF3A1C71), Color(0xFFD76D77)),
                 trackKey = "local:webdav",
-                icon = Icons.Rounded.Folder,
+                icon = SfStyleIcons.Folder,
                 hovered = cardHovered,
             )
             "local:smb" -> ServiceCard(
                 colors = listOf(Color(0xFF0F2027), Color(0xFF2C5364)),
                 trackKey = "local:smb",
-                icon = Icons.Rounded.Storage,
+                icon = SfStyleIcons.Storage,
                 hovered = cardHovered,
             )
             else -> {

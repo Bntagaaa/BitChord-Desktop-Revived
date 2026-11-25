@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,13 +17,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Videocam
-import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -72,27 +67,27 @@ internal fun DesktopContentPreferencesPage(onBack: () -> Unit) {
     val prefs = DesktopContentPreferences
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.widthIn(max = 860.dp).fillMaxWidth()) {
-            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, contentDescription = "Back to Settings") }
+            IconButton(onClick = onBack) { Icon(DesktopIcons.Navigation.ArrowBack, contentDescription = "Back to Settings") }
             Spacer(Modifier.height(10.dp))
             Text("Content Preferences", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(22.dp))
             Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
                 Column {
-                    PreferenceOption(Icons.Rounded.Videocam, "Prefer music-only version",
+                    PreferenceOption(DesktopIcons.Player.MusicVideo, "Prefer music-only version",
                         "Music videos play as their audio version; the next queue item is resolved ahead of time for smoother transitions.",
                         prefs.preferMusicOnly, prefs::updatePreferMusicOnly)
                     PreferenceSeparator()
-                    PreferenceOption(Icons.Rounded.VisibilityOff, "Hide Recents", null, prefs.hideRecents, prefs::updateHideRecents)
+                    PreferenceOption(DesktopIcons.Settings.VisibilityOff, "Hide Recents", null, prefs.hideRecents, prefs::updateHideRecents)
                     PreferenceSeparator()
-                    PreferenceOption(Icons.Rounded.VisibilityOff, "Hide videos from Home",
+                    PreferenceOption(DesktopIcons.Settings.VisibilityOff, "Hide videos from Home",
                         "Video-only shelves are hidden. Search, artists and playlists remain unchanged.",
                         prefs.hideHomeVideos, prefs::updateHideHomeVideos)
                     PreferenceSeparator()
-                    PreferenceOption(Icons.Rounded.AutoAwesome, "Hide Top Picks for You", null, prefs.hideTopPicks, prefs::updateHideTopPicks)
+                    PreferenceOption(DesktopIcons.Status.Sparkles, "Hide Top Picks for You", null, prefs.hideTopPicks, prefs::updateHideTopPicks)
                     PreferenceSeparator()
-                    PreferenceOption(Icons.Rounded.StarBorder, "Hide Find Your Mood", null, prefs.hideHomeMoods, prefs::updateHideHomeMoods)
+                    PreferenceOption(DesktopIcons.Player.Like, "Hide Find Your Mood", null, prefs.hideHomeMoods, prefs::updateHideHomeMoods)
                     PreferenceSeparator()
-                    PreferenceOption(Icons.Rounded.GridView, "Square video thumbnails",
+                    PreferenceOption(DesktopIcons.Navigation.GridView, "Square video thumbnails",
                         "Display music videos with square covers wherever thumbnail layout supports it.",
                         prefs.squareVideos, prefs::updateSquareVideos)
                 }
