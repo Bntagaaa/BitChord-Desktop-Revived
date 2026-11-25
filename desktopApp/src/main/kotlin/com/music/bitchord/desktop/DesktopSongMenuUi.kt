@@ -689,7 +689,7 @@ private fun DesktopMenuHeader(title: String, onBack: () -> Unit) {
 @Composable
 private fun DesktopMenuDivider() {
     HorizontalDivider(
-        Modifier.padding(vertical = 3.dp),
+        Modifier.padding(horizontal = 14.dp, vertical = 3.dp),
         thickness = 0.5.dp,
         color = DesktopBarEdge,
     )
