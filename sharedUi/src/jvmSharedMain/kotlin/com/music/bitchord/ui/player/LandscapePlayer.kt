@@ -452,39 +452,37 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
     desktop: Boolean = PlayerPlatform.host.musicVideoFullscreen != null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.width(10.dp))
-        GlassDiscPair {
-            // The desktop keeps a local liked library even without YouTube sign-in.
-            // Keep Android's existing guest behavior; never hide the desktop heart.
-            if (landscapeLikeVisible(
-                    signedIn = signedIn,
-                    localSong = song.localUri != null,
-                    desktop = desktop,
-                )) {
-                val liked = likeStatus == LikeStatus.LIKE
-                CircleGlyph(
-                    // Desktop follows the current mobile star for the Liked
-                    // playlist; retain the fork's old heart on Android.
-                    icon = when {
-                        PlayerPlatform.host.mobileTextChrome && liked -> BitChordIcons.StarFilled
-                        PlayerPlatform.host.mobileTextChrome -> BitChordIcons.Star
-                        liked -> BitChordIcons.HeartFilled
-                        else -> BitChordIcons.Heart
-                    },
-                    contentDescription = stringResource(
-                        if (liked) Res.string.remove_from_liked else Res.string.like,
-                    ),
-                    onClick = onToggleLike,
-                    active = liked,
-                    haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
-                )
-                Spacer(Modifier.width(8.dp))
-            }
+        // The desktop keeps a local liked library even without YouTube sign-in.
+        // Keep Android's existing guest behavior; never hide the desktop heart.
+        if (landscapeLikeVisible(
+                signedIn = signedIn,
+                localSong = song.localUri != null,
+                desktop = desktop,
+            )) {
+            val liked = likeStatus == LikeStatus.LIKE
             CircleGlyph(
-                icon = if (showRevertCue) Icons.AutoMirrored.Rounded.Undo else Icons.Rounded.MoreHoriz,
-                contentDescription = stringResource(Res.string.more),
-                onClick = onOpenMenu,
+                // Desktop follows the current mobile star for the Liked
+                // playlist; retain the fork's old heart on Android.
+                icon = when {
+                    PlayerPlatform.host.mobileTextChrome && liked -> BitChordIcons.StarFilled
+                    PlayerPlatform.host.mobileTextChrome -> BitChordIcons.Star
+                    liked -> BitChordIcons.HeartFilled
+                    else -> BitChordIcons.Heart
+                },
+                contentDescription = stringResource(
+                    if (liked) Res.string.remove_from_liked else Res.string.like,
+                ),
+                onClick = onToggleLike,
+                active = liked,
+                haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
             )
+            Spacer(Modifier.width(8.dp))
         }
+        CircleGlyph(
+            icon = if (showRevertCue) Icons.AutoMirrored.Rounded.Undo else Icons.Rounded.MoreHoriz,
+            contentDescription = stringResource(Res.string.more),
+            onClick = onOpenMenu,
+        )
     }
 }
 
