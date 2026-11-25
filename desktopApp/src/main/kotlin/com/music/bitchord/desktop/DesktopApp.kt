@@ -8560,13 +8560,6 @@ internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier {
         0.35f to if (isDark) Color.White.copy(alpha = 0.10f) else Color(0x221D2636),
         1.0f to if (isDark) Color.White.copy(alpha = 0.045f) else Color(0x2E1D2636),
     )
-    val surfaceSheen = Brush.verticalGradient(
-        listOf(
-            Color.White.copy(alpha = if (isDark) 0.03f else 0.18f),
-            Color.Transparent,
-            Color.Black.copy(alpha = if (isDark) 0.05f else 0.02f),
-        ),
-    )
     return this
         .shadow(
             elevation = 20.dp,
@@ -8582,7 +8575,6 @@ internal fun Modifier.desktopMenuGlass(shape: Shape): Modifier {
             allowBlur = DesktopAppearanceSettings.blurEnabled(DesktopBlurArea.MENUS_POPUPS),
             blurRadius = DesktopMenuGlassStyle.BLUR_RADIUS_DP.dp,
         )
-        .background(surfaceSheen)
         .border(0.75.dp, rimBrush, shape)
 }
 
