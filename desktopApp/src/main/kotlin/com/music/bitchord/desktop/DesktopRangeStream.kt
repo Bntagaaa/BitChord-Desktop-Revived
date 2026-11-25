@@ -39,6 +39,7 @@ internal class DesktopRangeStream(
     private val cancelled: () -> Boolean = { false },
     private val requestTimeoutMs: Long = 6_000,
     private val networkRead: ((Long) -> Unit)? = null,
+    private val prefetchNext: Boolean = false,
 ) {
     init { require(windowBytes in 1..DesktopAudioCache.MAX_SPAN) }
     @Volatile var unsupportedRange: Boolean = false
@@ -50,6 +51,8 @@ internal class DesktopRangeStream(
     private var position = 0L
     private var window = ByteArray(0)
     private var windowStart = -1L
+    private var prefetchedStart = -1L
+    private var prefetchFuture: CompletableFuture<HttpResponse<ByteArray>?>? = null
     private val uri = URI.create(url)
     private val expiresAt = minOf(System.currentTimeMillis() + 24 * 60 * 60 * 1000L,
         Regex("(?:^|&)expire=(\\d+)(?:&|$)").find(uri.rawQuery.orEmpty())?.groupValues?.get(1)
@@ -85,13 +88,10 @@ internal class DesktopRangeStream(
         }
         DesktopPlaybackDiagnostics.cacheMiss.incrementAndGet()
         val end = start + windowBytes - 1
-        val request = HttpRequest.newBuilder(uri).timeout(Duration.ofMillis(requestTimeoutMs))
-        headers.forEach { (name, value) -> runCatching { request.header(name, value) } }
-        request.setHeader("Range", "bytes=$start-$end").setHeader("Accept-Encoding", "identity")
         if (cancelled() || Thread.currentThread().isInterrupted) return false
         val started = if (networkRead != null) System.nanoTime() else 0L
         val response = try {
-            fetchRange(request.GET().build())
+            consumePrefetchOrFetch(start, end)
         } finally {
             networkRead?.invoke(System.nanoTime() - started)
         } ?: return false
@@ -134,7 +134,50 @@ internal class DesktopRangeStream(
             val expiry = minOf(expiresAt, System.currentTimeMillis() + (maxAge ?: 86400L).coerceIn(0, 86400) * 1000)
             cache.write(key, windowStart, body, length, expiry)
         }
+        if (prefetchNext && response.statusCode() == 206 && length > windowStart + window.size) {
+            schedulePrefetch(windowStart + windowBytes)
+        }
         return holds(at)
+    }
+
+    private fun buildRangeRequest(start: Long, end: Long): HttpRequest {
+        val request = HttpRequest.newBuilder(uri).timeout(Duration.ofMillis(requestTimeoutMs))
+        headers.forEach { (name, value) -> runCatching { request.header(name, value) } }
+        return request.setHeader("Range", "bytes=$start-$end")
+            .setHeader("Accept-Encoding", "identity")
+            .GET()
+            .build()
+    }
+
+    private fun consumePrefetchOrFetch(start: Long, end: Long): HttpResponse<ByteArray>? {
+        val inFlight = if (prefetchedStart == start) prefetchFuture else {
+            prefetchFuture?.cancel(true)
+            null
+        }
+        prefetchedStart = -1L
+        prefetchFuture = null
+        if (inFlight != null) {
+            val prefetched = runCatching { inFlight.get(requestTimeoutMs, TimeUnit.MILLISECONDS) }.getOrNull()
+            if (prefetched != null && prefetched.statusCode() in listOf(200, 206)) return prefetched
+        }
+        return fetchRange(buildRangeRequest(start, end))
+    }
+
+    private fun schedulePrefetch(nextStart: Long) {
+        if (cancelled() || prefetchedStart == nextStart) return
+        prefetchFuture?.cancel(true)
+        val nextEnd = minOf(nextStart + windowBytes - 1, length - 1)
+        if (nextEnd < nextStart) return
+        val request = buildRangeRequest(nextStart, nextEnd)
+        prefetchedStart = nextStart
+        prefetchFuture = client.sendAsync(request, boundedBody(windowBytes) { unsupportedRange = true })
+            .handle { response, _ -> response }
+    }
+
+    fun close() {
+        prefetchFuture?.cancel(true)
+        prefetchFuture = null
+        prefetchedStart = -1L
     }
 
     private fun fetchRange(request: HttpRequest): HttpResponse<ByteArray>? {
@@ -202,6 +245,7 @@ internal class DesktopWindowedAvio(
     cache: DesktopAudioCache? = DesktopAudioCache.shared,
     cancelled: () -> Boolean = { false },
     rangeRead: ((Long) -> Unit)? = null,
+    prefetchNext: Boolean = false,
 ) : AutoCloseable {
     val source = DesktopRangeStream(
         url = url,
@@ -211,6 +255,7 @@ internal class DesktopWindowedAvio(
         cache = cache,
         cancelled = cancelled,
         networkRead = rangeRead,
+        prefetchNext = prefetchNext,
     )
     private var readPacket: Read_packet_Pointer_BytePointer_int?
     private var seekPacket: Seek_Pointer_long_int?
@@ -249,6 +294,7 @@ internal class DesktopWindowedAvio(
     }
 
     override fun close() {
+        source.close()
         avio?.let {
             av_free(it.buffer())
             it.buffer(null as BytePointer?)
@@ -263,7 +309,7 @@ internal class DesktopWindowedAvio(
 
     companion object {
         const val IO_BUFFER_BYTES = 64 * 1024
-        const val VIDEO_WINDOW_BYTES = 256 * 1024
+        const val VIDEO_WINDOW_BYTES = 1024 * 1024
         private const val AVERROR_IO = -5
         private const val SEEK_CUR = 1
         private const val SEEK_END = 2

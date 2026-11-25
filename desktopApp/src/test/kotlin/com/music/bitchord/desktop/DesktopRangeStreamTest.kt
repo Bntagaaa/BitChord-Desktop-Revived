@@ -234,4 +234,22 @@ class DesktopRangeStreamTest {
         assertEquals(2, requested.size)
         assertTrue(requested.all { it.startsWith("bytes=") })
     }
+
+    @Test
+    fun `prefetchNext reads across multiple windows cleanly`() = serve { url, requested ->
+        val stream = DesktopRangeStream(url, windowBytes = 32 * 1024, cache = null, prefetchNext = true)
+        try {
+            val collected = ArrayList<Byte>(body.size)
+            val buffer = ByteArray(16 * 1024)
+            while (true) {
+                val taken = stream.read(buffer, buffer.size)
+                if (taken <= 0) break
+                repeat(taken) { collected += buffer[it] }
+            }
+            assertContentEquals(body, collected.toByteArray())
+            assertTrue(requested.isNotEmpty())
+        } finally {
+            stream.close()
+        }
+    }
 }

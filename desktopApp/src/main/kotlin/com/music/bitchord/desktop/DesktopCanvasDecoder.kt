@@ -34,7 +34,8 @@ import org.bytedeco.ffmpeg.global.avutil.av_dict_set
 import org.bytedeco.ffmpeg.global.avutil.av_frame_alloc
 import org.bytedeco.ffmpeg.global.avutil.av_frame_free
 import org.bytedeco.ffmpeg.global.avutil.av_image_fill_arrays
-import org.bytedeco.ffmpeg.global.swscale.SWS_BILINEAR
+import org.bytedeco.ffmpeg.global.swscale.SWS_FAST_BILINEAR
+import org.bytedeco.ffmpeg.global.swscale.SWS_POINT
 import org.bytedeco.ffmpeg.global.swscale.sws_freeContext
 import org.bytedeco.ffmpeg.global.swscale.sws_getContext
 import org.bytedeco.ffmpeg.global.swscale.sws_scale
@@ -112,6 +113,7 @@ internal class DesktopCanvasDecoder(
                 windowBytes = DesktopWindowedAvio.VIDEO_WINDOW_BYTES,
                 cache = null,
                 cancelled = { owner?.isActive == false || System.nanoTime() >= readDeadline },
+                prefetchNext = true,
             ).also { windowedAvio = it }
         } else null
         val opened = wrapper?.formatContext ?: avformat_alloc_context()
@@ -182,6 +184,8 @@ internal class DesktopCanvasDecoder(
         val context = avcodec_alloc_context3(decoder)
         codec = context
         check(avcodec_parameters_to_context(context, parameters) >= 0) { "bad codec parameters" }
+        context.thread_count(Runtime.getRuntime().availableProcessors().coerceIn(2, 6))
+        context.thread_type(AVCodecContext.FF_THREAD_FRAME or AVCodecContext.FF_THREAD_SLICE)
         check(avcodec_open2(context, decoder, null as AVDictionary?) >= 0) { "decoder refused to open" }
 
         sourceWidth = context.width()
@@ -256,10 +260,11 @@ internal class DesktopCanvasDecoder(
         scaler?.let { sws_freeContext(it) }
         // BGRA because that is the order Skia's N32 bitmaps are laid out in, so the scaled frame
         // can be handed over without a second pass.
+        val swsFlags = if (sourceWidth == width && sourceHeight == height) SWS_POINT else SWS_FAST_BILINEAR
         val built = sws_getContext(
             sourceWidth, sourceHeight, pixelFormat,
             width, height, AV_PIX_FMT_BGRA,
-            SWS_BILINEAR, null, null, null as DoublePointer?,
+            swsFlags, null, null, null as DoublePointer?,
         )
         if (built == null) {
             DesktopTrackLog.log("canvas: no converter for pixel format $pixelFormat")

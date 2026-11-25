@@ -10,6 +10,7 @@ import com.music.bitchord.data.innertube.InnerTubeXResolver
 import com.music.bitchord.ui.player.MusicVideoQualityUi
 import com.music.bitchord.ui.LocalDesktopPresentationVisible
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 
 /** The view never owns this decoder; only the currently playing video and quality do. */
@@ -58,6 +59,7 @@ internal class DesktopVideoSession(
     private var activeSession = false
     private var activeDecoder = false
     private var awaitingDraw = false
+    private val drawSignal = Channel<Unit>(Channel.CONFLATED)
     val failed = MutableStateFlow(false)
 
     @Synchronized fun attach(id: String) {
@@ -96,6 +98,7 @@ internal class DesktopVideoSession(
             audio.awaitingAudio || audio.seeks != seek) return false
         val old = latestFrame.value
         latestFrame.value = id to next
+        drawSignal.tryReceive()
         awaitingDraw = true
         mutablePresentation.value = MusicVideoPresentation(id, next.intrinsicSize, ++sequence)
         old?.second?.close()
@@ -107,6 +110,7 @@ internal class DesktopVideoSession(
         val old = latestFrame.value
         latestFrame.value = null
         awaitingDraw = false
+        drawSignal.trySend(Unit)
         mutablePresentation.value = null
         old?.second?.close()
     }
@@ -116,7 +120,10 @@ internal class DesktopVideoSession(
         if (users.value[id] == null) return
         val current = latestFrame.value?.takeIf { it.first == id }?.second ?: return
         draw(current)
-        awaitingDraw = false
+        if (awaitingDraw) {
+            awaitingDraw = false
+            drawSignal.trySend(Unit)
+        }
     }
 
     @Synchronized
@@ -188,7 +195,7 @@ internal class DesktopVideoSession(
                         // Until a surface records the current image, keep that image in the single slot.
                         // Seeks still replace it immediately and discard any stale output.
                         if (lastSeek == audio.seeks && !jumped && recordingBehind(id) && audio.isPlaying) {
-                            delay(10)
+                            withTimeoutOrNull(30) { drawSignal.receive() }
                             continue
                         }
                         if (lastSeek != audio.seeks || jumped) {
@@ -198,7 +205,7 @@ internal class DesktopVideoSession(
                         val context = currentCoroutineContext()
                         val next = decoder.nextFrame { pts ->
                             context.ensureActive()
-                            pts + 80 >= target
+                            pts + 100 >= target
                         }
                         if (next == null) {
                             check(producedFrame) { "Video has no decodable frames" }
@@ -208,7 +215,7 @@ internal class DesktopVideoSession(
                         var submitted = false
                         try {
                             ensureActive()
-                            val wait = ((decoder.frameTimeMs - target) / speed().coerceAtLeast(.1f)).toLong()
+                            val wait = ((decoder.frameTimeMs - target - VSYNC_LEAD_MS) / speed().coerceAtLeast(.1f)).toLong()
                             if (wait > 0) delay(wait.coerceAtMost(1000))
                             val latest = clock.value
                             if (latest.song?.videoId != id || latest.seeks != audio.seeks ||
@@ -243,6 +250,7 @@ internal class DesktopVideoSession(
 
     private companion object {
         const val SURFACE_HANDOFF_MS = 350L
+        const val VSYNC_LEAD_MS = 8L
     }
 }
 
