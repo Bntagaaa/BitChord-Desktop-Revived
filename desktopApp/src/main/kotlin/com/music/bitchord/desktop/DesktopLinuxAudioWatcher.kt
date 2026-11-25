@@ -32,7 +32,8 @@ import java.io.File
 internal object DesktopLinuxAudioWatcher {
 
     private const val CARDS = "/proc/asound/cards"
-    private const val POLL_MS = 3_000L
+    private const val POLL_MS = 5_000L
+    private const val PULSE_POLL_TICKS = 6 // Check pactl every 30s unless ALSA cards changed.
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -46,17 +47,25 @@ internal object DesktopLinuxAudioWatcher {
         scope.launch {
             var last = readCards()
             var lastSinks = DesktopLinuxPulseAudio.snapshot()
+            var ticks = 0
             while (true) {
                 delay(POLL_MS)
+                ticks++
                 val now = readCards()
+                val cardsChanged = now != last
+                // Avoid forking `pactl` every few seconds when hardware cards haven't changed
+                // and the window is hidden; refresh virtual sinks at most every 30s while visible.
+                val shouldCheckPulse = cardsChanged || (DesktopWindowVisibility.visible.value && ticks >= PULSE_POLL_TICKS)
+                if (!shouldCheckPulse) continue
+                ticks = 0
                 val sinks = DesktopLinuxPulseAudio.snapshot()
-                if (now != last || sinks != lastSinks) {
+                if (cardsChanged || sinks != lastSinks) {
                     last = now
                     lastSinks = sinks
                     DesktopAudioDevices.systemChanged()
                     DesktopTrackLog.log("audio devices changed ($now)")
                 }
-             }
+            }
         }
     }
 

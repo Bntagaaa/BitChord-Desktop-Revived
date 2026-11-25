@@ -66,6 +66,9 @@ class DesktopPoTokenWebView private constructor(
     private var closed = false
 
     @Volatile
+    private var lastUsedAtMs: Long = System.currentTimeMillis()
+
+    @Volatile
     override var isDead: Boolean = false
         private set
 
@@ -235,6 +238,7 @@ class DesktopPoTokenWebView private constructor(
         if (isDead || closed) {
             throw PoTokenException("PoToken WebView is dead/closed — instance must be recreated")
         }
+        lastUsedAtMs = System.currentTimeMillis()
         val requestKey = "$identifier#${requestCounter.incrementAndGet()}"
         return try {
             withTimeout(GENERATE_TIMEOUT_MS) {
@@ -364,6 +368,23 @@ class DesktopPoTokenWebView private constructor(
         /** Whether JavaFX could be started in this process; checked once. */
         val available: Boolean by lazy { startFx() }
 
+        @Volatile
+        private var activeInstance: java.lang.ref.WeakReference<DesktopPoTokenWebView>? = null
+
+        /** Closes the cached WebEngine if it has been idle longer than [maxIdleMs]. */
+        fun trimIfIdle(maxIdleMs: Long) {
+            val instance = activeInstance?.get() ?: return
+            if (instance.closed || instance.isDead) {
+                activeInstance = null
+                return
+            }
+            if (System.currentTimeMillis() - instance.lastUsedAtMs >= maxIdleMs) {
+                TrackLog.i(TAG, "Closing idle PoToken WebEngine to reclaim WebKit memory")
+                instance.close()
+                activeInstance = null
+            }
+        }
+
         suspend fun getNewPoTokenGenerator(): DesktopPoTokenWebView {
             var created: DesktopPoTokenWebView? = null
             try {
@@ -375,7 +396,7 @@ class DesktopPoTokenWebView private constructor(
                             potWv.loadHtmlAndObtainBotguard()
                         }
                     }
-                }
+                }.also { activeInstance = java.lang.ref.WeakReference(it) }
             } catch (e: TimeoutCancellationException) {
                 TrackLog.e(TAG, "PoTokenWebView init timed out after ${INIT_TIMEOUT_MS}ms")
                 closeQuietly(created)

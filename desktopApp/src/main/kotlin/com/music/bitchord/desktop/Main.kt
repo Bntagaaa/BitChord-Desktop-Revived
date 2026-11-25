@@ -329,11 +329,15 @@ private fun desktopMain(
             }
         }
         val isDarkTheme = DesktopTheme.isDark
-        // System mode follows changes while the app remains open. Native probes run off the UI thread.
-        LaunchedEffect(Unit) {
+        // System mode follows changes while the app remains open and visible. Native probes run off the UI thread.
+        LaunchedEffect(startup, visible, state.isMinimized, DesktopTheme.mode) {
+            if (!visible || state.isMinimized || DesktopTheme.mode != DesktopThemeMode.SYSTEM) {
+                return@LaunchedEffect
+            }
             startup.awaitInteractive()
+            DesktopTheme.updateSystemDark(withContext(Dispatchers.IO) { DesktopSystemTheme.isDark() })
             while (true) {
-                delay(2_500)
+                delay(15_000)
                 DesktopTheme.updateSystemDark(withContext(Dispatchers.IO) { DesktopSystemTheme.isDark() })
             }
         }

@@ -18,7 +18,7 @@ import okio.Path.Companion.toOkioPath
  * that re-visiting screens does not require network re-fetches.
  */
 internal object DesktopImageLoader {
-    const val MAX_MEMORY_CACHE_BYTES = 32L * 1024 * 1024 // 32 MiB
+    const val MAX_MEMORY_CACHE_BYTES = 20L * 1024 * 1024 // 20 MiB
     const val MAX_DISK_CACHE_BYTES = 100L * 1024 * 1024   // 100 MiB
 
     fun install() {

@@ -19,7 +19,7 @@ class DesktopPageMemoryPolicyTest {
     }
 
     @Test fun thresholdIsLoweredToPreventMemorySwelling() {
-        assertEquals(650L * 1024L * 1024L, DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES)
+        assertEquals(420L * 1024L * 1024L, DesktopPageMemoryPolicy.TRIM_THRESHOLD_BYTES)
     }
 
     @Test fun noInactivePageTrimIsThrottled() {

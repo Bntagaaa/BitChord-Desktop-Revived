@@ -493,7 +493,7 @@ val windowsPortableAssemble by tasks.registering {
                 appendLine("set \"HERE=%~dp0\"")
                 appendLine("set \"RUNNER=java\"")
                 appendLine("if defined JAVA_HOME set \"RUNNER=%JAVA_HOME%\\bin\\java\"")
-                append("\"%RUNNER%\" -Xms32m -Xmx512m -XX:+UseG1GC -XX:G1PeriodicGCInterval=10000 -XX:G1PeriodicGCSystemLoadThreshold=0 -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:-ShrinkHeapInSteps -Dbitchord.version=$version -Dbitchord.distribution=portable")
+                append("\"%RUNNER%\" -Xms32m -Xmx512m -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -XX:+UseStringDeduplication -XX:G1PeriodicGCInterval=10000 -XX:G1PeriodicGCSystemLoadThreshold=0 -XX:MinHeapFreeRatio=15 -XX:MaxHeapFreeRatio=30 -XX:-ShrinkHeapInSteps -Dbitchord.version=$version -Dbitchord.distribution=portable")
                 if (moduleIndex.isNotBlank()) append(" -Dbitchord.module.index=$moduleIndex")
                 if (lastfmKey.isNotBlank() && lastfmSharedSecret.isNotBlank()) {
                     append(" -Dbitchord.lastfm.key=$lastfmKey -Dbitchord.lastfm.secret=$lastfmSharedSecret")
@@ -561,10 +561,12 @@ compose.desktop {
         jvmArgs("-Xms32m", "-Xmx512m")
         jvmArgs(
             "-XX:+UseG1GC",
+            "-XX:+ExplicitGCInvokesConcurrent",
+            "-XX:+UseStringDeduplication",
             "-XX:G1PeriodicGCInterval=10000",
             "-XX:G1PeriodicGCSystemLoadThreshold=0",
-            "-XX:MinHeapFreeRatio=20",
-            "-XX:MaxHeapFreeRatio=40",
+            "-XX:MinHeapFreeRatio=15",
+            "-XX:MaxHeapFreeRatio=30",
             "-XX:-ShrinkHeapInSteps",
         )
         jvmArgs("-Dbitchord.version=$appVersion", "-Dbitchord.distribution=installed")
