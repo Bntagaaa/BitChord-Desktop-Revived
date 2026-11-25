@@ -145,7 +145,7 @@ private fun AudioOutputDeviceRows(onDismiss: () -> Unit, page: Boolean = false) 
         page, false,
         DesktopStrings["d_system_default", "System default"],
         if (selected == DesktopAudioDevices.SYSTEM_DEFAULT) stringResource(Res.string.audio_output_playing) else "",
-        Icons.Rounded.Speaker,
+        DesktopIcons.Audio.Speaker,
         selected == DesktopAudioDevices.SYSTEM_DEFAULT,
     ) {
         DesktopAudioDevices.select(DesktopAudioDevices.SYSTEM_DEFAULT)
@@ -170,7 +170,7 @@ private fun AudioOutputDeviceRows(onDismiss: () -> Unit, page: Boolean = false) 
     if (advanced > 0) {
         if (!page) AudioOutputMenuDivider()
         val label = if (showAdvanced) "Hide advanced audio devices" else "Show advanced audio devices ($advanced)"
-        val icon = if (showAdvanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore
+        val icon = if (showAdvanced) DesktopIcons.Window.ExpandLess else DesktopIcons.Window.ExpandMore
         if (page) {
             DesktopSettingsDivider(insetForIcon = true)
             DesktopSettingsRow(label, icon = icon, onClick = { showAdvanced = !showAdvanced })
