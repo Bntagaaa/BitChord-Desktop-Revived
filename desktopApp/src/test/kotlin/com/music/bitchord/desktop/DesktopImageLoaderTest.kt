@@ -11,7 +11,7 @@ class DesktopImageLoaderTest {
 
     @Test
     fun constantsMatchMemoryBudgets() {
-        assertEquals(32L * 1024 * 1024, DesktopImageLoader.MAX_MEMORY_CACHE_BYTES)
+        assertEquals(20L * 1024 * 1024, DesktopImageLoader.MAX_MEMORY_CACHE_BYTES)
         assertEquals(100L * 1024 * 1024, DesktopImageLoader.MAX_DISK_CACHE_BYTES)
     }
 
@@ -19,7 +19,7 @@ class DesktopImageLoaderTest {
     fun imageLoaderConfiguresMemoryAndDiskCaches() {
         val loader = DesktopImageLoader.createImageLoader(PlatformContext.INSTANCE)
         val memoryCache = assertNotNull(loader.memoryCache)
-        assertEquals(32L * 1024 * 1024, memoryCache.maxSize)
+        assertEquals(20L * 1024 * 1024, memoryCache.maxSize)
 
         val diskCache = assertNotNull(loader.diskCache)
         assertEquals(100L * 1024 * 1024, diskCache.maxSize)
