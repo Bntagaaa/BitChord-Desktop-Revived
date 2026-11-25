@@ -715,7 +715,6 @@ internal fun BitChordDesktopApp(
     // but rarely its ids — a home-feed tile carries neither — so without this
     // the credit under the title is not a link at all. Android does the same
     // thing, and for the same reason; see its `links` in MainActivity.
-    var trackLinks by remember { mutableStateOf<Song?>(null) }
     // Settings is a modal over whatever page is open, the way Music puts its own preferences in a
     // sheet rather than a navigation destination.
     var autoplay by remember { mutableStateOf(persistence.boolean("autoplay", true)) }
@@ -2188,23 +2187,27 @@ internal fun BitChordDesktopApp(
     var miniPlayerMenuOpen by remember(
         selectedSong?.videoId, activeAccountId, activeProfileId, overlays.nowPlaying, oldTopPlayerEnabled,
     ) { mutableStateOf(false) }
-    val needsPlayerTrackLinks = overlays.nowPlaying || miniPlayerMenuOpen
-    LaunchedEffect(selectedSong?.videoId, needsPlayerTrackLinks, activeAccountId, activeProfileId) {
-        trackLinks = null
-        val current = selectedSong ?: return@LaunchedEffect
-        if (!needsPlayerTrackLinks || !current.canFetchDesktopPlayerMetadata()) return@LaunchedEffect
-
-        val needsCover = current.thumbnailUrl.isNullOrBlank()
-        val needsCredits = current.artistId == null || current.albumId == null
+    val metadataTrack = selectedSong?.takeIf(Song::canFetchDesktopPlayerMetadata)
+    var trackLinks by remember(metadataTrack?.videoId, activeAccountId, activeProfileId) {
+        mutableStateOf<Song?>(null)
+    }
+    val needsPlayerCover = metadataTrack?.thumbnailUrl.isNullOrBlank()
+    val needsPlayerTrackLinks = needsPlayerCover || overlays.nowPlaying || miniPlayerMenuOpen
+    LaunchedEffect(metadataTrack?.videoId, needsPlayerTrackLinks, activeAccountId, activeProfileId) {
+        val current = metadataTrack ?: return@LaunchedEffect
+        if (!needsPlayerTrackLinks) return@LaunchedEffect
+        val known = current.withDesktopPlayerMetadata(trackLinks)
+        val needsCover = known.thumbnailUrl.isNullOrBlank()
+        val needsCredits = known.artistId == null || known.albumId == null
         if (!needsCover && !needsCredits) return@LaunchedEffect
-        val first = withTimeoutOrNull(PLAYER_METADATA_TIMEOUT_MS) {
-            DesktopSearchClient.trackLinks(current.videoId).getOrNull()
-        }
-        trackLinks = first
-        if (needsCover && first == null) {
-            delay(750)
-            trackLinks = withTimeoutOrNull(PLAYER_METADATA_TIMEOUT_MS) {
+        repeat(if (needsCover) 2 else 1) { attempt ->
+            if (attempt > 0) delay(750)
+            val links = withTimeoutOrNull(PLAYER_METADATA_TIMEOUT_MS) {
                 DesktopSearchClient.trackLinks(current.videoId).getOrNull()
+            }
+            if (links?.videoId == current.videoId) {
+                trackLinks = links.withDesktopPlayerMetadata(trackLinks)
+                if (!needsCover || !links.thumbnailUrl.isNullOrBlank()) return@LaunchedEffect
             }
         }
     }
@@ -4196,7 +4199,7 @@ internal fun BitChordDesktopApp(
                 topBar = { _ ->
                     if (oldTopPlayerEnabled) {
                         DesktopTopBar(
-                            song = selectedSong ?: liveQueue.current,
+                            song = (selectedSong ?: liveQueue.current)?.let(::playerSongWithLinks),
                             isPlaying = playback.isPlaying,
                             isLoading = playbackBuffering,
                             previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,
@@ -4245,7 +4248,7 @@ internal fun BitChordDesktopApp(
                         destination = destination,
                         settingsOpen = overlays.settingsPage != null,
                         showPlayer = !oldTopPlayerEnabled,
-                        song = current,
+                        song = current?.let(::playerSongWithLinks),
                         isPlaying = playback.isPlaying,
                         isLoading = playbackBuffering,
                         previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,

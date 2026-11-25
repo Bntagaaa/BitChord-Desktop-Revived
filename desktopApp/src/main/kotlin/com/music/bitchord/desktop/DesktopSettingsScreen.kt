@@ -733,8 +733,11 @@ internal fun DesktopSettingsScreen(
             "Clear image cache",
             if (imagesCleared) "Image cache cleared" else "Frees space used by album artwork",
         ) {
-            DesktopArtworkCache.clear()
-            imagesCleared = true
+            cacheScope.launch(Dispatchers.IO) {
+                DesktopArtworkCache.trimMemory()
+                DesktopImageLoader.clearCache()
+                withContext(Dispatchers.Main) { imagesCleared = true }
+            }
         }
     }
 

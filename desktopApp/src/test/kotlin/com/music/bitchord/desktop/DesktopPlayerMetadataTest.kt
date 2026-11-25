@@ -24,6 +24,14 @@ class DesktopPlayerMetadataTest {
         assertNull(current.withDesktopPlayerMetadata(watch.copy(videoId = "old")).thumbnailUrl)
     }
 
+    @Test fun `a partial metadata refresh keeps the recovered cover in both player surfaces`() {
+        val partial = watch.copy(thumbnailUrl = null, albumId = "refreshed-album")
+        val updated = partial.withDesktopPlayerMetadata(watch)
+        assertEquals(watch.thumbnailUrl, current.withDesktopPlayerMetadata(updated).thumbnailUrl)
+        assertEquals("refreshed-album", updated.albumId)
+        assertNull(current.copy(videoId = "OtherTrack1").withDesktopPlayerMetadata(updated).thumbnailUrl)
+    }
+
     @Test fun `watch lookups only use YouTube IDs`() {
         assertTrue(current.canFetchDesktopPlayerMetadata())
         assertFalse(current.copy(videoId = "local:/music/song.flac").canFetchDesktopPlayerMetadata())

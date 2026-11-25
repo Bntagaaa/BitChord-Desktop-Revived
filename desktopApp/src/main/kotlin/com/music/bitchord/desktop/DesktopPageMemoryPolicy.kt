@@ -28,7 +28,7 @@ internal object DesktopPageMemoryPolicy {
                   DesktopDestination.SEARCH, DesktopDestination.EXPLORE))
 
     fun trimProcessMemory() {
-        DesktopArtworkCache.clear()
+        DesktopArtworkCache.trimMemory()
         DesktopImageLoader.trimMemory()
         // Rely on G1PeriodicGCInterval for incremental heap reclamation instead of forcing
         // a Stop-The-World System.gc() that can cause audio underruns.

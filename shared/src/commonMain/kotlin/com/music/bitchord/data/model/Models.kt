@@ -254,7 +254,10 @@ fun String?.durationMillis(): Long {
 }
 
 /** As [Song.artworkAt], for artwork that isn't a track's. */
-fun String?.artworkAt(px: Int): String? = this?.replace(SIZE_HINT, "w$px-h$px")
+fun String?.artworkAt(px: Int): String? = this?.let { url ->
+    // A query or fragment may be part of a signed rendition URL. Resize its decode instead.
+    if ('?' in url || '#' in url) url else url.replace(SIZE_HINT, "w$px-h$px")
+}
 
 private val SIZE_HINT = Regex("""w\d+-h\d+""")
 

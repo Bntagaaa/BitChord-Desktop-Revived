@@ -19,6 +19,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import coil3.Extras
+import coil3.Image
 import coil3.PlatformContext
 import coil3.compose.LocalPlatformContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -86,80 +88,56 @@ internal fun rememberCanvasArtwork(song: Song): CanvasArtwork? {
     return canvas
 }
 
-/**
- * The player's cover: the one request every surface draws it from, whether it
- * has loaded, and the bounded retries after a failure.
- *
- * Everything here is keyed on the cover's [url] — see [rememberPlayerArtwork].
- */
-@Stable
-internal class PlayerArtwork(val url: String?, private val context: PlatformContext) {
-    /**
-     * Whether the cover is on screen. Keyed on the artwork rather than on the
-     * track, because that is what it actually describes and because only Coil
-     * can set it back to true.
-     */
-    var loaded by mutableStateOf(false)
-        private set
+/** Desktop's image scheduler reserves capacity for these requests. */
+val CurrentTrackArtwork = Extras.Key(false)
 
-    /**
-     * Which go at this cover we are on, and the reason there is more than one.
-     *
-     * Coil does not retry: a request that fails is over, and the state it leaves
-     * behind is the state this screen keeps until the model changes — which,
-     * keyed on the cover, means until the next track. One dropped connection at
-     * the wrong moment and the player showed its placeholder tile for a song it
-     * would have drawn perfectly a second later, with the widget and the
-     * notification both showing the cover from cache the whole time.
-     *
-     * Bounded and spaced, because the usual reason a cover fails is that there
-     * is no network at all, and a retry per recomposition — which is what an
-     * unremembered request effectively gave — is a spin, not a recovery.
-     */
+fun ImageRequest.Builder.currentTrackArtwork() = apply { extras[CurrentTrackArtwork] = true }
+
+internal class RetainedPlayerCover {
+    var image: Image? = null
+}
+
+/** One stable request per cover and retry, with the last success retained for this track. */
+@Stable
+internal class PlayerArtwork(
+    val url: String?,
+    private val context: PlatformContext,
+    private val retained: RetainedPlayerCover,
+) {
+    var loaded by mutableStateOf(retained.image != null)
+        private set
     var attempt by mutableIntStateOf(0)
         private set
-
-    /** Latched on an error, and only upwards — cleared by the retry itself. */
     internal var failed by mutableStateOf(false)
+        private set
 
-    /**
-     * The one request for this cover, built once.
-     *
-     * Built once rather than inline at the sleeve, because Coil compares models
-     * to decide whether to start a new load, and two separately built requests
-     * are never equal — `ImageRequest` has no `equals`, and neither does the
-     * size resolver `.size()` hands it. Inline, *every recomposition* was a new
-     * load. The player recomposes at least twice a second off the position
-     * tick, and each pass pushed the painter back through Loading before it
-     * settled on Success again, which is exactly the [loaded] this screen hangs
-     * the full-bleed banner, the sleeve's shadow and its placeholder icon on.
-     *
-     * Remembered on the cover and the attempt, so it changes when the picture
-     * changes and when a retry is deliberately asked for, and at no other time.
-     */
     val request: ImageRequest by derivedStateOf {
         val attempt = attempt
         ImageRequest.Builder(context)
             .data(url)
             .size(ART_PX)
-            // What makes a retry a new request as far as Coil's model comparison
-            // is concerned. Only from the second go onwards, so the ordinary
-            // request stays byte-identical to the one the mesh and the palette
-            // make of the same cover and goes on sharing their memory-cache
-            // entry. The disk key is unaffected either way.
+            .currentTrackArtwork()
+            .placeholder { retained.image }
+            .error { retained.image }
+            .fallback { retained.image }
+            // A retry starts a new painter request without changing the disk cache key.
             .apply { if (attempt > 0) memoryCacheKeyExtra("attempt", attempt.toString()) }
             .build()
     }
 
-    /** Fed from each painter drawing [request]. */
     fun onState(state: AsyncImagePainter.State) {
-        loaded = state is AsyncImagePainter.State.Success
-        // Only the failure is latched, and only upwards: the retry that clears
-        // it is [failed]'s own effect, and clearing it from a Loading state here
-        // would cancel that effect's wait every time the painter passed back
-        // through Loading.
-        if (state is AsyncImagePainter.State.Success) failed = false
-        if (state is AsyncImagePainter.State.Error) failed = true
+        when (state) {
+            is AsyncImagePainter.State.Success -> {
+                if (state.result.request.data != url) return
+                retained.image = state.result.image
+                loaded = true
+                failed = false
+            }
+            is AsyncImagePainter.State.Error -> {
+                if (state.result.request.data == url) failed = true
+            }
+            else -> Unit
+        }
     }
 
     internal fun retry() {
@@ -169,15 +147,15 @@ internal class PlayerArtwork(val url: String?, private val context: PlatformCont
 }
 
 @Composable
-internal fun rememberPlayerArtwork(remoteArt: String?): PlayerArtwork {
+internal fun rememberPlayerArtwork(trackId: String, remoteArt: String?): PlayerArtwork {
     val context = LocalPlatformContext.current
-    val artUrl = remoteArt?.artworkAt(ART_PX)
-    val art = remember(artUrl) { PlayerArtwork(artUrl, context) }
-    LaunchedEffect(artUrl, art.failed) {
-        // A track with no artwork at all fails immediately and would fail
-        // identically three more times: there is no request to make, so there is
-        // nothing a second go could do differently.
+    val artUrl = remoteArt?.takeIf { it.isNotBlank() }?.artworkAt(ART_PX)
+    val retained = remember(trackId, context) { RetainedPlayerCover() }
+    val art = remember(retained, artUrl) { PlayerArtwork(artUrl, context, retained) }
+    LaunchedEffect(art, art.failed) {
         if (artUrl == null || !art.failed || art.attempt >= ART_RETRIES) return@LaunchedEffect
+        // Desktop applies bounded transport retries in its shared loader.
+        if (PlayerPlatform.host.handlesArtworkRetries) return@LaunchedEffect
         delay(ART_RETRY_DELAY_MS)
         art.retry()
     }

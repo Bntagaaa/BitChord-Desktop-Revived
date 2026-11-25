@@ -104,6 +104,8 @@ internal object DesktopPlayerHost : PlayerHost {
     @Composable
     override fun CanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) = DesktopCanvasVideo(spec, modifier)
 
+    override val handlesArtworkRetries = true
+
     // Local files carry their art on the row already; there is no remote store to ask.
     @Composable
     override fun rememberRemoteArtworkUrl(song: Song?): String? = song?.thumbnailUrl

@@ -86,6 +86,8 @@ interface PlayerHost {
     @Composable
     fun rememberRemoteArtworkUrl(song: Song?): String?
 
+    val handlesArtworkRetries: Boolean get() = false
+
     /** Optional audio-clock-driven layers over the platform's normal player presentation. */
     @Composable
     fun AutoMixArtwork(song: Song, canvasVisible: Boolean, modifier: Modifier) = Unit

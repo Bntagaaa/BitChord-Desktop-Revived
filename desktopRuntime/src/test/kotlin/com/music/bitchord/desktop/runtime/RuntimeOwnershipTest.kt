@@ -114,6 +114,22 @@ class RuntimeOwnershipTest {
         }
     }
 
+    @Test fun trimmingKeepsVisibleReadersAndJoinsNewReadersWithoutRecachingTheResult() = runTest {
+        SharedLoadCache<String, ByteArray>(backgroundScope, 64, { it.size.toLong() }).use { cache ->
+            cache.load("inactive") { ByteArray(8) }
+            val ready = CompletableDeferred<Unit>()
+            val first = async { cache.load("playing") { ready.await(); ByteArray(16) } }
+            runCurrent()
+            cache.trim()
+            assertEquals(0, cache.cachedEntries)
+            val second = async { cache.load("playing") { error("Duplicate request after trim") } }
+            runCurrent()
+            ready.complete(Unit)
+            assertSame(first.await(), second.await())
+            assertEquals(0L, cache.heldBytes)
+        }
+    }
+
     @Test fun distinctImagesCannotExceedTheDecodeConcurrencyLimit() = runTest {
         SharedLoadCache<String, ByteArray>(backgroundScope, 64, { it.size.toLong() }, 2).use { cache ->
             val ready = CompletableDeferred<Unit>()

@@ -7,7 +7,9 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.music.bitchord.data.Http
+import kotlinx.coroutines.Dispatchers
 import okio.Path.Companion.toOkioPath
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 /**
@@ -17,7 +19,7 @@ import java.util.concurrent.TimeUnit
  * in-memory bitmap cache and disabling weak references (which prevent GC from
  * reclaiming Skia image buffers under native memory pressure).
  *
- * Evicted bitmaps fall back to a 100 MiB local disk cache on SSD, ensuring
+ * Evicted bitmaps fall back to a 64 MiB local disk cache on SSD, ensuring
  * that re-visiting screens does not require network re-fetches.
  */
 internal object DesktopImageLoader {
@@ -36,10 +38,17 @@ internal object DesktopImageLoader {
             .build()
     }
 
-    fun createImageLoader(context: PlatformContext): ImageLoader {
-        val cacheDir = DesktopMediaCache.directory.resolve("coil_cache")
+    private val trace = if (java.lang.Boolean.getBoolean("bitchord.artwork.trace")) DesktopTrackLog::log else null
+
+    fun createImageLoader(
+        context: PlatformContext,
+        cacheDir: Path = DesktopMediaCache.directory.resolve("coil_cache"),
+    ): ImageLoader {
         return ImageLoader.Builder(context)
+            .interceptorCoroutineContext(Dispatchers.IO)
+            .decoderCoroutineContext(Dispatchers.Default.limitedParallelism(3))
             .components {
+                add(DesktopArtworkRequests(trace = trace))
                 add(OkHttpNetworkFetcherFactory(callFactory = { imageHttpClient }))
             }
             .memoryCache {
@@ -60,7 +69,14 @@ internal object DesktopImageLoader {
 
     fun trimMemory() {
         runCatching {
-            SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache?.clear()
+            val cache = SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache
+            val evicted = cache?.size ?: 0
+            cache?.clear()
+            trace?.invoke("artwork event=memory_trim bytes=$evicted")
         }
+    }
+    fun clearCache() {
+        trimMemory()
+        SingletonImageLoader.get(PlatformContext.INSTANCE).diskCache?.clear()
     }
 }

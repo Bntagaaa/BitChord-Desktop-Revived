@@ -62,7 +62,7 @@ internal fun DesktopAutoMixArtwork(
     modifier: Modifier,
 ) {
     Box(modifier) {
-        DesktopArtwork(song.thumbnailUrl, Modifier.matchParentSize(), px = px)
+        DesktopArtwork(song.thumbnailUrl, Modifier.matchParentSize(), px = px, currentTrackId = song.videoId)
         DesktopAutoMixOverlay(song, Modifier.matchParentSize(), px, mini = true)
     }
 }
@@ -96,11 +96,11 @@ internal fun DesktopAutoMixOverlay(
     val incomingUrl = active.incoming.url.artworkAt(px)
     val outgoing by produceState<ImageBitmap?>(null, active.generation, outgoingUrl) {
         value = null
-        value = DesktopArtworkCache.load(outgoingUrl)
+        value = DesktopArtworkCache.load(outgoingUrl, px)
     }
     val incoming by produceState<ImageBitmap?>(null, active.generation, incomingUrl) {
         value = null
-        value = DesktopArtworkCache.load(incomingUrl)
+        value = DesktopArtworkCache.load(incomingUrl, px)
     }
     if (!showingIncoming) return
     val snapshot = if (mini) null else DesktopPlayerHost.autoMixCanvasFrame.collectAsState().value

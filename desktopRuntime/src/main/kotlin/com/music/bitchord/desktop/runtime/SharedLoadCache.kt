@@ -17,14 +17,13 @@ class SharedLoadCache<K : Any, V : Any>(
     owner: CoroutineScope,
     budgetBytes: Long,
     sizeOf: (V) -> Long,
-    maxConcurrentLoads: Int = 4,
+    maxConcurrentLoads: Int? = 4,
 ) : AutoCloseable {
-    init { require(maxConcurrentLoads > 0) }
     private class Flight<V>(val result: Deferred<V?>, var readers: Int = 0)
     private val lock = Any()
     private val job = SupervisorJob(owner.coroutineContext[Job])
     private val scope = CoroutineScope(owner.coroutineContext + job)
-    private val permits = Semaphore(maxConcurrentLoads)
+    private val permits = maxConcurrentLoads?.let { Semaphore(it) }
     private val values = ByteBudgetCache<K, V>(budgetBytes, sizeOf)
     private val flights = mutableMapOf<K, Flight<V>>()
     private var generation = 0L
@@ -40,14 +39,12 @@ class SharedLoadCache<K : Any, V : Any>(
             val entry = flights.getOrPut(key) {
                 val epoch = generation
                 Flight(scope.async(start = CoroutineStart.LAZY) {
-                    permits.withPermit {
-                        val loaded = producer()
-                        currentCoroutineContext().ensureActive()
-                        synchronized(lock) {
-                            if (!closed && epoch == generation && loaded != null) values.put(key, loaded)
-                        }
-                        loaded
+                    val loaded = if (permits == null) producer() else permits.withPermit { producer() }
+                    currentCoroutineContext().ensureActive()
+                    synchronized(lock) {
+                        if (!closed && epoch == generation && loaded != null) values.put(key, loaded)
                     }
+                    loaded
                 })
             }
             entry.readers++
@@ -65,6 +62,12 @@ class SharedLoadCache<K : Any, V : Any>(
                 }
             }
         }
+    }
+
+    /** Drop retained values without detaching requests that visible readers are awaiting. */
+    fun trim() = synchronized(lock) {
+        generation++
+        values.clear()
     }
 
     /** In-flight work from the old generation cannot repopulate a cleared cache. */
