@@ -5,7 +5,10 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import com.music.bitchord.data.Http
 import okio.Path.Companion.toOkioPath
+import java.util.concurrent.TimeUnit
 
 /**
  * Global Coil [ImageLoader] configuration for Desktop.
@@ -27,9 +30,18 @@ internal object DesktopImageLoader {
         }
     }
 
+    private val imageHttpClient by lazy {
+        Http.client.newBuilder()
+            .callTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
     fun createImageLoader(context: PlatformContext): ImageLoader {
         val cacheDir = DesktopMediaCache.directory.resolve("coil_cache")
         return ImageLoader.Builder(context)
+            .components {
+                add(OkHttpNetworkFetcherFactory(callFactory = { imageHttpClient }))
+            }
             .memoryCache {
                 MemoryCache.Builder()
                     .maxSizeBytes(MAX_MEMORY_CACHE_BYTES)

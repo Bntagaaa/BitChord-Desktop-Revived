@@ -419,6 +419,11 @@ object Innertube {
      */
     private suspend fun fetchSessionScope(session: String): SessionScope? {
         val html = client.get("$MUSIC_ORIGIN/") {
+            timeout {
+                requestTimeoutMillis = 10_000
+                connectTimeoutMillis = 8_000
+                socketTimeoutMillis = 8_000
+            }
             header("User-Agent", WEB_USER_AGENT)
             header("Accept-Language", acceptLanguageHeader)
             header("Cookie", session)

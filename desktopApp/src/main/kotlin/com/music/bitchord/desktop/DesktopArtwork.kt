@@ -1,5 +1,6 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.data.Http
 import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.ui.components.ArtworkHover
 import com.music.bitchord.ui.components.ArtworkHoverMode
@@ -18,11 +19,13 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.decodeToImageBitmap
-import java.net.URI
 import com.music.bitchord.desktop.runtime.SharedLoadCache
 import kotlinx.coroutines.CancellationException
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
 
 /**
  * Decoded artwork with a byte budget, shared producers and application ownership.
@@ -55,21 +58,37 @@ internal object DesktopArtworkCache {
     /** Everything held, dropped — what the Storage settings' "Clear image cache" does. */
     fun clear() { if (images.isInitialized()) images.value.clear() }
 
+    private val artworkClient by lazy {
+        Http.client.newBuilder()
+            .callTimeout(12, TimeUnit.SECONDS)
+            .build()
+    }
+
     suspend fun load(url: String?): ImageBitmap? {
         if (url.isNullOrBlank()) return null
         return images.value.load(url) {
-            try {
-                URI(url).toURL().openConnection().apply {
-                    connectTimeout = 10_000
-                    readTimeout = 10_000
-                }.getInputStream().use { stream -> stream.readBytes().decodeToImageBitmap() }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                null
+            var loaded: ImageBitmap? = null
+            for (attempt in 0 until ARTWORK_ATTEMPTS) {
+                if (attempt > 0) delay(ARTWORK_RETRY_BASE_MS * attempt)
+                loaded = try {
+                    val request = Request.Builder().url(url).build()
+                    artworkClient.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) null
+                        else response.body?.bytes()?.decodeToImageBitmap()
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+                if (loaded != null) break
             }
+            loaded
         }
     }
+
+    private const val ARTWORK_ATTEMPTS = 3
+    private const val ARTWORK_RETRY_BASE_MS = 400L
 }
 
 /** Artwork, fetched at the size the surface drawing it actually needs. */
