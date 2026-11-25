@@ -22,6 +22,8 @@ internal object DesktopYouTubeAuth {
         val authUser: String = "0",
         val pageId: String? = null,
         val dataSyncId: String? = null,
+        val visitorData: String? = null,
+        val clientVersion: String? = null,
     )
 
     @Volatile
@@ -42,6 +44,18 @@ internal object DesktopYouTubeAuth {
         // cookie and addresses this channel.
         Innertube.cookie = value?.cookie
         Innertube.selectChannel(value?.pageId, value?.dataSyncId, value?.authUser)
+        if (value != null) {
+            // Reuse the shell scope already fetched during account activation/sign-in
+            // so Innertube.ensureSessionScope() does not re-fetch music.youtube.com/ under scopeLock.
+            Innertube.adoptSessionScope(
+                pageId = value.pageId,
+                dataSyncId = value.dataSyncId,
+                authUser = value.authUser,
+                visitorData = value.visitorData,
+                clientVersion = value.clientVersion,
+                loggedIn = true,
+            )
+        }
         // A new session means a new player config and PoToken binding, as on the phone.
         StreamResolver.onSessionChanged()
         DesktopTrackLog.log(

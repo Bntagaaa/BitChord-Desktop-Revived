@@ -56,10 +56,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -76,6 +80,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.ui.icons.BitChordIcons
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
 import com.music.bitchord.data.model.CARD_ART_PX
 import com.music.bitchord.data.model.HEADER_ART_PX
 import com.music.bitchord.data.model.HomeShelf
@@ -611,12 +617,10 @@ fun CompactTrackRow(
             hovered = rowHovered,
         ) {
 
-            AsyncImage(
-                model = thumbnailUrl.artworkAt(ROW_ART_PX),
-                contentDescription = null,
+            RetryableHomeArtwork(
+                url = thumbnailUrl.artworkAt(ROW_ART_PX),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
-
             )
             if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
         }
@@ -983,9 +987,8 @@ private fun HeroCard(
             mode = ArtworkHoverMode.DARKEN_ONLY,
             hovered = cardHovered,
         ) {
-            AsyncImage(
-                model = item.thumbnailUrl.artworkAt(HEADER_ART_PX),
-                contentDescription = null,
+            RetryableHomeArtwork(
+                url = item.thumbnailUrl.artworkAt(HEADER_ART_PX),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -1104,11 +1107,10 @@ fun VideoShelfCard(
                 .thumbnailBorder(RoundedCornerShape(12.dp))
                 .background(placeholderColor),
         ) {
-            AsyncImage(
+            RetryableHomeArtwork(
                 // Video stills are not resizable googleusercontent art; the
                 // largest the row listed is already about card size.
-                model = item.thumbnailUrl,
-                contentDescription = null,
+                url = item.thumbnailUrl,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -1337,10 +1339,9 @@ internal fun ShelfCard(
                         mode = ArtworkHoverMode.DARKEN_ONLY,
                         hovered = cardHovered,
                     ) {
-                        AsyncImage(
-                            model = if (item.isVideo) item.thumbnailUrl else item.thumbnailUrl.artworkAt(CARD_ART_PX),
-                            contentDescription = null,
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        RetryableHomeArtwork(
+                            url = if (item.isVideo) item.thumbnailUrl else item.thumbnailUrl.artworkAt(CARD_ART_PX),
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
                         )
                         if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
@@ -1380,4 +1381,45 @@ internal fun ShelfCard(
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+private const val HOME_ART_MAX_RETRIES = 2
+
+/**
+ * Bounded retry wrapper for Home shelf artwork so transient CDN/pool failures
+ * recover automatically instead of leaving a permanently blank tile.
+ */
+@Composable
+private fun RetryableHomeArtwork(
+    url: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+) {
+    val context = LocalPlatformContext.current
+    var attempt by remember(url) { mutableIntStateOf(0) }
+    var failed by remember(url) { mutableStateOf(false) }
+
+    LaunchedEffect(url, failed, attempt) {
+        if (url.isNullOrBlank() || !failed || attempt >= HOME_ART_MAX_RETRIES) return@LaunchedEffect
+        delay(if (attempt == 0) 1_000L else 3_000L)
+        failed = false
+        attempt++
+    }
+
+    val model = remember(url, attempt, context) {
+        if (url.isNullOrBlank()) null
+        else ImageRequest.Builder(context)
+            .data(url)
+            .apply { if (attempt > 0) memoryCacheKeyExtra("retry", attempt.toString()) }
+            .build()
+    }
+
+    AsyncImage(
+        model = model,
+        contentDescription = null,
+        contentScale = contentScale,
+        onSuccess = { failed = false },
+        onError = { failed = true },
+        modifier = modifier,
+    )
 }

@@ -2,6 +2,7 @@ package com.music.bitchord.desktop
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
@@ -26,7 +27,13 @@ internal object DesktopYouTubeSession {
 
     private val visitorData = AtomicReference<String?>(null)
     private val visitorPattern = Regex("""Cg[A-Za-z0-9_%-]{40,}""")
-    private val client = HttpClient(CIO)
+    private val client = HttpClient(CIO) {
+        install(HttpTimeout) {
+            connectTimeoutMillis = 8_000
+            requestTimeoutMillis = 10_000
+            socketTimeoutMillis = 8_000
+        }
+    }
 
     /**
      * Whether the visitor id in hand came from the signed-in shell rather than being minted
@@ -76,10 +83,12 @@ internal object DesktopYouTubeSession {
             return null
         }
         // The shell's own visitor id, bound to this session — see [sessionBound].
-        CONFIG_VISITOR_DATA.find(html)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }?.let {
+        val shellVisitorData = CONFIG_VISITOR_DATA.find(html)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+        shellVisitorData?.let {
             visitorData.set(it)
             sessionBound = true
         }
+        val clientVersion = CONFIG_CLIENT_VERSION.find(html)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
         return DesktopYouTubeAuth.Session(
             cookie = cookie,
             authUser = CONFIG_SESSION_INDEX.find(html)?.groupValues?.get(1)?.takeIf { it.isNotBlank() } ?: "0",
@@ -89,6 +98,8 @@ internal object DesktopYouTubeSession {
             dataSyncId = CONFIG_DATASYNC_ID.find(html)?.groupValues?.get(1)
                 ?.substringBefore("||")
                 ?.takeIf { it.isNotBlank() },
+            visitorData = shellVisitorData,
+            clientVersion = clientVersion,
         )
     }
 
@@ -97,6 +108,7 @@ internal object DesktopYouTubeSession {
     private val CONFIG_PAGE_ID = Regex(""""DELEGATED_SESSION_ID"\s*:\s*"([^"]+)"""")
     private val CONFIG_SESSION_INDEX = Regex(""""SESSION_INDEX"\s*:\s*"?(\d+)""")
     private val CONFIG_VISITOR_DATA = Regex(""""VISITOR_DATA"\s*:\s*"([^"]+)"""")
+    private val CONFIG_CLIENT_VERSION = Regex(""""INNERTUBE_CLIENT_VERSION"\s*:\s*"([^"]+)"""")
 
     /** Browse/search responses sometimes already contain the same id. */
     fun capture(response: JsonObject) {
