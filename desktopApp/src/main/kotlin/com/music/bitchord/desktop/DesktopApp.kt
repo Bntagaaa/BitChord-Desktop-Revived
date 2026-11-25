@@ -252,7 +252,6 @@ import bitchord.desktopapp.generated.resources.logo
 import bitchord.desktopapp.generated.resources.bitchord_logo_original
 import bitchord.desktopapp.generated.resources.bitchord_no_music
 import bitchord.desktopapp.generated.resources.bitchord_wordmark
-import bitchord.desktopapp.generated.resources.player_transport_lyrics
 import bitchord.desktopapp.generated.resources.player_transport_next
 import bitchord.desktopapp.generated.resources.player_transport_pause
 import bitchord.desktopapp.generated.resources.player_transport_play
@@ -5995,7 +5994,7 @@ internal fun DesktopTopBar(
                     if (fullControls || showCompactPanels) {
                     DesktopToolbarButton(onClick = onOpenLyrics, size = 32.dp) {
                         Icon(
-                            painterResource(Res.drawable.player_transport_lyrics),
+                            DesktopIcons.Player.Lyrics,
                             DesktopStrings["lyrics", "Lyrics"],
                             tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopAccent else DesktopForeground,
                             modifier = Modifier.size(19.dp),

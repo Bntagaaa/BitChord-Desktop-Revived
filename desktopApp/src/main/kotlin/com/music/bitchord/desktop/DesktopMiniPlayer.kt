@@ -73,7 +73,6 @@ import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.Song
 import bitchord.desktopapp.generated.resources.Res
 import bitchord.desktopapp.generated.resources.bitchord_no_music
-import bitchord.desktopapp.generated.resources.player_transport_lyrics
 import bitchord.desktopapp.generated.resources.player_transport_next
 import bitchord.desktopapp.generated.resources.player_transport_pause
 import bitchord.desktopapp.generated.resources.player_transport_play
@@ -364,7 +363,7 @@ private fun DesktopMiniPlayerTools(
                     }
                     if (!actions.panelsInMenu) {
                         DesktopToolbarButton(onClick = actions.onOpenLyrics, size = buttonSize) {
-                            Icon(painterResource(Res.drawable.player_transport_lyrics), "Lyrics",
+                            Icon(DesktopIcons.Player.Lyrics, "Lyrics",
                                 tint = if (actions.sidePanel == DesktopSidePanel.LYRICS) DesktopAccent else foreground,
                                 modifier = Modifier.size(19.dp))
                         }
