@@ -90,12 +90,14 @@ internal fun DesktopListenTogetherDialog(autoplayEnabled: Boolean, onDismiss: ()
 
     DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 920) {
         Column(desktopPanelBody(cardMax = 760.dp, cardMin = 560.dp, fill = true)) {
+            val page = LocalDesktopPanelIsPage.current
+            if (page) DesktopSettingsPageTitle(DesktopSettingsPage.LISTEN_TOGETHER.title)
             Row(
-                Modifier.fillMaxWidth().padding(start = panelInset(28.dp), end = panelInset(18.dp), top = 22.dp, bottom = 16.dp),
+                Modifier.fillMaxWidth().padding(start = panelInset(28.dp), end = panelInset(18.dp), top = if (page) 0.dp else 22.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(
+                    if (!page) Text(
                         DesktopStrings["listen_together", "Listen together"],
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
@@ -513,10 +515,19 @@ private fun HostControls(state: DesktopListenTogether.State) {
                 Text("Only I can control playback")
                 Text("Guests can still pause on their own device.", color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
             }
-            Switch(state.hostOnlyControl, onCheckedChange = DesktopListenTogether::setHostOnlyControl)
+            if (LocalDesktopPanelIsPage.current) {
+                DesktopSettingsSwitch(
+                    state.hostOnlyControl, DesktopListenTogether::setHostOnlyControl,
+                    label = "Only I can control playback",
+                )
+            } else {
+                Switch(state.hostOnlyControl, onCheckedChange = DesktopListenTogether::setHostOnlyControl)
+            }
         }
         if (LocalDesktopPanelIsPage.current) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(10.dp))
+            DesktopSettingsDivider(insetForIcon = true)
+            Spacer(Modifier.height(10.dp))
         } else {
             HorizontalDivider(color = DesktopCardEdge, modifier = Modifier.padding(vertical = 10.dp))
         }

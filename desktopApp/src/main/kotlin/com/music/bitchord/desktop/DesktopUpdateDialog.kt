@@ -21,30 +21,35 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-@Composable
-internal fun DesktopUpdateSettings(service: DesktopUpdateService) {
-    val state by service.state.collectAsState()
-    val auto by service.autoCheck.collectAsState()
-    val checked by service.lastCheck.collectAsState()
-    Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Current version: ${DesktopUpdateChecker.currentVersion}")
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text("Automatically check for updates", Modifier.weight(1f))
-            Switch(auto, service::setAuto)
-        }
-        if (checked > 0) Text("Last successful check: " + DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(checked)), style = MaterialTheme.typography.bodySmall)
-        Text(updateStatus(state), style = MaterialTheme.typography.bodyMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { service.check() }, enabled = state.phase !in setOf(UpdatePhase.CHECKING, UpdatePhase.DOWNLOADING, UpdatePhase.VERIFYING, UpdatePhase.INSTALLING)) { Text("Check for Updates") }
-            if (state.release != null) Button(onClick = { service.dialog.value = true }) { Text("View update") }
-        }
-        Row {
-            TextButton(onClick = service::showLogs) { Text("Open updater logs") }
-            TextButton(onClick = { DesktopExternalLinks.open("https://github.com/${DesktopUpdateChecker.REPOSITORY}/releases") }) { Text("Official releases") }
-        }
+internal fun DesktopSettingsRows.updateSettingsRows(
+    service: DesktopUpdateService,
+    state: DesktopUpdateState,
+    auto: Boolean,
+    checked: Long,
+) {
+    val version = DesktopUpdateChecker.currentVersion
+    row("Current version", version, "release build") {
+        DesktopSettingsRow("Current version", subtitle = version)
+    }
+    toggle("Automatically check for updates", "Check for new BitChord releases in the background", auto, service::setAuto)
+    val busy = state.phase in setOf(UpdatePhase.CHECKING, UpdatePhase.DOWNLOADING, UpdatePhase.VERIFYING, UpdatePhase.INSTALLING)
+    row("Check for Updates", "Last successful check", updateStatus(state), "download install stable preview upgrade") {
+        val lastCheck = if (checked > 0) {
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(checked))
+        } else null
+        DesktopSettingsRow(
+            "Check for Updates", listOfNotNull(updateStatus(state), lastCheck?.let { "Last successful check: $it" }).joinToString("\n"),
+            enabled = !busy, onClick = { service.check() },
+        )
+    }
+    if (state.release != null) navigationRow("View update", "Download and install the available release") {
+        service.dialog.value = true
+    }
+    navigationRow("Open updater logs", "Review update diagnostics", service::showLogs)
+    navigationRow("Official releases", "Browse releases on GitHub") {
+        DesktopExternalLinks.open("https://github.com/${DesktopUpdateChecker.REPOSITORY}/releases")
     }
 }
-
 
 /**
  * Update availability has the same centered card, logo, headline and rounded

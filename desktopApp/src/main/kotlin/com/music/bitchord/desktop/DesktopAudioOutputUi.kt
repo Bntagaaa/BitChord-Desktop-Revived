@@ -3,6 +3,8 @@ package com.music.bitchord.desktop
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -93,13 +95,7 @@ internal fun DesktopAudioOutputMenu(
 ) {
     if (LocalDesktopMenuPortal.current == null) return
 
-    val selected by DesktopAudioDevices.selected.collectAsState()
-    val changes by DesktopAudioDevices.changes.collectAsState()
-    val devices = remember(changes) { DesktopAudioDevices.available() }
     val cast by DesktopPlayerHost.castState.collectAsState()
-    var showAdvanced by remember { mutableStateOf(false) }
-    val advanced = devices.count(DesktopAudioDevices::isAdvancedDevice)
-
     DesktopMenuSurface(onDismiss = onDismiss, anchor = anchor, maxHeight = 390.dp) {
         Text(
             DesktopStrings["audio_output", "Audio output"],
@@ -108,37 +104,7 @@ internal fun DesktopAudioOutputMenu(
             color = DesktopForeground,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 7.dp),
         )
-        AudioOutputMenuRow(
-            name = DesktopStrings["d_system_default", "System default"],
-            description = if (selected == DesktopAudioDevices.SYSTEM_DEFAULT) stringResource(Res.string.audio_output_playing) else "",
-            icon = Icons.Rounded.Speaker,
-            chosen = selected == DesktopAudioDevices.SYSTEM_DEFAULT,
-        ) {
-            DesktopAudioDevices.select(DesktopAudioDevices.SYSTEM_DEFAULT)
-            onDismiss()
-        }
-        devices.forEach { device ->
-            if (showAdvanced || device.id == selected || !DesktopAudioDevices.isAdvancedDevice(device)) {
-                key(device.id) {
-                    AudioOutputMenuRow(
-                        name = device.name,
-                        description = if (device.id == selected) stringResource(Res.string.audio_output_playing) else device.description,
-                        icon = audioOutputIcon(device.name),
-                        chosen = device.id == selected,
-                    ) {
-                        DesktopAudioDevices.select(device.id)
-                        onDismiss()
-                    }
-                }
-            }
-        }
-        if (advanced > 0) {
-            AudioOutputMenuDivider()
-            AudioOutputMenuRow(
-                name = if (showAdvanced) "Hide advanced audio devices" else "Show advanced audio devices ($advanced)",
-                icon = if (showAdvanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-            ) { showAdvanced = !showAdvanced }
-        }
+        AudioOutputDeviceRows(onDismiss)
         if (onOpenCast != null && cast.supported) {
             AudioOutputMenuRow(
                 name = cast.connectedName ?: stringResource(Res.string.cast),
@@ -157,6 +123,84 @@ internal fun DesktopAudioOutputMenu(
                 onOpenPipeline()
             }
         }
+    }
+}
+
+@Composable
+internal fun DesktopAudioOutputPage(onBack: () -> Unit) {
+    val scroll = rememberScrollState()
+    DesktopSettingsPageFrame {
+        DesktopSettingsPageTitle(DesktopSettingsPage.AUDIO_OUTPUT.title)
+        Column(
+            Modifier.weight(1f).verticalScroll(scroll).padding(bottom = 28.dp),
+        ) {
+            DesktopSettingsGroup {
+                AudioOutputDeviceRows(onBack, page = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioOutputDeviceRows(onDismiss: () -> Unit, page: Boolean = false) {
+    val selected by DesktopAudioDevices.selected.collectAsState()
+    val changes by DesktopAudioDevices.changes.collectAsState()
+    val devices = remember(changes) { DesktopAudioDevices.available() }
+    var showAdvanced by remember { mutableStateOf(false) }
+    val advanced = devices.count(DesktopAudioDevices::isAdvancedDevice)
+
+    AudioOutputDeviceRow(
+        page, false,
+        DesktopStrings["d_system_default", "System default"],
+        if (selected == DesktopAudioDevices.SYSTEM_DEFAULT) stringResource(Res.string.audio_output_playing) else "",
+        Icons.Rounded.Speaker,
+        selected == DesktopAudioDevices.SYSTEM_DEFAULT,
+    ) {
+        DesktopAudioDevices.select(DesktopAudioDevices.SYSTEM_DEFAULT)
+        onDismiss()
+    }
+    devices.forEach { device ->
+        if (showAdvanced || device.id == selected || !DesktopAudioDevices.isAdvancedDevice(device)) {
+            key(device.id) {
+                AudioOutputDeviceRow(
+                    page, true,
+                    name = device.name,
+                    description = if (device.id == selected) stringResource(Res.string.audio_output_playing) else device.description,
+                    icon = audioOutputIcon(device.name),
+                    chosen = device.id == selected,
+                ) {
+                    DesktopAudioDevices.select(device.id)
+                    onDismiss()
+                }
+            }
+        }
+    }
+    if (advanced > 0) {
+        if (!page) AudioOutputMenuDivider()
+        val label = if (showAdvanced) "Hide advanced audio devices" else "Show advanced audio devices ($advanced)"
+        val icon = if (showAdvanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore
+        if (page) {
+            DesktopSettingsDivider(insetForIcon = true)
+            DesktopSettingsRow(label, icon = icon, onClick = { showAdvanced = !showAdvanced })
+        } else AudioOutputMenuRow(name = label, icon = icon) { showAdvanced = !showAdvanced }
+    }
+}
+
+@Composable
+private fun AudioOutputDeviceRow(
+    page: Boolean,
+    divider: Boolean,
+    name: String,
+    description: String,
+    icon: ImageVector,
+    chosen: Boolean,
+    onClick: () -> Unit,
+) {
+    if (page) {
+        if (divider) DesktopSettingsDivider(insetForIcon = true)
+        DesktopSettingsRow(name, description, icon, selected = chosen, onClick = onClick)
+    } else {
+        AudioOutputMenuRow(name, description = description, icon = icon, chosen = chosen, onClick = onClick)
     }
 }
 

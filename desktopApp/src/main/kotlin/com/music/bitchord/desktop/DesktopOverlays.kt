@@ -56,20 +56,3 @@ internal class DesktopOverlays {
         sidePanel = if (sidePanel == panel) null else panel
     }
 }
-
-/**
- * Settings and the pages its rows lead to. Only the screens are here; the short prompts behind them
- * — a sign-in, a token, a source's address — stay cards over the page, as Android's alerts do.
- */
-internal enum class DesktopSettingsPage {
-    MAIN,
-    CONTENT_PREFERENCES,
-    EQUALIZER,
-    AUDIO_OUTPUT,
-    LISTEN_TOGETHER,
-    LYRICS_SOURCES,
-    TRANSLATION_LANGUAGE,
-    SPOTIFY_CANVAS,
-    INTEGRATIONS,
-    LICENSES,
-}
