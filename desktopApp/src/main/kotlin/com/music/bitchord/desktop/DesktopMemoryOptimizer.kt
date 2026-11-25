@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Trims in-memory resources when the window is minimized or hidden in system tray. */
 object DesktopMemoryOptimizer {
     private val hidden = AtomicBoolean(false)
-    private const val TRAY_POTOKEN_IDLE_MS = 2L * 60L * 1_000L
+    private const val TRAY_POTOKEN_IDLE_MS = 30L * 1_000L
 
     fun onWindowShown() { hidden.set(false) }
 

@@ -34,14 +34,20 @@ import java.util.concurrent.TimeUnit
 internal object DesktopArtworkCache {
 
     /**
-     * An eighth of the heap, within reason.
+     * A thirty-second of the heap, within reason.
      *
      * Derived rather than fixed so the budget still makes sense against whatever `-Xmx` the
      * launcher was given, and clamped at both ends so a small heap still caches something and a
      * large one does not decide it may hold half a gigabyte of thumbnails.
      */
     internal val budgetBytes: Long =
-        (Runtime.getRuntime().maxMemory() / 8).coerceIn(12L * 1024 * 1024, 16L * 1024 * 1024)
+        (Runtime.getRuntime().maxMemory() / 32).coerceIn(6L * 1024 * 1024, 8L * 1024 * 1024)
+
+    private val artworkHttp by lazy {
+        Http.client.newBuilder()
+            .callTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
 
     /** Four bytes a pixel, which is what every format here decodes to. */
     private val images = lazy {
@@ -58,12 +64,6 @@ internal object DesktopArtworkCache {
     /** Everything held, dropped — what the Storage settings' "Clear image cache" does. */
     fun clear() { if (images.isInitialized()) images.value.clear() }
 
-    private val artworkClient by lazy {
-        Http.client.newBuilder()
-            .callTimeout(12, TimeUnit.SECONDS)
-            .build()
-    }
-
     suspend fun load(url: String?): ImageBitmap? {
         if (url.isNullOrBlank()) return null
         return images.value.load(url) {
@@ -72,7 +72,7 @@ internal object DesktopArtworkCache {
                 if (attempt > 0) delay(ARTWORK_RETRY_BASE_MS * attempt)
                 loaded = try {
                     val request = Request.Builder().url(url).build()
-                    artworkClient.newCall(request).execute().use { response ->
+                    artworkHttp.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) null
                         else response.body?.bytes()?.decodeToImageBitmap()
                     }

@@ -34,7 +34,8 @@ import org.bytedeco.ffmpeg.global.avutil.av_dict_set
 import org.bytedeco.ffmpeg.global.avutil.av_frame_alloc
 import org.bytedeco.ffmpeg.global.avutil.av_frame_free
 import org.bytedeco.ffmpeg.global.avutil.av_image_fill_arrays
-import org.bytedeco.ffmpeg.global.swscale.SWS_BILINEAR
+import org.bytedeco.ffmpeg.global.swscale.SWS_FAST_BILINEAR
+import org.bytedeco.ffmpeg.global.swscale.SWS_POINT
 import org.bytedeco.ffmpeg.global.swscale.sws_freeContext
 import org.bytedeco.ffmpeg.global.swscale.sws_getContext
 import org.bytedeco.ffmpeg.global.swscale.sws_scale
@@ -60,6 +61,7 @@ internal class DesktopCanvasDecoder(
     private var interrupt: AVIOInterruptCB.Callback_Pointer? = null
     @Volatile private var readDeadline = Long.MAX_VALUE
     private var format: AVFormatContext? = null
+    private var windowedAvio: DesktopWindowedAvio? = null
     private var codec: AVCodecContext? = null
     private var packet: AVPacket? = null
     private var frame: AVFrame? = null
@@ -97,8 +99,29 @@ internal class DesktopCanvasDecoder(
             remembered ?: canvasGet(url, headers)?.let { selectContinuedArtistVariant(url, it, maxEdge) }
                 ?.also { if (headers.isEmpty()) synchronized(variants) { variants[key] = it } } ?: url
         } else url
-        val opened = avformat_alloc_context()
+        val remoteStream = !loopAtEnd &&
+            !isManifest(source) &&
+            (source.startsWith("https://", ignoreCase = true) || source.startsWith("http://", ignoreCase = true))
+        openInternal(source, headers, windowed = remoteStream)
+    }.onFailure { close() }
+
+    private fun openInternal(source: String, headers: Map<String, String>, windowed: Boolean) {
+        val wrapper = if (windowed) {
+            DesktopWindowedAvio(
+                url = source,
+                headers = headers,
+                windowBytes = DesktopWindowedAvio.VIDEO_WINDOW_BYTES,
+                cache = null,
+                cancelled = { owner?.isActive == false || System.nanoTime() >= readDeadline },
+                prefetchNext = true,
+            ).also { windowedAvio = it }
+        } else null
+        val opened = wrapper?.formatContext ?: avformat_alloc_context()
         check(opened != null && !opened.isNull) { "could not allocate a video demuxer" }
+        if (!isManifest(source)) {
+            opened.probesize(262_144L)
+            opened.max_analyze_duration(500_000L)
+        }
         format = opened
         val callback = object : AVIOInterruptCB.Callback_Pointer() {
             override fun call(opaque: Pointer?): Int =
@@ -108,7 +131,7 @@ internal class DesktopCanvasDecoder(
         opened.interrupt_callback().callback(callback)
         readDeadline = System.nanoTime() + IO_TIMEOUT_NANOS
         val options = AVDictionary(null)
-        if (headers.isNotEmpty()) {
+        if (!windowed && headers.isNotEmpty()) {
             av_dict_set(
                 options,
                 "headers",
@@ -118,7 +141,15 @@ internal class DesktopCanvasDecoder(
         }
         av_dict_set(options, "rw_timeout", "15000000", 0)
 
-        val status = try { avformat_open_input(opened, source, null, options) } finally { av_dict_free(options) }
+        val status = try {
+            avformat_open_input(opened, if (windowed) null as String? else source, null, options)
+        } finally { av_dict_free(options) }
+        if (status < 0 && windowed && wrapper?.source?.unsupportedRange == true) {
+            close()
+            readDeadline = System.nanoTime() + IO_TIMEOUT_NANOS
+            return openInternal(source, headers, windowed = false)
+        }
+        if (status < 0) wrapper?.source?.failure?.let { throw it }
         check(status >= 0) { "could not open the clip" }
         format = opened
         check(avformat_find_stream_info(opened, null as AVDictionary?) >= 0) { "no stream info" }
@@ -127,7 +158,7 @@ internal class DesktopCanvasDecoder(
         )
         check(streamIndex >= 0) { "no video stream" }
 
-        if (preferMotionRendition && isManifest(url)) {
+        if (preferMotionRendition && isManifest(source)) {
             // An HLS master lists every rendition as its own stream, and FFmpeg's pick is the largest:
             // a 4K decode for a frame that is scaled down anyway. The smallest that still covers the
             // target is taken instead, and the rest are dropped so their segments are never fetched.
@@ -153,6 +184,10 @@ internal class DesktopCanvasDecoder(
         val context = avcodec_alloc_context3(decoder)
         codec = context
         check(avcodec_parameters_to_context(context, parameters) >= 0) { "bad codec parameters" }
+        if (!loopAtEnd) {
+            context.thread_count(Runtime.getRuntime().availableProcessors().coerceIn(2, 6))
+            context.thread_type(AVCodecContext.FF_THREAD_FRAME or AVCodecContext.FF_THREAD_SLICE)
+        }
         check(avcodec_open2(context, decoder, null as AVDictionary?) >= 0) { "decoder refused to open" }
 
         sourceWidth = context.width()
@@ -176,7 +211,7 @@ internal class DesktopCanvasDecoder(
         strides = IntPointer(4L)
         packet = av_packet_alloc()
         frame = av_frame_alloc()
-    }.onFailure { close() }
+    }
 
     /** Decode directly into immutable frame storage owned by Skia. */
     override fun nextFrame(accept: (Long) -> Boolean): VideoFrame? {
@@ -227,10 +262,11 @@ internal class DesktopCanvasDecoder(
         scaler?.let { sws_freeContext(it) }
         // BGRA because that is the order Skia's N32 bitmaps are laid out in, so the scaled frame
         // can be handed over without a second pass.
+        val swsFlags = if (sourceWidth == width && sourceHeight == height) SWS_POINT else SWS_FAST_BILINEAR
         val built = sws_getContext(
             sourceWidth, sourceHeight, pixelFormat,
             width, height, AV_PIX_FMT_BGRA,
-            SWS_BILINEAR, null, null, null as DoublePointer?,
+            swsFlags, null, null, null as DoublePointer?,
         )
         if (built == null) {
             DesktopTrackLog.log("canvas: no converter for pixel format $pixelFormat")
@@ -260,6 +296,8 @@ internal class DesktopCanvasDecoder(
         scaler?.let { sws_freeContext(it) }
         codec?.let { avcodec_free_context(it) }
         format?.takeUnless { it.isNull }?.let { avformat_close_input(it) }
+        windowedAvio?.close()
+        windowedAvio = null
         interrupt?.close()
         interrupt = null
         strides?.deallocate()

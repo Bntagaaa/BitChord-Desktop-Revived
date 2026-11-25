@@ -21,8 +21,8 @@ import java.util.concurrent.TimeUnit
  * that re-visiting screens does not require network re-fetches.
  */
 internal object DesktopImageLoader {
-    const val MAX_MEMORY_CACHE_BYTES = 20L * 1024 * 1024 // 20 MiB
-    const val MAX_DISK_CACHE_BYTES = 100L * 1024 * 1024   // 100 MiB
+    const val MAX_MEMORY_CACHE_BYTES = 12L * 1024 * 1024 // 12 MiB
+    const val MAX_DISK_CACHE_BYTES = 64L * 1024 * 1024    // 64 MiB
 
     fun install() {
         SingletonImageLoader.setSafe { context ->
