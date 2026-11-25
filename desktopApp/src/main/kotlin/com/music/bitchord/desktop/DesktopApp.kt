@@ -9435,13 +9435,17 @@ private fun DesktopCollectionPage(
                     Modifier.fillMaxWidth().padding(
                         start = if (compactCollectionHeader) 4.dp else 0.dp,
                         top = if (compactCollectionHeader) 10.dp else 0.dp,
-                        bottom = if (compactCollectionHeader) 12.dp else 36.dp,
+                        bottom = if (compactCollectionHeader) 24.dp else 36.dp,
                     ),
                 ) {
-                    val stacked = compactCollectionHeader && maxWidth < 360.dp
-                    // At desktop UI scale 1.25, 112.dp renders near the 140px cover in
-                    // the reference; 236.dp rendered near 295px in the rejected layout.
-                    val artworkSize = if (compactCollectionHeader) 112.dp else 286.dp
+                    // Keep web-inspired proportions readable without assuming a screenshot scale.
+                    // Move the actions below the header at narrow window widths.
+                    val stacked = compactCollectionHeader && maxWidth < 520.dp
+                    val artworkSize = when {
+                        !compactCollectionHeader -> 286.dp
+                        stacked -> 132.dp
+                        else -> 180.dp
+                    }
                     // The services hang motion artwork off the release, so a page for one asks for
                     // it directly rather than picking a track and hoping it sits on the right
                     // edition.
@@ -9486,8 +9490,8 @@ private fun DesktopCollectionPage(
                                 collection.title,
                                 style = if (compactCollectionHeader) {
                                     MaterialTheme.typography.titleMedium.copy(
-                                        fontSize = 16.sp,
-                                        lineHeight = 20.sp,
+                                        fontSize = if (stacked) 22.sp else 26.sp,
+                                        lineHeight = if (stacked) 28.sp else 32.sp,
                                     )
                                 } else MaterialTheme.typography.displaySmall,
                                 fontWeight = FontWeight.Bold,
@@ -9495,24 +9499,24 @@ private fun DesktopCollectionPage(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             if (credit.isNotBlank()) {
-                                Spacer(Modifier.height(if (compactCollectionHeader) 2.dp else 6.dp))
+                                Spacer(Modifier.height(if (compactCollectionHeader) 4.dp else 6.dp))
                                 Text(
                                     credit,
                                     color = DesktopAccent,
                                     style = if (compactCollectionHeader) {
-                                        MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, lineHeight = 12.sp)
+                                        MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 18.sp)
                                     } else MaterialTheme.typography.titleMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
                             if (metadata.isNotBlank()) {
-                                Spacer(Modifier.height(if (compactCollectionHeader) 4.dp else 8.dp))
+                                Spacer(Modifier.height(if (compactCollectionHeader) 6.dp else 8.dp))
                                 Text(
                                     metadata,
                                     color = DesktopSecondary,
                                     style = if (compactCollectionHeader) {
-                                        MaterialTheme.typography.bodySmall.copy(fontSize = 8.sp, lineHeight = 11.sp)
+                                        MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 15.sp)
                                     } else MaterialTheme.typography.bodySmall,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
@@ -9527,8 +9531,8 @@ private fun DesktopCollectionPage(
                                 description,
                                 color = DesktopSecondary,
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = 9.sp,
-                                    lineHeight = 12.sp,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp,
                                 ),
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
@@ -9539,10 +9543,10 @@ private fun DesktopCollectionPage(
                     // Scale only the compact header controls; other screens stay untouched.
                     val actions: @Composable () -> Unit = {
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(if (compactCollectionHeader) 6.dp else 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(if (compactCollectionHeader) 8.dp else 10.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            val buttonSize = if (compactCollectionHeader) 28.dp else 50.dp
+                            val buttonSize = if (compactCollectionHeader) 40.dp else 50.dp
                             DesktopCircleButton(
                                 BitChordIcons.Shuffle,
                                 DesktopStrings["shuffle", "Shuffle"],
@@ -9651,21 +9655,21 @@ private fun DesktopCollectionPage(
                             verticalAlignment = if (compactCollectionHeader) Alignment.Top else Alignment.CenterVertically,
                         ) {
                             artwork()
-                            Spacer(Modifier.width(if (compactCollectionHeader) 22.dp else 30.dp))
+                            Spacer(Modifier.width(if (compactCollectionHeader) 26.dp else 30.dp))
                             Column(
                                 modifier = Modifier.weight(1f).then(
                                     if (compactCollectionHeader) Modifier.heightIn(min = artworkSize) else Modifier
                                 ),
                                 verticalArrangement = if (compactCollectionHeader) Arrangement.SpaceBetween else Arrangement.Top,
                             ) {
-                                Column(Modifier.padding(top = if (compactCollectionHeader) 16.dp else 0.dp)) {
+                                Column(Modifier.padding(top = if (compactCollectionHeader) 12.dp else 0.dp)) {
                                     headline()
                                 }
                                 Column {
                                     if (compactCollectionHeader) {
                                         if (description != null) {
                                             blurb()
-                                            Spacer(Modifier.height(6.dp))
+                                            Spacer(Modifier.height(8.dp))
                                         }
                                     } else {
                                         Spacer(Modifier.height(24.dp))
