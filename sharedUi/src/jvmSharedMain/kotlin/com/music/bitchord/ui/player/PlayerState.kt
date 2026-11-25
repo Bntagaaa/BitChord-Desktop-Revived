@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import coil3.Extras
 import coil3.Image
 import coil3.PlatformContext
@@ -93,9 +94,11 @@ val CurrentTrackArtwork = Extras.Key(false)
 
 fun ImageRequest.Builder.currentTrackArtwork() = apply { extras[CurrentTrackArtwork] = true }
 
-internal class RetainedPlayerCover {
-    var image: Image? = null
+class RetainedPlayerCover(val trackId: String) {
+    @Volatile internal var image: Image? = null
 }
+
+val LocalRetainedPlayerCover = staticCompositionLocalOf<RetainedPlayerCover?> { null }
 
 /** One stable request per cover and retry, with the last success retained for this track. */
 @Stable
@@ -150,7 +153,8 @@ internal class PlayerArtwork(
 internal fun rememberPlayerArtwork(trackId: String, remoteArt: String?): PlayerArtwork {
     val context = LocalPlatformContext.current
     val artUrl = remoteArt?.takeIf { it.isNotBlank() }?.artworkAt(ART_PX)
-    val retained = remember(trackId, context) { RetainedPlayerCover() }
+    val retained = LocalRetainedPlayerCover.current?.takeIf { it.trackId == trackId }
+        ?: remember(trackId, context) { RetainedPlayerCover(trackId) }
     val art = remember(retained, artUrl) { PlayerArtwork(artUrl, context, retained) }
     LaunchedEffect(art, art.failed) {
         if (artUrl == null || !art.failed || art.attempt >= ART_RETRIES) return@LaunchedEffect

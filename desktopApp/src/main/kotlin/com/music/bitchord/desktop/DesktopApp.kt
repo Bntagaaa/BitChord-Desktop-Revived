@@ -2188,10 +2188,14 @@ internal fun BitChordDesktopApp(
         selectedSong?.videoId, activeAccountId, activeProfileId, overlays.nowPlaying, oldTopPlayerEnabled,
     ) { mutableStateOf(false) }
     val metadataTrack = selectedSong?.takeIf(Song::canFetchDesktopPlayerMetadata)
+    // The sheet unmounts after dismissal. Keep just this track's last cover above that boundary.
+    val retainedPlayerCover = remember(selectedSong?.videoId, activeAccountId, activeProfileId) {
+        selectedSong?.let { com.music.bitchord.ui.player.RetainedPlayerCover(it.videoId) }
+    }
     var trackLinks by remember(metadataTrack?.videoId, activeAccountId, activeProfileId) {
         mutableStateOf<Song?>(null)
     }
-    val needsPlayerCover = metadataTrack?.thumbnailUrl.isNullOrBlank()
+    val needsPlayerCover = metadataTrack != null && metadataTrack.thumbnailUrl.isNullOrBlank()
     val needsPlayerTrackLinks = needsPlayerCover || overlays.nowPlaying || miniPlayerMenuOpen
     LaunchedEffect(metadataTrack?.videoId, needsPlayerTrackLinks, activeAccountId, activeProfileId) {
         val current = metadataTrack ?: return@LaunchedEffect
@@ -4383,6 +4387,7 @@ internal fun BitChordDesktopApp(
                 },
                 overlay = {
                     DesktopPlayerSheet(
+                        retainedCover = retainedPlayerCover,
                         onOpenPip = ::openPip,
                         dragToDismiss = !videoBetaEnabled || selectedSong?.isVideo != true,
                         visible = overlays.nowPlaying && selectedSong != null,

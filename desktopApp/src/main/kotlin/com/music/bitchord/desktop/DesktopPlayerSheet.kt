@@ -35,6 +35,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.music.bitchord.ui.player.LocalRetainedPlayerCover
+import com.music.bitchord.ui.player.RetainedPlayerCover
 import kotlinx.coroutines.launch
 
 /**
@@ -55,6 +57,7 @@ internal fun DesktopPlayerSheet(
     onDismiss: () -> Unit,
     dragToDismiss: Boolean = true,
     onOpenPip: (() -> Unit)? = null,
+    retainedCover: RetainedPlayerCover? = null,
     content: @Composable BoxScope.(windowWidth: Dp, windowHeight: Dp) -> Unit,
 ) {
     // Mounted while it animates out, so the slide down is seen.
@@ -101,6 +104,7 @@ internal fun DesktopPlayerSheet(
         ) {
             androidx.compose.runtime.CompositionLocalProvider(
                 com.music.bitchord.ui.player.LocalCenteredLyrics provides true,
+                LocalRetainedPlayerCover provides retainedCover,
             ) { content(windowWidth, windowHeight) }
             val fullscreen by DesktopWindowMode.fullScreen.collectAsState()
             Box(Modifier.align(Alignment.TopStart).padding(8.dp)) {

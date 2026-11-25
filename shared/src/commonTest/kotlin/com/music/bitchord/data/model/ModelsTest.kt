@@ -21,6 +21,12 @@ class ModelsTest {
         assertEquals("https://example.test/cover.jpg", "https://example.test/cover.jpg".artworkAt(720))
     }
 
+    @Test
+    fun signedArtworkRetainsItsOriginalUrlAtEverySize() {
+        val signed = "https://example.test/w120-h120.jpg?signature=test"
+        assertEquals(signed, signed.artworkAt(720))
+    }
+
     private fun album(id: String) = ShelfItem(id, "", null, null, id)
     private fun song(id: String) = ShelfItem(id, "", null, id, null)
 

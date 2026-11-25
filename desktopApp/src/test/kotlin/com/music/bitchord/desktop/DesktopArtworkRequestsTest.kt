@@ -38,7 +38,7 @@ class DesktopArtworkRequestsTest {
         server.createContext("/art") { exchange ->
             exchange.use {
                 if (attempts.incrementAndGet() == 1) {
-                    it.responseHeaders.add("Retry-After", "0")
+                    it.responseHeaders.add("Retry-After", "1")
                     it.sendResponseHeaders(503, -1)
                 } else {
                     it.responseHeaders.add("Content-Type", "image/png")

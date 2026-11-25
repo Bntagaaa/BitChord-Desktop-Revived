@@ -45,8 +45,9 @@ internal class DesktopArtworkRequests(
         val group = synchronized(lock) {
             groups.getOrPut(url, ::RequestGroup).also { it.readers++ }
         }
-        val requestId = requestIds.incrementAndGet()
-        val prefix = "artwork image=${url.hashCode().toUInt().toString(16)} request=$requestId"
+        val prefix = trace?.let {
+            "artwork image=${url.hashCode().toUInt().toString(16)} request=${requestIds.incrementAndGet()}"
+        }
         trace?.invoke("$prefix event=start")
         val currentTrack = chain.request.getExtra(CurrentTrackArtwork)
         try {
