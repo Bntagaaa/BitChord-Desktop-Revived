@@ -1,11 +1,7 @@
 package com.music.bitchord.desktop
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Videocam
-import androidx.compose.material.icons.rounded.VisibilityOff
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -41,14 +37,14 @@ internal fun DesktopSettingsRows.contentPreferenceRows() {
     val prefs = DesktopContentPreferences
     toggle("Prefer music-only version",
         "Music videos play as their audio version; the next queue item is resolved ahead of time for smoother transitions.",
-        prefs.preferMusicOnly, prefs::updatePreferMusicOnly, icon = Icons.Rounded.Videocam)
-    toggle("Hide Recents", null, prefs.hideRecents, prefs::updateHideRecents, icon = Icons.Rounded.VisibilityOff)
+        prefs.preferMusicOnly, prefs::updatePreferMusicOnly, icon = DesktopIcons.Player.MusicVideo)
+    toggle("Hide Recents", null, prefs.hideRecents, prefs::updateHideRecents, icon = DesktopIcons.Settings.VisibilityOff)
     toggle("Hide videos from Home",
         "Video-only shelves are hidden. Search, artists and playlists remain unchanged.",
-        prefs.hideHomeVideos, prefs::updateHideHomeVideos, icon = Icons.Rounded.VisibilityOff)
-    toggle("Hide Top Picks for You", null, prefs.hideTopPicks, prefs::updateHideTopPicks, icon = Icons.Rounded.AutoAwesome)
-    toggle("Hide Find Your Mood", null, prefs.hideHomeMoods, prefs::updateHideHomeMoods, icon = Icons.Rounded.StarBorder)
+        prefs.hideHomeVideos, prefs::updateHideHomeVideos, icon = DesktopIcons.Settings.VisibilityOff)
+    toggle("Hide Top Picks for You", null, prefs.hideTopPicks, prefs::updateHideTopPicks, icon = DesktopIcons.Status.Sparkles)
+    toggle("Hide Find Your Mood", null, prefs.hideHomeMoods, prefs::updateHideHomeMoods, icon = DesktopIcons.Player.Like)
     toggle("Square video thumbnails",
         "Display music videos with square covers wherever thumbnail layout supports it.",
-        prefs.squareVideos, prefs::updateSquareVideos, icon = Icons.Rounded.GridView)
+        prefs.squareVideos, prefs::updateSquareVideos, icon = DesktopIcons.Navigation.GridView)
 }

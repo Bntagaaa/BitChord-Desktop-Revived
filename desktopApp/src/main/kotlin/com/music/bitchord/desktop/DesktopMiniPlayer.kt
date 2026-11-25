@@ -363,7 +363,7 @@ private fun DesktopMiniPlayerTools(
                     }
                     if (!actions.panelsInMenu) {
                         DesktopToolbarButton(onClick = actions.onOpenLyrics, size = buttonSize) {
-                            Icon(DesktopIcons.Player.Lyrics, "Lyrics",
+                            Icon(BitChordIcons.LyricsQuote, "Lyrics",
                                 tint = if (actions.sidePanel == DesktopSidePanel.LYRICS) DesktopAccent else foreground,
                                 modifier = Modifier.size(19.dp))
                         }

@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -8,22 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BugReport
-import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.Headphones
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material.icons.outlined.PlayCircleOutline
-import androidx.compose.material.icons.outlined.SettingsApplications
-import androidx.compose.material.icons.outlined.Speaker
-import androidx.compose.material.icons.outlined.Storage
-import androidx.compose.material.icons.outlined.SystemUpdateAlt
-import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.outlined.VideoLibrary
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.WebAsset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
@@ -97,28 +83,28 @@ internal class DesktopSettingsSections(
 private class Category(val page: DesktopSettingsPage, val icon: ImageVector)
 private val categories = listOf(
     listOf(
-        Category(DesktopSettingsPage.INTEGRATIONS, Icons.Outlined.PersonOutline),
-        Category(DesktopSettingsPage.LISTEN_TOGETHER, Icons.Outlined.Groups),
+        Category(DesktopSettingsPage.INTEGRATIONS, DesktopIcons.Settings.Account),
+        Category(DesktopSettingsPage.LISTEN_TOGETHER, DesktopIcons.Status.Groups),
         Category(DesktopSettingsPage.SOURCES, BitChordIcons.MusicNote),
-        Category(DesktopSettingsPage.AUDIO_QUALITY, Icons.Outlined.Headphones),
+        Category(DesktopSettingsPage.AUDIO_QUALITY, DesktopIcons.Audio.Headphones),
     ),
     listOf(
         Category(DesktopSettingsPage.DOWNLOADS, BitChordIcons.Download),
-        Category(DesktopSettingsPage.PLAYBACK, Icons.Outlined.PlayCircleOutline),
-        Category(DesktopSettingsPage.DESKTOP_PLAYBACK, Icons.Outlined.WebAsset),
-        Category(DesktopSettingsPage.AUDIO_OUTPUT, Icons.Outlined.Speaker),
-        Category(DesktopSettingsPage.AUDIO_PROCESSING, Icons.Outlined.Tune),
-        Category(DesktopSettingsPage.CONTENT_PREFERENCES, Icons.Outlined.VideoLibrary),
-        Category(DesktopSettingsPage.APPEARANCE, Icons.Outlined.Visibility),
+        Category(DesktopSettingsPage.PLAYBACK, DesktopIcons.Player.PlayCircle),
+        Category(DesktopSettingsPage.DESKTOP_PLAYBACK, DesktopIcons.Settings.Appearance),
+        Category(DesktopSettingsPage.AUDIO_OUTPUT, DesktopIcons.Audio.Speaker),
+        Category(DesktopSettingsPage.AUDIO_PROCESSING, DesktopIcons.Settings.Tune),
+        Category(DesktopSettingsPage.CONTENT_PREFERENCES, DesktopIcons.Player.MusicVideo),
+        Category(DesktopSettingsPage.APPEARANCE, DesktopIcons.Settings.Appearance),
         Category(DesktopSettingsPage.PERFORMANCE, BitChordIcons.Performance),
-        Category(DesktopSettingsPage.WINDOW_SYSTEM, Icons.Outlined.SettingsApplications),
+        Category(DesktopSettingsPage.WINDOW_SYSTEM, DesktopIcons.Settings.General),
         Category(DesktopSettingsPage.LYRICS, BitChordIcons.Lyrics),
         Category(DesktopSettingsPage.LOCAL_MUSIC, BitChordIcons.Library),
-        Category(DesktopSettingsPage.STORAGE, Icons.Outlined.Storage),
-        Category(DesktopSettingsPage.LANGUAGE, Icons.Outlined.Language),
-        Category(DesktopSettingsPage.MISCELLANEOUS, Icons.Outlined.Info),
-        Category(DesktopSettingsPage.ADVANCED, Icons.Outlined.BugReport),
-        Category(DesktopSettingsPage.APP_UPDATES, Icons.Outlined.SystemUpdateAlt),
+        Category(DesktopSettingsPage.STORAGE, DesktopIcons.Settings.Storage),
+        Category(DesktopSettingsPage.LANGUAGE, DesktopIcons.Settings.Language),
+        Category(DesktopSettingsPage.MISCELLANEOUS, DesktopIcons.Status.Info),
+        Category(DesktopSettingsPage.ADVANCED, DesktopIcons.Settings.Bug),
+        Category(DesktopSettingsPage.APP_UPDATES, DesktopIcons.Settings.Upgrade),
     ),
 )
 
