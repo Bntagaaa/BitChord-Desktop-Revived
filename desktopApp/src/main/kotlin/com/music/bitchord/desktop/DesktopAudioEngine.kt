@@ -539,7 +539,11 @@ class DesktopPlaybackEngine internal constructor(
                         durationUs = decoder.durationUs,
                         measuredFormat = decoder.measuredFormat,
                         aheadSamples = decoder.outputFormat.sampleRate * decoder.outputFormat.channels *
-                            (if (prefetch && !automixEnabled && crossfadeSeconds == 0) 2 else 8),
+                            when {
+                                prefetch && !automixEnabled && crossfadeSeconds == 0 -> 2
+                                !automixEnabled && crossfadeSeconds == 0 -> 4
+                                else -> 8
+                            },
                         name = "BitChord-Decode ${song.title.take(24)}",
                     )
                     wrappedDecoder = ahead

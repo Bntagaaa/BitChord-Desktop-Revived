@@ -136,11 +136,16 @@ data class PlayerClient(
             }
         }
 
-        /** NewPipe's extraction mints with this; its agent is read from NewPipe so the two can't drift. */
+        /** VISIONOS client headers matching web/NewPipe extraction. */
         private fun visionOs(version: String?) = PlayerClient(
-            clientName = "VISIONOS",
-            clientVersion = version ?: "1.02",
-            userAgent = YoutubeParsingHelper.getVisionOsUserAgent(NewPipe.getPreferredLocalization()),
+            clientName = VisionOsClient.CLIENT_NAME,
+            clientVersion = version ?: VisionOsClient.CLIENT_VERSION,
+            userAgent = if (version == null || version == VisionOsClient.CLIENT_VERSION) {
+                VisionOsClient.USER_AGENT
+            } else {
+                YoutubeParsingHelper.getVisionOsUserAgent(NewPipe.getPreferredLocalization())
+            },
+            origin = YOUTUBE_ORIGIN,
         )
 
         /** Largest single range googlevideo reliably serves for [url]'s client; mirrors InnerTubeX's `mediaRangeChunkSize`. */

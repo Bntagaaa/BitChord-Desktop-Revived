@@ -20,9 +20,11 @@ import androidx.compose.foundation.Image
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.decodeToImageBitmap
-import java.net.URI
+import com.music.bitchord.data.Http
 import com.music.bitchord.desktop.runtime.SharedLoadCache
 import kotlinx.coroutines.CancellationException
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
 
 /**
  * Decoded artwork with a byte budget, shared producers and application ownership.
@@ -38,7 +40,13 @@ internal object DesktopArtworkCache {
      * large one does not decide it may hold half a gigabyte of thumbnails.
      */
     internal val budgetBytes: Long =
-        (Runtime.getRuntime().maxMemory() / 8).coerceIn(12L * 1024 * 1024, 16L * 1024 * 1024)
+        (Runtime.getRuntime().maxMemory() / 32).coerceIn(6L * 1024 * 1024, 8L * 1024 * 1024)
+
+    private val artworkHttp by lazy {
+        Http.client.newBuilder()
+            .callTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
 
     /** Four bytes a pixel, which is what every format here decodes to. */
     private val images = lazy {
@@ -59,10 +67,12 @@ internal object DesktopArtworkCache {
         if (url.isNullOrBlank()) return null
         return images.value.load(url) {
             try {
-                URI(url).toURL().openConnection().apply {
-                    connectTimeout = 10_000
-                    readTimeout = 10_000
-                }.getInputStream().use { stream -> stream.readBytes().decodeToImageBitmap() }
+                val request = Request.Builder().url(url).get().build()
+                artworkHttp.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    val bytes = response.body?.bytes() ?: return@use null
+                    bytes.decodeToImageBitmap()
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

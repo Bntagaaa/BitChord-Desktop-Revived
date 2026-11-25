@@ -73,6 +73,8 @@ object InnerTubeXResolver {
     private var poTokens: TokenProvider? = null
     private var playerDir: File? = null
     private var warmup: Job? = null
+    private val warmed = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val playerCacheConfigured = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /**
      * @param filesDir where the preprocessed EJS players are kept.
@@ -84,9 +86,14 @@ object InnerTubeXResolver {
         prefs = store
         poTokens = poTokenProvider
         playerDir = File(filesDir, "innertubex_players").apply { mkdirs() }
-        scope.launch {
+    }
+
+    private suspend fun ensureWarmed() {
+        if (playerCacheConfigured.compareAndSet(false, true)) {
             cipherService.setPreprocessedPlayerCache(::readPlayer, ::writePlayer)
-            warm(WARM_DELAY_MS)
+        }
+        if (warmed.compareAndSet(false, true)) {
+            warm(0)
         }
     }
 
@@ -221,13 +228,25 @@ object InnerTubeXResolver {
         skipClients: Set<String> = emptySet(),
         requireM4a: Boolean = false,
     ): Extracted? {
+        val blocked = excludedFor(videoId) + skipClients
+        val visitor = Innertube.ensureVisitorData()
+        val hl = Innertube.currentLanguage
+        val gl = Innertube.currentRegion
+        if (VisionOsClient.PROFILE_ID !in blocked) {
+            VisionOsClient.resolveAudio(videoId, maxKbps, requireM4a, visitor, hl, gl)?.let { fast ->
+                if (minted.size >= MAX_REMEMBERED) minted.clear()
+                minted[fast.url] = fast
+                return fast
+            }
+        }
+        ensureWarmed()
         innerTube.cookie = Innertube.cookie
-        innerTube.visitorData = Innertube.ensureVisitorData()
-        innerTube.locale = YouTubeLocale(gl = Innertube.currentRegion, hl = Innertube.currentLanguage)
+        innerTube.visitorData = visitor
+        innerTube.locale = YouTubeLocale(gl = gl, hl = hl)
         val stream = extractor.extract(
             videoId = videoId,
             hints = ContentHints().withStreamCapabilities(allowHls = false, allowSabr = false, allowBoundedRange = true),
-            excludedClients = excludedFor(videoId) + skipClients,
+            excludedClients = blocked,
             audioQuality = when {
                 requireM4a -> AudioQuality.MP4
                 maxKbps <= LOW_KBPS -> AudioQuality.LOW
@@ -275,14 +294,22 @@ object InnerTubeXResolver {
      *   catalogue track (a still image as its "video") is the normal answer.
      */
     suspend fun extractVideo(videoId: String, maxHeight: Int): VideoStream? {
+        val blocked = excludedFor(videoId)
+        val visitor = Innertube.ensureVisitorData()
+        val hl = Innertube.currentLanguage
+        val gl = Innertube.currentRegion
+        if (VisionOsClient.PROFILE_ID !in blocked) {
+            VisionOsClient.resolveVideo(videoId, maxHeight, visitor, hl, gl)?.let { return it }
+        }
+        ensureWarmed()
         innerTube.cookie = Innertube.cookie
-        innerTube.visitorData = Innertube.ensureVisitorData()
-        innerTube.locale = YouTubeLocale(gl = Innertube.currentRegion, hl = Innertube.currentLanguage)
+        innerTube.visitorData = visitor
+        innerTube.locale = YouTubeLocale(gl = gl, hl = hl)
         val stream = extractor.extract(
             videoId = videoId,
             hints = ContentHints(wantVideo = true, maxVideoHeight = maxHeight)
                 .withStreamCapabilities(allowHls = false, allowSabr = false, allowBoundedRange = true),
-            excludedClients = excludedFor(videoId),
+            excludedClients = blocked,
             audioQuality = AudioQuality.LOW,
             clientPlaybackNonce = generateClientPlaybackNonce(),
         ) ?: return null
@@ -322,8 +349,12 @@ object InnerTubeXResolver {
     fun onRefused(url: String): String? {
         val refused = minted.remove(url) ?: return null
         exclude(refused.videoId, refused.profileId)
-        // A refused ciphered URL is the signal the remote cipher config may be stale; it has its own cooldown.
-        scope.launch { runCatching { cipherService.refreshAfterStreamRejection() } }
+        if (refused.profileId == VisionOsClient.PROFILE_ID) {
+            VisionOsClient.clearCache(refused.videoId)
+        } else {
+            // A refused ciphered URL is the signal the remote cipher config may be stale; it has its own cooldown.
+            scope.launch { runCatching { cipherService.refreshAfterStreamRejection() } }
+        }
         return refused.videoId
     }
 
@@ -335,8 +366,10 @@ object InnerTubeXResolver {
     fun onSessionChanged() {
         excluded.clear()
         minted.clear()
-        // A new cookie or visitor means a new player config and PoToken binding.
-        if (prefs != null) warm(0)
+        VisionOsClient.clearCache()
+        // A new cookie or visitor means a new player config and PoToken binding,
+        // but only re-warm eagerly if fallback extraction was already initialized.
+        if (prefs != null && warmed.get()) warm(0)
     }
 
     private fun excludedFor(videoId: String): Set<String> {

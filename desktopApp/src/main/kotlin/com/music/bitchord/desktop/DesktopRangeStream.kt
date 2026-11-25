@@ -1,6 +1,19 @@
 package com.music.bitchord.desktop
 
 import com.music.bitchord.data.innertube.StreamResolver
+import org.bytedeco.ffmpeg.avformat.AVFormatContext
+import org.bytedeco.ffmpeg.avformat.AVIOContext
+import org.bytedeco.ffmpeg.avformat.Read_packet_Pointer_BytePointer_int
+import org.bytedeco.ffmpeg.avformat.Seek_Pointer_long_int
+import org.bytedeco.ffmpeg.global.avformat.AVSEEK_SIZE
+import org.bytedeco.ffmpeg.global.avformat.avformat_alloc_context
+import org.bytedeco.ffmpeg.global.avformat.avio_alloc_context
+import org.bytedeco.ffmpeg.global.avformat.avio_context_free
+import org.bytedeco.ffmpeg.global.avutil.AVERROR_EOF
+import org.bytedeco.ffmpeg.global.avutil.av_free
+import org.bytedeco.ffmpeg.global.avutil.av_malloc
+import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.Pointer
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -22,7 +35,7 @@ internal class DesktopRangeStream(
     private val headers: Map<String, String> = emptyMap(),
     private val windowBytes: Int = DEFAULT_WINDOW,
     cacheIdentity: String = "",
-    private val cache: DesktopAudioCache = DesktopAudioCache.shared,
+    private val cache: DesktopAudioCache? = DesktopAudioCache.shared,
     private val cancelled: () -> Boolean = { false },
     private val requestTimeoutMs: Long = 6_000,
     private val networkRead: ((Long) -> Unit)? = null,
@@ -64,8 +77,8 @@ internal class DesktopRangeStream(
 
     private fun fetchWindowFor(at: Long): Boolean {
         val start = at - (at % windowBytes)
-        val key = cacheKey?.takeIf { expiresAt > System.currentTimeMillis() }
-        key?.let { cache.read(it, start) }?.let {
+        val key = if (cache == null) null else cacheKey?.takeIf { expiresAt > System.currentTimeMillis() }
+        key?.let { cache?.read(it, start) }?.let {
             windowStart = start; length = it.total; window = it.bytes
             DesktopPlaybackDiagnostics.cacheHit.incrementAndGet()
             return holds(at)
@@ -117,7 +130,7 @@ internal class DesktopRangeStream(
         val maxAge = Regex("(?:^|[, ])max-age=(\\d+)").find(policy)?.groupValues?.get(1)?.toLongOrNull()
         val immutableSource = uri.host.orEmpty().endsWith(".googlevideo.com") &&
             listOf("itag", "lmt", "clen", "expire").all { name -> Regex("(?:^|&)$name=[^&]+").containsMatchIn(uri.rawQuery.orEmpty()) }
-        if (key != null && (immutableSource || (maxAge ?: 0) > 0) && "no-store" !in policy && "private" !in policy && response.headers().firstValue("set-cookie").isEmpty) {
+        if (cache != null && key != null && (immutableSource || (maxAge ?: 0) > 0) && "no-store" !in policy && "private" !in policy && response.headers().firstValue("set-cookie").isEmpty) {
             val expiry = minOf(expiresAt, System.currentTimeMillis() + (maxAge ?: 86400L).coerceIn(0, 86400) * 1000)
             cache.write(key, windowStart, body, length, expiry)
         }
@@ -174,5 +187,85 @@ internal class DesktopRangeStream(
                 override fun onComplete() { result.complete(bytes.toByteArray()) }
             }
         }
+    }
+}
+
+/**
+ * Attaches a [DesktopRangeStream] to an FFmpeg [AVFormatContext] via custom [AVIOContext]
+ * so both audio and video decoders share bounded HTTP `Range` reading and clean native disposal.
+ */
+internal class DesktopWindowedAvio(
+    url: String,
+    headers: Map<String, String>,
+    windowBytes: Int = DesktopRangeStream.DEFAULT_WINDOW,
+    cacheIdentity: String = "",
+    cache: DesktopAudioCache? = DesktopAudioCache.shared,
+    cancelled: () -> Boolean = { false },
+    rangeRead: ((Long) -> Unit)? = null,
+) : AutoCloseable {
+    val source = DesktopRangeStream(
+        url = url,
+        headers = headers,
+        windowBytes = windowBytes,
+        cacheIdentity = cacheIdentity,
+        cache = cache,
+        cancelled = cancelled,
+        networkRead = rangeRead,
+    )
+    private var readPacket: Read_packet_Pointer_BytePointer_int?
+    private var seekPacket: Seek_Pointer_long_int?
+    private var avio: AVIOContext?
+    val formatContext: AVFormatContext = avformat_alloc_context()
+
+    init {
+        val scratch = ByteArray(IO_BUFFER_BYTES)
+        val read = object : Read_packet_Pointer_BytePointer_int() {
+            override fun call(opaque: Pointer?, buffer: BytePointer?, size: Int): Int {
+                if (buffer == null) return AVERROR_EOF
+                val taken = source.read(scratch, minOf(size, scratch.size))
+                if (taken <= 0) return if (source.failure != null) AVERROR_IO else AVERROR_EOF
+                buffer.put(scratch, 0, taken)
+                return taken
+            }
+        }
+        val seek = object : Seek_Pointer_long_int() {
+            override fun call(opaque: Pointer?, offset: Long, whence: Int): Long {
+                if (whence == AVSEEK_SIZE) return source.length
+                val target = when (whence) {
+                    SEEK_CUR -> source.position() + offset
+                    SEEK_END -> source.length + offset
+                    else -> offset
+                }
+                source.seek(target)
+                return target
+            }
+        }
+        val buffer = BytePointer(av_malloc(IO_BUFFER_BYTES.toLong()))
+        val io = avio_alloc_context(buffer, IO_BUFFER_BYTES, 0, null, read, null, seek)
+        formatContext.pb(io)
+        readPacket = read
+        seekPacket = seek
+        avio = io
+    }
+
+    override fun close() {
+        avio?.let {
+            av_free(it.buffer())
+            it.buffer(null as BytePointer?)
+            avio_context_free(it)
+        }
+        avio = null
+        readPacket?.deallocate()
+        seekPacket?.deallocate()
+        readPacket = null
+        seekPacket = null
+    }
+
+    companion object {
+        const val IO_BUFFER_BYTES = 64 * 1024
+        const val VIDEO_WINDOW_BYTES = 256 * 1024
+        private const val AVERROR_IO = -5
+        private const val SEEK_CUR = 1
+        private const val SEEK_END = 2
     }
 }

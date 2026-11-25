@@ -104,10 +104,8 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
     private var drained = false
 
     /** Live only while this decoder reads through windowed HTTP; see [open]. */
-    private var rangeSource: DesktopRangeStream? = null
-    private var avio: AVIOContext? = null
-    private var readPacket: Read_packet_Pointer_BytePointer_int? = null
-    private var seekPacket: Seek_Pointer_long_int? = null
+    private var windowedAvio: DesktopWindowedAvio? = null
+    private val rangeSource: DesktopRangeStream? get() = windowedAvio?.source
 
     /** The format samples arrive in, once [open] has succeeded. */
     var outputFormat: DesktopPcmFormat = DesktopPcmFormat(44_100, 2, 2)
@@ -168,6 +166,12 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
 
         this.trace = trace
         val opened = if (windowed) windowedContext(url, headers, cacheIdentity, cancelled, rangeRead) else avformat_alloc_context()
+        if (transport == null) {
+            // Bound FFmpeg's initial probe for single audio containers (Opus/WebM, M4A) so
+            // avformat_find_stream_info starts emitting PCM with minimal extra buffering.
+            opened.probesize(131_072L)
+            opened.max_analyze_duration(500_000L)
+        }
         format = opened
         interrupt = object : AVIOInterruptCB.Callback_Pointer() {
             override fun call(opaque: Pointer?): Int = if (Thread.currentThread().isInterrupted || cancelled()) 1 else 0
@@ -303,41 +307,16 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         url: String, headers: Map<String, String>, cacheIdentity: String, cancelled: () -> Boolean,
         rangeRead: ((Long) -> Unit)?,
     ): AVFormatContext {
-        val source = DesktopRangeStream(url, headers, cacheIdentity = cacheIdentity, cancelled = cancelled, networkRead = rangeRead)
-        val scratch = ByteArray(IO_BUFFER_BYTES)
-        val read = object : Read_packet_Pointer_BytePointer_int() {
-            override fun call(opaque: Pointer?, buffer: BytePointer?, size: Int): Int {
-                if (buffer == null) return AVERROR_EOF
-                val taken = source.read(scratch, minOf(size, scratch.size))
-                if (taken <= 0) return if (source.failure != null) AVERROR_IO else AVERROR_EOF
-                buffer.put(scratch, 0, taken)
-                return taken
-            }
-        }
-        val seek = object : Seek_Pointer_long_int() {
-            override fun call(opaque: Pointer?, offset: Long, whence: Int): Long {
-                // FFmpeg asks for the length this way rather than with a seek.
-                if (whence == AVSEEK_SIZE) return source.length
-                val target = when (whence) {
-                    SEEK_CUR -> source.position() + offset
-                    SEEK_END -> source.length + offset
-                    else -> offset
-                }
-                source.seek(target)
-                return target
-            }
-        }
-        val buffer = BytePointer(av_malloc(IO_BUFFER_BYTES.toLong()))
-        val io = avio_alloc_context(buffer, IO_BUFFER_BYTES, 0, null, read, null, seek)
-        val context = avformat_alloc_context()
-        // avformat_open_input sets AVFMT_FLAG_CUSTOM_IO itself when it finds a context that already
-        // has a pb, so there is no flag to set here.
-        context.pb(io)
-        rangeSource = source
-        readPacket = read
-        seekPacket = seek
-        avio = io
-        return context
+        val wrapper = DesktopWindowedAvio(
+            url = url,
+            headers = headers,
+            cacheIdentity = cacheIdentity,
+            cache = DesktopAudioCache.shared,
+            cancelled = cancelled,
+            rangeRead = rangeRead,
+        )
+        windowedAvio = wrapper
+        return wrapper.formatContext
     }
 
     /** FFmpeg's own words for an AVERROR, so a failure says what it was. */
@@ -524,17 +503,8 @@ internal class DesktopAudioDecoder : DesktopSampleSource {
         outputBufferSamples = 0
         measuredFormat = null
         // Custom I/O is not freed by avformat_close_input.
-        avio?.let {
-            av_free(it.buffer())
-            it.buffer(null as BytePointer?)
-            avio_context_free(it)
-        }
-        avio = null
-        readPacket?.deallocate()
-        seekPacket?.deallocate()
-        readPacket = null
-        seekPacket = null
-        rangeSource = null
+        windowedAvio?.close()
+        windowedAvio = null
     }
 
     internal companion object {

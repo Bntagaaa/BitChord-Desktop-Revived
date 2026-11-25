@@ -482,6 +482,12 @@ object StreamResolver {
                 TrackLog.w(TAG, "InnerTubeX failed for $videoId: ${e.javaClass.simpleName}: ${e.message}")
                 return null
             } ?: return null
+            // Direct VISIONOS streams bypass the blocking 1 MiB pre-probe so playback opens
+            // immediately like the web player; any mid-stream 403 triggers onPlaybackRefused.
+            if (found.clientName == VisionOsClient.CLIENT_NAME) {
+                TrackLog.d(TAG, "resolved $videoId via ${found.profileId} @ ${found.kbps}kbps (fast-path)")
+                return Stream(found.url, found.kbps, found.mimeType, found.loudnessDb)
+            }
             val verdict = timed("$videoId InnerTubeX ${found.profileId} probe") { probe(found.url) }
             if (verdict == Probe.OK) {
                 TrackLog.d(TAG, "resolved $videoId via InnerTubeX ${found.profileId} @ ${found.kbps}kbps")

@@ -221,4 +221,17 @@ class DesktopRangeStreamTest {
         }
         assertContentEquals(whole, seen.get())
     }
+
+    @Test
+    fun `null cache streams bounded windows without disk reuse`() = serve { url, requested ->
+        val first = DesktopRangeStream(url, windowBytes = 32 * 1024, cache = null)
+        val buffer = ByteArray(16)
+        assertEquals(16, first.read(buffer, buffer.size))
+        assertContentEquals(body.copyOf(16), buffer)
+
+        val second = DesktopRangeStream(url, windowBytes = 32 * 1024, cache = null)
+        assertEquals(16, second.read(buffer, buffer.size))
+        assertEquals(2, requested.size)
+        assertTrue(requested.all { it.startsWith("bytes=") })
+    }
 }
