@@ -1,0 +1,2 @@
+Cannot load libcuda.so.1
+successful_swaps=148 vaapi_observed=true end_reason=0

@@ -45,10 +45,7 @@ class DesktopUpstream1109Test {
         val frame = VideoFrame(8, 8, bytes)
         org.jetbrains.skia.PictureRecorder().use { recorder ->
             val target = recorder.beginRecording(org.jetbrains.skia.Rect.makeWH(8f, 8f))
-            // Painter drawing occurs inside Compose; the underlying ownership contract is Skia's.
-            org.jetbrains.skia.Image.makeRaster(org.jetbrains.skia.ImageInfo.makeN32(8, 8, org.jetbrains.skia.ColorAlphaType.OPAQUE), bytes, 32).use {
-                target.drawImage(it, 0f, 0f)
-            }
+            frame.use { it.drawTo(target, org.jetbrains.skia.Rect.makeWH(8f, 8f)) }
             recorder.finishRecordingAsPicture().use { picture ->
                 org.jetbrains.skia.Surface.makeRasterN32Premul(8, 8).use { surface ->
                     surface.canvas.drawPicture(picture)

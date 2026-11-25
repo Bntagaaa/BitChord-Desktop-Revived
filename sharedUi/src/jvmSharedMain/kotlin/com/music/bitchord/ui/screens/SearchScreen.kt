@@ -30,6 +30,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -59,13 +61,11 @@ import androidx.compose.material.icons.rounded.NorthWest
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -465,41 +465,57 @@ fun SearchScreen(
                                 )
                             }
                         }
-                        itemsIndexed(
-                            items = section.rows,
-                            key = { index, row ->
-                                when (row) {
-                                    is SearchResult.TopTrack -> "top_${row.song.videoId}_$index"
-                                    is SearchResult.Track -> "track_${row.song.videoId}_$index"
-                                    is SearchResult.Browse -> "browse_${row.item.browseId}_$index"
-                                }
-                            },
-                        ) { index, row ->
-                            when (row) {
-                                is SearchResult.TopTrack -> Unit
-                                is SearchResult.Track -> SongRow(
-                                    song = row.song,
-                                    onClick = {
-                                        onSongClick(tracks, tracks.indexOf(row.song).coerceAtLeast(0))
-                                    },
-                                    onLongPress = { onSongLongPress(row.song) },
-                                    onSwipeToQueue = { onSongSwipe(row.song) },
-                                    isCurrent = row.song.isSameTrackAs(currentSong),
-                                    isPlaying = isPlaying && row.song.isSameTrackAs(currentSong),
-                                    searchPlayingStyle = true,
-                                )
-                                is SearchResult.Browse -> BrowseRow(
-                                    item = row.item,
-                                    onClick = { onBrowseClick(row.item) },
-                                    onLongPress = onBrowseLongPress?.let { { it(row.item) } },
+                        val browseGrid = section.rows.all {
+                            it is SearchResult.Browse && it.item.type in
+                                setOf(BrowseType.ARTIST, BrowseType.ALBUM, BrowseType.PLAYLIST)
+                        }
+                        if (browseGrid && section.rows.isNotEmpty()) {
+                            val browseItems = section.rows.filterIsInstance<SearchResult.Browse>().map { it.item }
+                            item(key = "search-grid:${section.title ?: filter.label}") {
+                                SearchBrowseGrid(
+                                    items = browseItems,
+                                    onBrowseClick = onBrowseClick,
+                                    onBrowseLongPress = onBrowseLongPress,
                                 )
                             }
-                            if (index < section.rows.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(start = ROW_DIVIDER_INSET),
-                                    thickness = 0.5.dp,
-                                    color = MaterialTheme.colorScheme.outline,
-                                )
+                        } else {
+                            itemsIndexed(
+                                items = section.rows,
+                                key = { index, row ->
+                                    when (row) {
+                                        is SearchResult.TopTrack -> "top_${row.song.videoId}_$index"
+                                        is SearchResult.Track -> "track_${row.song.videoId}_$index"
+                                        is SearchResult.Browse -> "browse_${row.item.browseId}_$index"
+                                    }
+                                },
+                            ) { index, row ->
+                                when (row) {
+                                    is SearchResult.TopTrack -> Unit
+                                    is SearchResult.Track -> SongRow(
+                                        song = row.song,
+                                        onClick = {
+                                            onSongClick(tracks, tracks.indexOf(row.song).coerceAtLeast(0))
+                                        },
+                                        onLongPress = { onSongLongPress(row.song) },
+                                        onSwipeToQueue = { onSongSwipe(row.song) },
+                                        isCurrent = row.song.isSameTrackAs(currentSong),
+                                        isPlaying = isPlaying && row.song.isSameTrackAs(currentSong),
+                                        searchPlayingStyle = true,
+                                        landscapeArtwork = filter == SearchFilter.VIDEOS,
+                                    )
+                                    is SearchResult.Browse -> BrowseRow(
+                                        item = row.item,
+                                        onClick = { onBrowseClick(row.item) },
+                                        onLongPress = onBrowseLongPress?.let { { it(row.item) } },
+                                    )
+                                }
+                                if (index < section.rows.lastIndex) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = ROW_DIVIDER_INSET),
+                                        thickness = 0.5.dp,
+                                        color = MaterialTheme.colorScheme.outline,
+                                    )
+                                }
                             }
                         }
                     }
@@ -590,79 +606,75 @@ private fun TopResultCard(
     onPlaylist: () -> Unit,
     onLongPress: () -> Unit,
 ) {
-    val cardHoverInteraction = remember { MutableInteractionSource() }
-    val cardHovered by cardHoverInteraction.collectIsHoveredAsState()
-    Column(
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val highlight by animateColorAsState(
+        targetValue = if (hovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f)
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f),
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "search-top-result-highlight",
+    )
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .hoverable(cardHoverInteraction)
-            .padding(start = PAGE_GUTTER, end = PAGE_GUTTER, top = 18.dp, bottom = 8.dp)
+            .padding(horizontal = PAGE_GUTTER, vertical = 10.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(highlight)
+            .hoverable(interaction)
             .longPressMenuClickable(onClick = onPlay, onLongClick = onLongPress)
-            .contextClick(onLongPress),
+            .contextClick(onLongPress)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "Top result",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ArtworkHover(
-                modifier = Modifier.size(72.dp),
-                shape = RoundedCornerShape(10.dp),
-                mode = ArtworkHoverMode.DARKEN_AND_PLAY,
-                hovered = cardHovered,
-            ) {
-                AsyncImage(
-                    model = song.thumbnailUrl?.artworkAt(ROW_ART_PX),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            RowMoreButton(
-                onClick = onLongPress,
-                tint = MaterialTheme.colorScheme.onSurface,
-                iconSize = 24.dp,
+        ArtworkHover(
+            modifier = Modifier.size(72.dp),
+            shape = RoundedCornerShape(9.dp),
+            mode = ArtworkHoverMode.DARKEN_AND_PLAY,
+            hovered = hovered,
+        ) {
+            AsyncImage(
+                model = song.thumbnailUrl?.artworkAt(ROW_ART_PX),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
             )
         }
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(
-                onClick = onPlay,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-            ) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(Res.string.play))
-            }
-            OutlinedButton(
-                onClick = onPlaylist,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-            ) {
-                Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(Res.string.playlist_action))
-            }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = song.artist,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
+        IconButton(onClick = onPlaylist) {
+            Icon(
+                Icons.AutoMirrored.Rounded.PlaylistAdd,
+                contentDescription = stringResource(Res.string.playlist_action),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(onClick = onPlay, modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(PlayingAccent)) {
+            Icon(
+                Icons.Rounded.PlayArrow,
+                contentDescription = stringResource(Res.string.play),
+                tint = Color.White,
+            )
+        }
+        RowMoreButton(onClick = onLongPress)
     }
 }
 
@@ -1057,6 +1069,99 @@ private fun BrowseRow(item: BrowseItem, onClick: () -> Unit, onLongPress: (() ->
 }
 
 /**
+ * Search uses Spotify's content hierarchy but BitChord's existing Material theme.
+ * Browse categories become a responsive cover grid, while Songs and Videos remain rows.
+ */
+@Composable
+private fun SearchBrowseGrid(
+    items: List<BrowseItem>,
+    onBrowseClick: (BrowseItem) -> Unit,
+    onBrowseLongPress: ((BrowseItem) -> Unit)?,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = PAGE_GUTTER)) {
+        val columns = (maxWidth.value / 164f).toInt().coerceIn(2, 7)
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items.chunked(columns).forEach { chunk ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    chunk.forEach { browse ->
+                        SearchBrowseCard(
+                            item = browse,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onBrowseClick(browse) },
+                            onLongPress = onBrowseLongPress?.let { handler -> { handler(browse) } },
+                        )
+                    }
+                    repeat(columns - chunk.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchBrowseCard(
+    item: BrowseItem,
+    modifier: Modifier,
+    onClick: () -> Unit,
+    onLongPress: (() -> Unit)?,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val isArtist = item.type == BrowseType.ARTIST
+    val imageShape = if (isArtist) CircleShape else RoundedCornerShape(9.dp)
+    val background by animateColorAsState(
+        targetValue = if (hovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.075f)
+        else Color.Transparent,
+        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        label = "search-grid-card-hover",
+    )
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(background)
+            .hoverable(interaction)
+            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .contextClick(onLongPress)
+            .padding(8.dp),
+    ) {
+        ArtworkHover(
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f).thumbnailBorder(imageShape),
+            shape = imageShape,
+            mode = ArtworkHoverMode.DARKEN_ONLY,
+            hovered = hovered,
+        ) {
+            AsyncImage(
+                model = item.thumbnailUrl?.artworkAt(ROW_ART_PX),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = if (isArtist) "Artist" else item.subtitle.ifBlank {
+                item.type.name.lowercase(Locale.ROOT).replaceFirstChar { it.uppercase(Locale.ROOT) }
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
  * Filter pills rather than a tab row: squarish rounded rectangles, the selected
  * one inverted. They scroll horizontally so a long label set never squeezes the
  * text, and the gutter padding sits inside the scroll so it scrolls with them.
@@ -1064,39 +1169,45 @@ private fun BrowseRow(item: BrowseItem, onClick: () -> Unit, onLongPress: (() ->
 @Composable
 private fun SearchFilterTabs(filter: SearchFilter, onFilterChange: (SearchFilter) -> Unit) {
     val haptics = rememberHaptics()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = PAGE_GUTTER, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    // Center the filter group under the desktop search field while keeping
+    // horizontal scrolling on narrow windows.
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
     ) {
-        SearchFilter.entries.forEach { entry ->
-            val selected = entry == filter
-            Box(
-                modifier = Modifier
-                    .clip(FILTER_PILL_SHAPE)
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.onBackground
-                        else MaterialTheme.colorScheme.surfaceVariant,
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = PAGE_GUTTER, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SearchFilter.entries.forEach { entry ->
+                val selected = entry == filter
+                Box(
+                    modifier = Modifier
+                        .clip(FILTER_PILL_SHAPE)
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.onBackground
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                        // Only the pill that isn't already selected has anything to
+                        // report — re-tapping the current filter changes nothing, so
+                        // buzzing for it would be feedback for a no-op.
+                        .clickable {
+                            if (!selected) haptics.play(Haptic.Select)
+                            onFilterChange(entry)
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        text = entry.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (selected) MaterialTheme.colorScheme.background
+                        else MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
                     )
-                    // Only the pill that isn't already selected has anything to
-                    // report — re-tapping the current filter changes nothing, so
-                    // buzzing for it would be feedback for a no-op.
-                    .clickable {
-                        if (!selected) haptics.play(Haptic.Select)
-                        onFilterChange(entry)
-                    }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Text(
-                    text = entry.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (selected) MaterialTheme.colorScheme.background
-                    else MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                )
+                }
             }
         }
     }

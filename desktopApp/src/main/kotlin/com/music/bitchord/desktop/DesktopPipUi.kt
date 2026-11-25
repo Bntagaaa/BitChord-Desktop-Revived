@@ -95,7 +95,7 @@ internal fun DesktopPipUi(
                             verticalAlignment = Alignment.CenterVertically) {
                             val aspect = if (state.song?.isVideo == true) 16f / 9 else 1f
                             val width = minOf(bodyWidth * .36f, bodyHeight * aspect, 240.dp)
-                            PipCover(art, Modifier.width(width).aspectRatio(aspect))
+                            PipCover(art, state.song, Modifier.width(width).aspectRatio(aspect))
                             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(layout.gap.dp)) {
                                 PipMetadata(state, layout)
                                 if (preferences.lyrics) PipLyrics(state, position, layout.lyricSp, reduceAnimation,
@@ -108,7 +108,7 @@ internal fun DesktopPipUi(
                             val height = minOf(bodyHeight * (if (preferences.lyrics) .48f else .9f), bodyWidth * .32f / aspect, 144.dp)
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy((layout.gap * 2).dp)) {
-                                PipCover(art, Modifier.height(height).aspectRatio(aspect))
+                                PipCover(art, state.song, Modifier.height(height).aspectRatio(aspect))
                                 Box(Modifier.weight(1f)) { PipMetadata(state, layout) }
                             }
                             if (preferences.lyrics) PipLyrics(state, position, layout.lyricSp, reduceAnimation, Modifier.weight(1f).fillMaxWidth())
@@ -172,9 +172,13 @@ private fun PipBackground(url: String?, art: ImageBitmap?, reduceBlur: Boolean, 
 }
 
 @Composable
-private fun PipCover(image: ImageBitmap?, modifier: Modifier) {
+private fun PipCover(image: ImageBitmap?, song: com.music.bitchord.data.model.Song?, modifier: Modifier) {
     Box(modifier.clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = .06f)).testTag("pip-cover")) {
         if (image != null) Image(BitmapPainter(image), "Current artwork", Modifier.fillMaxSize().testTag("pip-artwork"), contentScale = ContentScale.Fit)
+        if (song?.isVideo == true) {
+            DesktopMusicVideoSurface(song.videoId, fit = true, onRendered = {}, modifier = Modifier.fillMaxSize(),
+                showFailure = false)
+        }
     }
 }
 

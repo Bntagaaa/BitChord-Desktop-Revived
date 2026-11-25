@@ -1,0 +1,32 @@
+cycle=1 first_decoded_us=13948 first_sink_input_us=13983 rendered=30 dropped=0 teardown_us=13305
+decoder_caps=video/x-raw(memory:DMABuf), format=(string)DMA_DRM, width=(int)1920, height=(int)1080, interlace-mode=(string)progressive, multiview-mode=(string)mono, multiview-flags=(GstVideoMultiviewFlagsSet)0:ffffffff:/right-view-first/left-flipped/left-flopped/right-flipped/right-flopped/half-aspect/mixed-mono, pixel-aspect-ratio=(fraction)1/1, framerate=(fraction)30/1, drm-format=(string)NV12:0x0100000000000002
+sink_caps=video/x-raw(memory:DMABuf), format=(string)DMA_DRM, width=(int)1920, height=(int)1080, interlace-mode=(string)progressive, multiview-mode=(string)mono, multiview-flags=(GstVideoMultiviewFlagsSet)0:ffffffff:/right-view-first/left-flipped/left-flopped/right-flipped/right-flopped/half-aspect/mixed-mono, pixel-aspect-ratio=(fraction)1/1, framerate=(fraction)30/1, drm-format=(string)NV12:0x0100000000000002
+cycle=2 first_decoded_us=13459 first_sink_input_us=13487 rendered=30 dropped=0 teardown_us=7195
+cycle=3 first_decoded_us=30459 first_sink_input_us=30522 rendered=30 dropped=0 teardown_us=17567
+cycle=4 first_decoded_us=36915 first_sink_input_us=36943 rendered=30 dropped=0 teardown_us=7211
+cycle=5 first_decoded_us=27601 first_sink_input_us=27638 rendered=30 dropped=0 teardown_us=8360
+cycle=6 first_decoded_us=40778 first_sink_input_us=40806 rendered=30 dropped=0 teardown_us=6365
+cycle=7 first_decoded_us=31789 first_sink_input_us=31817 rendered=30 dropped=0 teardown_us=11559
+cycle=8 first_decoded_us=42248 first_sink_input_us=42289 rendered=30 dropped=0 teardown_us=4984
+cycle=9 first_decoded_us=25797 first_sink_input_us=25835 rendered=30 dropped=0 teardown_us=4922
+cycle=10 first_decoded_us=26728 first_sink_input_us=26759 rendered=30 dropped=0 teardown_us=5683
+cycle=11 first_decoded_us=41798 first_sink_input_us=41828 rendered=30 dropped=0 teardown_us=3760
+cycle=12 first_decoded_us=32926 first_sink_input_us=32954 rendered=30 dropped=0 teardown_us=14484
+cycle=13 first_decoded_us=18923 first_sink_input_us=18959 rendered=30 dropped=0 teardown_us=8358
+cycle=14 first_decoded_us=28935 first_sink_input_us=28984 rendered=30 dropped=0 teardown_us=16460
+cycle=15 first_decoded_us=50921 first_sink_input_us=50948 rendered=30 dropped=0 teardown_us=7987
+cycle=16 first_decoded_us=14676 first_sink_input_us=14702 rendered=30 dropped=0 teardown_us=11281
+cycle=17 first_decoded_us=36627 first_sink_input_us=36659 rendered=30 dropped=0 teardown_us=5431
+cycle=18 first_decoded_us=25259 first_sink_input_us=25305 rendered=30 dropped=0 teardown_us=9165
+cycle=19 first_decoded_us=19203 first_sink_input_us=19242 rendered=30 dropped=0 teardown_us=16589
+cycle=20 first_decoded_us=35098 first_sink_input_us=35131 rendered=30 dropped=0 teardown_us=5182
+cycle=21 first_decoded_us=37670 first_sink_input_us=37700 rendered=30 dropped=0 teardown_us=3606
+cycle=22 first_decoded_us=29027 first_sink_input_us=29064 rendered=30 dropped=0 teardown_us=6280
+cycle=23 first_decoded_us=39991 first_sink_input_us=40019 rendered=30 dropped=0 teardown_us=8463
+cycle=24 first_decoded_us=31565 first_sink_input_us=31606 rendered=30 dropped=0 teardown_us=5914
+cycle=25 first_decoded_us=29466 first_sink_input_us=29495 rendered=30 dropped=0 teardown_us=7551
+cycle=26 first_decoded_us=29229 first_sink_input_us=29273 rendered=30 dropped=0 teardown_us=8066
+cycle=27 first_decoded_us=53800 first_sink_input_us=53828 rendered=30 dropped=0 teardown_us=9325
+cycle=28 first_decoded_us=46404 first_sink_input_us=46435 rendered=30 dropped=0 teardown_us=7030
+cycle=29 first_decoded_us=42215 first_sink_input_us=42243 rendered=30 dropped=0 teardown_us=7290
+cycle=30 first_decoded_us=35670 first_sink_input_us=35697 rendered=30 dropped=0 teardown_us=3708

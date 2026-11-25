@@ -179,6 +179,10 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
     }
+    // This opt-in probe uses the internal frame host in the Linux Compose pin.
+    if (targetOs == "linux") {
+        sourceSets.named("test") { kotlin.srcDir("src/linuxTest/kotlin") }
+    }
 }
 
 java {

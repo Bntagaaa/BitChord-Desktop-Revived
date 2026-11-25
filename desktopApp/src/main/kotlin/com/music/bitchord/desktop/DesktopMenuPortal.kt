@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,17 @@ internal class DesktopMenuPortalState {
     private var press: Offset? = null
     private var pressedAt = 0L
 
+    internal fun show(next: DesktopMenuPortalEntry) {
+        val previous = entry.value
+        if (previous?.owner === next.owner && previous.anchor == next.anchor &&
+            previous.horizontalBiasPx == next.horizontalBiasPx && previous.keepAdjacent == next.keepAdjacent &&
+            previous.content === next.content
+        ) return
+
+        entry.value = next
+        if (previous?.owner !== next.owner) previous?.onDismiss?.invoke()
+    }
+
     internal fun recordPress(position: Offset) {
         press = position + originInRoot
         pressedAt = System.nanoTime()
@@ -70,6 +82,7 @@ internal data class DesktopMenuPortalEntry(
     val anchor: Rect,
     val onDismiss: () -> Unit,
     val content: @Composable () -> Unit,
+    val keepAdjacent: Boolean = false,
 )
 
 internal val LocalDesktopMenuPortal = staticCompositionLocalOf<DesktopMenuPortalState?> { null }
@@ -118,18 +131,27 @@ internal fun DesktopMenuPortal(state: DesktopMenuPortalState) {
                 },
         )
         val margin = with(density) { 12.dp.roundToPx() }
+        val minAdjacentHeight = with(density) { 96.dp.roundToPx() }
         Layout(
-            content = { Box { shown.content() } },
+            content = { Box { key(shown.owner) { shown.content() } } },
             modifier = Modifier.fillMaxSize(),
         ) { measurables, constraints ->
-            val child = measurables.first().measure(constraints.copy(
+            val anchor = shown.anchor.translate(-state.originInRoot)
+            val below = anchor.bottom.roundToInt() + margin
+            val maxWindowHeight = (constraints.maxHeight - 2 * margin).coerceAtLeast(0)
+            val adjacentHeight = maxOf(
+                anchor.top.roundToInt() - 2 * margin,
+                constraints.maxHeight - below - margin,
+            )
+            val maxHeight = if (shown.keepAdjacent && adjacentHeight >= minAdjacentHeight) {
+                minOf(maxWindowHeight, adjacentHeight)
+            } else maxWindowHeight
+            val child = measurables.single().measure(constraints.copy(
                 minWidth = 0,
                 minHeight = 0,
                 maxWidth = (constraints.maxWidth - 2 * margin).coerceAtLeast(0),
-                maxHeight = (constraints.maxHeight - 2 * margin).coerceAtLeast(0),
+                maxHeight = maxHeight,
             ))
-            val anchor = shown.anchor.translate(-state.originInRoot)
-            val below = anchor.bottom.roundToInt() + margin
             val above = anchor.top.roundToInt() - child.height - margin
             val placeAbove = below + child.height + margin > constraints.maxHeight && above >= margin
             val y = if (placeAbove) above else below

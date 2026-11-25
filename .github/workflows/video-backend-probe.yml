@@ -1,0 +1,54 @@
+name: Video backend probe
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/video-backend-probe.yml'
+      - 'tools/video-backend-probe/**'
+      - 'desktopApp/src/linuxTest/**'
+      - 'desktopApp/src/test/kotlin/com/music/bitchord/desktop/DesktopGStreamerOverlayProbeTest.kt'
+
+permissions:
+  contents: read
+
+jobs:
+  headless-probe:
+    name: GStreamer software decode · ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build and probe dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad gstreamer1.0-libav ffmpeg
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          pacboy: >-
+            gcc:p
+            pkgconf:p
+            gst-plugins-base:p
+            gst-plugins-good:p
+            gst-plugins-bad:p
+            gst-libav:p
+      - name: Build and smoke-test decoder lifecycle on Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          CC: gcc
+        run: bash tools/video-backend-probe/smoke.sh video-probe-build
+      - name: Build and smoke-test decoder lifecycle on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          CC: gcc
+        run: bash tools/video-backend-probe/smoke.sh video-probe-build

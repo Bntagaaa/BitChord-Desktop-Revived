@@ -45,8 +45,8 @@ while [[ -r "/proc/$pid/status" ]]; do
   fds="$(find "/proc/$pid/fd" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l || true)"
   printf '%s,%s,%s,%s,%s,%s,%s,%s,%s\n' "$now" "$elapsed" "$rss" "$peak" "$pss" "$private_dirty" "$swap" "$threads" "$fds" >> "$csv"
 
-  # Heap/NMT are diagnostic only. Absence of a full JDK or enabled NMT is not a failure.
-  if (( elapsed % 300 < interval )) && command -v jcmd >/dev/null 2>&1; then
+  # Set BITCHORD_MEMORY_PROFILE_JCMD=0 for a native probe without a JVM.
+  if [[ "${BITCHORD_MEMORY_PROFILE_JCMD:-1}" == 1 ]] && (( elapsed % 300 < interval )) && command -v jcmd >/dev/null 2>&1; then
     jcmd "$pid" GC.heap_info > "$outdir/heap-$elapsed.txt" 2>&1 || true
     jcmd "$pid" VM.native_memory summary > "$outdir/nmt-$elapsed.txt" 2>&1 || true
   fi

@@ -642,7 +642,10 @@ fun CompactTrackRow(
             )
         }
         if (onLongPress != null) {
-            RowMoreButton(onClick = onLongPress)
+            // Compact rows are packed into 12dp-spaced columns on Home (and into
+            // multi-column lists on New). The button's 36dp hit/hover area
+            // must stay inside its own column instead of hanging 14dp into the next one.
+            RowMoreButton(onClick = onLongPress, outset = 0.dp)
         }
     }
 }

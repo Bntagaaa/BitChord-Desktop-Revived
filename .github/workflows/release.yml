@@ -514,7 +514,7 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           target_commitish: ${{ github.sha }}
-          name: BitChord ${{ env.RELEASE_TAG }}
+          name: Bitchord-Dekstop ${{ env.RELEASE_TAG }}
           draft: true
           prerelease: ${{ env.IS_PRERELEASE == 'true' }}
           body_path: ${{ env.RELEASE_NOTES_PATH }}

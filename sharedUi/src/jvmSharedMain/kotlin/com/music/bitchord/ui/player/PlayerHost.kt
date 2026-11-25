@@ -2,6 +2,7 @@ package com.music.bitchord.ui.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.music.bitchord.data.canvas.CanvasArtwork
@@ -98,6 +99,15 @@ interface PlayerHost {
      */
     @Composable
     fun rememberOutputPicker(onOpen: () -> Unit): () -> Unit
+
+    /** Returns true when the platform owns presentation of the output picker. */
+    @Composable
+    fun PlatformAudioOutputMenu(
+        anchor: Rect?,
+        onDismiss: () -> Unit,
+        onOpenPipeline: () -> Unit,
+        onOpenCast: () -> Unit,
+    ): Boolean = false
 
     fun selectAudioOutput(id: Int?)
 
@@ -374,11 +384,13 @@ class CanvasVideoSpec(
     val onRenderedChanged: (Boolean) -> Unit,
     val onFrameCaptured: (ImageBitmap) -> Unit,
     val refreshFrameEveryMs: Long?,
+    /** Longest edge of a capture. Zero disables sampling. */
     val frameCapturePx: Int,
     val onCoverChanged: (Float) -> Unit,
     val bottomFade: Float,
     val bottomFadeEndPx: Float?,
     val pausedForTransition: Boolean,
+    val playbackIdentity: String? = null,
 )
 
 /**
@@ -403,6 +415,7 @@ fun CanvasArtworkPlayer(
     bottomFade: Float = 0f,
     bottomFadeEndPx: Float? = null,
     pausedForTransition: Boolean = false,
+    playbackIdentity: String? = null,
 ) {
     PlayerPlatform.host.CanvasVideo(
         CanvasVideoSpec(
@@ -421,6 +434,7 @@ fun CanvasArtworkPlayer(
             bottomFade = bottomFade,
             bottomFadeEndPx = bottomFadeEndPx,
             pausedForTransition = pausedForTransition,
+            playbackIdentity = playbackIdentity,
         ),
         modifier,
     )
