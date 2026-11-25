@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,9 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -170,7 +169,7 @@ private fun ManageRow(code: String?, onClick: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.Rounded.Settings,
+                imageVector = SfStyleIcons.Settings,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.size(20.dp),
@@ -197,7 +196,7 @@ private fun ManageRow(code: String?, onClick: () -> Unit) {
             }
         }
         Icon(
-            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            imageVector = SfStyleIcons.ChevronRight,
             contentDescription = null,
             tint = Color.White.copy(alpha = 0.35f),
             modifier = Modifier.size(20.dp),

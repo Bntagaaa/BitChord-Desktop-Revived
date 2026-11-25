@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,8 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -326,7 +326,7 @@ private fun DialogField(
                 Modifier.size(26.dp).clip(CircleShape).clickable { onValueChange("") },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.Close, DesktopStrings["clear", "Clear"], tint = DesktopSecondary, modifier = Modifier.size(16.dp))
+                Icon(DesktopIcons.Actions.Close, DesktopStrings["clear", "Clear"], tint = DesktopSecondary, modifier = Modifier.size(16.dp))
             }
         }
     }

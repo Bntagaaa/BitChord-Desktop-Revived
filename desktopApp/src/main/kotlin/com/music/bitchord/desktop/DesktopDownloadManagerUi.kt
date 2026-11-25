@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import com.music.bitchord.ui.screens.desktopTopScrollFade
 
 import androidx.compose.foundation.background
@@ -18,10 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -153,7 +151,7 @@ private fun DownloadRow(item: DesktopDownloadItem) {
                 }
                 is DesktopDownloadState.Failed -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        Icons.Rounded.ErrorOutline,
+                        DesktopIcons.Status.Error,
                         contentDescription = null,
                         tint = DesktopAccent,
                         modifier = Modifier.size(13.dp),
@@ -171,11 +169,11 @@ private fun DownloadRow(item: DesktopDownloadItem) {
         }
         if (item.state is DesktopDownloadState.Failed) {
             IconButton(onClick = { DesktopDownloadQueue.retry(item.song.videoId) }) {
-                Icon(Icons.Rounded.Refresh, DesktopStrings["retry", "Retry"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))
+                Icon(DesktopIcons.Actions.Refresh, DesktopStrings["retry", "Retry"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))
             }
         }
         IconButton(onClick = { DesktopDownloadQueue.cancel(item.song.videoId) }) {
-            Icon(Icons.Rounded.Close, DesktopStrings["cancel", "Cancel"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))
+            Icon(DesktopIcons.Actions.Close, DesktopStrings["cancel", "Cancel"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))
         }
     }
 }

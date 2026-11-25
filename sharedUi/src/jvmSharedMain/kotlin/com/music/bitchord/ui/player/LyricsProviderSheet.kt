@@ -1,5 +1,9 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.ui.icons.BitChordIcons
+
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,10 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -208,19 +208,19 @@ private fun LyricsProviderRow(
                     modifier = Modifier.size(20.dp),
                 )
                 current || state == LyricsProviderState.FOUND -> Icon(
-                    imageVector = Icons.Rounded.Check,
+                    imageVector = BitChordIcons.Check,
                     contentDescription = null,
                     tint = Color.White.copy(alpha = if (current) 1f else 0.75f),
                     modifier = Modifier.size(21.dp),
                 )
                 state == LyricsProviderState.NOT_FOUND -> Icon(
-                    imageVector = Icons.Rounded.Close,
+                    imageVector = SfStyleIcons.Close,
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.4f),
                     modifier = Modifier.size(20.dp),
                 )
                 else -> Icon(
-                    imageVector = Icons.Rounded.Search,
+                    imageVector = BitChordIcons.Search,
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.size(20.dp),

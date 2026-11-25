@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,8 +17,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,7 +55,7 @@ internal fun DesktopKeyboardShortcutsModal(onDismiss: () -> Unit) {
                         fontWeight = FontWeight.Bold,
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Close keyboard shortcuts", tint = DesktopSecondary)
+                        Icon(DesktopIcons.Actions.Close, contentDescription = "Close keyboard shortcuts", tint = DesktopSecondary)
                     }
                 }
                 Row(

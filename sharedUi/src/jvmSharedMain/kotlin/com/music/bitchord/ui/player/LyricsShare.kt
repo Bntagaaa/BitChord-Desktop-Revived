@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,9 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -316,7 +315,7 @@ internal fun LyricsPickBar(
     ) {
         PickAction(
             label = stringResource(Res.string.cancel),
-            icon = Icons.Rounded.Close,
+            icon = SfStyleIcons.Close,
             accent = false,
             enabled = true,
             modifier = Modifier.weight(1f),
@@ -327,7 +326,7 @@ internal fun LyricsPickBar(
         )
         PickAction(
             label = stringResource(Res.string.share),
-            icon = Icons.Rounded.IosShare,
+            icon = SfStyleIcons.Share,
             accent = true,
             enabled = shareEnabled,
             modifier = Modifier.weight(1f),

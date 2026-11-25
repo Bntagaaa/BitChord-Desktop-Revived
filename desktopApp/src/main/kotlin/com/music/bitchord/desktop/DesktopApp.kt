@@ -1,10 +1,11 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.foundation.lazy.LazyListState
 import com.music.bitchord.ui.components.LocalShelfRowChrome
 import com.music.bitchord.ui.components.ShelfRowChrome
 import com.music.bitchord.ui.components.ShelfRow
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.pointer.isBackPressed
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -128,46 +129,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
-import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
-import androidx.compose.material.icons.rounded.AccountCircle
-import androidx.compose.material.icons.rounded.Album
-import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Bedtime
-import androidx.compose.material.icons.rounded.ChevronLeft
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.DeleteSweep
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Extension
-import androidx.compose.material.icons.rounded.FastForward
-import androidx.compose.material.icons.rounded.FastRewind
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.DownloadDone
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Fullscreen
-import androidx.compose.material.icons.rounded.FullscreenExit
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Headphones
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.NorthWest
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.PlayCircle
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.RemoveCircleOutline
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.Sort
-import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -287,15 +248,10 @@ import bitchord.desktopapp.generated.resources.logo
 import bitchord.desktopapp.generated.resources.bitchord_logo_original
 import bitchord.desktopapp.generated.resources.bitchord_no_music
 import bitchord.desktopapp.generated.resources.bitchord_wordmark
-import bitchord.desktopapp.generated.resources.player_transport_lyrics
 import bitchord.desktopapp.generated.resources.player_transport_next
 import bitchord.desktopapp.generated.resources.player_transport_pause
 import bitchord.desktopapp.generated.resources.player_transport_play
 import bitchord.desktopapp.generated.resources.player_transport_previous
-import bitchord.desktopapp.generated.resources.player_transport_repeat
-import bitchord.desktopapp.generated.resources.player_transport_repeat_one
-import bitchord.desktopapp.generated.resources.player_transport_shuffle
-import bitchord.desktopapp.generated.resources.player_transport_up_next
 import bitchord.desktopapp.generated.resources.sf_pro_display_bold
 import bitchord.desktopapp.generated.resources.sf_pro_display_heavy
 import bitchord.desktopapp.generated.resources.sf_pro_display_medium
@@ -2749,7 +2705,7 @@ internal fun BitChordDesktopApp(
                     videoId = null,
                     browseId = LOCAL_DOWNLOADS_ID,
                 ),
-                icon = Icons.Rounded.Download,
+                icon = DesktopIcons.Actions.Download,
             ),
             LibraryLink(
                 item = ShelfItem(
@@ -2759,7 +2715,7 @@ internal fun BitChordDesktopApp(
                     videoId = null,
                     browseId = LOCAL_MUSIC_ID,
                 ),
-                icon = Icons.Rounded.Folder,
+                icon = DesktopIcons.Settings.Folder,
             ),
             LibraryLink(
                 item = ShelfItem(
@@ -5793,10 +5749,10 @@ internal fun DesktopTopBar(
                     ) {
                         DesktopToolbarButton(onClick = { onShuffleChange(!shuffle) }, size = 32.dp) {
                             Icon(
-                                painterResource(Res.drawable.player_transport_shuffle),
+                                DesktopIcons.Player.Shuffle,
                                 DesktopStrings["shuffle", "Shuffle"],
-                                tint = if (shuffle) DesktopAccent else DesktopSecondary,
-                                modifier = Modifier.size(18.dp),
+                                tint = if (shuffle) DesktopAccent else DesktopForeground,
+                                modifier = Modifier.size(19.dp),
                             )
                         }
                         DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = 32.dp) {
@@ -5835,18 +5791,16 @@ internal fun DesktopTopBar(
                             onClick = { onRepeatModeChange(repeatMode.next()) },
                             size = 32.dp,
                         ) {
-                            val tint = if (repeatMode != DesktopRepeatMode.OFF) DesktopAccent else DesktopSecondary
+                            val tint = if (repeatMode != DesktopRepeatMode.OFF) DesktopAccent else DesktopForeground
                             Icon(
-                                painterResource(
-                                    if (repeatMode == DesktopRepeatMode.ONE) {
-                                        Res.drawable.player_transport_repeat_one
-                                    } else {
-                                        Res.drawable.player_transport_repeat
-                                    },
-                                ),
+                                if (repeatMode == DesktopRepeatMode.ONE) {
+                                    DesktopIcons.Player.RepeatOne
+                                } else {
+                                    DesktopIcons.Player.Repeat
+                                },
                                 "Repeat ${repeatMode.label()}",
                                 tint = tint,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(19.dp),
                             )
                         }
                     }
@@ -6034,10 +5988,10 @@ internal fun DesktopTopBar(
                 ) {
                     if (fullControls) {
                     Icon(
-                        Icons.Rounded.VolumeUp,
+                        DesktopIcons.Audio.VolumeUp,
                         DesktopStrings["d_volume", "Volume"],
-                        tint = DesktopSecondary,
-                        modifier = Modifier.size(17.dp),
+                        tint = DesktopForeground,
+                        modifier = Modifier.size(19.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     DesktopThinSlider(
@@ -6048,31 +6002,31 @@ internal fun DesktopTopBar(
                         modifier = Modifier.width(78.dp),
                     )
                     Spacer(Modifier.width(5.dp))
-                    DesktopAudioOutputButton(onOpenAudioOutput, iconSize = 19.dp)
+                    DesktopAudioOutputButton(onOpenAudioOutput, iconSize = 19.dp, tint = DesktopForeground)
                     }
                     if (fullControls || showCompactPanels) {
                     DesktopToolbarButton(onClick = onOpenLyrics, size = 32.dp) {
                         Icon(
-                            painterResource(Res.drawable.player_transport_lyrics),
+                            DesktopIcons.Player.Lyrics,
                             DesktopStrings["lyrics", "Lyrics"],
-                            tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopForeground else DesktopSecondary,
+                            tint = if (sidePanel == DesktopSidePanel.LYRICS) DesktopAccent else DesktopForeground,
                             modifier = Modifier.size(19.dp),
                         )
                     }
-                    DesktopPipLauncher(onOpenPip, enabled = song != null)
+                    DesktopPipLauncher(onOpenPip, enabled = song != null, tint = DesktopForeground, iconSize = 19.dp)
                     DesktopToolbarButton(onClick = onOpenQueue, size = 32.dp) {
                         Icon(
-                            painterResource(Res.drawable.player_transport_up_next),
+                            DesktopIcons.Player.Queue,
                             DesktopStrings["queue", "Queue"],
-                            tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopForeground else DesktopSecondary,
+                            tint = if (sidePanel == DesktopSidePanel.QUEUE) DesktopAccent else DesktopForeground,
                             modifier = Modifier.size(19.dp),
                         )
                     }
                     DesktopToolbarButton(onClick = onOpenDetails, size = 32.dp) {
                         Icon(
-                            Icons.Rounded.Info,
+                            DesktopIcons.Status.Info,
                             "Now playing details",
-                            tint = if (sidePanel == DesktopSidePanel.DETAILS) DesktopForeground else DesktopSecondary,
+                            tint = if (sidePanel == DesktopSidePanel.DETAILS) DesktopAccent else DesktopForeground,
                             modifier = Modifier.size(19.dp),
                         )
                     }
@@ -6204,7 +6158,7 @@ private fun DesktopSidebar(
                 )
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onToggleCollapse, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Rounded.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
+                    Icon(DesktopIcons.Navigation.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                 }
             }
             DesktopSidebarItem(DesktopPrimaryNavigationIcons.Home, DesktopStrings["home", "Home"], !settingsOpen && destination == DesktopDestination.LISTEN_NOW, collapsed = collapsed) {
@@ -6253,7 +6207,7 @@ private fun DesktopSidebar(
             Spacer(Modifier.height(12.dp))
             val playlistNavState = rememberLazyListState()
             if (collapsed) {
-                DesktopSidebarItem(Icons.AutoMirrored.Rounded.PlaylistPlay, "Browse playlists", false, collapsed = true) {
+                DesktopSidebarItem(DesktopIcons.Actions.PlaylistPlay, "Browse playlists", false, collapsed = true) {
                     onToggleCollapse()
                 }
                 Spacer(Modifier.weight(1f))
@@ -6264,14 +6218,14 @@ private fun DesktopSidebar(
             ) {
                 items(accountPlaylists, key = { "account:${it.browseId}" }) { playlist ->
                     DesktopSidebarItem(
-                        Icons.AutoMirrored.Rounded.PlaylistPlay,
+                        DesktopIcons.Actions.PlaylistPlay,
                         playlist.title,
                         !settingsOpen && openedCollectionId == playlist.browseId,
                     ) { onOpenAccountPlaylist(playlist) }
                 }
                 items(localPlaylists, key = { "local:${it.id}" }) { playlist ->
                     DesktopSidebarItem(
-                        Icons.AutoMirrored.Rounded.PlaylistPlay,
+                        DesktopIcons.Actions.PlaylistPlay,
                         playlist.title,
                         !settingsOpen && openedCollectionId == playlist.id,
                     ) { onOpenLocalPlaylist(playlist) }
@@ -6325,7 +6279,7 @@ private fun DesktopSidebar(
                 }
                 Spacer(Modifier.height(4.dp))
             }
-            DesktopSidebarItem(Icons.Rounded.Settings, "Settings", settingsOpen, collapsed = collapsed) {
+            DesktopSidebarItem(DesktopIcons.Settings.General, "Settings", settingsOpen, collapsed = collapsed) {
                 onOpenSettings()
             }
         }
@@ -6637,7 +6591,7 @@ internal fun DesktopSearchField(
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
-                                Icons.Rounded.Close,
+                                DesktopIcons.Actions.Close,
                                 "Clear search",
                                 tint = DesktopSecondary,
                                 modifier = Modifier.size(17.dp),
@@ -7024,13 +6978,13 @@ private fun DesktopArtistPage(
                                         ) {
                                             artist.subscriberCountText?.let {
                                                 DesktopStatChip(
-                                                    Icons.Rounded.Person,
+                                                    DesktopIcons.Settings.Account,
                                                     "${it.substringBefore(' ')} subscribers",
                                                 )
                                             }
                                             artist.monthlyListenerCount?.let {
                                                 DesktopStatChip(
-                                                    Icons.Rounded.GraphicEq,
+                                                    DesktopIcons.Audio.GraphicEq,
                                                     "${it.substringBefore(' ')} monthly listeners",
                                                 )
                                             }
@@ -7041,7 +6995,7 @@ private fun DesktopArtistPage(
                                 if (top.isEmpty() && shelves.isEmpty()) {
                                     item(key = "artist-empty") {
                                         DesktopEmptyPage(
-                                            Icons.Rounded.Person,
+                                            DesktopIcons.Settings.Account,
                                             "Nothing to show for $name",
                                             "YouTube Music has no songs or releases on this page.",
                                         )
@@ -7170,7 +7124,7 @@ private fun DesktopArtistBanner(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Icons.Rounded.PlayArrow,
+                        DesktopIcons.Player.Play,
                         contentDescription = "Play $name",
                         tint = appleArt?.keyColor?.let { Color(it) } ?: Color(0xFF654C3A),
                         modifier = Modifier.size(31.dp),
@@ -7607,12 +7561,12 @@ private fun DesktopPlaylistDownloadTile(
             }
             when {
                 progress.complete -> DesktopPlaylistDownloadTileBadge(
-                    Icons.Rounded.DownloadDone,
+                    DesktopIcons.Actions.Downloaded,
                     "Available offline",
                     DesktopAccent,
                 )
                 stale -> DesktopPlaylistDownloadTileBadge(
-                    Icons.Rounded.Refresh,
+                    DesktopIcons.Actions.Refresh,
                     "Update available",
                     DesktopSecondary,
                 )
@@ -7870,7 +7824,7 @@ private fun DesktopLocalMusicPage(
                 DesktopEmptyPage(emptyIcon, emptyTitle, emptyDescription)
             } else if (drillDown != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { drillDown = null }) { Icon(Icons.Rounded.ArrowBack, DesktopStrings["back", "Back"]) }
+                    IconButton(onClick = { drillDown = null }) { Icon(DesktopIcons.Navigation.ArrowBack, DesktopStrings["back", "Back"]) }
                     Text(drillDown!!.first, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.height(6.dp))
@@ -8027,7 +7981,6 @@ private fun DesktopLibraryGroupingContent(
     }
 }
 
-/** Mobile's section order, with desktop-only groups placed beside their closest mobile counterpart. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DesktopCollectionPage(
@@ -8260,7 +8213,7 @@ private fun DesktopCollectionPage(
                                 compact = compactCollectionHeader,
                             )
                             DesktopCircleButton(
-                                if (searching) Icons.Rounded.Close else BitChordIcons.Search,
+                                if (searching) DesktopIcons.Actions.Close else BitChordIcons.Search,
                                 if (searching) DesktopStrings["close_search", "Close search"] else DesktopStrings["search_this_list", "Search this list"],
                                 onClick = {
                                     searching = !searching
@@ -8270,7 +8223,7 @@ private fun DesktopCollectionPage(
                             )
                             Box {
                                 DesktopCircleButton(
-                                    Icons.Rounded.MoreHoriz,
+                                    DesktopIcons.Actions.More,
                                     DesktopStrings["more", "More"],
                                     onClick = { moreOpen = true },
                                     size = buttonSize,
@@ -8530,7 +8483,7 @@ private fun DesktopCollectionSongRow(
             onRemove?.let { remove ->
                 IconButton(onClick = { remove(song) }, modifier = Modifier.size(34.dp)) {
                     Icon(
-                        Icons.Rounded.RemoveCircleOutline,
+                        DesktopIcons.Actions.RemoveCircle,
                         DesktopStrings["d_remove_from_playlist", "Remove from playlist"],
                         tint = DesktopSecondary,
                         modifier = Modifier.size(18.dp),
@@ -8783,7 +8736,7 @@ internal object DesktopShelfRowChrome : ShelfRowChrome {
             row()
             DesktopShelfArrow(
                 alignment = Alignment.CenterStart,
-                icon = Icons.Rounded.ChevronLeft,
+                icon = DesktopIcons.Navigation.ChevronLeft,
                 description = DesktopStrings["d_scroll_left", "Scroll left"],
                 visible = hovered && state.canScrollBackward,
                 onClick = { page(forward = false) },
@@ -9048,7 +9001,7 @@ private fun DesktopLoadingPage(label: String) {
 
 @Composable
 private fun DesktopErrorPage(message: String, onRetry: () -> Unit) {
-    DesktopEmptyPage(Icons.Rounded.Tune, "Something went wrong", message, onRetry, "Try again")
+    DesktopEmptyPage(DesktopIcons.Settings.Tune, "Something went wrong", message, onRetry, "Try again")
 }
 
 @Composable

@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import com.music.bitchord.ui.screens.desktopTopScrollFade
 
 import androidx.compose.foundation.background
@@ -24,10 +26,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.ManageAccounts
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -85,7 +83,7 @@ internal fun DesktopAccountButton(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.Person,
+                    DesktopIcons.Settings.Account,
                     DesktopStrings["accounts", "Accounts"],
                     tint = DesktopForeground.copy(alpha = 0.85f),
                     modifier = Modifier.size(16.dp),
@@ -211,7 +209,7 @@ internal fun DesktopAccountSelector(
                 item { DesktopSelectorAction(BitChordIcons.Plus, "Add account", onAddAccount) }
                 if (accounts.isNotEmpty()) {
                     item {
-                        DesktopSelectorAction(Icons.Rounded.ManageAccounts, "Manage accounts") {
+                        DesktopSelectorAction(DesktopIcons.Settings.ManageAccounts, "Manage accounts") {
                             managing = !managing
                         }
                     }
@@ -250,7 +248,7 @@ private fun DesktopProfileRow(
             )
         } else {
             Icon(
-                Icons.Rounded.Person,
+                DesktopIcons.Settings.Account,
                 null,
                 tint = DesktopSecondary,
                 modifier = Modifier.size(32.dp),
@@ -534,7 +532,7 @@ internal fun DesktopSignInDialog(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
-                                Icons.Rounded.ContentPaste,
+                                DesktopIcons.Actions.Paste,
                                 null,
                                 tint = DesktopForeground.copy(alpha = 0.85f),
                                 modifier = Modifier.size(18.dp),

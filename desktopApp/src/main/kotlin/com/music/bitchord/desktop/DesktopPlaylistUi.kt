@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import com.music.bitchord.ui.screens.desktopTopScrollFade
 
 import androidx.compose.foundation.background
@@ -25,12 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Link
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -183,7 +179,7 @@ private fun NewPlaylistForm(
     ) {
         onBack?.let {
             IconButton(onClick = it) {
-                Icon(Icons.Rounded.ArrowBack, DesktopStrings["back", "Back"], tint = DesktopForeground)
+                Icon(DesktopIcons.Navigation.ArrowBack, DesktopStrings["back", "Back"], tint = DesktopForeground)
             }
         }
         Column(Modifier.weight(1f)) {
@@ -231,7 +227,7 @@ private fun NewPlaylistForm(
                 Modifier.size(28.dp).clip(CircleShape).clickable { name = "" },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.Close, DesktopStrings["clear_name", "Clear name"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))
+                Icon(DesktopIcons.Actions.Close, DesktopStrings["clear_name", "Clear name"], tint = DesktopSecondary, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -499,7 +495,7 @@ private fun PrivacyPill(icon: ImageVector, label: String, selected: Boolean, onC
 
 private val PlaylistPrivacy.icon: ImageVector
     get() = when (this) {
-        PlaylistPrivacy.PRIVATE -> Icons.Rounded.Lock
-        PlaylistPrivacy.UNLISTED -> Icons.Rounded.Link
-        PlaylistPrivacy.PUBLIC -> Icons.Rounded.Public
+        PlaylistPrivacy.PRIVATE -> DesktopIcons.Settings.Lock
+        PlaylistPrivacy.UNLISTED -> DesktopIcons.Actions.Link
+        PlaylistPrivacy.PUBLIC -> DesktopIcons.Settings.Language
     }

@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -17,10 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Fullscreen
-import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
@@ -107,13 +105,13 @@ internal fun DesktopPlayerSheet(
             val fullscreen by DesktopWindowMode.fullScreen.collectAsState()
             Box(Modifier.align(Alignment.TopStart).padding(8.dp)) {
                 DesktopToolbarButton(onClick = onDismiss, size = 32.dp) {
-                    Icon(Icons.Rounded.KeyboardArrowDown, "Minimize player", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(DesktopIcons.Window.ExpandMore, "Minimize player", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
             Row(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                 if (onOpenPip != null) DesktopPipLauncher(onOpenPip, tint = Color.White)
                 DesktopToolbarButton(onClick = { DesktopWindowMode.toggle() }, size = 32.dp) {
-                    Icon(if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen, "Toggle fullscreen", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(if (fullscreen) DesktopIcons.Window.ExitFullscreen else DesktopIcons.Window.Fullscreen, "Toggle fullscreen", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
             // The handle the landscape player draws at its top edge, made to do

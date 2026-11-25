@@ -1,5 +1,9 @@
 package com.music.bitchord.ui.screens
 
+import com.music.bitchord.ui.icons.BitChordIcons
+
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import com.music.bitchord.ui.components.PlayingAccent
 
 
@@ -54,16 +58,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.NorthWest
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -823,7 +817,7 @@ private fun TopResultCard(
         ) {
             IconButton(onClick = onPlaylist) {
                 Icon(
-                    Icons.AutoMirrored.Rounded.PlaylistAdd,
+                    SfStyleIcons.PlaylistAdd,
                     contentDescription = stringResource(Res.string.playlist_action),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -833,7 +827,7 @@ private fun TopResultCard(
                 modifier = Modifier.size(44.dp).clip(CircleShape).background(PlayingAccent),
             ) {
                 Icon(
-                    Icons.Rounded.PlayArrow,
+                    SfStyleIcons.Play,
                     contentDescription = stringResource(Res.string.play),
                     tint = Color.White,
                 )
@@ -909,7 +903,7 @@ private fun SuggestionRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            Icons.Rounded.Search,
+            BitChordIcons.Search,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
@@ -935,7 +929,7 @@ private fun SuggestionRow(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.NorthWest,
+                    SfStyleIcons.NorthWest,
                     contentDescription = stringResource(Res.string.recent_search_edit, term),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
@@ -1177,7 +1171,7 @@ private fun RecentSearchEntityRow(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Rounded.Close,
+                SfStyleIcons.Close,
                 contentDescription = stringResource(Res.string.recent_search_remove, entity.title),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
@@ -1267,7 +1261,7 @@ private fun SearchBrowseShelf(
                     },
                     enabled = scrollState.value > 0,
                 ) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Scroll $title left")
+                    Icon(SfStyleIcons.ArrowBack, contentDescription = "Scroll $title left")
                 }
                 IconButton(
                     onClick = {
@@ -1277,7 +1271,7 @@ private fun SearchBrowseShelf(
                     },
                     enabled = scrollState.value < scrollState.maxValue,
                 ) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Scroll $title right")
+                    Icon(SfStyleIcons.ArrowForward, contentDescription = "Scroll $title right")
                 }
             }
             Row(

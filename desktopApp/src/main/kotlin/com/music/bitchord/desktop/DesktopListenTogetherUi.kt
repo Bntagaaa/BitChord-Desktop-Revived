@@ -1,5 +1,7 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import com.music.bitchord.ui.screens.desktopTopScrollFade
 
 import androidx.compose.foundation.background
@@ -22,15 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.LockOpen
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.RemoveCircleOutline
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -111,7 +104,7 @@ internal fun DesktopListenTogetherDialog(autoplayEnabled: Boolean, onDismiss: ()
                 }
                 // A page is left by the window's back, as every other page is.
                 if (!LocalDesktopPanelIsPage.current) {
-                    IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, "Close") }
+                    IconButton(onClick = onDismiss) { Icon(DesktopIcons.Actions.Close, "Close") }
                 }
             }
             if (!LocalDesktopPanelIsPage.current) HorizontalDivider(color = DesktopCardEdge)
@@ -296,7 +289,7 @@ private fun PartyLanding(
         item {
             Column(Modifier.desktopCardInset(RoundedCornerShape(14.dp)).padding(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Settings, null, tint = DesktopSecondary, modifier = Modifier.size(20.dp))
+                    Icon(DesktopIcons.Settings.General, null, tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text("Party server", fontWeight = FontWeight.Medium)
@@ -359,7 +352,7 @@ private fun JoinConfirmation(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(Icons.Rounded.Groups, null, tint = DesktopAccent, modifier = Modifier.size(54.dp))
+        Icon(DesktopIcons.Status.Groups, null, tint = DesktopAccent, modifier = Modifier.size(54.dp))
         Spacer(Modifier.height(14.dp))
         Text(
             if (preview.hostName.isBlank()) "Join this party?" else "Join ${preview.hostName}’s party?",
@@ -435,7 +428,7 @@ private fun RoomHero(state: DesktopListenTogether.State) {
         Spacer(Modifier.width(10.dp))
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             TextButton(onClick = { DesktopExternalLinks.copy(invite) }) {
-                Icon(Icons.Rounded.ContentCopy, null, modifier = Modifier.size(17.dp))
+                Icon(DesktopIcons.Actions.Copy, null, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(7.dp))
                 Text("Copy invite")
             }
@@ -509,7 +502,7 @@ private fun HostControls(state: DesktopListenTogether.State) {
         Text("HOST CONTROLS", color = DesktopSecondary, style = MaterialTheme.typography.labelSmall)
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(if (state.hostOnlyControl) Icons.Rounded.Lock else Icons.Rounded.LockOpen, null, modifier = Modifier.size(20.dp))
+            Icon(if (state.hostOnlyControl) DesktopIcons.Settings.Lock else DesktopIcons.Settings.LockOpen, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text("Only I can control playback")
@@ -575,7 +568,7 @@ private fun MemberRow(member: PartyMember, isYou: Boolean, canKick: Boolean, onK
             )
         }
         if (canKick) IconButton(onClick = onKick, modifier = Modifier.size(30.dp)) {
-            Icon(Icons.Rounded.RemoveCircleOutline, "Remove", tint = DesktopDestructive, modifier = Modifier.size(18.dp))
+            Icon(DesktopIcons.Actions.RemoveCircle, "Remove", tint = DesktopDestructive, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -590,7 +583,7 @@ private fun PartyAvatar(url: String?, size: Int, fallback: String = "") {
             contentAlignment = Alignment.Center,
         ) {
             if (fallback.isNotBlank()) Text(fallback.take(1).uppercase(), fontWeight = FontWeight.Bold)
-            else Icon(Icons.Rounded.Person, null, tint = DesktopSecondary, modifier = Modifier.size((size * .55f).dp))
+            else Icon(DesktopIcons.Settings.Account, null, tint = DesktopSecondary, modifier = Modifier.size((size * .55f).dp))
         }
     }
 }

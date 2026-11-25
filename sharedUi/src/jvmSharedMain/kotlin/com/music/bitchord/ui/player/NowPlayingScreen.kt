@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import com.music.bitchord.data.settings.PlayerTheme
 
 import androidx.compose.animation.animateColorAsState
@@ -65,13 +67,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Undo
-import androidx.compose.material.icons.rounded.FastForward
-import androidx.compose.material.icons.rounded.FastRewind
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.IosShare
-import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -3538,7 +3533,7 @@ fun NowPlayingScreen(
                             val enabled = if (showNext) hasNext else hasPrevious
                             val hintAlpha = if (enabled) 0.85f else 0.3f
                             Icon(
-                                imageVector = if (showNext) Icons.Rounded.FastForward else Icons.Rounded.FastRewind,
+                                imageVector = if (showNext) SfStyleIcons.FastForward else SfStyleIcons.FastRewind,
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier
@@ -3715,10 +3710,10 @@ fun NowPlayingScreen(
                                 !lyrics.isNullOrEmpty() && (!lyricsControlsOpen || lyricPicker.picking)
                             CircleGlyph(
                                 icon = when {
-                                    showRevertCue -> Icons.AutoMirrored.Rounded.Undo
-                                    lyricsShareGlyphVisible && lyricPicker.picking -> Icons.Rounded.Close
-                                    lyricsShareGlyphVisible -> Icons.Rounded.IosShare
-                                    else -> Icons.Rounded.MoreHoriz
+                                    showRevertCue -> SfStyleIcons.Undo
+                                    lyricsShareGlyphVisible && lyricPicker.picking -> SfStyleIcons.Close
+                                    lyricsShareGlyphVisible -> SfStyleIcons.Share
+                                    else -> SfStyleIcons.MoreHorizontal
                                 },
                                 contentDescription = stringResource(
                                     when {

@@ -1,5 +1,9 @@
 package com.music.bitchord.ui.components
 
+import com.music.bitchord.ui.icons.BitChordIcons
+
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import com.music.bitchord.sharedui.resources.*
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
@@ -18,9 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -95,7 +96,7 @@ fun SearchField(
         // pressing it is the only thing that runs a search, leaving it
         // decorative would mean the keyboard's own key was the single way in.
         Icon(
-            Icons.Rounded.Search,
+            BitChordIcons.Search,
             contentDescription = stringResource(Res.string.search),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
@@ -149,7 +150,7 @@ fun SearchField(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.Close,
+                    SfStyleIcons.Close,
                     contentDescription = stringResource(Res.string.clear_search),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),

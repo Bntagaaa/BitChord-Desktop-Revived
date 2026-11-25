@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
@@ -50,9 +52,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -1493,7 +1492,7 @@ internal fun TranslationToggleButton(
             )
         } else {
             Icon(
-                imageVector = Icons.Rounded.Translate,
+                imageVector = SfStyleIcons.Translate,
                 contentDescription = stringResource(
                     if (showingTranslation) Res.string.show_original_lyrics
                     else Res.string.translate_lyrics,
@@ -1551,7 +1550,7 @@ internal fun RomanizationToggleButton(
             )
         } else {
             Icon(
-                imageVector = Icons.Rounded.Language,
+                imageVector = SfStyleIcons.Language,
                 contentDescription = stringResource(
                     if (showingRomanization) Res.string.show_original_lyrics
                     else Res.string.romanize_lyrics,

@@ -1,5 +1,9 @@
 package com.music.bitchord.ui.player
 
+import com.music.bitchord.ui.icons.BitChordIcons
+
+import com.music.bitchord.ui.icons.SfStyleIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,20 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.rounded.VolumeOff
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.Bluetooth
-import androidx.compose.material.icons.rounded.Cast
-import androidx.compose.material.icons.rounded.CastConnected
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Headphones
-import androidx.compose.material.icons.rounded.PhoneAndroid
-import androidx.compose.material.icons.rounded.Speaker
-import androidx.compose.material.icons.rounded.Tv
-import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -163,7 +153,7 @@ private fun AudioPipelineRow(onClick: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.Rounded.GraphicEq,
+                imageVector = SfStyleIcons.GraphicEq,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.size(20.dp),
@@ -188,7 +178,7 @@ private fun AudioPipelineRow(onClick: () -> Unit) {
             )
         }
         Icon(
-            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            imageVector = SfStyleIcons.ChevronRight,
             contentDescription = null,
             tint = Color.White.copy(alpha = 0.35f),
             modifier = Modifier.size(20.dp),
@@ -228,7 +218,7 @@ private fun CastRow(cast: CastUi, onClick: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = if (casting) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
+                imageVector = if (casting) SfStyleIcons.CastConnected else SfStyleIcons.Cast,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = if (casting) 1f else 0.7f),
                 modifier = Modifier.size(21.dp),
@@ -261,7 +251,7 @@ private fun CastRow(cast: CastUi, onClick: () -> Unit) {
             )
         }
         Icon(
-            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            imageVector = SfStyleIcons.ChevronRight,
             contentDescription = null,
             tint = Color.White.copy(alpha = 0.35f),
             modifier = Modifier.size(20.dp),
@@ -333,7 +323,7 @@ private fun OutputRow(
         }
         if (active) {
             Icon(
-                imageVector = Icons.Rounded.Check,
+                imageVector = BitChordIcons.Check,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(20.dp),
@@ -386,7 +376,7 @@ private fun VolumeRow(routeKey: Any) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = if (level > 0f) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff,
+            imageVector = if (level > 0f) SfStyleIcons.VolumeUp else SfStyleIcons.VolumeOff,
             contentDescription = null,
             tint = Color.White.copy(alpha = 0.6f),
             modifier = Modifier.size(20.dp),
@@ -408,12 +398,12 @@ private fun VolumeRow(routeKey: Any) {
 }
 
 private fun iconFor(kind: AudioOutputKind): ImageVector = when (kind) {
-    AudioOutputKind.PHONE -> Icons.Rounded.PhoneAndroid
-    AudioOutputKind.WIRED -> Icons.Rounded.Headphones
-    AudioOutputKind.USB -> Icons.Rounded.Usb
-    AudioOutputKind.BLUETOOTH -> Icons.Rounded.Bluetooth
-    AudioOutputKind.HDMI -> Icons.Rounded.Tv
-    AudioOutputKind.OTHER -> Icons.Rounded.Speaker
+    AudioOutputKind.PHONE -> SfStyleIcons.Phone
+    AudioOutputKind.WIRED -> SfStyleIcons.Headphones
+    AudioOutputKind.USB -> SfStyleIcons.Usb
+    AudioOutputKind.BLUETOOTH -> SfStyleIcons.Bluetooth
+    AudioOutputKind.HDMI -> SfStyleIcons.Tv
+    AudioOutputKind.OTHER -> SfStyleIcons.Speaker
 }
 
 /** How many times the level is re-read after a route change, and how far apart. */
