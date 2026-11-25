@@ -5025,6 +5025,7 @@ internal fun BitChordDesktopApp(
                                             DesktopSettingsPage.LICENSES -> DesktopLicensesPage()
                                             else -> DesktopSettingsScreen(
                                                 page = page,
+                                                bottomScrollInset = contentPadding.calculateBottomPadding(),
                                                 onOpenPage = ::openSettingsPage,
                                                 onBack = ::goBack,
                                                 scroll = settingsScroll,

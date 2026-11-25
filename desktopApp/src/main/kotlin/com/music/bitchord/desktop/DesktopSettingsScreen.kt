@@ -2,6 +2,8 @@ package com.music.bitchord.desktop
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
@@ -34,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.desktop.DesktopSettingsPage.*
 import com.music.bitchord.data.settings.AutomixPerformanceMode
@@ -49,6 +52,7 @@ import kotlin.math.roundToInt
 @Composable
 internal fun DesktopSettingsScreen(
     page: DesktopSettingsPage,
+    bottomScrollInset: Dp,
     onOpenPage: (DesktopSettingsPage) -> Unit,
     onBack: () -> Unit,
     scroll: DesktopSettingsScroll,
@@ -781,11 +785,11 @@ internal fun DesktopSettingsScreen(
         if (page == MAIN) {
             DesktopSettingsSearch(query, onQueryChange)
         }
-        LazyColumn(
+        DesktopSettingsList(
             state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth().desktopTopScrollFade(listState),
-            contentPadding = PaddingValues(top = if (page == MAIN) 10.dp else 0.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(26.dp),
+            modifier = Modifier.weight(1f),
+            topPadding = if (page == MAIN) 10.dp else 0.dp,
+            bottomScrollInset = bottomScrollInset,
         ) {
             if (overview) {
                 item("categories") { DesktopSettingsOverview(updater != null, audioQuality.label, onOpenPage) }
@@ -825,6 +829,28 @@ internal fun DesktopSettingsScreen(
             onTest = onTestSource,
         )
     }
+}
+
+/**
+ * Keep the viewport full height so rows can scroll behind the floating player.
+ * Put the shell's clearance inside the list instead, so its final row or About
+ * footer can scroll completely above the player without a permanent bottom gap.
+ */
+@Composable
+internal fun DesktopSettingsList(
+    state: LazyListState,
+    modifier: Modifier,
+    topPadding: Dp,
+    bottomScrollInset: Dp,
+    content: LazyListScope.() -> Unit,
+) {
+    LazyColumn(
+        state = state,
+        modifier = modifier.fillMaxWidth().desktopTopScrollFade(state),
+        contentPadding = PaddingValues(top = topPadding, bottom = 28.dp + bottomScrollInset),
+        verticalArrangement = Arrangement.spacedBy(26.dp),
+        content = content,
+    )
 }
 
 /** The centered About footer, matching the Android-style version wordmark. */
