@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -248,19 +249,21 @@ internal fun LandscapeArtwork(
                     modifier = Modifier.fillMaxSize(0.36f),
                 )
             }
-            AsyncImage(
-                model = artRequest,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                onState = onArtState,
-                // Keep the sleeve available for the fade and fallback. An opaque
-                // cropped clip already fills the same layer.
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawWithContent {
-                        if (!canvasRendered || (artLoaded && canvasCover.floatValue < 1f)) drawContent()
-                    },
-            )
+            key(playbackIdentity) {
+                AsyncImage(
+                    model = artRequest,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    onState = onArtState,
+                    // Keep the sleeve available for the fade and fallback. An opaque
+                    // cropped clip already fills the same layer.
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .drawWithContent {
+                            if (!canvasRendered || (artLoaded && canvasCover.floatValue < 1f)) drawContent()
+                        },
+                )
+            }
             canvas?.let { clip ->
                 CanvasArtworkPlayer(
                     canvas = clip,

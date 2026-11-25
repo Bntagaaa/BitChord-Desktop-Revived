@@ -3309,45 +3309,19 @@ fun NowPlayingScreen(
                                     )
                                 }
                             }
-                            AsyncImage(
-                                // Decode at the sleeve's *expanded* size, always.
-                                // Coil otherwise sizes the decode to however large
-                                // this is when the request goes out — and changing
-                                // track from the queue does that while the sleeve is
-                                // collapsed to a thumbnail, leaving a thumbnail-sized
-                                // bitmap to be blown back up when the queue closes.
-                                // Skipping tracks with the transport keeps it sharp
-                                // only because the sleeve happens to be full size at
-                                // that moment.
-                                //
-                                // Asked for at the source's own size rather than the
-                                // sleeve's: the banner is taller than the card is
-                                // wide, and the one bitmap has to serve both shapes
-                                // with nothing to upscale between them.
-                                model = art.request,
-                                contentDescription = null,
-                                // Video thumbnails are 16:9; letterboxing them inside
-                                // the square sleeve looks like a broken frame.
-                                contentScale = ContentScale.Crop,
-                                onState = art::onState,
-                                // TextureView-backed canvas frames can arrive
-                                // before Coil has decoded the sleeve. Alpha alone
-                                // doesn't hide this layer for that window: a
-                                // TextureView composites through its own hardware
-                                // layer, and on some devices that layer wins the
-                                // stacking order against a sibling Compose layer
-                                // even when that layer's alpha is zero — so the
-                                // still image's empty placeholder still shows
-                                // through, above a perfectly healthy animated
-                                // cover. Skipping the draw call outright leaves
-                                // nothing there to composite, in the wrong order
-                                // or otherwise; the request stays mounted so
-                                // loading still finishes in the background and
-                                // [PlayerArtwork.loaded] still flips the moment it does.
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .drawWithContent { if (art.loaded || !canvasRendered) drawContent() },
-                            )
+                            key(song.videoId) {
+                                AsyncImage(
+                                    // Use the expanded size even when the sleeve is collapsed.
+                                    model = art.request,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    onState = art::onState,
+                                    // A separate Canvas layer can land before the still cover.
+                                    modifier = Modifier.fillMaxSize().drawWithContent {
+                                        if (art.loaded || !canvasRendered) drawContent()
+                                    },
+                                )
+                            }
 
                             // Where the clip plays when it can't have the banner:
                             // inside the same clip as the still art, taking the

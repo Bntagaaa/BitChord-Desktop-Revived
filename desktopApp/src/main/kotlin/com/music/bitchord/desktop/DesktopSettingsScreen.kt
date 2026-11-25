@@ -735,8 +735,8 @@ internal fun DesktopSettingsScreen(
         ) {
             cacheScope.launch(Dispatchers.IO) {
                 DesktopArtworkCache.trimMemory()
-                DesktopImageLoader.clearCache()
-                withContext(Dispatchers.Main) { imagesCleared = true }
+                val cleared = runCatching { DesktopImageLoader.clearCache() }.isSuccess
+                withContext(Dispatchers.Main) { imagesCleared = cleared }
             }
         }
     }
