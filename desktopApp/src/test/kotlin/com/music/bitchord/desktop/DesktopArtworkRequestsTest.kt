@@ -33,6 +33,7 @@ class DesktopArtworkRequestsTest {
         }.toByteArray()
         val attempts = AtomicInteger()
         val unavailable = AtomicInteger()
+        val corrupt = AtomicInteger()
         val rateLimited = AtomicInteger()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/art") { exchange ->
@@ -45,6 +46,14 @@ class DesktopArtworkRequestsTest {
                     it.sendResponseHeaders(200, png.size.toLong())
                     it.responseBody.write(png)
                 }
+            }
+        }
+        server.createContext("/bad-data") {
+            it.use {
+                val body = if (corrupt.incrementAndGet() == 1) byteArrayOf(1, 2, 3) else png
+                it.responseHeaders.add("Content-Type", "image/png")
+                it.sendResponseHeaders(200, body.size.toLong())
+                it.responseBody.write(body)
             }
         }
         server.createContext("/missing") {
@@ -74,6 +83,9 @@ class DesktopArtworkRequestsTest {
             loader.memoryCache?.clear()
             assertIs<SuccessResult>(loader.execute(cover))
             assertEquals(2, attempts.get(), "Warm disk cache avoids another network request")
+            assertIs<ErrorResult>(loader.execute(request("$base/bad-data")))
+            assertIs<SuccessResult>(loader.execute(request("$base/bad-data")))
+            assertEquals(2, corrupt.get(), "A corrupt response cannot poison the disk-cache entry")
             assertIs<ErrorResult>(loader.execute(request("$base/missing")))
             assertIs<ErrorResult>(loader.execute(request("$base/missing")))
             assertEquals(2, unavailable.get(), "A missing cover is neither retried nor negatively cached")

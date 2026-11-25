@@ -4,6 +4,7 @@ import coil3.getExtra
 import coil3.intercept.Interceptor
 import coil3.network.HttpException
 import coil3.request.ErrorResult
+import coil3.request.ImageRequest
 import coil3.request.ImageResult
 import coil3.request.SuccessResult
 import com.music.bitchord.ui.player.CurrentTrackArtwork
@@ -27,6 +28,7 @@ internal class DesktopArtworkRequests(
     maxConcurrent: Int = 5,
     private val clock: Clock = Clock.systemUTC(),
     private val jitterMs: () -> Long = { Random.nextLong(150) },
+    private val invalidateDisk: (String) -> Boolean = { false },
     private val trace: ((String) -> Unit)? = null,
 ) : Interceptor {
     private class RequestGroup(val gate: Mutex = Mutex(), var readers: Int = 0)
@@ -66,7 +68,9 @@ internal class DesktopArtworkRequests(
                         return@withLock result
                     }
                     val error = (result as ErrorResult).throwable
-                    val wait = retryDelay(error, attempt)
+                    val wait = if (error is ArtworkDecodeException) {
+                        recoverDecode(chain.request, url, error, attempt)
+                    } else retryDelay(error, attempt)
                     trace?.invoke("$prefix event=failed type=${error.javaClass.simpleName} " +
                         "status=${(error as? HttpException)?.response?.code} retry_ms=$wait")
                     if (wait == null) return@withLock result
@@ -84,7 +88,13 @@ internal class DesktopArtworkRequests(
         }
     }
 
-    internal private fun retryDelay(error: Throwable, attempt: Int): Long? {
+    private fun recoverDecode(request: ImageRequest, url: String, error: ArtworkDecodeException, attempt: Int): Long? {
+        // Coil has closed its snapshot by the time the decode error reaches the interceptor.
+        val removed = runCatching { invalidateDisk(request.diskCacheKey ?: url) }.getOrDefault(false)
+        return if (removed && error.fromDisk && attempt < MAX_RETRIES) 0L else null
+    }
+
+    private fun retryDelay(error: Throwable, attempt: Int): Long? {
         if (attempt >= MAX_RETRIES) return null
         val response = (error as? HttpException)?.response
         if (response != null) {
@@ -118,3 +128,5 @@ internal class DesktopArtworkRequests(
         val RETRYABLE_HTTP = setOf(408, 429, 500, 502, 503, 504)
     }
 }
+
+internal class ArtworkDecodeException(val fromDisk: Boolean, cause: Exception) : Exception(cause)
