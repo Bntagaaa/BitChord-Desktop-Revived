@@ -184,8 +184,10 @@ internal class DesktopCanvasDecoder(
         val context = avcodec_alloc_context3(decoder)
         codec = context
         check(avcodec_parameters_to_context(context, parameters) >= 0) { "bad codec parameters" }
-        context.thread_count(Runtime.getRuntime().availableProcessors().coerceIn(2, 6))
-        context.thread_type(AVCodecContext.FF_THREAD_FRAME or AVCodecContext.FF_THREAD_SLICE)
+        if (!loopAtEnd) {
+            context.thread_count(Runtime.getRuntime().availableProcessors().coerceIn(2, 6))
+            context.thread_type(AVCodecContext.FF_THREAD_FRAME or AVCodecContext.FF_THREAD_SLICE)
+        }
         check(avcodec_open2(context, decoder, null as AVDictionary?) >= 0) { "decoder refused to open" }
 
         sourceWidth = context.width()
