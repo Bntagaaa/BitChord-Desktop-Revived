@@ -1,20 +1,12 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.desktop.icons.DesktopIcons
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Bedtime
-import androidx.compose.material.icons.rounded.DeleteSweep
-import androidx.compose.material.icons.rounded.Extension
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.PlayCircle
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
@@ -331,7 +323,7 @@ internal fun DesktopSettingsScreen(
             "${repeatMode.label()} · Tap to change",
         ) { onRepeatModeChange(repeatMode.next()) }
         iconRow(
-            Icons.Rounded.Tune,
+            DesktopIcons.Settings.Tune,
             DesktopStrings["d_playback_speed", "Playback speed"],
             "${"%.2f".format(playbackSpeed)}×",
         ) {
@@ -347,7 +339,7 @@ internal fun DesktopSettingsScreen(
         val directSource by DesktopDirectSource.enabled.collectAsState()
         toggle("Direct source stream", "Start on a higher priority source; YouTube remains the fallback.", directSource, DesktopDirectSource::setEnabled)
         iconRow(
-            Icons.Rounded.Bedtime,
+            DesktopIcons.Player.SleepTimer,
             "Sleep timer",
             when {
                 sleepRemainingMs != null -> "${formatSleepTimer(sleepRemainingMs)} until playback pauses"
@@ -460,7 +452,7 @@ internal fun DesktopSettingsScreen(
                     OutlinedButton(onClick = { uiScaleMenuOpen = true }) {
                         Text("$uiScalePercent%")
                         Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null)
+                        Icon(DesktopIcons.Window.ExpandMore, contentDescription = null)
                     }
                     DesktopDropdownMenu(
                         expanded = uiScaleMenuOpen,
@@ -667,7 +659,7 @@ internal fun DesktopSettingsScreen(
     sections.section(LOCAL_MUSIC) {
         var folderLabel by remember { mutableStateOf(DesktopLocalMusic.folderLabel()) }
         iconRow(
-            Icons.Rounded.Folder,
+            DesktopIcons.Settings.Folder,
             "Local music folder",
             folderLabel,
         ) {
@@ -725,7 +717,7 @@ internal fun DesktopSettingsScreen(
         }
         }
         iconRow(
-            Icons.Rounded.DeleteSweep,
+            DesktopIcons.Actions.DeleteSweep,
             "Clear song cache",
             cleared ?: "Frees space used by downloaded audio",
         ) {
@@ -737,7 +729,7 @@ internal fun DesktopSettingsScreen(
         }
         var imagesCleared by remember { mutableStateOf(false) }
         iconRow(
-            Icons.Rounded.DeleteSweep,
+            DesktopIcons.Actions.DeleteSweep,
             "Clear image cache",
             if (imagesCleared) "Image cache cleared" else "Frees space used by album artwork",
         ) {
@@ -971,10 +963,10 @@ private fun DesktopSourceSettingsRow(
         )
         Icon(
             when (config.kind) {
-                DesktopSourceKind.ADDON -> Icons.Rounded.Extension
-                DesktopSourceKind.CUSTOM_MODULE, DesktopSourceKind.MODULE -> Icons.Rounded.Extension
-                DesktopSourceKind.JIOSAAVN -> Icons.Rounded.GraphicEq
-                DesktopSourceKind.YOUTUBE -> Icons.Rounded.PlayCircle
+                DesktopSourceKind.ADDON -> DesktopIcons.Settings.Extension
+                DesktopSourceKind.CUSTOM_MODULE, DesktopSourceKind.MODULE -> DesktopIcons.Settings.Extension
+                DesktopSourceKind.JIOSAAVN -> DesktopIcons.Audio.GraphicEq
+                DesktopSourceKind.YOUTUBE -> DesktopIcons.Player.PlayCircle
             },
             contentDescription = null,
             tint = DesktopForeground,
@@ -1006,12 +998,12 @@ private fun DesktopSourceSettingsRow(
         Spacer(Modifier.width(8.dp))
         if (onMoveUp != null) {
             IconButton(onClick = onMoveUp, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Rounded.KeyboardArrowUp, "Move source earlier")
+                Icon(DesktopIcons.Window.ExpandLess, "Move source earlier")
             }
         }
         if (onMoveDown != null) {
             IconButton(onClick = onMoveDown, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Rounded.KeyboardArrowDown, "Move source later")
+                Icon(DesktopIcons.Window.ExpandMore, "Move source later")
             }
         }
         if (onToggle == null) {

@@ -159,6 +159,9 @@ object DesktopIcons {
         val VisibilityOff: ImageVector get() = SfStyleIcons.VisibilityOff
         val Performance: ImageVector get() = BitChordIcons.Performance
         val FrameRate: ImageVector get() = BitChordIcons.FrameRate
+        val Bug: ImageVector get() = SfStyleIcons.Bug
+        val Upgrade: ImageVector get() = SfStyleIcons.Upgrade
+        val Appearance: ImageVector get() = SfStyleIcons.Appearance
     }
 
     object Status {
