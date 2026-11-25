@@ -81,7 +81,7 @@ object DesktopIcons {
         val MusicNote: ImageVector get() = BitChordIcons.MusicNote
         val MusicVideo: ImageVector get() = SfStyleIcons.Videocam
         val SleepTimer: ImageVector get() = SfStyleIcons.Bedtime
-        val StartRadio: ImageVector get() = DesktopPhoneMenuIcons.StartRadio
+        val StartRadio: ImageVector get() = DesktopPhoneMenuIcons.Radio
     }
 
     object Actions {
@@ -93,11 +93,11 @@ object DesktopIcons {
         val Edit: ImageVector get() = SfStyleIcons.Edit
         val Add: ImageVector get() = BitChordIcons.Plus
         val AddToPlaylist: ImageVector get() = DesktopPhoneMenuIcons.AddToPlaylist
-        val RemoveFromPlaylist: ImageVector get() = DesktopPhoneMenuIcons.Remove
+        val RemoveFromPlaylist: ImageVector get() = SfStyleIcons.RemoveCircle
         val PlaylistPlay: ImageVector get() = SfStyleIcons.PlaylistPlay
         val PlaylistAdd: ImageVector get() = SfStyleIcons.PlaylistAdd
         val PlayNext: ImageVector get() = DesktopPhoneMenuIcons.PlayNext
-        val PlayLast: ImageVector get() = DesktopPhoneMenuIcons.PlayLast
+        val PlayLast: ImageVector get() = DesktopPhoneMenuIcons.AddToQueue
         val Pin: ImageVector get() = BitChordIcons.Pin
         val More: ImageVector get() = SfStyleIcons.MoreHorizontal
         val MoreVertical: ImageVector get() = SfStyleIcons.MoreVertical
@@ -111,8 +111,8 @@ object DesktopIcons {
         val RemoveCircle: ImageVector get() = SfStyleIcons.RemoveCircle
         val Link: ImageVector get() = SfStyleIcons.Link
         val DragHandle: ImageVector get() = SfStyleIcons.DragHandle
-        val ViewArtist: ImageVector get() = DesktopPhoneMenuIcons.ViewArtist
-        val ViewAlbum: ImageVector get() = DesktopPhoneMenuIcons.ViewAlbum
+        val ViewArtist: ImageVector get() = DesktopPhoneMenuIcons.Artist
+        val ViewAlbum: ImageVector get() = DesktopPhoneMenuIcons.Album
     }
 
     object Audio {
