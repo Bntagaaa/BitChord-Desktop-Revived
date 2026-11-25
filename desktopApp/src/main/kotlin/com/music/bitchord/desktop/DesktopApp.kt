@@ -6304,6 +6304,21 @@ private fun DesktopSidebarItem(
     logo: org.jetbrains.compose.resources.DrawableResource? = null,
     onClick: () -> Unit,
 ) {
+    val navShape = RoundedCornerShape(8.dp)
+    val isDark = DesktopTheme.isDark
+    val selectedRim = if (selected) {
+        Modifier.border(
+            width = 0.75.dp,
+            brush = Brush.verticalGradient(
+                0.0f to if (isDark) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.65f),
+                0.4f to if (isDark) Color.White.copy(alpha = 0.08f) else Color(0x181D2636),
+                1.0f to if (isDark) Color.White.copy(alpha = 0.04f) else Color(0x261D2636),
+            ),
+            shape = navShape,
+        )
+    } else {
+        Modifier
+    }
     if (collapsed) {
         TooltipBox(
             positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
@@ -6312,14 +6327,16 @@ private fun DesktopSidebarItem(
         ) {
             Box(
                 Modifier.fillMaxWidth().height(42.dp)
-                    .clip(RoundedCornerShape(7.dp))
+                    .clip(navShape)
                     .background(if (selected) DesktopTheme.palette.navSelectedSurface else Color.Transparent)
+                    .then(selectedRim)
                     .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
                     .clickable(onClick = onClick),
                 contentAlignment = Alignment.Center,
             ) {
                 if (selected) Box(
                     Modifier.align(Alignment.CenterStart).width(3.dp).height(18.dp)
+                        .clip(RoundedCornerShape(3.dp))
                         .background(DesktopTheme.palette.navAccent),
                 )
                 if (logo != null) {
@@ -6334,8 +6351,9 @@ private fun DesktopSidebarItem(
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(7.dp))
+            .clip(navShape)
             .background(if (selected) DesktopTheme.palette.navSelectedSurface else Color.Transparent)
+            .then(selectedRim)
             .desktopHoverFill(alpha = if (selected) 0.035f else 0.075f)
             .clickable(onClick = onClick)
             .padding(horizontal = 9.dp, vertical = 7.dp),
