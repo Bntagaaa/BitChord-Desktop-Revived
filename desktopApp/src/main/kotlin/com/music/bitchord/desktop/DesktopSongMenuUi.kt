@@ -807,7 +807,11 @@ private fun DesktopMenuRow(
 
 /** The "…" the menu hangs off, sized and tinted to sit beside the player's heart. */
 @Composable
-internal fun DesktopMoreButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun DesktopMoreButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = DesktopForeground.copy(alpha = 0.75f),
+) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val hoverColor by animateColorAsState(
@@ -832,7 +836,7 @@ internal fun DesktopMoreButton(onClick: () -> Unit, modifier: Modifier = Modifie
                     Modifier
                         .size(3.5.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(DesktopForeground.copy(alpha = 0.75f)),
+                        .background(tint),
                 )
             }
         }

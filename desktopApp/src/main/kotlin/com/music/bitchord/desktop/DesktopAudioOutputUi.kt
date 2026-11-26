@@ -57,24 +57,33 @@ import com.music.bitchord.sharedui.resources.cast
 import com.music.bitchord.ui.player.ThinSlider
 import org.jetbrains.compose.resources.stringResource
 
+internal val DesktopAudioOutputButtonSize = 32.dp
+
 @Composable
 internal fun DesktopAudioOutputButton(
     onOpen: (Rect) -> Unit,
     iconSize: Dp = 18.dp,
     tint: Color = DesktopSecondary,
+    interactive: Boolean = true,
 ) {
-    var anchor by remember { mutableStateOf<Rect?>(null) }
-    DesktopToolbarButton(
-        onClick = { anchor?.let(onOpen) },
-        size = 32.dp,
-        modifier = Modifier.onGloballyPositioned { anchor = it.boundsInRoot() },
-    ) {
+    val glyph: @Composable () -> Unit = {
         Icon(
             DesktopIcons.Audio.Headphones,
-            DesktopStrings["audio_output", "Audio output"],
+            if (interactive) DesktopStrings["audio_output", "Audio output"] else null,
             tint = tint,
             modifier = Modifier.size(iconSize),
         )
+    }
+    if (interactive) {
+        var anchor by remember { mutableStateOf<Rect?>(null) }
+        DesktopToolbarButton(
+            onClick = { anchor?.let(onOpen) },
+            size = DesktopAudioOutputButtonSize,
+            modifier = Modifier.onGloballyPositioned { anchor = it.boundsInRoot() },
+            content = glyph,
+        )
+    } else {
+        Box(Modifier.size(DesktopAudioOutputButtonSize), contentAlignment = Alignment.Center) { glyph() }
     }
 }
 
