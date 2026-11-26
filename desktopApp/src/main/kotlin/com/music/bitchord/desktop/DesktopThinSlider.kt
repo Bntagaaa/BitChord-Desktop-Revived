@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,8 +56,11 @@ internal fun DesktopThinSlider(
     inactiveColor: Color = DesktopForeground.copy(alpha = if (DesktopTheme.isDark) 0.26f else 0.30f),
     /** Halfway between the two track colours: visible against unplayed, invisible under played. */
     markerColor: Color = DesktopForeground.copy(alpha = 0.50f),
+    interactive: Boolean = true,
 ) {
     var dragging by remember { mutableStateOf(false) }
+    val changeValue by rememberUpdatedState(onValueChange)
+    val finishChange by rememberUpdatedState(onValueChangeFinished)
     val height by animateDpAsState(
         targetValue = if (dragging) activeHeight else idleHeight,
         animationSpec = spring(
@@ -66,34 +70,34 @@ internal fun DesktopThinSlider(
         label = "sliderHeight",
     )
 
-    Box(
-        modifier = modifier
-            // Generous invisible hit target — the visible bar is only ~7dp.
-            .height(activeHeight + 22.dp)
-            // One gesture loop for both clicks and drags.
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    dragging = true
-                    onValueChange((down.position.x / size.width).coerceIn(0f, 1f))
-
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val pointer = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!pointer.pressed) {
-                            pointer.consume()
-                            break
-                        }
-                        if (pointer.positionChanged()) {
-                            onValueChange((pointer.position.x / size.width).coerceIn(0f, 1f))
-                            pointer.consume()
-                        }
+    // An outgoing fade is paint-only. Removing this modifier also cancels any in-flight drag.
+    val gesture = if (interactive) Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            dragging = true
+            try {
+                changeValue((down.position.x / size.width).coerceIn(0f, 1f))
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val pointer = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!pointer.pressed) {
+                        pointer.consume()
+                        break
                     }
-
-                    dragging = false
-                    onValueChangeFinished?.invoke()
+                    if (pointer.positionChanged()) {
+                        changeValue((pointer.position.x / size.width).coerceIn(0f, 1f))
+                        pointer.consume()
+                    }
                 }
-            },
+            } finally {
+                dragging = false
+                finishChange?.invoke()
+            }
+        }
+    } else Modifier
+    Box(
+        // Generous invisible hit target around the thin visible bar.
+        modifier = modifier.height(activeHeight + 22.dp).then(gesture),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(

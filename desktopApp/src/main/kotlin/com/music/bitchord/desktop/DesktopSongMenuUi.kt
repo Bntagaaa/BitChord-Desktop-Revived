@@ -73,6 +73,9 @@ import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.ui.icons.BitChordIcons
 
+/** Carries the origin of a row menu without changing the player or other page menus. */
+internal data class DesktopPageSongMenuTarget(val song: Song, val fromHome: Boolean = false)
+
 /** The verbs the song menu needs that the player does not otherwise know about. */
 internal data class DesktopSongActions(
     val signedIn: Boolean,
@@ -136,6 +139,7 @@ internal fun DesktopSongMenuFor(
     onUpgradeQuality: (() -> Unit)?,
     onDismiss: () -> Unit,
     miniPlayerActions: DesktopMiniPlayerMenuActions? = null,
+    showSleepTimer: Boolean = true,
 ) {
     val close = onDismiss
     DesktopSongMenu(
@@ -171,6 +175,7 @@ internal fun DesktopSongMenuFor(
         onDismiss = close,
         onRemoveHistory = actions.onRemoveHistory?.let { remove -> { remove(song); close() } },
         miniPlayerActions = miniPlayerActions,
+        showSleepTimer = showSleepTimer,
     )
 }
 
@@ -205,11 +210,12 @@ internal fun DesktopSongMenu(
     onRemoveHistory: (() -> Unit)? = null,
     onSwitchMediaVersion: (() -> Unit)? = null,
     miniPlayerActions: DesktopMiniPlayerMenuActions? = null,
+    showSleepTimer: Boolean = true,
 ) {
-    var pickingSleepTimer by remember { mutableStateOf(false) }
-    var customTimer by remember { mutableStateOf(false) }
-    var customMinutes by remember { mutableStateOf("30") }
-    if (customTimer) Dialog(
+    var pickingSleepTimer by remember(song.videoId, showSleepTimer) { mutableStateOf(false) }
+    var customTimer by remember(song.videoId, showSleepTimer) { mutableStateOf(false) }
+    var customMinutes by remember(song.videoId, showSleepTimer) { mutableStateOf("30") }
+    if (showSleepTimer && customTimer) Dialog(
         onDismissRequest = { customTimer = false },
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
@@ -294,7 +300,7 @@ internal fun DesktopSongMenu(
     val isOffline = song.localUri != null
 
     DesktopMenuSurface(onDismiss = onDismiss) {
-        if (pickingSleepTimer) {
+        if (showSleepTimer && pickingSleepTimer) {
             DesktopMenuHeader("Sleep timer") { pickingSleepTimer = false }
             DesktopMenuDivider()
             DesktopSleepTimer.presets.forEach { minutes ->
@@ -410,12 +416,14 @@ internal fun DesktopSongMenu(
             label = "Song Info",
             onClick = { showingSongInfo = true },
         )
-        DesktopMenuDivider()
-        DesktopMenuRow(
-            icon = DesktopIcons.Player.SleepTimer,
-            label = DesktopStrings["sleep_timer", "Sleep timer"],
-            value = sleepTimerLabel(sleepTimerMinutes, sleepAfterTrack),
-        ) { pickingSleepTimer = true }
+        if (showSleepTimer) {
+            DesktopMenuDivider()
+            DesktopMenuRow(
+                icon = DesktopIcons.Player.SleepTimer,
+                label = DesktopStrings["sleep_timer", "Sleep timer"],
+                value = sleepTimerLabel(sleepTimerMinutes, sleepAfterTrack),
+            ) { pickingSleepTimer = true }
+        }
     }
 }
 
@@ -849,7 +857,11 @@ private fun DesktopMenuRow(
 
 /** The "…" the menu hangs off, sized and tinted to sit beside the player's heart. */
 @Composable
-internal fun DesktopMoreButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun DesktopMoreButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = DesktopForeground.copy(alpha = 0.75f),
+) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val hoverColor by animateColorAsState(
@@ -874,7 +886,7 @@ internal fun DesktopMoreButton(onClick: () -> Unit, modifier: Modifier = Modifie
                     Modifier
                         .size(3.5.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(DesktopForeground.copy(alpha = 0.75f)),
+                        .background(tint),
                 )
             }
         }

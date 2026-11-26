@@ -34,7 +34,7 @@ class DesktopInstantPlaybackEngineTest {
     }
     private class Output(private val acceleration: Int = 1) : DesktopAudioOutput {
         override var format = DesktopPcmFormat(44100, 2, 2)
-        override var gain = 1f
+        @Volatile override var gain = 1f
         @Volatile override var isOpen = false
         override val deviceName = "test collector"
         override val bufferBytes = 0
@@ -80,6 +80,44 @@ class DesktopInstantPlaybackEngineTest {
         resolve: suspend (Song) -> DesktopStream): DesktopPlaybackEngine =
         DesktopPlaybackEngine(ended, handoff, output, analysis) { song, _, _, _ -> Result.success(resolve(song)).map { DesktopLiveResolution(it) } }
             .also { engines += it }
+
+    @Test fun `mute keeps the selected volume through play pause track and output changes`() {
+        val stream = tone()
+        val output = Output()
+        val engine = engine(output) { stream }
+        engine.setVolume(0.35f)
+        engine.load(song("first"))
+        waitFor("first PCM") { output.writes > 0 }
+
+        engine.toggleMute()
+        assertTrue(engine.muted.value)
+        assertEquals(0f, output.gain)
+        assertEquals(0.35f, engine.state.value.volume)
+        engine.toggleMute()
+        assertFalse(engine.muted.value)
+        assertEquals(0.35f, output.gain)
+
+        engine.pause()
+        waitFor("paused playback") { !engine.state.value.isPlaying }
+        engine.toggleMute()
+        engine.setVolume(0.62f)
+        assertEquals(0.62f, engine.state.value.volume)
+        assertEquals(0f, output.gain)
+
+        engine.load(song("second"), playWhenReady = false)
+        waitFor("second track loaded") {
+            engine.state.value.song?.videoId == "second" && !engine.state.value.isLoading
+        }
+        engine.play()
+        waitFor("resumed playback") { engine.state.value.isPlaying }
+        engine.setOutputPrecision("FLOAT_32")
+        waitFor("output reopened") { output.format.isFloat }
+        assertTrue(engine.muted.value)
+        assertEquals(0f, output.gain)
+        engine.toggleMute()
+        assertFalse(engine.muted.value)
+        assertEquals(0.62f, output.gain)
+    }
 
     @Test fun `resolution timeout clears loading and Play retries the failed track`() {
         val output = Output()
