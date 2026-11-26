@@ -5,15 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertDoesNotExist
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.click
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.*
 import com.music.bitchord.data.model.Song
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class DesktopAutomixOverviewMenuTest {
@@ -94,6 +90,6 @@ class DesktopAutomixOverviewMenuTest {
             }
         }
         onNodeWithText("Sleep timer").assertIsDisplayed()
-        onNodeWithText("Automix overview").assertDoesNotExist()
+        assertTrue(onAllNodesWithText("Automix overview").fetchSemanticsNodes().isEmpty())
     }
 }
