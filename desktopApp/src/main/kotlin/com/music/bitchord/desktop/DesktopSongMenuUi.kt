@@ -557,31 +557,6 @@ internal fun DesktopCollectionContextMenu(
     }
 }
 
-@Composable
-private fun SongInfoRow(label: String, value: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = DesktopSecondary,
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = DesktopForeground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.End,
-        )
-    }
-}
-
 /**
  * The Downloads page's playlist-download menu: open it, update it when stale,
  * or throw the record away.
@@ -622,31 +597,6 @@ internal fun DesktopSpotifyPendingSongMenu(onResolveAndPlay: () -> Unit) {
                 ) {}
             }
         }
-    }
-}
-
-@Composable
-private fun SongInfoRow(label: String, value: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = DesktopSecondary,
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = DesktopForeground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.End,
-        )
     }
 }
 
