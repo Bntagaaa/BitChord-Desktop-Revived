@@ -4871,19 +4871,39 @@ internal fun BitChordDesktopApp(
                     LocalPullToRefreshEnabled provides false,
                     LocalShelfRowChrome provides DesktopShelfRowChrome,
                 ) {
-                DesktopPointerMenuHost<Song>(
-                    menu = { song, onDismiss ->
+                DesktopPointerMenuHost<DesktopPageSongMenuTarget>(
+                    menu = { target, onDismiss ->
+                        val song = target.song
+                        // Home shelves carry titles but not album/artist browse IDs. Resolve only
+                        // the clicked track, while its menu is mounted, never the whole feed.
+                        val menuSong = if (target.fromHome) {
+                            var resolved by remember(song, activeAccountId, activeProfileId) {
+                                mutableStateOf(song)
+                            }
+                            LaunchedEffect(song, activeAccountId, activeProfileId) {
+                                resolved = song.withDesktopHomeMenuLinks { videoId ->
+                                    withTimeoutOrNull(PLAYER_METADATA_TIMEOUT_MS) {
+                                        DesktopSearchClient.trackLinks(videoId).getOrNull()
+                                    }
+                                }
+                            }
+                            resolved
+                        } else song
                         DesktopSongMenuFor(
-                            song = song,
+                            song = menuSong,
                             liked = song.videoId in likedIds,
                             actions = songActionsFor(song),
                             onToggleLike = { toggleLike(song) },
                             onRevertToOriginal = null,
                             onUpgradeQuality = null,
                             onDismiss = onDismiss,
+                            showSleepTimer = !target.fromHome,
                         )
                     },
-                ) { openMenu ->
+                ) { openTarget ->
+                val openMenu: (Song) -> Unit = remember(openTarget) {
+                    { song -> openTarget(DesktopPageSongMenuTarget(song)) }
+                }
                 pageMenu = openMenu
                 Box(
                     Modifier
@@ -5343,7 +5363,11 @@ internal fun BitChordDesktopApp(
                             contentPadding = sharedPagePadding,
                             title = "Home",
                             signedIn = true,
-                            onItemLongPress = { item -> if (item.videoId != null) openMenu(item.toSong()) },
+                            onItemLongPress = { item ->
+                                if (item.videoId != null) {
+                                    openTarget(DesktopPageSongMenuTarget(item.toSong(), fromHome = true))
+                                }
+                            },
                             onLoadMore = ::loadMoreHome,
                             loadingMore = homeLoadingMore,
                             recentlyPlayedLoading = homeRecentsLoading && !DesktopContentPreferences.hideRecents,
