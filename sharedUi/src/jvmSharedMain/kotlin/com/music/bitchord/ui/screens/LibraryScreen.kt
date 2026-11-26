@@ -146,7 +146,12 @@ fun LibraryScreen(
                         text = stringResource(Res.string.library),
                         style = if (compactHeadings) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayLarge,
                         color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(horizontal = PAGE_GUTTER, vertical = 8.dp),
+                        modifier = Modifier.padding(
+                            start = PAGE_GUTTER,
+                            end = PAGE_GUTTER,
+                            top = if (compactHeadings) 0.dp else 8.dp,
+                            bottom = 8.dp,
+                        ),
                     )
                 }
             }

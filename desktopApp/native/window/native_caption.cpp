@@ -16,6 +16,7 @@
 namespace {
 
 constexpr wchar_t CAPTION_PROPERTY[] = L"BitChord.IntegratedCaption.v1";
+constexpr wchar_t CHILD_CAPTION_PROPERTY[] = L"BitChord.IntegratedCaptionChild.v1";
 
 struct PixelRect {
     int left = 0;
@@ -34,14 +35,26 @@ struct CaptionState {
     std::mutex mutex;
     int title_bar_height_px = 0;
     bool fullscreen = false;
+    bool overlay_blocked = false;
+    LRESULT pressed_button = HTNOWHERE;
+    HWND hovered_child = nullptr;
     PixelRect min_rect{};
     PixelRect max_rect{};
     PixelRect close_rect{};
     std::vector<PixelRect> interactive_rects;
 };
 
+struct ChildCaptionState {
+    WNDPROC original = nullptr;
+    HWND parent = nullptr;
+};
+
 CaptionState* get_state(HWND hwnd) {
     return reinterpret_cast<CaptionState*>(GetPropW(hwnd, CAPTION_PROPERTY));
+}
+
+ChildCaptionState* get_child_state(HWND hwnd) {
+    return reinterpret_cast<ChildCaptionState*>(GetPropW(hwnd, CHILD_CAPTION_PROPERTY));
 }
 
 UINT window_dpi(HWND hwnd) {
@@ -67,6 +80,155 @@ PixelRect decode_rect(JNIEnv* env, jintArray array) {
     return PixelRect{buf[0], buf[1], buf[2], buf[3]};
 }
 
+LRESULT hit_test_window(HWND hwnd, CaptionState* state, POINT screen_pt) {
+    bool is_fullscreen = false;
+    bool overlay_blocked = false;
+    int title_height = 0;
+    PixelRect min_rect{};
+    PixelRect max_rect{};
+    PixelRect close_rect{};
+    std::vector<PixelRect> interactive;
+    {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        is_fullscreen = state->fullscreen;
+        overlay_blocked = state->overlay_blocked;
+        title_height = state->title_bar_height_px;
+        min_rect = state->min_rect;
+        max_rect = state->max_rect;
+        close_rect = state->close_rect;
+        interactive = state->interactive_rects;
+    }
+    if (is_fullscreen) {
+        return HTCLIENT;
+    }
+
+    if (!IsZoomed(hwnd)) {
+        RECT win_rect{};
+        if (GetWindowRect(hwnd, &win_rect)) {
+            const int bx = border_x(hwnd);
+            const int by = border_y(hwnd);
+            const bool on_left = screen_pt.x >= win_rect.left && screen_pt.x < win_rect.left + bx;
+            const bool on_right = screen_pt.x < win_rect.right && screen_pt.x >= win_rect.right - bx;
+            const bool on_top = screen_pt.y >= win_rect.top && screen_pt.y < win_rect.top + by;
+            const bool on_bottom = screen_pt.y < win_rect.bottom && screen_pt.y >= win_rect.bottom - by;
+
+            if (on_top && on_left) return HTTOPLEFT;
+            if (on_top && on_right) return HTTOPRIGHT;
+            if (on_bottom && on_left) return HTBOTTOMLEFT;
+            if (on_bottom && on_right) return HTBOTTOMRIGHT;
+            if (on_top) return HTTOP;
+            if (on_bottom) return HTBOTTOM;
+            if (on_left) return HTLEFT;
+            if (on_right) return HTRIGHT;
+        }
+    }
+
+    POINT client_pt = screen_pt;
+    ScreenToClient(hwnd, &client_pt);
+
+    if (close_rect.contains(client_pt.x, client_pt.y)) return HTCLOSE;
+    if (max_rect.contains(client_pt.x, client_pt.y)) return HTMAXBUTTON;
+    if (min_rect.contains(client_pt.x, client_pt.y)) return HTMINBUTTON;
+
+    if (overlay_blocked) {
+        return HTCLIENT;
+    }
+
+    for (const auto& rect : interactive) {
+        if (rect.contains(client_pt.x, client_pt.y)) {
+            return HTCLIENT;
+        }
+    }
+
+    if (title_height > 0 && client_pt.y >= 0 && client_pt.y < title_height) {
+        return HTCAPTION;
+    }
+    return HTCLIENT;
+}
+
+void detach_child(HWND child) {
+    ChildCaptionState* child_state = get_child_state(child);
+    if (child_state == nullptr) return;
+    RemovePropW(child, CHILD_CAPTION_PROPERTY);
+    if (child_state->original != nullptr) {
+        SetWindowLongPtrW(child, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(child_state->original));
+    }
+    delete child_state;
+}
+
+BOOL CALLBACK enum_detach_child(HWND child, LPARAM) {
+    detach_child(child);
+    return TRUE;
+}
+
+LRESULT CALLBACK child_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    ChildCaptionState* child_state = get_child_state(hwnd);
+    if (child_state == nullptr) {
+        return DefWindowProcW(hwnd, msg, wParam, lParam);
+    }
+    WNDPROC original = child_state->original;
+    HWND parent = child_state->parent;
+
+    switch (msg) {
+        case WM_NCDESTROY: {
+            RemovePropW(hwnd, CHILD_CAPTION_PROPERTY);
+            SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(original));
+            delete child_state;
+            return CallWindowProcW(original, hwnd, msg, wParam, lParam);
+        }
+
+        case WM_NCHITTEST: {
+            if (IsWindow(parent)) {
+                if (CaptionState* parent_state = get_state(parent)) {
+                    const POINT screen_pt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                    const LRESULT hit = hit_test_window(parent, parent_state, screen_pt);
+                    if (hit != HTCLIENT) {
+                        std::lock_guard<std::mutex> lock(parent_state->mutex);
+                        parent_state->hovered_child = hwnd;
+                        return HTTRANSPARENT;
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    return CallWindowProcW(original, hwnd, msg, wParam, lParam);
+}
+
+void attach_child(HWND child, HWND parent) {
+    if (!IsWindow(child) || child == parent || get_child_state(child) != nullptr) return;
+    DWORD child_pid = 0;
+    DWORD parent_pid = 0;
+    GetWindowThreadProcessId(child, &child_pid);
+    GetWindowThreadProcessId(parent, &parent_pid);
+    if (child_pid == 0 || child_pid != parent_pid) return;
+
+    auto* child_state = new (std::nothrow) ChildCaptionState();
+    if (child_state == nullptr) return;
+    child_state->parent = parent;
+    if (!SetPropW(child, CHILD_CAPTION_PROPERTY, child_state)) {
+        delete child_state;
+        return;
+    }
+
+    SetLastError(0);
+    const LONG_PTR prev = SetWindowLongPtrW(
+        child, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(child_wnd_proc)
+    );
+    if (prev == 0 && GetLastError() != 0) {
+        RemovePropW(child, CHILD_CAPTION_PROPERTY);
+        delete child_state;
+        return;
+    }
+    child_state->original = reinterpret_cast<WNDPROC>(prev);
+}
+
+BOOL CALLBACK enum_attach_child(HWND child, LPARAM lParam) {
+    attach_child(child, reinterpret_cast<HWND>(lParam));
+    return TRUE;
+}
+
 LRESULT CALLBACK caption_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     CaptionState* state = get_state(hwnd);
     if (state == nullptr) {
@@ -76,10 +238,18 @@ LRESULT CALLBACK caption_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
 
     switch (msg) {
         case WM_NCDESTROY: {
+            EnumChildWindows(hwnd, enum_detach_child, 0);
             RemovePropW(hwnd, CAPTION_PROPERTY);
             SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(original));
             delete state;
             return CallWindowProcW(original, hwnd, msg, wParam, lParam);
+        }
+
+        case WM_PARENTNOTIFY: {
+            if (LOWORD(wParam) == WM_CREATE) {
+                attach_child(reinterpret_cast<HWND>(lParam), hwnd);
+            }
+            break;
         }
 
         case WM_NCCALCSIZE: {
@@ -115,77 +285,50 @@ LRESULT CALLBACK caption_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
         }
 
         case WM_NCHITTEST: {
-            bool is_fullscreen = false;
-            int title_height = 0;
-            PixelRect min_rect{};
-            PixelRect max_rect{};
-            PixelRect close_rect{};
-            std::vector<PixelRect> interactive;
-            {
-                std::lock_guard<std::mutex> lock(state->mutex);
-                is_fullscreen = state->fullscreen;
-                title_height = state->title_bar_height_px;
-                min_rect = state->min_rect;
-                max_rect = state->max_rect;
-                close_rect = state->close_rect;
-                interactive = state->interactive_rects;
-            }
-            if (is_fullscreen) {
-                return HTCLIENT;
-            }
-
             const POINT screen_pt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            if (!IsZoomed(hwnd)) {
-                RECT win_rect{};
-                if (GetWindowRect(hwnd, &win_rect)) {
-                    const int bx = border_x(hwnd);
-                    const int by = border_y(hwnd);
-                    const bool on_left = screen_pt.x >= win_rect.left && screen_pt.x < win_rect.left + bx;
-                    const bool on_right = screen_pt.x < win_rect.right && screen_pt.x >= win_rect.right - bx;
-                    const bool on_top = screen_pt.y >= win_rect.top && screen_pt.y < win_rect.top + by;
-                    const bool on_bottom = screen_pt.y < win_rect.bottom && screen_pt.y >= win_rect.bottom - by;
-
-                    if (on_top && on_left) return HTTOPLEFT;
-                    if (on_top && on_right) return HTTOPRIGHT;
-                    if (on_bottom && on_left) return HTBOTTOMLEFT;
-                    if (on_bottom && on_right) return HTBOTTOMRIGHT;
-                    if (on_top) return HTTOP;
-                    if (on_bottom) return HTBOTTOM;
-                    if (on_left) return HTLEFT;
-                    if (on_right) return HTRIGHT;
-                }
-            }
-
-            POINT client_pt = screen_pt;
-            ScreenToClient(hwnd, &client_pt);
-
-            if (close_rect.contains(client_pt.x, client_pt.y)) return HTCLOSE;
-            if (max_rect.contains(client_pt.x, client_pt.y)) return HTMAXBUTTON;
-            if (min_rect.contains(client_pt.x, client_pt.y)) return HTMINBUTTON;
-
-            for (const auto& rect : interactive) {
-                if (rect.contains(client_pt.x, client_pt.y)) {
-                    return HTCLIENT;
-                }
-            }
-
-            if (title_height > 0 && client_pt.y >= 0 && client_pt.y < title_height) {
-                return HTCAPTION;
-            }
-            return HTCLIENT;
+            return hit_test_window(hwnd, state, screen_pt);
         }
 
         case WM_NCMOUSEMOVE: {
             if (wParam == HTMINBUTTON || wParam == HTMAXBUTTON || wParam == HTCLOSE) {
-                POINT client_pt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-                ScreenToClient(hwnd, &client_pt);
-                CallWindowProcW(original, hwnd, WM_MOUSEMOVE, 0, MAKELPARAM(client_pt.x, client_pt.y));
+                HWND target = nullptr;
+                {
+                    std::lock_guard<std::mutex> lock(state->mutex);
+                    target = state->hovered_child;
+                }
+                if (target == nullptr || !IsWindow(target)) {
+                    target = hwnd;
+                }
+                POINT target_pt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                ScreenToClient(target, &target_pt);
+                PostMessageW(target, WM_MOUSEMOVE, 0, MAKELPARAM(target_pt.x, target_pt.y));
+
+                TRACKMOUSEEVENT tme{};
+                tme.cbSize = sizeof(tme);
+                tme.dwFlags = TME_NONCLIENT | TME_LEAVE;
+                tme.hwndTrack = hwnd;
+                TrackMouseEvent(&tme);
+            }
+            break;
+        }
+
+        case WM_NCMOUSELEAVE: {
+            HWND target = nullptr;
+            {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                target = state->hovered_child;
+                state->pressed_button = HTNOWHERE;
+            }
+            if (target != nullptr && IsWindow(target)) {
+                PostMessageW(target, WM_MOUSELEAVE, 0, 0);
             }
             break;
         }
 
         case WM_NCLBUTTONDOWN: {
             if (wParam == HTMINBUTTON || wParam == HTMAXBUTTON || wParam == HTCLOSE) {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                state->pressed_button = static_cast<LRESULT>(wParam);
                 // Suppress legacy Windows non-client caption button painting; click executes on UP.
                 return 0;
             }
@@ -193,16 +336,22 @@ LRESULT CALLBACK caption_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
         }
 
         case WM_NCLBUTTONUP: {
-            if (wParam == HTMINBUTTON) {
-                PostMessageW(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
-                return 0;
-            }
-            if (wParam == HTMAXBUTTON) {
-                PostMessageW(hwnd, WM_SYSCOMMAND, IsZoomed(hwnd) ? SC_RESTORE : SC_MAXIMIZE, 0);
-                return 0;
-            }
-            if (wParam == HTCLOSE) {
-                PostMessageW(hwnd, WM_CLOSE, 0, 0);
+            if (wParam == HTMINBUTTON || wParam == HTMAXBUTTON || wParam == HTCLOSE) {
+                LRESULT pressed = HTNOWHERE;
+                {
+                    std::lock_guard<std::mutex> lock(state->mutex);
+                    pressed = state->pressed_button;
+                    state->pressed_button = HTNOWHERE;
+                }
+                if (pressed == static_cast<LRESULT>(wParam)) {
+                    if (wParam == HTMINBUTTON) {
+                        PostMessageW(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
+                    } else if (wParam == HTMAXBUTTON) {
+                        PostMessageW(hwnd, WM_SYSCOMMAND, IsZoomed(hwnd) ? SC_RESTORE : SC_MAXIMIZE, 0);
+                    } else if (wParam == HTCLOSE) {
+                        PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    }
+                }
                 return 0;
             }
             break;
@@ -224,8 +373,11 @@ Java_com_music_bitchord_desktop_DesktopWindowsNativeCaption_nativeAttach(
     if (!IsWindow(hwnd)) return JNI_FALSE;
 
     if (CaptionState* existing = get_state(hwnd)) {
-        std::lock_guard<std::mutex> lock(existing->mutex);
-        existing->title_bar_height_px = std::max(0, static_cast<int>(titleBarHeightPx));
+        {
+            std::lock_guard<std::mutex> lock(existing->mutex);
+            existing->title_bar_height_px = std::max(0, static_cast<int>(titleBarHeightPx));
+        }
+        EnumChildWindows(hwnd, enum_attach_child, reinterpret_cast<LPARAM>(hwnd));
         return JNI_TRUE;
     }
 
@@ -248,6 +400,7 @@ Java_com_music_bitchord_desktop_DesktopWindowsNativeCaption_nativeAttach(
         return JNI_FALSE;
     }
     state->original = reinterpret_cast<WNDPROC>(prev);
+    EnumChildWindows(hwnd, enum_attach_child, reinterpret_cast<LPARAM>(hwnd));
 
     SetWindowPos(
         hwnd, nullptr, 0, 0, 0, 0,
@@ -265,6 +418,7 @@ Java_com_music_bitchord_desktop_DesktopWindowsNativeCaption_nativeDetach(
     CaptionState* state = get_state(hwnd);
     if (state == nullptr) return;
 
+    EnumChildWindows(hwnd, enum_detach_child, 0);
     RemovePropW(hwnd, CAPTION_PROPERTY);
     if (state->original != nullptr) {
         SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(state->original));
@@ -307,6 +461,18 @@ Java_com_music_bitchord_desktop_DesktopWindowsNativeCaption_nativeSetFullscreen(
 }
 
 JNIEXPORT void JNICALL
+Java_com_music_bitchord_desktop_DesktopWindowsNativeCaption_nativeSetOverlayBlocked(
+    JNIEnv*, jclass, jlong hwndPtr, jboolean blocked
+) {
+    HWND hwnd = reinterpret_cast<HWND>(static_cast<intptr_t>(hwndPtr));
+    if (!IsWindow(hwnd)) return;
+    if (CaptionState* state = get_state(hwnd)) {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        state->overlay_blocked = (blocked == JNI_TRUE);
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_music_bitchord_desktop_DesktopWindowsNativeCaption_nativeSetHitTestRects(
     JNIEnv* env,
     jclass,
@@ -320,6 +486,8 @@ Java_com_music_bitchord_desktop_DesktopWindowsNativeCaption_nativeSetHitTestRect
     if (!IsWindow(hwnd)) return;
     CaptionState* state = get_state(hwnd);
     if (state == nullptr) return;
+
+    EnumChildWindows(hwnd, enum_attach_child, reinterpret_cast<LPARAM>(hwnd));
 
     PixelRect min_r = decode_rect(env, minRect);
     PixelRect max_r = decode_rect(env, maxRect);

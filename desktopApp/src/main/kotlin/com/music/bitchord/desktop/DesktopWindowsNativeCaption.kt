@@ -11,13 +11,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -28,33 +32,54 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.platform.Font as platformFont
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.sun.jna.Native
 import com.sun.jna.Pointer
 import java.awt.Frame
 import java.awt.Window
+import java.io.File
 import kotlin.math.roundToInt
 
 internal object DesktopWindowsCaptionMetrics {
     val BUTTON_WIDTH: Dp = 46.dp
     const val BUTTON_COUNT: Int = 3
     val TOTAL_WIDTH: Dp = BUTTON_WIDTH * BUTTON_COUNT // 138.dp
-    val INTEGRATED_TITLE_BAR_HEIGHT: Dp = 38.dp
+    val INTEGRATED_TITLE_BAR_HEIGHT: Dp = 32.dp
     val TOP_PLAYER_HEIGHT: Dp = 64.dp
 
     fun isIntegratedTitleBarActive(isWindows: Boolean, isFullscreen: Boolean): Boolean =
         isWindows && !isFullscreen
 
-    fun captionInsetEnd(isWindows: Boolean, isFullscreen: Boolean): Dp =
-        if (isIntegratedTitleBarActive(isWindows, isFullscreen)) TOTAL_WIDTH else 0.dp
+    fun integratedTitleBarHeight(uiScalePercent: Int = 100): Dp =
+        INTEGRATED_TITLE_BAR_HEIGHT * (100f / uiScalePercent.coerceAtLeast(1))
+
+    fun captionInsetEnd(
+        isWindows: Boolean,
+        isFullscreen: Boolean,
+        uiScalePercent: Int = 100,
+    ): Dp =
+        if (isIntegratedTitleBarActive(isWindows, isFullscreen)) {
+            TOTAL_WIDTH * (100f / uiScalePercent.coerceAtLeast(1))
+        } else {
+            0.dp
+        }
 }
 
 internal class DesktopTitleBarHitTestRegistry {
     val interactiveRects = mutableStateMapOf<String, Rect>()
-    var minRect: Rect = Rect.Zero
-    var maxRect: Rect = Rect.Zero
-    var closeRect: Rect = Rect.Zero
+    var minRect by mutableStateOf(Rect.Zero)
+    var maxRect by mutableStateOf(Rect.Zero)
+    var closeRect by mutableStateOf(Rect.Zero)
+    var overlayBlocked by mutableStateOf(false)
 }
 
 internal data class DesktopWindowActions(
@@ -64,6 +89,8 @@ internal data class DesktopWindowActions(
 )
 
 internal val LocalDesktopWindowActions = compositionLocalOf<DesktopWindowActions?> { null }
+
+internal val LocalDesktopSystemDensity = compositionLocalOf<Density?> { null }
 
 internal val LocalDesktopTitleBarHitTestRegistry =
     compositionLocalOf<DesktopTitleBarHitTestRegistry?> { null }
@@ -130,6 +157,13 @@ internal object DesktopWindowsNativeCaption {
         }
     }
 
+    fun setOverlayBlocked(blocked: Boolean) {
+        val ptr = hwndPtr
+        if (available && ptr != 0L) {
+            runCatching { nativeSetOverlayBlocked(ptr, blocked) }
+        }
+    }
+
     fun updateHitTestRects(
         minRect: Rect,
         maxRect: Rect,
@@ -168,6 +202,7 @@ internal object DesktopWindowsNativeCaption {
     @JvmStatic private external fun nativeDetach(hwndPtr: Long)
     @JvmStatic private external fun nativeSetTitleBarHeight(hwndPtr: Long, titleBarHeightPx: Int)
     @JvmStatic private external fun nativeSetFullscreen(hwndPtr: Long, fullscreen: Boolean)
+    @JvmStatic private external fun nativeSetOverlayBlocked(hwndPtr: Long, blocked: Boolean)
     @JvmStatic private external fun nativeSetHitTestRects(
         hwndPtr: Long,
         minRect: IntArray,
@@ -177,6 +212,31 @@ internal object DesktopWindowsNativeCaption {
     )
 
     private const val LIBRARY = "bitchord_window"
+}
+
+private object WindowsCaptionIconFont {
+    const val GLYPH_MINIMIZE = "\uE921"
+    const val GLYPH_MAXIMIZE = "\uE922"
+    const val GLYPH_RESTORE = "\uE923"
+    const val GLYPH_CLOSE = "\uE8BB"
+
+    val family: FontFamily? by lazy { loadSystemCaptionFontFamily() }
+
+    private fun loadSystemCaptionFontFamily(): FontFamily? {
+        if (!DesktopPlatform.isWindows) return null
+        val windir = System.getenv("WINDIR")?.takeIf { it.isNotBlank() } ?: "C:\\Windows"
+        val fontsDir = File(windir, "Fonts")
+        val candidates = listOf("SegoeIcons.ttf", "segmdl2.ttf")
+        for (fileName in candidates) {
+            val file = File(fontsDir, fileName)
+            if (!file.isFile) continue
+            val loaded = runCatching {
+                FontFamily(platformFont("windows-caption-$fileName", file.readBytes(), FontWeight.Normal))
+            }.getOrNull()
+            if (loaded != null) return loaded
+        }
+        return null
+    }
 }
 
 /** Default Windows 10/11 caption buttons (Minimize, Maximize/Restore, Close). */
@@ -191,6 +251,10 @@ internal fun DesktopWindowsCaptionButtons(
 ) {
     val registry = LocalDesktopTitleBarHitTestRegistry.current
     val foreground = DesktopForeground
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    val defaultIconTint = if (windowFocused) foreground else foreground.copy(alpha = 0.45f)
+    val captionDensity = LocalDesktopSystemDensity.current ?: LocalDensity.current
+    val captionFontFamily = WindowsCaptionIconFont.family
 
     LaunchedEffect(
         registry?.minRect,
@@ -207,100 +271,147 @@ internal fun DesktopWindowsCaptionButtons(
         )
     }
 
-    Row(modifier = modifier.height(height), verticalAlignment = Alignment.CenterVertically) {
-        CaptionButton(
-            width = DesktopWindowsCaptionMetrics.BUTTON_WIDTH,
-            height = height,
-            hoverColor = foreground.copy(alpha = 0.08f),
-            pressedColor = foreground.copy(alpha = 0.13f),
-            onPositioned = { registry?.minRect = it },
-            onClick = onMinimize,
-        ) { iconColor ->
-            Canvas(Modifier.size(10.dp)) {
-                val y = size.height / 2f
-                drawLine(
-                    color = iconColor,
-                    start = Offset(0f, y),
-                    end = Offset(size.width, y),
-                    strokeWidth = 1.dp.toPx(),
-                )
-            }
-        }
-        CaptionButton(
-            width = DesktopWindowsCaptionMetrics.BUTTON_WIDTH,
-            height = height,
-            hoverColor = foreground.copy(alpha = 0.08f),
-            pressedColor = foreground.copy(alpha = 0.13f),
-            onPositioned = { registry?.maxRect = it },
-            onClick = onToggleMaximize,
-        ) { iconColor ->
-            Canvas(Modifier.size(10.dp)) {
-                val stroke = 1.dp.toPx()
-                if (isMaximized) {
-                    val backOffset = 2.dp.toPx()
-                    val boxSize = size.width - backOffset
-                    drawRect(
-                        color = iconColor,
-                        topLeft = Offset(0f, backOffset),
-                        size = Size(boxSize, boxSize),
-                        style = Stroke(width = stroke),
-                    )
-                    drawLine(
-                        color = iconColor,
-                        start = Offset(backOffset, 0f),
-                        end = Offset(size.width, 0f),
-                        strokeWidth = stroke,
-                    )
-                    drawLine(
-                        color = iconColor,
-                        start = Offset(size.width, 0f),
-                        end = Offset(size.width, boxSize),
-                        strokeWidth = stroke,
-                    )
+    LaunchedEffect(registry?.overlayBlocked) {
+        val reg = registry ?: return@LaunchedEffect
+        DesktopWindowsNativeCaption.setOverlayBlocked(reg.overlayBlocked)
+    }
+
+    CompositionLocalProvider(LocalDensity provides captionDensity) {
+        Row(modifier = modifier.height(height), verticalAlignment = Alignment.CenterVertically) {
+            CaptionButton(
+                width = DesktopWindowsCaptionMetrics.BUTTON_WIDTH,
+                height = height,
+                defaultIconColor = defaultIconTint,
+                hoverColor = foreground.copy(alpha = 0.06f),
+                pressedColor = foreground.copy(alpha = 0.04f),
+                onPositioned = { registry?.minRect = it },
+                onClick = onMinimize,
+            ) { iconColor ->
+                if (captionFontFamily != null) {
+                    CaptionGlyphText(WindowsCaptionIconFont.GLYPH_MINIMIZE, captionFontFamily, iconColor)
                 } else {
-                    drawRect(
-                        color = iconColor,
-                        topLeft = Offset.Zero,
-                        size = size,
-                        style = Stroke(width = stroke),
-                    )
+                    Canvas(Modifier.size(10.dp)) {
+                        val y = size.height / 2f
+                        drawLine(
+                            color = iconColor,
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                    }
                 }
             }
-        }
-        CaptionButton(
-            width = DesktopWindowsCaptionMetrics.BUTTON_WIDTH,
-            height = height,
-            hoverColor = Color(0xFFC42B1C),
-            pressedColor = Color(0xFFB22719),
-            hoverIconColor = Color.White,
-            onPositioned = { registry?.closeRect = it },
-            onClick = onClose,
-        ) { iconColor ->
-            Canvas(Modifier.size(10.dp)) {
-                val stroke = 1.dp.toPx()
-                drawLine(
-                    color = iconColor,
-                    start = Offset.Zero,
-                    end = Offset(size.width, size.height),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Square,
-                )
-                drawLine(
-                    color = iconColor,
-                    start = Offset(size.width, 0f),
-                    end = Offset(0f, size.height),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Square,
-                )
+            CaptionButton(
+                width = DesktopWindowsCaptionMetrics.BUTTON_WIDTH,
+                height = height,
+                defaultIconColor = defaultIconTint,
+                hoverColor = foreground.copy(alpha = 0.06f),
+                pressedColor = foreground.copy(alpha = 0.04f),
+                onPositioned = { registry?.maxRect = it },
+                onClick = onToggleMaximize,
+            ) { iconColor ->
+                if (captionFontFamily != null) {
+                    CaptionGlyphText(
+                        glyph = if (isMaximized) WindowsCaptionIconFont.GLYPH_RESTORE else WindowsCaptionIconFont.GLYPH_MAXIMIZE,
+                        fontFamily = captionFontFamily,
+                        color = iconColor,
+                    )
+                } else {
+                    Canvas(Modifier.size(10.dp)) {
+                        val stroke = 1.dp.toPx()
+                        val half = stroke / 2f
+                        if (isMaximized) {
+                            val backOffset = 2.dp.toPx()
+                            val boxSize = size.width - backOffset - stroke
+                            drawRect(
+                                color = iconColor,
+                                topLeft = Offset(half, backOffset + half),
+                                size = Size(boxSize, boxSize),
+                                style = Stroke(width = stroke),
+                            )
+                            drawLine(
+                                color = iconColor,
+                                start = Offset(backOffset, half),
+                                end = Offset(size.width - half, half),
+                                strokeWidth = stroke,
+                            )
+                            drawLine(
+                                color = iconColor,
+                                start = Offset(size.width - half, half),
+                                end = Offset(size.width - half, backOffset + boxSize),
+                                strokeWidth = stroke,
+                            )
+                        } else {
+                            drawRect(
+                                color = iconColor,
+                                topLeft = Offset(half, half),
+                                size = Size(size.width - stroke, size.height - stroke),
+                                style = Stroke(width = stroke),
+                            )
+                        }
+                    }
+                }
+            }
+            CaptionButton(
+                width = DesktopWindowsCaptionMetrics.BUTTON_WIDTH,
+                height = height,
+                defaultIconColor = defaultIconTint,
+                hoverColor = Color(0xFFC42B1C),
+                pressedColor = Color(0xFFB22719),
+                hoverIconColor = Color.White,
+                onPositioned = { registry?.closeRect = it },
+                onClick = onClose,
+            ) { iconColor ->
+                if (captionFontFamily != null) {
+                    CaptionGlyphText(WindowsCaptionIconFont.GLYPH_CLOSE, captionFontFamily, iconColor)
+                } else {
+                    Canvas(Modifier.size(10.dp)) {
+                        val stroke = 1.dp.toPx()
+                        drawLine(
+                            color = iconColor,
+                            start = Offset.Zero,
+                            end = Offset(size.width, size.height),
+                            strokeWidth = stroke,
+                            cap = StrokeCap.Butt,
+                        )
+                        drawLine(
+                            color = iconColor,
+                            start = Offset(size.width, 0f),
+                            end = Offset(0f, size.height),
+                            strokeWidth = stroke,
+                            cap = StrokeCap.Butt,
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
+private fun CaptionGlyphText(
+    glyph: String,
+    fontFamily: FontFamily,
+    color: Color,
+) {
+    Text(
+        text = glyph,
+        color = color,
+        style = TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+        ),
+        maxLines = 1,
+    )
+}
+
+@Composable
 private fun CaptionButton(
     width: Dp,
     height: Dp,
+    defaultIconColor: Color,
     hoverColor: Color,
     pressedColor: Color,
     hoverIconColor: Color? = null,
@@ -316,7 +427,7 @@ private fun CaptionButton(
         hovered -> hoverColor
         else -> Color.Transparent
     }
-    val iconTint = if ((hovered || pressed) && hoverIconColor != null) hoverIconColor else DesktopForeground
+    val iconTint = if ((hovered || pressed) && hoverIconColor != null) hoverIconColor else defaultIconColor
     Box(
         modifier = Modifier
             .width(width)

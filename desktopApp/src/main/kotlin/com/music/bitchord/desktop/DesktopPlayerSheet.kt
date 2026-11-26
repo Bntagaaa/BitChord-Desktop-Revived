@@ -103,9 +103,11 @@ internal fun DesktopPlayerSheet(
                 com.music.bitchord.ui.player.LocalCenteredLyrics provides true,
             ) { content(windowWidth, windowHeight) }
             val fullscreen by DesktopWindowMode.fullScreen.collectAsState()
+            val uiScalePercent by DesktopUiScaleSettings.percent.collectAsState()
             val captionInsetEnd = DesktopWindowsCaptionMetrics.captionInsetEnd(
                 isWindows = DesktopPlatform.isWindows,
                 isFullscreen = fullscreen,
+                uiScalePercent = uiScalePercent,
             )
             Box(Modifier.align(Alignment.TopStart).padding(8.dp).registerTitleBarInteractive("player_sheet_dismiss")) {
                 DesktopToolbarButton(onClick = onDismiss, size = 32.dp) {

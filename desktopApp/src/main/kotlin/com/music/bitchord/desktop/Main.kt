@@ -441,8 +441,12 @@ private fun desktopMain(
                 onClose = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },
             )
         }
+        val captionSystemDensity = remember(systemDensity) {
+            Density(systemDensity.density, fontScale = 1f)
+        }
         CompositionLocalProvider(
             LocalDensity provides uiDensity,
+            LocalDesktopSystemDensity provides captionSystemDensity,
             LocalLyricAnimationAllowed provides lyricsAnimationAllowed,
             LocalDesktopWindowActions provides windowActions,
         ) {

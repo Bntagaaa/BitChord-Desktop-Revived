@@ -104,17 +104,18 @@ fun MixesScreen(
         ) {
             if (title != null) {
                 item(key = "title") {
+                    val compactHeadings = LocalDesktopCompactHeadings.current
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.displayLarge,
+                        style = if (compactHeadings) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         // Explore's exact spacing, so the heading stays put when
                         // switching between the tabs that carry one.
                         modifier = Modifier.padding(
                             start = PAGE_GUTTER,
                             end = PAGE_GUTTER,
-                            top = 8.dp,
-                            bottom = 14.dp,
+                            top = if (compactHeadings) 0.dp else 8.dp,
+                            bottom = if (compactHeadings) 8.dp else 14.dp,
                         ),
                     )
                 }

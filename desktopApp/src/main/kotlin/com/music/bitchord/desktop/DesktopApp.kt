@@ -5770,9 +5770,11 @@ internal fun DesktopTopBar(
     val currentProgress by rememberUpdatedState(progress)
 
     val fullScreen by DesktopWindowMode.fullScreen.collectAsState()
+    val uiScalePercent by DesktopUiScaleSettings.percent.collectAsState()
     val captionInsetEnd = DesktopWindowsCaptionMetrics.captionInsetEnd(
         isWindows = DesktopPlatform.isWindows,
         isFullscreen = fullScreen,
+        uiScalePercent = uiScalePercent,
     )
 
     // Render the whole bar as a flat, opaque theme surface even if dynamic blur is enabled.
@@ -6181,10 +6183,10 @@ private fun DesktopSidebar(
     ) {
         Column(Modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 16.dp),
+            Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 16.dp),
         ) {
             if (collapsed) {
-                Box(Modifier.fillMaxWidth().height(35.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
                     IconButton(
                         onClick = onToggleCollapse,
                         modifier = Modifier.registerTitleBarInteractive("sidebar_toggle_collapsed"),
@@ -6197,9 +6199,9 @@ private fun DesktopSidebar(
                         )
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(4.dp))
             } else Row(
-                Modifier.fillMaxWidth().padding(start = 9.dp, top = 1.dp, bottom = 16.dp),
+                Modifier.fillMaxWidth().padding(start = 9.dp, top = 0.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
@@ -6224,12 +6226,18 @@ private fun DesktopSidebar(
                 Spacer(Modifier.weight(1f))
                 IconButton(
                     onClick = onToggleCollapse,
-                    modifier = Modifier.size(28.dp).registerTitleBarInteractive("sidebar_toggle_expanded"),
+                    modifier = Modifier.size(26.dp).registerTitleBarInteractive("sidebar_toggle_expanded"),
                 ) {
                     Icon(DesktopIcons.Navigation.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                 }
             }
-            DesktopSidebarItem(DesktopPrimaryNavigationIcons.Home, DesktopStrings["home", "Home"], !settingsOpen && destination == DesktopDestination.LISTEN_NOW, collapsed = collapsed) {
+            DesktopSidebarItem(
+                DesktopPrimaryNavigationIcons.Home,
+                DesktopStrings["home", "Home"],
+                !settingsOpen && destination == DesktopDestination.LISTEN_NOW,
+                collapsed = collapsed,
+                modifier = Modifier.registerTitleBarInteractive("sidebar_nav_home"),
+            ) {
                 onDestinationSelected(DesktopDestination.LISTEN_NOW)
             }
             DesktopSidebarItem(DesktopPrimaryNavigationIcons.New, "New", !settingsOpen && destination == DesktopDestination.NEW, collapsed = collapsed) {
@@ -6370,6 +6378,7 @@ private fun DesktopSidebarItem(
     selected: Boolean,
     collapsed: Boolean = false,
     logo: org.jetbrains.compose.resources.DrawableResource? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val navShape = RoundedCornerShape(8.dp)
@@ -6394,7 +6403,7 @@ private fun DesktopSidebarItem(
             state = rememberTooltipState(),
         ) {
             Box(
-                Modifier.fillMaxWidth().height(42.dp)
+                modifier.fillMaxWidth().height(42.dp)
                     .clip(navShape)
                     .background(if (selected) DesktopTheme.palette.navSelectedSurface else Color.Transparent)
                     .then(selectedRim)
@@ -6417,7 +6426,7 @@ private fun DesktopSidebarItem(
         return
     }
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clip(navShape)
             .background(if (selected) DesktopTheme.palette.navSelectedSurface else Color.Transparent)
@@ -6732,6 +6741,7 @@ internal fun DesktopFrame(
     val oldTopPlayerEnabled by DesktopAppearanceSettings.enableOldTopMusicPlayerStyle.collectAsState()
     val fullScreen by DesktopWindowMode.fullScreen.collectAsState()
     val placement by DesktopWindowMode.placement.collectAsState()
+    val uiScalePercent by DesktopUiScaleSettings.percent.collectAsState()
     val integratedCaptionActive = DesktopWindowsCaptionMetrics.isIntegratedTitleBarActive(
         isWindows = DesktopPlatform.isWindows,
         isFullscreen = fullScreen,
@@ -6739,17 +6749,19 @@ internal fun DesktopFrame(
     val hitTestRegistry = remember { DesktopTitleBarHitTestRegistry() }
     val windowActions = LocalDesktopWindowActions.current
     val density = LocalDensity.current
-    val titleBarHeight = if (oldTopPlayerEnabled) {
-        DesktopWindowsCaptionMetrics.TOP_PLAYER_HEIGHT
-    } else {
-        DesktopWindowsCaptionMetrics.INTEGRATED_TITLE_BAR_HEIGHT
-    }
-    LaunchedEffect(integratedCaptionActive, titleBarHeight, density) {
+    val systemDensity = LocalDesktopSystemDensity.current ?: density
+    val integratedTitleBarSpacerHeight = DesktopWindowsCaptionMetrics.integratedTitleBarHeight(uiScalePercent)
+    LaunchedEffect(integratedCaptionActive, oldTopPlayerEnabled, density, systemDensity) {
         if (DesktopPlatform.isWindows) {
-            val heightPx = if (integratedCaptionActive) with(density) { titleBarHeight.roundToPx() } else 0
+            val heightPx = when {
+                !integratedCaptionActive -> 0
+                oldTopPlayerEnabled -> with(density) { DesktopWindowsCaptionMetrics.TOP_PLAYER_HEIGHT.roundToPx() }
+                else -> with(systemDensity) { DesktopWindowsCaptionMetrics.INTEGRATED_TITLE_BAR_HEIGHT.roundToPx() }
+            }
             DesktopWindowsNativeCaption.setTitleBarHeight(heightPx)
         }
     }
+    hitTestRegistry.overlayBlocked = menuPortal.entry.value != null
     CompositionLocalProvider(
         LocalDesktopHaze provides haze,
         LocalDesktopMenuPortal provides menuPortal,
@@ -6791,7 +6803,7 @@ internal fun DesktopFrame(
                                     Spacer(
                                         Modifier
                                             .fillMaxWidth()
-                                            .height(DesktopWindowsCaptionMetrics.INTEGRATED_TITLE_BAR_HEIGHT),
+                                            .height(integratedTitleBarSpacerHeight),
                                     )
                                 }
                                 DesktopPageWithSidePanel(
@@ -7537,7 +7549,7 @@ private fun DesktopHistoryPage(
                     "History",
                     style = MaterialTheme.typography.headlineLarge,
                     color = DesktopForeground,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                    modifier = Modifier.padding(top = 0.dp, bottom = 12.dp),
                 )
             }
             if (history.isEmpty()) item { DesktopEmptyPage(BitChordIcons.Clock, "Nothing played yet", "Songs you play will show up here.") }
@@ -7915,7 +7927,7 @@ private fun DesktopLocalMusicPage(
                 title,
                 style = MaterialTheme.typography.headlineLarge,
                 color = DesktopForeground,
-                modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                modifier = Modifier.padding(top = 0.dp, bottom = 12.dp),
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 DesktopSearchField(

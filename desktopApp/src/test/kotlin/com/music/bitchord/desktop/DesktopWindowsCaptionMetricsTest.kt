@@ -16,8 +16,17 @@ class DesktopWindowsCaptionMetricsTest {
     }
 
     @Test
-    fun `caption inset end reserves 138dp only when integrated title bar is active`() {
+    fun `integrated title bar uses 32dp height and compensates for ui scale`() {
+        assertEquals(32.dp, DesktopWindowsCaptionMetrics.INTEGRATED_TITLE_BAR_HEIGHT)
+        assertEquals(32.dp, DesktopWindowsCaptionMetrics.integratedTitleBarHeight(100))
+        assertEquals(40.dp, DesktopWindowsCaptionMetrics.integratedTitleBarHeight(80))
+        assertEquals(25.6.dp, DesktopWindowsCaptionMetrics.integratedTitleBarHeight(125))
+    }
+
+    @Test
+    fun `caption inset end reserves 138dp at 100 percent and scales for ui zoom`() {
         assertEquals(138.dp, DesktopWindowsCaptionMetrics.captionInsetEnd(isWindows = true, isFullscreen = false))
+        assertEquals(172.5.dp, DesktopWindowsCaptionMetrics.captionInsetEnd(isWindows = true, isFullscreen = false, uiScalePercent = 80))
         assertEquals(0.dp, DesktopWindowsCaptionMetrics.captionInsetEnd(isWindows = true, isFullscreen = true))
         assertEquals(0.dp, DesktopWindowsCaptionMetrics.captionInsetEnd(isWindows = false, isFullscreen = false))
     }
