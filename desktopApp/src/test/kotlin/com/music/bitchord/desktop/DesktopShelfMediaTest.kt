@@ -3,6 +3,7 @@ package com.music.bitchord.desktop
 import com.music.bitchord.data.model.*
 import com.music.bitchord.data.innertube.InnertubeParser
 import com.music.bitchord.data.sources.TrackMatcher
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.test.*
 
@@ -35,6 +36,32 @@ class DesktopShelfMediaTest {
         assertTrue(card.toSong().isVideo)
         val artistCard = InnertubeParser.parseArtistPage(home("Music Videos", null)).sections.single().items.single()
         assertTrue(artistCard.isVideo); assertTrue(artistCard.toSong().isVideo)
+    }
+
+    @Test fun homeMenuResolvesOnlyTheClickedTracksMissingLinks() = runBlocking {
+        val clicked = Song("AbCdEf123_-", "Clicked track", "Artist", null)
+        val metadata = clicked.copy(albumId = "album", albumName = "Release", artistId = "artist")
+        val requested = mutableListOf<String>()
+        val resolved = clicked.withDesktopHomeMenuLinks { id ->
+            requested += id
+            metadata
+        }
+        assertEquals(listOf(clicked.videoId), requested)
+        assertEquals("album", resolved.albumId)
+        assertEquals("Release", resolved.albumName)
+        assertEquals("artist", resolved.artistId)
+        assertEquals(clicked.title, resolved.title)
+        assertEquals(clicked, clicked.withDesktopHomeMenuLinks { metadata.copy(videoId = "ZbCdEf123_-") })
+        assertEquals(clicked, clicked.withDesktopHomeMenuLinks { null })
+    }
+
+    @Test fun homeMenuSkipsLookupForKnownLinksAndNonYoutubeTracks() = runBlocking {
+        val known = Song("AbCdEf123_-", "Track", "Artist", null, albumId = "album", artistId = "artist")
+        val local = known.copy(localPath = "/music/song.flac", albumId = null)
+        val nonYoutube = known.copy(videoId = "spotify:track:123", artistId = null)
+        for (song in listOf(known, local, nonYoutube)) {
+            assertEquals(song, song.withDesktopHomeMenuLinks { error("Unexpected lookup") })
+        }
     }
 
     @Test fun manualVideoSelectionAcceptsAnIntroButRejectsCoversAndDifferentVersions() {

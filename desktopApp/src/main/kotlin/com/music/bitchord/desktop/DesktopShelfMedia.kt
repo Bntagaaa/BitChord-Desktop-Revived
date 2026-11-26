@@ -21,6 +21,12 @@ internal fun ShelfItem.toSong(): Song {
     )
 }
 
+/** Resolve missing browse links on demand, using the player's verified track metadata merge. */
+internal suspend fun Song.withDesktopHomeMenuLinks(fetchLinks: suspend (String) -> Song?): Song {
+    if (!canFetchDesktopPlayerMetadata() || (albumId != null && artistId != null)) return this
+    return withDesktopPlayerMetadata(fetchLinks(videoId))
+}
+
 private val SHELF_DURATION = Regex("""\d{1,2}:\d{2}(?::\d{2})?""")
 private val SHELF_TALLY = Regex("[0-9,.]+\\s*(?:views?|likes?|songs?)", RegexOption.IGNORE_CASE)
 private val SHELF_TYPE_WORDS = setOf("song", "video", "album", "ep", "single", "playlist", "mix")
