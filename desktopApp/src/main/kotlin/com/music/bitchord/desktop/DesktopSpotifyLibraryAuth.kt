@@ -54,7 +54,7 @@ internal object DesktopSpotifyLibraryAuth {
     @Volatile private var cachedSession: SessionInfo? = null
 
     private data class SessionInfo(val clientVersion: String, val deviceId: String)
-    private data class HarvestedToken(val token: String, val expiresAt: Long, val clientId: String?)
+    internal data class HarvestedToken(val token: String, val expiresAt: Long, val clientId: String?)
 
     suspend fun tokens(): SpotifyLibrary.Tokens? = withContext(Dispatchers.IO) {
         val cookie = DesktopSpotifyToken.cookie().ifBlank { return@withContext null }
@@ -136,12 +136,19 @@ internal object DesktopSpotifyLibraryAuth {
         }
     }
 
+    @Volatile
+    internal var fxAvailableProvider: () -> Boolean = { DesktopPoTokenWebView.available }
+
     /**
      * Opens a fresh web-player profile, applies the user's saved session cookie, and observes the
      * real token response. The page may mint an anonymous token first; only an authenticated token
      * is accepted, matching the mobile implementation.
      */
-    private suspend fun harvestViaWebEngine(cookie: String): HarvestedToken? {
+    internal suspend fun harvestViaWebEngine(cookie: String): HarvestedToken? {
+        if (!fxAvailableProvider()) {
+            DesktopTrackLog.log("spotify: JavaFX toolkit unavailable for web-player token capture")
+            return null
+        }
         val result = CompletableDeferred<HarvestedToken?>()
         val engineReady = CompletableDeferred<Unit>()
         val profile = runCatching { Files.createTempDirectory("bitchord-spotify-token-") }.getOrNull()
