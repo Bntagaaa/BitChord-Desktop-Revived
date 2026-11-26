@@ -60,7 +60,6 @@ import com.music.bitchord.data.model.ArtistRef
 import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.playback.PlaybackPosition
-import com.music.bitchord.ui.icons.BitChordIcons
 
 /**
  * The compact Spotify-style track details view. It deliberately uses BitChord's existing
@@ -216,7 +215,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                     if (showLike) {
                         DesktopToolbarButton(onClick = onToggleLike, size = 32.dp) {
                             Icon(
-                                imageVector = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
+                                imageVector = if (liked) DesktopIcons.Player.LikeFilled else DesktopIcons.Player.Like,
                                 contentDescription = if (liked) "Remove from liked" else "Add to liked",
                                 tint = if (liked) DesktopAccent else canvasCaptionInk,
                                 modifier = Modifier.size(19.dp),
@@ -266,7 +265,7 @@ internal fun DesktopNowPlayingDetailsPanel(
                 if (showLike) {
                     DesktopToolbarButton(onClick = onToggleLike, size = 34.dp) {
                         Icon(
-                            imageVector = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
+                            imageVector = if (liked) DesktopIcons.Player.LikeFilled else DesktopIcons.Player.Like,
                             contentDescription = if (liked) "Remove from liked" else "Add to liked",
                             tint = if (liked) DesktopAccent else secondary,
                             modifier = Modifier.size(19.dp),
