@@ -49,6 +49,7 @@ internal object DesktopReleaseNotesMarkdown {
         .build()
     private val rawBase = URI.create("https://raw.githubusercontent.com/Bntagaaa/BitChord-Desktop-Revived/1.9.1/")
     private val pageBase = URI.create("https://github.com/Bntagaaa/BitChord-Desktop-Revived/blob/1.9.1/")
+    private val versionedChangesTitle = Regex("""new in v?\d+\.\d+(?:\.\d+)*(?:-[a-z0-9]+(?:[.-][a-z0-9]+)*)?""")
 
     fun parse(markdown: String): Node = parser.parse(markdown.take(32_000))
 
@@ -60,17 +61,25 @@ internal object DesktopReleaseNotesMarkdown {
 
     internal fun whatsNew(markdown: String): WhatsNew {
         val blocks = parse(markdown).children()
-        val index = blocks.indexOfFirst { node ->
-            sectionHeading(node)?.second?.let(::isWhatsNewTitle) == true
+        val headings = blocks.map(::sectionHeading)
+        val primaryIndex = headings.indexOfFirst { heading ->
+            when (heading?.second?.let(::normalizeHeading)) {
+                "what's new", "whats new" -> true
+                else -> false
+            }
         }
-        // Do not show Installation, Credits or arbitrary release-body text
-        // when an older release has no What's New heading.
+        val index = if (primaryIndex >= 0) primaryIndex else headings.indexOfFirst { heading ->
+            val title = heading?.second?.let(::normalizeHeading) ?: return@indexOfFirst false
+            title == "changes" || versionedChangesTitle.matches(title)
+        }
+        // Only include recognized changelog sections, not downloads or credits.
         if (index < 0) return WhatsNew(null, emptyList())
-        val level = requireNotNull(sectionHeading(blocks[index])).first
+        val level = requireNotNull(headings[index]).first
         val selected = mutableListOf<Node>()
-        for (block in blocks.drop(index + 1)) {
+        for (position in index + 1 until blocks.size) {
+            val block = blocks[position]
             if (block is ThematicBreak) break
-            val heading = sectionHeading(block)
+            val heading = headings[position]
             if (heading != null && heading.first <= level) break
             selected += block
         }
@@ -97,11 +106,9 @@ internal object DesktopReleaseNotesMarkdown {
         else -> null
     }
 
-    private fun isWhatsNewTitle(raw: String): Boolean {
-        val text = raw.trim().replace('’', '\'').replace('‘', '\'')
+    private fun normalizeHeading(raw: String): String =
+        raw.trim().replace('’', '\'').replace('‘', '\'')
             .trimEnd(':', '!', ' ').lowercase(java.util.Locale.ROOT)
-        return text == "what's new" || text == "whats new"
-    }
 
     private fun plainText(node: Node): String = buildString {
         fun visit(current: Node) {
