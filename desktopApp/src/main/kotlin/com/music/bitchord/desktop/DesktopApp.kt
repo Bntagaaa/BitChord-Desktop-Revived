@@ -2163,7 +2163,7 @@ internal fun BitChordDesktopApp(
         )
     }
 
-    LaunchedEffect(selectedSong?.videoId, selectedSong?.isVideo, animatedCanvas) {
+    LaunchedEffect(selectedSong?.videoId, selectedSong?.albumName, selectedSong?.isVideo, animatedCanvas) {
         val current = selectedSong
         if (current == null || !animatedCanvas || current.isVideo) {
             canvas = null
@@ -2173,6 +2173,15 @@ internal fun BitChordDesktopApp(
         // resolved a minute ago should not go dark on its way back to the same clip.
         canvas = DesktopCanvasClient.cached(current)
         canvas = withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(current) }
+    }
+
+    // Warm metadata for the upcoming queue track after playback settles so skips start immediately.
+    val nextQueueSong = liveQueue.songs.getOrNull(liveQueue.index + 1)
+    LaunchedEffect(nextQueueSong?.videoId, animatedCanvas) {
+        val upcoming = nextQueueSong ?: return@LaunchedEffect
+        if (!animatedCanvas || upcoming.isVideo) return@LaunchedEffect
+        delay(2_500L)
+        withContext(Dispatchers.IO) { DesktopCanvasClient.prefetch(upcoming) }
     }
 
 
@@ -6183,10 +6192,10 @@ private fun DesktopSidebar(
     ) {
         Column(Modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 16.dp),
+            Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 16.dp),
         ) {
             if (collapsed) {
-                Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().height(35.dp), contentAlignment = Alignment.Center) {
                     IconButton(
                         onClick = onToggleCollapse,
                         modifier = Modifier.registerTitleBarInteractive("sidebar_toggle_collapsed"),
@@ -6199,9 +6208,9 @@ private fun DesktopSidebar(
                         )
                     }
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(16.dp))
             } else Row(
-                Modifier.fillMaxWidth().padding(start = 9.dp, top = 0.dp, bottom = 4.dp),
+                Modifier.fillMaxWidth().padding(start = 9.dp, top = 1.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
@@ -6226,7 +6235,7 @@ private fun DesktopSidebar(
                 Spacer(Modifier.weight(1f))
                 IconButton(
                     onClick = onToggleCollapse,
-                    modifier = Modifier.size(26.dp).registerTitleBarInteractive("sidebar_toggle_expanded"),
+                    modifier = Modifier.size(28.dp).registerTitleBarInteractive("sidebar_toggle_expanded"),
                 ) {
                     Icon(DesktopIcons.Navigation.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                 }
