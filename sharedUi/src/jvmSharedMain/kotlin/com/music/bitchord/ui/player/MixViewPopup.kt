@@ -138,7 +138,7 @@ private const val SilentAlpha = 0.32f
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 internal fun MixViewPopup(
-    view: MixTransitionView,
+    view: MixTransitionView?,
     visible: Boolean,
     /** False once the blend has finished: the popup stays up on its last frame, without a playhead. */
     live: Boolean,
@@ -203,8 +203,165 @@ internal fun MixViewPopup(
                     .padding(vertical = 14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                MixViewContent(view, progress, live)
+                if (view != null) {
+                    MixViewContent(view, progress, live)
+                } else {
+                    MixViewSkeletonContent()
+                }
             }
+        }
+    }
+}
+
+/** Placeholder skeleton shown while Automix is still analysing or planning the next transition. */
+@Composable
+internal fun MixViewSkeletonContent() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        DeckHeaderSkeleton(Modifier.padding(horizontal = 14.dp))
+        Spacer(Modifier.height(12.dp))
+        MixDecksSkeleton()
+        Spacer(Modifier.height(12.dp))
+        DeckHeaderSkeleton(Modifier.padding(horizontal = 14.dp))
+    }
+}
+
+@Composable
+private fun DeckHeaderSkeleton(modifier: Modifier = Modifier) {
+    val placeholder = Color.White.copy(alpha = 0.12f)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(46.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(placeholder),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.55f)
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(placeholder),
+            )
+            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.32f)
+                    .height(11.dp)
+                    .clip(RoundedCornerShape(5.5.dp))
+                    .background(placeholder),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Box(
+                modifier = Modifier
+                    .width(54.dp)
+                    .height(13.dp)
+                    .clip(RoundedCornerShape(6.5.dp))
+                    .background(placeholder),
+            )
+            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier
+                    .width(34.dp)
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(placeholder),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MixDecksSkeleton() {
+    val placeholder = Color.White.copy(alpha = 0.14f)
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(DecksHeight),
+    ) {
+        val width = maxWidth
+        val panelStart = width * BoxStart
+        val panelWidth = width * (BoxEnd - BoxStart)
+        Box(
+            Modifier
+                .offset(x = panelStart, y = 0.dp)
+                .width(panelWidth)
+                .height(DecksHeight - 20.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(PanelColor.copy(alpha = 0.85f)),
+        )
+        Canvas(Modifier.fillMaxSize()) {
+            val deckHeight = DeckHeight.toPx()
+            val topDeck = DeckTop.toPx()
+            val bottomDeck = size.height - DeckBottomInset.toPx() - deckHeight
+            val boxLeft = size.width * BoxStart
+            val boxRight = size.width * BoxEnd
+
+            fun drawPlaceholderBars(top: Float) {
+                val centre = top + deckHeight / 2f
+                val maxHalf = deckHeight / 2f * 0.72f
+                val barWidth = 3.dp.toPx()
+                val gap = 3.dp.toPx()
+                val step = barWidth + gap
+                val count = (size.width / step).toInt().coerceAtLeast(1)
+                for (i in 0 until count) {
+                    val phase = i * 0.65f
+                    val amp = (0.28f + 0.55f * kotlin.math.abs(kotlin.math.sin(phase) * kotlin.math.cos(phase * 0.43f))).coerceIn(0.18f, 0.9f)
+                    val extent = maxHalf * amp
+                    val x = i * step
+                    drawRoundRect(
+                        color = placeholder,
+                        topLeft = Offset(x, centre - extent),
+                        size = Size(barWidth, extent * 2f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f, barWidth / 2f),
+                    )
+                }
+            }
+
+            fun drawFrame(top: Float, outgoing: Boolean) {
+                val floor = top + deckHeight
+                val frame = Stroke(width = 2.5.dp.toPx(), join = StrokeJoin.Round)
+                val edge = Path().apply {
+                    if (outgoing) {
+                        moveTo(boxLeft, top)
+                        lineTo(boxRight, top)
+                        lineTo(boxRight, floor)
+                    } else {
+                        moveTo(boxLeft, floor)
+                        lineTo(boxLeft, top)
+                        lineTo(boxRight, top)
+                    }
+                }
+                drawPath(edge, FrameColor, style = frame)
+            }
+
+            drawPlaceholderBars(topDeck)
+            drawPlaceholderBars(bottomDeck)
+            drawFrame(topDeck, outgoing = true)
+            drawFrame(bottomDeck, outgoing = false)
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(x = width * ((BoxStart + BoxEnd) / 2f) - width / 2)
+                .clip(RoundedCornerShape(14.dp))
+                .background(ChipColor)
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(34.dp)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.White.copy(alpha = 0.16f)),
+            )
         }
     }
 }
@@ -606,7 +763,7 @@ private fun camelotOf(key: String): Camelot? {
  * Whether the mix popup has been asked for. Set by tapping the "Mixing" label
  * under the scrubber, cleared on dismiss. One player per process, so one flag.
  */
-internal object MixViewRequest {
+object MixViewRequest {
     var open by mutableStateOf(false)
 }
 
@@ -619,12 +776,16 @@ internal object MixViewRequest {
  * and not the player it is mounted in.
  */
 @Composable
-internal fun MixViewOverlay(hazeState: HazeState) {
+fun MixViewOverlay(hazeState: HazeState) {
     val view by PlayerSettings.smartMixView.collectAsStateWithLifecycle()
+    val mixInProgress by PlayerSettings.smartMixInProgress.collectAsStateWithLifecycle()
+    val smartFadeEnabled by PlayerSettings.smartFadeEnabled.collectAsStateWithLifecycle()
     var held by remember { mutableStateOf<MixTransitionView?>(null) }
     val open = MixViewRequest.open
-    LaunchedEffect(open) { PlayerPlatform.host.onMixViewOpen(open) }
     val current = view
+    LaunchedEffect(open, current != null) {
+        PlayerPlatform.host.onMixViewOpen(open)
+    }
     LaunchedEffect(current, open) {
         if (current != null) {
             held = current
@@ -634,16 +795,16 @@ internal fun MixViewOverlay(hazeState: HazeState) {
             held = null
         }
     }
-    // Nothing to show: a tap that raced the blend's end, or a stale request.
-    LaunchedEffect(open, held) {
-        if (open && held == null && current == null) MixViewRequest.open = false
+    // Close automatically only if Automix itself is off and nothing is held.
+    LaunchedEffect(open, held, current, smartFadeEnabled) {
+        if (open && held == null && current == null && !smartFadeEnabled) MixViewRequest.open = false
     }
     PlayerBackHandler(enabled = open) { MixViewRequest.open = false }
-    val shown = held ?: return
+    if (!open && held == null) return
     MixViewPopup(
-        view = shown,
+        view = held,
         visible = open,
-        live = current != null,
+        live = current != null && mixInProgress,
         hazeState = hazeState,
         onDismiss = { MixViewRequest.open = false },
     )

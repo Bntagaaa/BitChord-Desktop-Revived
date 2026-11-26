@@ -130,6 +130,7 @@ internal fun DesktopSongMenuFor(
     onUpgradeQuality: (() -> Unit)?,
     onDismiss: () -> Unit,
     miniPlayerActions: DesktopMiniPlayerMenuActions? = null,
+    onAutomixOverview: (() -> Unit)? = null,
 ) {
     val close = onDismiss
     DesktopSongMenu(
@@ -165,6 +166,7 @@ internal fun DesktopSongMenuFor(
         onDismiss = close,
         onRemoveHistory = actions.onRemoveHistory?.let { remove -> { remove(song); close() } },
         miniPlayerActions = miniPlayerActions,
+        onAutomixOverview = onAutomixOverview?.let { { it(); close() } },
     )
 }
 
@@ -199,6 +201,7 @@ internal fun DesktopSongMenu(
     onRemoveHistory: (() -> Unit)? = null,
     onSwitchMediaVersion: (() -> Unit)? = null,
     miniPlayerActions: DesktopMiniPlayerMenuActions? = null,
+    onAutomixOverview: (() -> Unit)? = null,
 ) {
     var pickingSleepTimer by remember { mutableStateOf(false) }
     var customTimer by remember { mutableStateOf(false) }
@@ -366,6 +369,13 @@ internal fun DesktopSongMenu(
             label = DesktopStrings["sleep_timer", "Sleep timer"],
             value = sleepTimerLabel(sleepTimerMinutes, sleepAfterTrack),
         ) { pickingSleepTimer = true }
+        if (onAutomixOverview != null) {
+            DesktopMenuRow(
+                icon = DesktopIcons.Audio.GraphicEq,
+                label = DesktopStrings["automix_overview", "Automix overview"],
+                onClick = onAutomixOverview,
+            )
+        }
     }
 }
 
