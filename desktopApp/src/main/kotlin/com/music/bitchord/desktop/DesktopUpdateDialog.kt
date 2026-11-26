@@ -27,10 +27,6 @@ internal fun DesktopSettingsRows.updateSettingsRows(
     auto: Boolean,
     checked: Long,
 ) {
-    val version = DesktopUpdateChecker.currentVersion
-    row("Current version", version, "release build") {
-        DesktopSettingsRow("Current version", subtitle = version)
-    }
     toggle("Automatically check for updates", "Check for new BitChord releases in the background", auto, service::setAuto)
     val busy = state.phase in setOf(UpdatePhase.CHECKING, UpdatePhase.DOWNLOADING, UpdatePhase.VERIFYING, UpdatePhase.INSTALLING)
     row("Check for Updates", "Last successful check", updateStatus(state), "download install stable preview upgrade") {

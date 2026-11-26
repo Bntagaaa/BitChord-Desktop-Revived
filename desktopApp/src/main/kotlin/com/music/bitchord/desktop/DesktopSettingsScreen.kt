@@ -19,15 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.desktop.DesktopSettingsPage.*
@@ -197,7 +190,7 @@ internal fun DesktopSettingsScreen(
             }
         }
         sections.section(LICENSES) {
-            navigationRow(LICENSES.title, "About BitChord and its open-source dependencies") { onOpenPage(LICENSES) }
+            navigationRow(LICENSES.title, "Open-source dependencies and their licenses") { onOpenPage(LICENSES) }
         }
     }
 
@@ -762,7 +755,16 @@ internal fun DesktopSettingsScreen(
         )
     }
 
-    sections.section(APP_UPDATES) {
+    sections.section(ABOUT) {
+        if (searching) {
+            row(ABOUT.title, "app updates", "desktop version GitHub developer Discord") {
+                DesktopSettingsRow(ABOUT.title, onClick = { onOpenPage(ABOUT) })
+            }
+        }
+        val version = DesktopUpdateChecker.currentVersion
+        row("Current version", version, "release build") {
+            DesktopSettingsRow("Current version", subtitle = version)
+        }
         updater?.let { service ->
             val state by service.state.collectAsState()
             val auto by service.autoCheck.collectAsState()
@@ -780,13 +782,19 @@ internal fun DesktopSettingsScreen(
         DesktopSettingsList(
             state = listState,
             modifier = Modifier.weight(1f),
-            topPadding = if (page == MAIN) 10.dp else 0.dp,
+            topPadding = when (page) {
+                MAIN -> 10.dp
+                ABOUT -> 22.dp
+                else -> 0.dp
+            },
             bottomScrollInset = bottomScrollInset,
         ) {
             if (overview) {
-                item("categories") { DesktopSettingsOverview(updater != null, audioQuality.label, onOpenPage) }
-                item("about") { DesktopSettingsFooter { onOpenPage(LICENSES) } }
+                item("categories") { DesktopSettingsOverview(audioQuality.label, onOpenPage) }
             } else {
+                if (page == ABOUT) {
+                    item("about") { DesktopAboutCard(onLicenses = { onOpenPage(LICENSES) }) }
+                }
                 sections.groups.forEach { (route, rows) ->
                     item(route.name) { rows.Content(route.title.takeIf { searching }) }
                 }
@@ -825,8 +833,7 @@ internal fun DesktopSettingsScreen(
 
 /**
  * Keep the viewport full height so rows can scroll behind the floating player.
- * Put the shell's clearance inside the list instead, so its final row or About
- * footer can scroll completely above the player without a permanent bottom gap.
+ * Put the shell's clearance inside the list instead, so its final row can scroll completely above the player without a permanent bottom gap.
  */
 @Composable
 internal fun DesktopSettingsList(
@@ -843,45 +850,6 @@ internal fun DesktopSettingsList(
         verticalArrangement = Arrangement.spacedBy(26.dp),
         content = content,
     )
-}
-
-/** The centered About footer, matching the Android-style version wordmark. */
-@Composable
-private fun DesktopSettingsFooter(onLicenses: () -> Unit) {
-    val version = remember { System.getProperty("bitchord.version") ?: "1.9.1" }
-    val linkStyles = TextLinkStyles(
-        style = SpanStyle(color = DesktopAccent, textDecoration = TextDecoration.Underline),
-    )
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        DesktopAboutVersionTitle(version = version, color = DesktopForeground)
-        Text(
-            text = buildAnnotatedString {
-                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
-                    append("GitHub")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
-                    append("Developer")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
-                    append("Discord")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Clickable("licenses", linkStyles) { onLicenses() }) {
-                    append("Licenses")
-                }
-                append("\n~YouTube Music Backend")
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = DesktopSecondary,
-            textAlign = TextAlign.Center,
-        )
-    }
 }
 
 /** Everything this build is assembled from, and the terms each part came under. A page of Settings. */

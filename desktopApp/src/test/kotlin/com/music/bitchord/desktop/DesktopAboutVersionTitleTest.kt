@@ -26,7 +26,6 @@ import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.LoadedFont
 import androidx.compose.ui.text.platform.Font as loadedFont
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import bitchord.desktopapp.generated.resources.Res
@@ -40,42 +39,48 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class DesktopAboutVersionTitleTest {
-    private val versions = listOf("1.9.1", "1.8.2-test", "1.9.1-beta.10", "2.0.0+build.123")
+    private val versions = mapOf(
+        "1.9.1" to "1.9.1",
+        "1.10-phase3-fix" to "1.10",
+        "1.9.1-beta.10" to "1.9.1",
+        "2.0.0+build.123" to "2.0.0",
+        "test-visua" to "test-visua",
+    )
 
     @Test fun suppliedFontIsBundledInFullAndCoversVersionLabels() = runBlocking {
         val bytes = Res.readBytes("font/bintang_music_black_about.ttf")
         // Exact uploaded Bintang-Music-Black.ttf, rather than the old 5 KB subset.
         assertEquals("dbc7b5014205d52e6f66b321b2334d12f0a191a9399f2a1e5a07a281022f7a21", hash(bytes))
         val font = Font.createFont(Font.TRUETYPE_FONT, ByteArrayInputStream(bytes))
-        for (version in versions) assertEquals(-1, font.canDisplayUpTo("BitChord $version"), version)
+        for (version in versions.values) assertEquals(-1, font.canDisplayUpTo("BitChord Desktop $version"), version)
     }
 
     @Test fun releaseAndTestVersionsRenderWithTheSuppliedFaceInBothProfiles() {
         val bytes = runBlocking { Res.readBytes("font/bintang_music_black_about.ttf") }
         val reference = FontFamily(loadedFont("uploaded-bintang-music-black", bytes, FontWeight.Black))
         runDesktopComposeUiTest(width = 720, height = 160) {
-            val version = mutableStateOf(versions.first())
+            val version = mutableStateOf(versions.keys.first())
             val mode = mutableStateOf(DesktopFontMode.DEFAULT)
             setContent {
                 MaterialTheme(typography = desktopTypography(mode.value)) {
                     Column(Modifier.background(Color(0xff202020))) {
                         DesktopAboutVersionTitle(version.value, Color.White,
                             Modifier.height(64.dp).testTag("about-title"))
-                        Text("BitChord ${version.value}", color = Color.White,
+                        Text("BitChord Desktop ${versions.getValue(version.value)}", color = Color.White,
                             style = MaterialTheme.typography.headlineLarge.copy(
                                 fontFamily = reference, fontSynthesis = FontSynthesis.None,
                                 fontSize = 32.sp, letterSpacing = 0.sp,
-                            ), fontWeight = FontWeight.Black, textAlign = TextAlign.Center, maxLines = 1,
+                            ), fontWeight = FontWeight.Black,
                             modifier = Modifier.fillMaxWidth().height(64.dp).testTag("uploaded-font-reference"))
                     }
                 }
             }
-            for (label in versions) for (profile in DesktopFontMode.entries) {
+            for ((label, displayVersion) in versions) for (profile in DesktopFontMode.entries) {
                 runOnIdle { version.value = label; mode.value = profile }
                 waitUntil(timeoutMillis = 15_000) {
                     val layout = onNodeWithTag("about-title").layoutResult()
                     val font = (layout.layoutInput.style.fontFamily as? FontListFontFamily)?.fonts?.singleOrNull()
-                    layout.layoutInput.text.text == "BitChord $label" && font is LoadedFont
+                    layout.layoutInput.text.text == "BitChord Desktop $displayVersion" && font is LoadedFont
                 }
                 waitForIdle()
                 val title = onNodeWithTag("about-title")

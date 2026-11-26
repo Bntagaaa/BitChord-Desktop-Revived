@@ -3,7 +3,7 @@ import java.util.zip.ZipFile
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-/** What the launcher and settings footer display when no build version is supplied. */
+/** What the launcher and About page display when no build version is supplied. */
 val defaultAppVersion = "1.8-beta1"
 
 /** The app may use a descriptive test label; native installers still need a numeric version. */
