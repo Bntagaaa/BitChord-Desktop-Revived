@@ -47,6 +47,8 @@ import com.music.bitchord.data.listentogether.partyUpcomingAfter
 import com.music.bitchord.ui.LyricsProviderState
 import com.music.bitchord.ui.player.DesktopMenuGlassStyle
 import com.music.bitchord.ui.player.LyricsSidePanel
+import com.music.bitchord.ui.player.MixViewOverlay
+import com.music.bitchord.ui.player.MixViewRequest
 import com.music.bitchord.ui.player.NowPlayingScreen
 import com.music.bitchord.ui.player.QueueSidePanel
 import com.music.bitchord.ui.player.PlayerBack
@@ -3605,6 +3607,11 @@ internal fun BitChordDesktopApp(
             }.takeIf { DesktopOriginalVersion.isPinned(song.videoId) },
             onDismiss = onDismiss,
             miniPlayerActions = miniPlayerActions,
+            onAutomixOverview = { MixViewRequest.open = true }.takeIf {
+                automix &&
+                    !song.isVideo &&
+                    playback.song?.let { it.videoId == song.videoId && it.queueEntryId == song.queueEntryId } == true
+            },
         )
     }
 
@@ -4093,6 +4100,10 @@ internal fun BitChordDesktopApp(
                                         true
                                     }
                                     overlays.nowPlaying && PlayerBack.dispatch() -> true
+                                    MixViewRequest.open -> {
+                                        MixViewRequest.open = false
+                                        true
+                                    }
                                     // The OS fullscreen layer is above Now Playing. Exiting it
                                     // must not leave the main window fullscreen without controls.
                                     DesktopWindowMode.exitOnEscape() -> true
@@ -4573,6 +4584,9 @@ internal fun BitChordDesktopApp(
                                     .padding(horizontal = 18.dp, vertical = 10.dp),
                             )
                         }
+                    }
+                    if (!overlays.nowPlaying || selectedSong == null) {
+                        MixViewOverlay(hazeState = fullSearchHaze)
                     }
                     playback.error?.takeIf { !playback.isLoading && !playback.isPlaying }?.let { message ->
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {

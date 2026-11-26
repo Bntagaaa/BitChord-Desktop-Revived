@@ -1156,13 +1156,27 @@ class DesktopPlaybackEngine internal constructor(
                 loopRuntime?.let { DesktopPlayerSettings.smartMixView.value = it.view; return@mixViewOpen }
                 val view = DesktopPlayerSettings.smartMixView.value
                 val outgoing = current?.stream
-                val incoming = upcoming?.stream
-                if (view != null && outgoing != null && incoming != null) waveformJob = scope.launch {
-                    val result = try { withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        view.withDecks(desktopMixWaveform(outgoing, view.outgoing), desktopMixWaveform(incoming, view.incoming))
-                    } } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                    catch (_: Exception) { return@launch }
-                    if (DesktopPlayerSettings.smartMixView.value === view) DesktopPlayerSettings.smartMixView.value = result
+                if (view != null && outgoing != null) {
+                    if (view.outgoing.low.isNotEmpty() && view.incoming.low.isNotEmpty()) return@mixViewOpen
+                    val openKey = mixViewKey
+                    val preparedIncoming = upcoming?.stream ?: nextLocalStream
+                    val nextTarget = nextSong
+                    waveformJob = scope.launch {
+                        val result = try { withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val incoming = preparedIncoming ?: nextTarget?.let { song ->
+                                val local = DesktopDownloadManager.savedFile(song)?.toAbsolutePath()?.toString()?.let { DesktopStream(it) }
+                                local ?: resolveSource(song, audioQuality, null, true).getOrNull()?.stream
+                            }
+                            val outDeck = if (view.outgoing.low.isNotEmpty()) view.outgoing else desktopMixWaveform(outgoing, view.outgoing)
+                            val inDeck = if (view.incoming.low.isNotEmpty() || incoming == null) view.incoming else desktopMixWaveform(incoming, view.incoming)
+                            view.withDecks(outDeck, inDeck)
+                        } } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                        catch (_: Exception) { return@launch }
+                        val latest = DesktopPlayerSettings.smartMixView.value
+                        if (latest === view || (latest != null && openKey != null && mixViewKey == openKey)) {
+                            DesktopPlayerSettings.smartMixView.value = result
+                        }
+                    }
                 }
             }
         }

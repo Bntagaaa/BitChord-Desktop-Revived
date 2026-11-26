@@ -726,6 +726,7 @@
     <string name="delete_download_confirmation">Remove “%1$s” from this device? Tap again to confirm.</string>
     <string name="running">Running</string>
     <string name="automix_analysis_status">Automix · this song: %1$s · next: %2$s</string>
+    <string name="automix_overview">Automix overview</string>
     <string name="automix_not_supported_video">Automix not supported on video songs</string>
     <string name="analysis_complete">analysed</string>
     <string name="analysis_refining">analysed, refining…</string>
