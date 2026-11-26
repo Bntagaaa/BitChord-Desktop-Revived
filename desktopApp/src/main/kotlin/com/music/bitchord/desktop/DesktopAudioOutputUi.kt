@@ -101,6 +101,8 @@ internal fun DesktopAudioOutputMenu(
     if (LocalDesktopMenuPortal.current == null) return
 
     val cast by DesktopPlayerHost.castState.collectAsState()
+    val connect by DesktopConnectHost.state.collectAsState()
+    val openConnect = DesktopPlayerHost.onOpenConnect
     DesktopMenuSurface(onDismiss = onDismiss, anchor = anchor, maxHeight = 390.dp) {
         Text(
             DesktopStrings["audio_output", "Audio output"],
@@ -110,6 +112,17 @@ internal fun DesktopAudioOutputMenu(
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 7.dp),
         )
         AudioOutputDeviceRows(onDismiss)
+        if (openConnect != null) {
+            val activePhone = connect.connectedClients.firstOrNull()?.clientName
+            AudioOutputMenuRow(
+                name = activePhone?.let { "Remote: $it" } ?: "Connect (LAN Remote)",
+                icon = DesktopIcons.Audio.Phone,
+                arrow = true,
+            ) {
+                onDismiss()
+                openConnect()
+            }
+        }
         if (onOpenCast != null && cast.supported) {
             AudioOutputMenuRow(
                 name = cast.connectedName ?: stringResource(Res.string.cast),

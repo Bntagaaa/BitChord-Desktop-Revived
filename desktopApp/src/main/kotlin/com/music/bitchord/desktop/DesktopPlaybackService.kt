@@ -1,6 +1,7 @@
 package com.music.bitchord.desktop
 
 import androidx.compose.runtime.mutableStateOf
+import com.music.bitchord.data.connect.ConnectTrack
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.playback.PlaybackPosition
 import java.awt.EventQueue
@@ -40,6 +41,9 @@ internal class DesktopPlaybackService(
         val onRateChanged: (Double) -> Unit,
         val onVolumeChanged: (Double) -> Unit,
         val onPartyAutoplay: () -> Unit = {},
+        val onLoadRemoteQueue: ((List<ConnectTrack>, Int, Long, Boolean, String?) -> Unit)? = null,
+        val onUpdateRemoteUpcoming: ((List<ConnectTrack>) -> Unit)? = null,
+        val onJumpToRemote: ((String, Int?, Long, Boolean) -> Unit)? = null,
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -307,14 +311,85 @@ internal class DesktopPlaybackService(
         }
     }
 
-    fun volume(value: Double) {
+    fun volume(value: Double) = transport {
         val cb = activeUi
         if (cb != null) cb.onVolumeChanged(value)
         else {
             val volume = value.toFloat().coerceIn(0f, 1f)
+            DesktopPlayerHost.volumeLevel.value = volume
             persistence.saveString("volume", volume.toString())
             engine.setVolume(volume)
         }
+    }
+
+    /** Replaces the queue and starts playback at [index] / [positionMs] from a paired LAN remote. */
+    fun loadRemoteQueue(
+        tracks: List<ConnectTrack>,
+        index: Int,
+        positionMs: Long,
+        play: Boolean,
+        repeatMode: String?,
+    ) = transport {
+        if (DesktopListenTogether.state.value.controlsLocked) return@transport
+        val cb = activeUi?.onLoadRemoteQueue
+        if (cb != null) {
+            cb(tracks, index, positionMs, play, repeatMode)
+            return@transport
+        }
+        val songs = DesktopQueue.adopt(liveQueue.value.songs, tracks.map(ConnectTrack::toDesktopConnectSong))
+        if (songs.isEmpty()) return@transport
+        val safeIndex = index.coerceIn(songs.indices)
+        liveQueue.value = DesktopQueue(songs, safeIndex).trimmed()
+        repeatMode?.let { mode ->
+            val normalized = when (mode.uppercase()) {
+                "ONE" -> "ONE"
+                "ALL" -> "ALL"
+                else -> "OFF"
+            }
+            repeatState.value = normalized
+            persistence.saveString("repeat_mode", normalized)
+        }
+        val target = liveQueue.value.current ?: return@transport
+        selectedSong.value = target
+        history.value = (listOf(target) + history.value.filterNot { it.videoId == target.videoId }).take(50)
+        persistQueue()
+        persistence.saveHistory(history.value)
+        engine.load(target, playWhenReady = play, startAtMs = positionMs.coerceAtLeast(0L))
+        scope.launch { DesktopScrobbling.updateNowPlaying(target) }
+    }
+
+    /** Updates upcoming tracks after the playing song from a paired LAN remote. */
+    fun updateRemoteUpcoming(tracks: List<ConnectTrack>) = transport {
+        if (DesktopListenTogether.state.value.controlsLocked) return@transport
+        val cb = activeUi?.onUpdateRemoteUpcoming
+        if (cb != null) {
+            cb(tracks)
+            return@transport
+        }
+        val updated = liveQueue.value.withPartyUpcoming(tracks.map(ConnectTrack::toDesktopConnectSong))
+        if (updated !== liveQueue.value) {
+            liveQueue.value = updated
+            persistQueue()
+        }
+    }
+
+    /** Jumps to an existing queue track requested by a paired LAN remote. */
+    fun jumpToRemote(videoId: String, index: Int?, positionMs: Long, play: Boolean) = transport {
+        if (DesktopListenTogether.state.value.controlsLocked) return@transport
+        val cb = activeUi?.onJumpToRemote
+        if (cb != null) {
+            cb(videoId, index, positionMs, play)
+            return@transport
+        }
+        val current = liveQueue.value
+        val targetIndex = index?.takeIf { it in current.songs.indices && current.songs[it].videoId == videoId }
+            ?: current.songs.indices.firstOrNull { current.songs[it].videoId == videoId }
+            ?: return@transport
+        liveQueue.value = current.copy(index = targetIndex)
+        val song = liveQueue.value.current ?: return@transport
+        selectedSong.value = song
+        persistQueue()
+        engine.load(song, playWhenReady = play, startAtMs = positionMs.coerceAtLeast(0L))
     }
 
     fun close() {

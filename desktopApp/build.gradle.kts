@@ -177,6 +177,11 @@ dependencies {
     // Listen Together speaks over a WebSocket; the Discord gateway already uses the same engine.
     implementation("io.ktor:ktor-client-websockets:3.0.3")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
+    // BitChord LAN Connect: embedded HTTP/WebSocket receiver + mDNS discovery for Android remote control.
+    implementation("io.ktor:ktor-server-core:3.5.2")
+    implementation("io.ktor:ktor-server-cio:3.5.2")
+    implementation("io.ktor:ktor-server-websockets:3.5.2")
+    implementation("org.jmdns:jmdns:3.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
     implementation("org.slf4j:slf4j-nop:2.0.16")

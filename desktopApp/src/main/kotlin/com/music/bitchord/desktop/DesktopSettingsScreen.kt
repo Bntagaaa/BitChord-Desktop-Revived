@@ -208,6 +208,9 @@ internal fun DesktopSettingsScreen(
         sections.section(LISTEN_TOGETHER) {
             navigationRow(LISTEN_TOGETHER.title, "Create or join a room by code, nickname, party size, custom server, queue and host controls") { onOpenPage(LISTEN_TOGETHER) }
         }
+        sections.section(CONNECT) {
+            navigationRow(CONNECT.title, "Pair Android phone over local network Wi-Fi or Tailscale with PIN and QR code to control PC playback") { onOpenPage(CONNECT) }
+        }
         sections.section(AUDIO_QUALITY) {
             toggle(
                 "Direct source stream",

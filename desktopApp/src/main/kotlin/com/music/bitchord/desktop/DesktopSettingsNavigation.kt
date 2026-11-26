@@ -22,6 +22,7 @@ internal enum class DesktopSettingsPage(private val key: String, private val fal
     MAIN("settings", "Settings"),
     INTEGRATIONS("account_integrations", "Account & integrations"),
     LISTEN_TOGETHER("listen_together", "Listen Together"),
+    CONNECT("connect_lan_remote", "Connect (LAN Remote)"),
     SOURCES("d_music_sources", "Music sources"),
     AUDIO_QUALITY("audio_quality", "Audio quality"),
     DOWNLOADS("download_channel_name", "Downloads"),
@@ -88,6 +89,11 @@ private val topCategories = listOf(
         DesktopSettingsPage.LISTEN_TOGETHER,
         DesktopIcons.Status.Groups,
         subtitle = "Share a code and play the same music, in time",
+    ),
+    Category(
+        DesktopSettingsPage.CONNECT,
+        DesktopIcons.Audio.Phone,
+        subtitle = "Control this PC from BitChord Android on Wi-Fi",
     ),
 )
 
