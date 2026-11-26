@@ -39,7 +39,7 @@ internal enum class DesktopSettingsPage(private val key: String, private val fal
     LANGUAGE("language", "Language"),
     MISCELLANEOUS("miscellaneous", "Miscellaneous"),
     ADVANCED("advanced_options", "Advanced options"),
-    APP_UPDATES("d_app_updates", "App updates"),
+    APP_UPDATES("d_about_bitchord", "About BitChord"),
     FONT("font", "Font"),
     DOWNLOAD_QUALITY("download_quality", "Download quality"),
     AUTOMIX_PERFORMANCE("automix_performance", "Automix performance"),
@@ -110,7 +110,6 @@ private val categories = listOf(
 
 @Composable
 internal fun DesktopSettingsOverview(
-    hasUpdater: Boolean,
     audioQuality: String,
     onOpenPage: (DesktopSettingsPage) -> Unit,
 ) {
@@ -119,7 +118,7 @@ internal fun DesktopSettingsOverview(
     ) {
         categories.forEach { group ->
             DesktopSettingsGroup {
-                group.filter { it.page != DesktopSettingsPage.APP_UPDATES || hasUpdater }.forEachIndexed { index, category ->
+                group.forEachIndexed { index, category ->
                     if (index > 0) DesktopSettingsDivider(insetForIcon = true)
                     DesktopSettingsRow(
                         category.page.title,

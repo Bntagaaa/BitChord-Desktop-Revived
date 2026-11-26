@@ -2,6 +2,8 @@ package com.music.bitchord.desktop
 
 import com.music.bitchord.desktop.icons.DesktopIcons
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -19,6 +21,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -30,6 +35,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import bitchord.desktopapp.generated.resources.Res
+import bitchord.desktopapp.generated.resources.bitchord_logo_original
+import bitchord.desktopapp.generated.resources.logo
+import org.jetbrains.compose.resources.painterResource
 import com.music.bitchord.desktop.DesktopSettingsPage.*
 import com.music.bitchord.data.settings.AutomixPerformanceMode
 import com.music.bitchord.data.settings.PlayerTheme
@@ -784,9 +794,11 @@ internal fun DesktopSettingsScreen(
             bottomScrollInset = bottomScrollInset,
         ) {
             if (overview) {
-                item("categories") { DesktopSettingsOverview(updater != null, audioQuality.label, onOpenPage) }
-                item("about") { DesktopSettingsFooter { onOpenPage(LICENSES) } }
+                item("categories") { DesktopSettingsOverview(audioQuality.label, onOpenPage) }
             } else {
+                if (page == APP_UPDATES && !searching) {
+                    item("about_header") { DesktopAboutHeaderCard { onOpenPage(LICENSES) } }
+                }
                 sections.groups.forEach { (route, rows) ->
                     item(route.name) { rows.Content(route.title.takeIf { searching }) }
                 }
@@ -845,42 +857,75 @@ internal fun DesktopSettingsList(
     )
 }
 
-/** The centered About footer, matching the Android-style version wordmark. */
+/** The About BitChord header card shown at the top of the About BitChord settings page. */
 @Composable
-private fun DesktopSettingsFooter(onLicenses: () -> Unit) {
-    val version = remember { System.getProperty("bitchord.version") ?: "1.9.1" }
+private fun DesktopAboutHeaderCard(onLicenses: () -> Unit) {
+    val version = remember { System.getProperty("bitchord.version") ?: "1.10" }
     val linkStyles = TextLinkStyles(
-        style = SpanStyle(color = DesktopAccent, textDecoration = TextDecoration.Underline),
+        style = SpanStyle(color = DesktopForeground, textDecoration = TextDecoration.Underline),
     )
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .heightIn(min = 112.dp)
+            .settingsCard(),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        DesktopAboutVersionTitle(version = version, color = DesktopForeground)
-        Text(
-            text = buildAnnotatedString {
-                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
-                    append("GitHub")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
-                    append("Developer")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
-                    append("Discord")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Clickable("licenses", linkStyles) { onLicenses() }) {
-                    append("Licenses")
-                }
-                append("\n~YouTube Music Backend")
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = DesktopSecondary,
-            textAlign = TextAlign.Center,
-        )
+        Box(
+            modifier = Modifier
+                .width(136.dp)
+                .fillMaxHeight()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(DesktopForeground.copy(alpha = 0.06f), Color.Transparent),
+                    ),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(if (DesktopTheme.isLight) Res.drawable.logo else Res.drawable.bitchord_logo_original),
+                contentDescription = "BitChord",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(width = 56.dp, height = 38.dp),
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp, end = 24.dp, top = 22.dp, bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+        ) {
+            DesktopAboutVersionTitle(
+                version = version,
+                color = DesktopForeground,
+                textAlign = TextAlign.Start,
+                fontSize = 28.sp,
+            )
+            Text(
+                text = buildAnnotatedString {
+                    withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
+                        append("GitHub")
+                    }
+                    append(" ")
+                    withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
+                        append("Developer")
+                    }
+                    append(" ")
+                    withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
+                        append("Discord")
+                    }
+                    append(" ")
+                    withLink(LinkAnnotation.Clickable("licenses", linkStyles) { onLicenses() }) {
+                        append("Licenses")
+                    }
+                    append("  ~YouTube Music Backend")
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = DesktopSecondary,
+                textAlign = TextAlign.Start,
+            )
+        }
     }
 }
 
