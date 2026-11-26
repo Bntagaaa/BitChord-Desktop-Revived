@@ -83,7 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import coil3.compose.AsyncImage
+import com.music.bitchord.ui.components.RetryableAsyncImage
 import com.music.bitchord.data.model.BrowseItem
 import com.music.bitchord.data.model.BrowseType
 import com.music.bitchord.data.model.ROW_ART_PX
@@ -787,8 +787,9 @@ private fun TopResultCard(
             mode = ArtworkHoverMode.DARKEN_AND_PLAY,
             hovered = hovered,
         ) {
-            AsyncImage(
-                model = song.thumbnailUrl?.artworkAt(ROW_ART_PX),
+            RetryableAsyncImage(
+                url = song.thumbnailUrl?.artworkAt(ROW_ART_PX),
+                fallbackUrl = song.thumbnailUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
@@ -1024,11 +1025,11 @@ private fun TypeaheadSongRow(
             mode = ArtworkHoverMode.DARKEN_AND_PLAY,
             hovered = rowHovered,
         ) {
-            AsyncImage(
-                model = song.artworkAt(ROW_ART_PX),
+            RetryableAsyncImage(
+                url = song.artworkAt(ROW_ART_PX),
+                fallbackUrl = song.thumbnailUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
-
             )
             if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
         }
@@ -1135,8 +1136,8 @@ private fun RecentSearchEntityRow(
             mode = if (entity.entityType == EntityType.TRACK) ArtworkHoverMode.DARKEN_AND_PLAY else ArtworkHoverMode.DARKEN_ONLY,
             hovered = rowHovered,
         ) {
-            AsyncImage(
-                model = entity.artworkUrl,
+            RetryableAsyncImage(
+                url = entity.artworkUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
             )
@@ -1201,8 +1202,9 @@ private fun BrowseRow(item: BrowseItem, onClick: () -> Unit, onLongPress: (() ->
             mode = ArtworkHoverMode.DARKEN_ONLY,
             hovered = rowHovered,
         ) {
-            AsyncImage(
-                model = item.thumbnailUrl.artworkAt(ROW_ART_PX),
+            RetryableAsyncImage(
+                url = item.thumbnailUrl.artworkAt(ROW_ART_PX),
+                fallbackUrl = item.thumbnailUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
             )
@@ -1353,8 +1355,9 @@ private fun SearchBrowseCard(
             mode = ArtworkHoverMode.DARKEN_ONLY,
             hovered = hovered,
         ) {
-            AsyncImage(
-                model = item.thumbnailUrl?.artworkAt(ROW_ART_PX),
+            RetryableAsyncImage(
+                url = item.thumbnailUrl?.artworkAt(ROW_ART_PX),
+                fallbackUrl = item.thumbnailUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
                 contentScale = ContentScale.Crop,

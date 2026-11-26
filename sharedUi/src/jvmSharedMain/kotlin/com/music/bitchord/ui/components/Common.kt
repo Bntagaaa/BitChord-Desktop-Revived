@@ -77,6 +77,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,6 +100,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.isMatchPending
@@ -620,12 +629,13 @@ private fun SongRowContent(
                 mode = ArtworkHoverMode.DARKEN_AND_PLAY,
                 hovered = rowHovered,
             ) {
-                AsyncImage(
-                    model = com.music.bitchord.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
+                val remoteUrl = com.music.bitchord.ui.player.rememberRemoteArtworkUrl(song)
+                RetryableAsyncImage(
+                    url = remoteUrl?.artworkAt(ROW_ART_PX),
+                    fallbackUrl = remoteUrl,
                     contentDescription = null,
                     contentScale = if (landscapeArtwork) ContentScale.Crop else ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
-
                 )
                 if (searchPlayingStyle && isCurrent && isPlaying) {
                     SearchPlayingBars(Modifier.align(Alignment.Center))
@@ -1015,3 +1025,55 @@ fun PillTextField(
 
 /** Public list accent retained for Android and desktop callers. */
 val PlayingAccent = Color(0xFFFB4A62)
+
+private const val ARTWORK_MAX_RETRIES = 3
+private val ARTWORK_RETRY_DELAYS_MS = longArrayOf(800L, 2_000L, 4_000L)
+
+/**
+ * Bounded retry wrapper around Coil's [AsyncImage] so transient CDN/network
+ * failures recover automatically instead of leaving a permanently dark tile.
+ */
+@Composable
+fun RetryableAsyncImage(
+    url: String?,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+    contentScale: ContentScale = ContentScale.Crop,
+    fallbackUrl: String? = null,
+) {
+    val context = LocalPlatformContext.current
+    var attempt by remember(url, fallbackUrl) { mutableIntStateOf(0) }
+    var failed by remember(url, fallbackUrl) { mutableStateOf(false) }
+
+    LaunchedEffect(url, fallbackUrl, failed, attempt) {
+        if ((url.isNullOrBlank() && fallbackUrl.isNullOrBlank()) || !failed || attempt >= ARTWORK_MAX_RETRIES) {
+            return@LaunchedEffect
+        }
+        delay(ARTWORK_RETRY_DELAYS_MS[attempt])
+        failed = false
+        attempt++
+    }
+
+    val activeUrl = if (attempt >= ARTWORK_MAX_RETRIES && !fallbackUrl.isNullOrBlank() && fallbackUrl != url) {
+        fallbackUrl
+    } else {
+        url ?: fallbackUrl
+    }
+
+    val model = remember(activeUrl, attempt, context) {
+        if (activeUrl.isNullOrBlank()) null
+        else ImageRequest.Builder(context)
+            .data(activeUrl)
+            .apply { if (attempt > 0) memoryCacheKeyExtra("retry", attempt.toString()) }
+            .build()
+    }
+
+    AsyncImage(
+        model = model,
+        contentDescription = contentDescription,
+        contentScale = contentScale,
+        onSuccess = { failed = false },
+        onError = { failed = true },
+        modifier = modifier,
+    )
+}

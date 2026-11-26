@@ -1383,43 +1383,13 @@ internal fun ShelfCard(
     }
 }
 
-private const val HOME_ART_MAX_RETRIES = 2
-
-/**
- * Bounded retry wrapper for Home shelf artwork so transient CDN/pool failures
- * recover automatically instead of leaving a permanently blank tile.
- */
 @Composable
 private fun RetryableHomeArtwork(
     url: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-) {
-    val context = LocalPlatformContext.current
-    var attempt by remember(url) { mutableIntStateOf(0) }
-    var failed by remember(url) { mutableStateOf(false) }
-
-    LaunchedEffect(url, failed, attempt) {
-        if (url.isNullOrBlank() || !failed || attempt >= HOME_ART_MAX_RETRIES) return@LaunchedEffect
-        delay(if (attempt == 0) 1_000L else 3_000L)
-        failed = false
-        attempt++
-    }
-
-    val model = remember(url, attempt, context) {
-        if (url.isNullOrBlank()) null
-        else ImageRequest.Builder(context)
-            .data(url)
-            .apply { if (attempt > 0) memoryCacheKeyExtra("retry", attempt.toString()) }
-            .build()
-    }
-
-    AsyncImage(
-        model = model,
-        contentDescription = null,
-        contentScale = contentScale,
-        onSuccess = { failed = false },
-        onError = { failed = true },
-        modifier = modifier,
-    )
-}
+) = com.music.bitchord.ui.components.RetryableAsyncImage(
+    url = url,
+    modifier = modifier,
+    contentScale = contentScale,
+)

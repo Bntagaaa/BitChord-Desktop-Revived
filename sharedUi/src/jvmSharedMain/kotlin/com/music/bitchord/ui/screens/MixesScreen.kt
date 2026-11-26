@@ -36,7 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import com.music.bitchord.ui.components.RetryableAsyncImage
 import com.music.bitchord.data.model.HEADER_ART_PX
 import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.KeyedMix
@@ -231,8 +231,9 @@ private fun StationTile(
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
             .contextClick(onLongPress),
     ) {
-        AsyncImage(
-            model = item.thumbnailUrl.artworkAt(TILE_BLUR_ART_PX),
+        RetryableAsyncImage(
+            url = item.thumbnailUrl.artworkAt(TILE_BLUR_ART_PX),
+            fallbackUrl = item.thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -332,8 +333,9 @@ private fun FeatureCard(
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
             .contextClick(onLongPress),
     ) {
-        AsyncImage(
-            model = item.thumbnailUrl.artworkAt(HEADER_ART_PX),
+        RetryableAsyncImage(
+            url = item.thumbnailUrl.artworkAt(HEADER_ART_PX),
+            fallbackUrl = item.thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier

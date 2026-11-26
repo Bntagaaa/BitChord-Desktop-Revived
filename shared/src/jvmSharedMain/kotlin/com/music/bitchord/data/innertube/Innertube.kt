@@ -42,6 +42,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.Locale
@@ -484,9 +485,9 @@ object Innertube {
         // failure it raises reads as "Socket timeout has expired […]
         // socket_timeout=unknown" — Ktor reporting a limit it was never told.
         install(HttpTimeout) {
-            requestTimeoutMillis = 30_000
-            connectTimeoutMillis = 15_000
-            socketTimeoutMillis = 20_000
+            requestTimeoutMillis = 18_000
+            connectTimeoutMillis = 8_000
+            socketTimeoutMillis = 12_000
         }
         expectSuccess = true
     }
@@ -514,17 +515,10 @@ object Innertube {
             try {
                 return block()
             } catch (e: HttpRequestTimeoutException) {
-                // Not weather, and not worth repeating. A timeout is this app's
-                // own decision that the request had long enough — so trying it
-                // again cannot learn anything the first attempt didn't, and the
-                // cost is multiplied rather than shared: [HttpRequestTimeoutException]
-                // is an [IOException], so before this branch existed every timed-out
-                // `player` call was quietly attempted three times. That turned a
-                // six-second ceiling into a nineteen-second one on a walk of
-                // seven clients, which is worse than the unbounded call the
-                // ceiling was added to prevent. Give up on this client and let
-                // the caller move to the next one.
                 Log.d(TAG, "not retrying, request timed out: ${e.message}")
+                throw e
+            } catch (e: SocketTimeoutException) {
+                Log.d(TAG, "not retrying, socket timed out: ${e.message}")
                 throw e
             } catch (e: IOException) {
                 Log.d(TAG, "retrying: ${e.message}")

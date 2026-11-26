@@ -30,12 +30,27 @@ internal object DesktopPageMemoryPolicy {
     fun trimProcessMemory() {
         DesktopArtworkCache.clear()
         DesktopImageLoader.trimMemory()
-        // Rely on G1PeriodicGCInterval for incremental heap reclamation instead of forcing
-        // a Stop-The-World System.gc() that can cause audio underruns.
+        // Concurrent G1GC (-XX:+ExplicitGCInvokesConcurrent) finalizes evicted Skia ImageBitmap peers
+        // without a Stop-The-World pause, allowing malloc_trim to return native memory to the OS.
+        System.gc()
         if (System.getProperty("os.name").contains("Linux", ignoreCase = true)) {
             runCatching { LinuxLibC.instance?.malloc_trim(0L) }
         }
     }
+
+    /**
+     * Reclaims native heap and idle WebView memory on the active page without wiping
+     * the already-capped artwork caches, preventing a re-decode RSS spike & black-thumbnail loop.
+     */
+    fun trimNativeHeapOnly() {
+        DesktopPoTokenWebView.trimIfIdle(IDLE_POTOKEN_TRIM_MS)
+        System.gc()
+        if (System.getProperty("os.name").contains("Linux", ignoreCase = true)) {
+            runCatching { LinuxLibC.instance?.malloc_trim(0L) }
+        }
+    }
+
+    private const val IDLE_POTOKEN_TRIM_MS = 60L * 1_000L
 
     // Do not substitute JVM heap size for resident memory: native allocations are substantial.
     fun processResidentBytes(): Long? = runCatching {

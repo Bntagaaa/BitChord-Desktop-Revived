@@ -9,8 +9,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -44,7 +48,7 @@ internal object DesktopArtworkCache {
         (Runtime.getRuntime().maxMemory() / 32).coerceIn(6L * 1024 * 1024, 8L * 1024 * 1024)
 
     private val artworkHttp by lazy {
-        Http.client.newBuilder()
+        Http.imageClient.newBuilder()
             .callTimeout(10, TimeUnit.SECONDS)
             .build()
     }
@@ -55,7 +59,7 @@ internal object DesktopArtworkCache {
         owner.own("artwork") {
             SharedLoadCache<String, ImageBitmap>(owner.scope, budgetBytes,
                 sizeOf = { it.width.toLong() * it.height.toLong() * 4L },
-                maxConcurrentLoads = 4)
+                maxConcurrentLoads = 12)
         }
     }
 
@@ -103,9 +107,23 @@ fun DesktopArtwork(
     hovered: Boolean? = null,
 ) {
     val sized = if (px != null) url.artworkAt(px) else url
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = sized) {
-        value = withContext(Dispatchers.IO) {
-            DesktopArtworkCache.load(sized)
+    var attempt by remember(sized, url) { mutableIntStateOf(0) }
+    var bitmap by remember(sized, url) { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(sized, url, attempt) {
+        val target = if (attempt >= ARTWORK_UI_RETRIES && !url.isNullOrBlank() && url != sized) url else sized
+        if (target.isNullOrBlank()) {
+            bitmap = null
+            return@LaunchedEffect
+        }
+        val loaded = withContext(Dispatchers.IO) {
+            DesktopArtworkCache.load(target)
+        }
+        if (loaded != null) {
+            bitmap = loaded
+        } else if (attempt < ARTWORK_UI_RETRIES) {
+            delay(ARTWORK_UI_RETRY_DELAYS_MS[attempt])
+            attempt++
         }
     }
 
@@ -140,3 +158,6 @@ fun DesktopArtwork(
         }
     }
 }
+
+private const val ARTWORK_UI_RETRIES = 3
+private val ARTWORK_UI_RETRY_DELAYS_MS = longArrayOf(800L, 2_000L, 4_000L)
