@@ -1,11 +1,14 @@
 <div align="center">
 
-<img width="1920" height="1080" alt="Dekstop (1)" src="https://github.com/user-attachments/assets/724e80d6-61ab-4152-81dc-a1884c485f0c" />
+<img width="1920" height="1080" alt="Dekstop (4)" src="https://github.com/user-attachments/assets/683653d1-e85f-41d0-8464-17a47c836abf" />
+
 <br>
 <br>
 <br>
 
 <h1><img width="577" height="41" alt="BitChord Desktop Revived" src="https://github.com/user-attachments/assets/dc498e1b-f9c7-4d0d-a173-a4669c193e9c" /></h1>
+
+
 
 
 **A desktop music experience, refined.**
