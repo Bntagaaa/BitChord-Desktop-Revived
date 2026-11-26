@@ -9,9 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -29,6 +29,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -1174,6 +1175,8 @@ private fun DesktopSourceEditorDialog(
     var checking by remember(config.id) { mutableStateOf(false) }
     var message by remember(config.id) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     val candidate = config.copy(label = label.trim(), baseUrl = baseUrl.trim())
 
     /** Works out what is actually on the end of the URL before storing it. */
@@ -1218,68 +1221,80 @@ private fun DesktopSourceEditorDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (isNew) "Add a source" else config.displayName) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = {
-                        baseUrl = it
-                        message = null
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(DesktopStrings["d_addon_url", "Addon URL"]) },
-                    placeholder = { Text("https://example.com/addon") },
-                    singleLine = true,
-                )
+    val canAct = candidate.baseUrl.isNotBlank() && !checking
+
+    DesktopDialogFrame(onDismiss = onDismiss) {
+        DesktopDialogHeading(if (isNew) "Add a source" else config.displayName)
+        Spacer(Modifier.height(16.dp))
+        DesktopDialogField(
+            value = baseUrl,
+            onValueChange = {
+                baseUrl = it
+                message = null
+            },
+            placeholder = DesktopStrings["d_addon_url", "Addon URL"],
+            imeAction = ImeAction.Next,
+            modifier = Modifier.focusRequester(focusRequester),
+        )
+        Text(
+            DesktopStrings[
+                "d_an_addon_server",
+                "An addon server — BitChord asks it over plain HTTP and runs no code from it. " +
+                    "A compatible module index also works and is stored as one.",
+            ],
+            color = DesktopSecondary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+        )
+        DesktopDialogField(
+            value = label,
+            onValueChange = { label = it },
+            placeholder = DesktopStrings["d_name_optional", "Name (optional)"],
+            onSubmit = { identify(thenSave = true) },
+        )
+        (message ?: status)?.let {
+            Text(
+                it,
+                color = DesktopSecondary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 10.dp),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (!isNew) {
+                TextButton(onClick = onRemove) {
+                    Text(DesktopStrings["remove", "Remove"], color = DesktopDestructive)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onDismiss) {
+                Text(DesktopStrings["cancel", "Cancel"], color = DesktopSecondary)
+            }
+            TextButton(
+                onClick = {
+                    onTest(candidate)
+                    identify(thenSave = false)
+                },
+                enabled = canAct,
+            ) {
                 Text(
-                    DesktopStrings[
-                        "d_an_addon_server",
-                        "An addon server — BitChord asks it over plain HTTP and runs no code from it. " +
-                            "A compatible module index also works and is stored as one.",
-                    ],
-                    color = DesktopSecondary,
-                    style = MaterialTheme.typography.bodySmall,
+                    if (checking) "Checking…" else "Test",
+                    color = if (canAct) DesktopAccent else DesktopSecondary,
                 )
-                OutlinedTextField(
-                    value = label,
-                    onValueChange = { label = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(DesktopStrings["d_name_optional", "Name (optional)"]) },
-                    placeholder = { Text(DesktopStrings["d_my_music_source", "My music source"]) },
-                    singleLine = true,
+            }
+            TextButton(
+                onClick = { identify(thenSave = true) },
+                enabled = canAct,
+            ) {
+                Text(
+                    DesktopStrings["save", "Save"],
+                    color = if (canAct) DesktopAccent else DesktopSecondary,
                 )
-                (message ?: status)?.let {
-                    Text(it, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
-                }
             }
-        },
-        dismissButton = {
-            Row {
-                if (!isNew) TextButton(onClick = onRemove) { Text(DesktopStrings["remove", "Remove"]) }
-                TextButton(onClick = onDismiss) { Text(DesktopStrings["cancel", "Cancel"]) }
-            }
-        },
-        confirmButton = {
-            Row {
-                TextButton(
-                    onClick = {
-                        onTest(candidate)
-                        identify(thenSave = false)
-                    },
-                    enabled = candidate.baseUrl.isNotBlank() && !checking,
-                ) {
-                    Text(if (checking) "Checking…" else "Test")
-                }
-                TextButton(
-                    onClick = { identify(thenSave = true) },
-                    enabled = candidate.baseUrl.isNotBlank() && !checking,
-                ) {
-                    Text(DesktopStrings["save", "Save"])
-                }
-            }
-        },
-    )
+        }
+    }
 }

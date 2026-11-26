@@ -264,8 +264,8 @@ internal fun DesktopListenBrainzTokenDialog(onDismiss: () -> Unit) {
 @Composable
 private fun DialogHeading(title: String?, message: String, isError: Boolean = false) {
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = panelInset(22.dp), vertical = 18.dp),
-        horizontalAlignment = if (LocalDesktopPanelIsPage.current) Alignment.Start else Alignment.CenterHorizontally,
+        Modifier.fillMaxWidth().padding(start = panelInset(22.dp), end = panelInset(22.dp), top = 20.dp, bottom = 14.dp),
+        horizontalAlignment = Alignment.Start,
     ) {
         if (title != null) Text(
             title,
@@ -275,10 +275,10 @@ private fun DialogHeading(title: String?, message: String, isError: Boolean = fa
         )
         Text(
             message,
-            modifier = Modifier.padding(top = 5.dp),
+            modifier = Modifier.padding(top = 6.dp),
             style = MaterialTheme.typography.bodySmall,
             color = if (isError) DesktopDestructive else DesktopSecondary,
-            textAlign = if (LocalDesktopPanelIsPage.current) TextAlign.Start else TextAlign.Center,
+            textAlign = TextAlign.Start,
         )
     }
 }

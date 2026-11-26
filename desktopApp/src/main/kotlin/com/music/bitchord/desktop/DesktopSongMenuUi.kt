@@ -32,9 +32,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,10 +44,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -203,42 +210,86 @@ internal fun DesktopSongMenu(
     var pickingSleepTimer by remember { mutableStateOf(false) }
     var customTimer by remember { mutableStateOf(false) }
     var customMinutes by remember { mutableStateOf("30") }
-    if (customTimer) androidx.compose.material3.AlertDialog(
+    if (customTimer) Dialog(
         onDismissRequest = { customTimer = false },
-        title = { androidx.compose.material3.Text("Custom sleep timer") },
-        text = { androidx.compose.material3.OutlinedTextField(
-            value = customMinutes, onValueChange = { customMinutes = it },
-            label = { androidx.compose.material3.Text("Minutes (5–720)") }, singleLine = true,
-            isError = DesktopSleepTimer.customMinutes(customMinutes) == null,
-        ) },
-        confirmButton = { androidx.compose.material3.TextButton(
-            enabled = DesktopSleepTimer.customMinutes(customMinutes) != null,
-            onClick = { DesktopSleepTimer.customMinutes(customMinutes)?.let { onSleepTimer(it) }; customTimer = false },
-        ) { androidx.compose.material3.Text("Start") } },
-        dismissButton = { androidx.compose.material3.TextButton(onClick = { customTimer = false }) { androidx.compose.material3.Text("Cancel") } },
-    )
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        val focusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+        val parsed = DesktopSleepTimer.customMinutes(customMinutes)
+        val submit = {
+            parsed?.let {
+                onSleepTimer(it)
+                customTimer = false
+            }
+        }
+        DesktopDialogFrame(onDismiss = { customTimer = false }, maxWidth = 380.dp) {
+            DesktopDialogHeading("Custom sleep timer", "Minutes (5–720)")
+            Spacer(Modifier.height(16.dp))
+            DesktopDialogField(
+                value = customMinutes,
+                onValueChange = { customMinutes = it },
+                placeholder = "Minutes (5–720)",
+                onSubmit = { submit() },
+                modifier = Modifier.focusRequester(focusRequester),
+            )
+            if (customMinutes.isNotBlank() && parsed == null) {
+                DesktopDialogError("Enter a number between 5 and 720.")
+            }
+            Spacer(Modifier.height(6.dp))
+            DesktopDialogButtons(
+                confirmLabel = "Start",
+                confirmEnabled = parsed != null,
+                onConfirm = { submit() },
+                onDismiss = { customTimer = false },
+            )
+        }
+    }
     val liked = likeStatus == LikeStatus.LIKE
     val disliked = likeStatus == LikeStatus.DISLIKE
     var showingSongInfo by remember(song.videoId) { mutableStateOf(false) }
-    if (showingSongInfo) androidx.compose.material3.AlertDialog(
+    if (showingSongInfo) Dialog(
         onDismissRequest = { showingSongInfo = false },
-        title = { Text("Song Info") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(song.title, fontWeight = FontWeight.Bold)
-                Text(song.artist, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                song.albumName?.takeIf(String::isNotBlank)?.let {
-                    Text("Album: $it", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        DesktopDialogFrame(onDismiss = { showingSongInfo = false }, maxWidth = 420.dp) {
+            DesktopDialogHeading("Song Info")
+            Column(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 14.dp)) {
+                Text(
+                    song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = DesktopForeground,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    song.artist,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DesktopSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            HorizontalDivider(thickness = 0.5.dp, color = DesktopCardEdge)
+            song.albumName?.takeIf(String::isNotBlank)?.let { album ->
+                SongInfoRow(label = "Album", value = album)
+                HorizontalDivider(thickness = 0.5.dp, color = DesktopCardEdge)
+            }
+            SongInfoRow(label = "Type", value = if (song.isVideo) "Music video" else "Song")
+            HorizontalDivider(thickness = 0.5.dp, color = DesktopCardEdge)
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { showingSongInfo = false }) {
+                    Text(DesktopStrings["done", "Done"], color = DesktopAccent)
                 }
-                Text(if (song.isVideo) "Music video" else "Song", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = { showingSongInfo = false }) {
-                Text("Done")
-            }
-        },
-    )
+        }
+    }
     // A local file or a finished download has no YouTube identity behind it to rate, queue into a
     // playlist, fetch again, or share a link for.
     val isOffline = song.localUri != null
@@ -506,6 +557,31 @@ internal fun DesktopCollectionContextMenu(
     }
 }
 
+@Composable
+private fun SongInfoRow(label: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = DesktopSecondary,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = DesktopForeground,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+        )
+    }
+}
+
 /**
  * The Downloads page's playlist-download menu: open it, update it when stale,
  * or throw the record away.
@@ -546,6 +622,31 @@ internal fun DesktopSpotifyPendingSongMenu(onResolveAndPlay: () -> Unit) {
                 ) {}
             }
         }
+    }
+}
+
+@Composable
+private fun SongInfoRow(label: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = DesktopSecondary,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = DesktopForeground,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+        )
     }
 }
 
@@ -828,5 +929,30 @@ internal fun DesktopMoreButton(onClick: () -> Unit, modifier: Modifier = Modifie
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SongInfoRow(label: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = DesktopSecondary,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = DesktopForeground,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+        )
     }
 }

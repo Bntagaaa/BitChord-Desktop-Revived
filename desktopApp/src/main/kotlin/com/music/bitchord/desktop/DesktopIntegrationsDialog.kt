@@ -721,13 +721,13 @@ internal fun DesktopChoiceDialog(
 ) {
     DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 380, popup = true) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 14.dp),
+            horizontalAlignment = Alignment.Start,
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = DesktopForeground)
             Text(
                 message,
-                modifier = Modifier.padding(top = 5.dp),
+                modifier = Modifier.padding(top = 6.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = DesktopSecondary,
             )
