@@ -3144,9 +3144,9 @@ internal fun BitChordDesktopApp(
             if (evict == null) {
                 val now = System.nanoTime()
                 if (DesktopPageMemoryPolicy.shouldTrimActivePage(rss, now - lastActiveTrimNanos)) {
-                    withContext(Dispatchers.IO) { DesktopPageMemoryPolicy.trimProcessMemory() }
+                    withContext(Dispatchers.IO) { DesktopPageMemoryPolicy.trimNativeHeapOnly() }
                     lastActiveTrimNanos = System.nanoTime()
-                    DesktopTrackLog.log("memory: trimmed caches on the active page at ${rss / 1_048_576L} MiB RSS")
+                    DesktopTrackLog.log("memory: trimmed native heap on the active page at ${rss / 1_048_576L} MiB RSS")
                 }
                 continue
             }

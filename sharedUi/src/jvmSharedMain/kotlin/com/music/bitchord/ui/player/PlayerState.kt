@@ -93,7 +93,11 @@ internal fun rememberCanvasArtwork(song: Song): CanvasArtwork? {
  * Everything here is keyed on the cover's [url] — see [rememberPlayerArtwork].
  */
 @Stable
-internal class PlayerArtwork(val url: String?, private val context: PlatformContext) {
+internal class PlayerArtwork(
+    val url: String?,
+    private val context: PlatformContext,
+    private val fallbackUrl: String? = null,
+) {
     /**
      * Whether the cover is on screen. Keyed on the artwork rather than on the
      * track, because that is what it actually describes and because only Coil
@@ -139,8 +143,13 @@ internal class PlayerArtwork(val url: String?, private val context: PlatformCont
      */
     val request: ImageRequest by derivedStateOf {
         val attempt = attempt
+        val dataUrl = if (attempt >= ART_RETRIES && !fallbackUrl.isNullOrBlank() && fallbackUrl != url) {
+            fallbackUrl
+        } else {
+            url
+        }
         ImageRequest.Builder(context)
-            .data(url)
+            .data(dataUrl)
             .size(ART_PX)
             // What makes a retry a new request as far as Coil's model comparison
             // is concerned. Only from the second go onwards, so the ordinary
@@ -172,13 +181,14 @@ internal class PlayerArtwork(val url: String?, private val context: PlatformCont
 internal fun rememberPlayerArtwork(remoteArt: String?): PlayerArtwork {
     val context = LocalPlatformContext.current
     val artUrl = remoteArt?.artworkAt(ART_PX)
-    val art = remember(artUrl) { PlayerArtwork(artUrl, context) }
+    val art = remember(artUrl, remoteArt) { PlayerArtwork(artUrl, context, remoteArt) }
     LaunchedEffect(artUrl, art.failed) {
         // A track with no artwork at all fails immediately and would fail
         // identically three more times: there is no request to make, so there is
         // nothing a second go could do differently.
         if (artUrl == null || !art.failed || art.attempt >= ART_RETRIES) return@LaunchedEffect
-        delay(ART_RETRY_DELAY_MS)
+        val backoffMs = (ART_RETRY_DELAY_MS shl art.attempt.coerceAtMost(2)).coerceAtMost(5_000L)
+        delay(backoffMs)
         art.retry()
     }
     return art

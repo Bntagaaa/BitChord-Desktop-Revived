@@ -1,6 +1,12 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.data.Http
 import com.music.bitchord.data.innertube.StreamResolver
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
 import org.bytedeco.ffmpeg.avformat.AVFormatContext
 import org.bytedeco.ffmpeg.avformat.AVIOContext
 import org.bytedeco.ffmpeg.avformat.Read_packet_Pointer_BytePointer_int
@@ -14,17 +20,11 @@ import org.bytedeco.ffmpeg.global.avutil.av_free
 import org.bytedeco.ffmpeg.global.avutil.av_malloc
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.nio.ByteBuffer
-import java.time.Duration
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Flow
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.net.http.HttpTimeoutException
+import java.net.SocketTimeoutException
+import java.net.URI
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -52,7 +52,12 @@ internal class DesktopRangeStream(
     private var window = ByteArray(0)
     private var windowStart = -1L
     private var prefetchedStart = -1L
-    private var prefetchFuture: CompletableFuture<HttpResponse<ByteArray>?>? = null
+    private var prefetchFuture: CompletableFuture<RangeResponse?>? = null
+    private val rangeClient: OkHttpClient by lazy {
+        Http.client.newBuilder()
+            .callTimeout(requestTimeoutMs, TimeUnit.MILLISECONDS)
+            .build()
+    }
     private val uri = URI.create(url)
     private val expiresAt = minOf(System.currentTimeMillis() + 24 * 60 * 60 * 1000L,
         Regex("(?:^|&)expire=(\\d+)(?:&|$)").find(uri.rawQuery.orEmpty())?.groupValues?.get(1)
@@ -95,9 +100,9 @@ internal class DesktopRangeStream(
         } finally {
             networkRead?.invoke(System.nanoTime() - started)
         } ?: return false
-        val status = response.statusCode()
+        val status = response.statusCode
         if (status == 416) {
-            val total = response.headers().firstValue("content-range").orElse("")
+            val total = response.contentRange.orEmpty()
                 .removePrefix("bytes */").toLongOrNull()
             if (total != null && at >= total) {
                 length = total
@@ -109,10 +114,10 @@ internal class DesktopRangeStream(
             failure = IOException("Audio range request returned HTTP $status")
             return false
         }
-        val body = response.body()
-        val stated = response.headers().firstValue("content-range").orElse("")
+        val body = response.body
+        val stated = response.contentRange.orEmpty()
         val range = Regex("bytes (\\d+)-(\\d+)/(\\d+)").matchEntire(stated)
-        if (response.statusCode() == 206) {
+        if (status == 206) {
             val from = range?.groupValues?.get(1)?.toLongOrNull()
             val to = range?.groupValues?.get(2)?.toLongOrNull()
             val total = range?.groupValues?.get(3)?.toLongOrNull()
@@ -126,30 +131,30 @@ internal class DesktopRangeStream(
             windowStart = 0; length = body.size.toLong()
         }
         window = body
-        val policy = response.headers().firstValue("cache-control").orElse("").lowercase()
+        val policy = response.cacheControl.orEmpty().lowercase()
         val maxAge = Regex("(?:^|[, ])max-age=(\\d+)").find(policy)?.groupValues?.get(1)?.toLongOrNull()
         val immutableSource = uri.host.orEmpty().endsWith(".googlevideo.com") &&
             listOf("itag", "lmt", "clen", "expire").all { name -> Regex("(?:^|&)$name=[^&]+").containsMatchIn(uri.rawQuery.orEmpty()) }
-        if (cache != null && key != null && (immutableSource || (maxAge ?: 0) > 0) && "no-store" !in policy && "private" !in policy && response.headers().firstValue("set-cookie").isEmpty) {
+        if (cache != null && key != null && (immutableSource || (maxAge ?: 0) > 0) && "no-store" !in policy && "private" !in policy && !response.hasSetCookie) {
             val expiry = minOf(expiresAt, System.currentTimeMillis() + (maxAge ?: 86400L).coerceIn(0, 86400) * 1000)
             cache.write(key, windowStart, body, length, expiry)
         }
-        if (prefetchNext && response.statusCode() == 206 && length > windowStart + window.size) {
+        if (prefetchNext && status == 206 && length > windowStart + window.size) {
             schedulePrefetch(windowStart + windowBytes)
         }
         return holds(at)
     }
 
-    private fun buildRangeRequest(start: Long, end: Long): HttpRequest {
-        val request = HttpRequest.newBuilder(uri).timeout(Duration.ofMillis(requestTimeoutMs))
-        headers.forEach { (name, value) -> runCatching { request.header(name, value) } }
-        return request.setHeader("Range", "bytes=$start-$end")
-            .setHeader("Accept-Encoding", "identity")
-            .GET()
+    private fun buildRangeRequest(start: Long, end: Long): Request {
+        val builder = Request.Builder().url(url)
+        headers.forEach { (name, value) -> runCatching { builder.header(name, value) } }
+        return builder.header("Range", "bytes=$start-$end")
+            .header("Accept-Encoding", "identity")
+            .get()
             .build()
     }
 
-    private fun consumePrefetchOrFetch(start: Long, end: Long): HttpResponse<ByteArray>? {
+    private fun consumePrefetchOrFetch(start: Long, end: Long): RangeResponse? {
         val inFlight = if (prefetchedStart == start) prefetchFuture else {
             prefetchFuture?.cancel(true)
             null
@@ -158,7 +163,7 @@ internal class DesktopRangeStream(
         prefetchFuture = null
         if (inFlight != null) {
             val prefetched = runCatching { inFlight.get(requestTimeoutMs, TimeUnit.MILLISECONDS) }.getOrNull()
-            if (prefetched != null && prefetched.statusCode() in listOf(200, 206)) return prefetched
+            if (prefetched != null && prefetched.statusCode in listOf(200, 206)) return prefetched
         }
         return fetchRange(buildRangeRequest(start, end))
     }
@@ -170,7 +175,7 @@ internal class DesktopRangeStream(
         if (nextEnd < nextStart) return
         val request = buildRangeRequest(nextStart, nextEnd)
         prefetchedStart = nextStart
-        prefetchFuture = client.sendAsync(request, boundedBody(windowBytes) { unsupportedRange = true })
+        prefetchFuture = enqueueRange(request)
             .handle { response, _ -> response }
     }
 
@@ -180,21 +185,20 @@ internal class DesktopRangeStream(
         prefetchedStart = -1L
     }
 
-    private fun fetchRange(request: HttpRequest): HttpResponse<ByteArray>? {
+    private fun fetchRange(request: Request): RangeResponse? {
         repeat(2) { attempt ->
             if (cancelled() || Thread.currentThread().isInterrupted) return null
-            val call = client.sendAsync(request, boundedBody(windowBytes) { unsupportedRange = true })
+            val callFuture = enqueueRange(request)
             try {
-                // HttpRequest.timeout can stop at the headers. Bound the body as well.
-                val response = call.get(requestTimeoutMs, TimeUnit.MILLISECONDS)
-                if (attempt == 1 || response.statusCode() !in 502..504) return response
+                val response = callFuture.get(requestTimeoutMs, TimeUnit.MILLISECONDS)
+                if (attempt == 1 || response.statusCode !in 502..504) return response
             } catch (_: InterruptedException) {
-                call.cancel(true)
+                callFuture.cancel(true)
                 Thread.currentThread().interrupt()
                 return null
             } catch (_: TimeoutException) {
-                call.cancel(true)
-                if (attempt == 1) failure = HttpTimeoutException("Audio range body timed out")
+                callFuture.cancel(true)
+                if (attempt == 1) failure = SocketTimeoutException("Audio range body timed out")
             } catch (e: ExecutionException) {
                 if (unsupportedRange) return null
                 if (attempt == 1) failure = IOException("Audio range request failed", e.cause)
@@ -203,32 +207,65 @@ internal class DesktopRangeStream(
         return null
     }
 
+    private fun enqueueRange(request: Request): CompletableFuture<RangeResponse> {
+        val future = CompletableFuture<RangeResponse>()
+        val call = rangeClient.newCall(request)
+        future.whenComplete { _, _ -> if (future.isCancelled) call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                future.completeExceptionally(e)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                try {
+                    response.use { res ->
+                        val bodyBytes = readBoundedBytes(res, windowBytes) { unsupportedRange = true }
+                        future.complete(
+                            RangeResponse(
+                                statusCode = res.code,
+                                body = bodyBytes,
+                                contentRange = res.header("Content-Range"),
+                                cacheControl = res.header("Cache-Control"),
+                                hasSetCookie = res.header("Set-Cookie") != null,
+                            ),
+                        )
+                    }
+                } catch (e: Throwable) {
+                    future.completeExceptionally(e)
+                }
+            }
+        })
+        return future
+    }
+
+    private class RangeResponse(
+        val statusCode: Int,
+        val body: ByteArray,
+        val contentRange: String?,
+        val cacheControl: String?,
+        val hasSetCookie: Boolean,
+    )
+
     companion object {
         const val DEFAULT_WINDOW = 512 * 1024
-        private val client: HttpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL)
-            .connectTimeout(Duration.ofSeconds(15)).build()
 
         /** Cancels oversized/ignored range responses before they can allocate a whole track. */
-        private fun boundedBody(limit: Int, onOversize: () -> Unit) = HttpResponse.BodyHandler<ByteArray> {
-            object : HttpResponse.BodySubscriber<ByteArray> {
-                private val result = CompletableFuture<ByteArray>()
-                private val bytes = ByteArrayOutputStream()
-                private lateinit var subscription: Flow.Subscription
-                override fun getBody() = result
-                override fun onSubscribe(value: Flow.Subscription) { subscription = value; value.request(1) }
-                override fun onNext(items: List<ByteBuffer>) {
-                    for (item in items) {
-                        if (bytes.size().toLong() + item.remaining() > limit) {
-                            if (it.statusCode() == 200) onOversize()
-                            subscription.cancel(); result.completeExceptionally(java.io.IOException("range response exceeded window")); return
-                        }
-                        val chunk = ByteArray(item.remaining()); item.get(chunk); bytes.write(chunk)
+        private fun readBoundedBytes(response: Response, limit: Int, onOversize: () -> Unit): ByteArray {
+            val stream = response.body?.byteStream() ?: return ByteArray(0)
+            val buffer = ByteArrayOutputStream()
+            val chunk = ByteArray(16 * 1024)
+            stream.use { input ->
+                while (true) {
+                    val read = input.read(chunk)
+                    if (read <= 0) break
+                    if (buffer.size() + read > limit) {
+                        if (response.code == 200) onOversize()
+                        throw IOException("range response exceeded window")
                     }
-                    subscription.request(1)
+                    buffer.write(chunk, 0, read)
                 }
-                override fun onError(error: Throwable) { result.completeExceptionally(error) }
-                override fun onComplete() { result.complete(bytes.toByteArray()) }
             }
+            return buffer.toByteArray()
         }
     }
 }

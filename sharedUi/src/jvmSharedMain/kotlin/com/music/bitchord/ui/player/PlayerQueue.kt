@@ -82,7 +82,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Velocity
-import coil3.compose.AsyncImage
+import com.music.bitchord.ui.components.RetryableAsyncImage
 import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.data.model.QueueTier
@@ -803,8 +803,9 @@ private fun InlineQueueRow(
             mode = ArtworkHoverMode.DARKEN_AND_PLAY,
             hovered = rowHovered,
         ) {
-            AsyncImage(
-                model = rememberRemoteArtworkUrl(song),
+            val artUrl = rememberRemoteArtworkUrl(song)
+            RetryableAsyncImage(
+                url = artUrl,
                 contentScale = ContentScale.Crop,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().background(colors.primary.copy(alpha = 0.08f)),

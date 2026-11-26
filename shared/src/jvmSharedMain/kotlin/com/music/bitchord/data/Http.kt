@@ -2,6 +2,7 @@ package com.music.bitchord.data
 
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
 import okio.Buffer
@@ -9,6 +10,7 @@ import okio.BufferedSource
 import okio.ForwardingSource
 import okio.Source
 import okio.buffer
+import java.net.Inet4Address
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -130,13 +132,42 @@ object Http {
         chain.proceed(request)
     }
 
+    /** Prefer IPv4 addresses first so broken/blackholed IPv6 routes don't stall connects for 20s+. */
+    private val preferIpv4Dns = Dns { hostname ->
+        val addresses = Dns.SYSTEM.lookup(hostname)
+        if (addresses.size <= 1) addresses
+        else addresses.sortedBy { if (it is Inet4Address) 0 else 1 }
+    }
+
     val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .dns(preferIpv4Dns)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .dispatcher(Dispatcher().apply { maxRequestsPerHost = 16 })
         .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
         .addInterceptor(webDavInterceptor)
         .apply { if (USAGE_LOGGING_ENABLED) addNetworkInterceptor(usageInterceptor) }
+        .build()
+
+    /**
+     * Dedicated OkHttp client for artwork/thumbnail fetches.
+     *
+     * Isolated from [client]'s [Dispatcher] and [ConnectionPool] so burst thumbnail
+     * loading on Home/Search never starves Innertube API calls or stream resolution.
+     */
+    val imageClient: OkHttpClient = OkHttpClient.Builder()
+        .dns(preferIpv4Dns)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
+        .callTimeout(15, TimeUnit.SECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .dispatcher(Dispatcher().apply {
+            maxRequests = 64
+            maxRequestsPerHost = 24
+        })
+        .connectionPool(ConnectionPool(16, 3, TimeUnit.MINUTES))
         .build()
 }
