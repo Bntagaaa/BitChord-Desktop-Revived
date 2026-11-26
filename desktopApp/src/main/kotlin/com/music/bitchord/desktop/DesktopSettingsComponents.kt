@@ -385,8 +385,8 @@ internal class DesktopSettingsRows(private val query: DesktopSettingsQuery, priv
         DesktopSettingsRow(title, subtitle, icon = icon, enabled = enabled, checked = checked, onClick = { onCheckedChange(!checked) })
     }
 
-    fun navigationRow(title: String, subtitle: String?, icon: ImageVector? = null, onClick: () -> Unit) =
-        row(title, subtitle, icon = icon != null) { DesktopSettingsRow(title, subtitle, icon = icon, onClick = onClick) }
+    fun navigationRow(title: String, subtitle: String?, onClick: () -> Unit) =
+        row(title, subtitle) { DesktopSettingsRow(title, subtitle, onClick = onClick) }
 
     fun iconRow(icon: ImageVector, title: String, subtitle: String?, onClick: (() -> Unit)? = null) =
         row(title, subtitle, icon = true) { DesktopSettingsRow(title, subtitle, icon = icon, onClick = onClick) }
