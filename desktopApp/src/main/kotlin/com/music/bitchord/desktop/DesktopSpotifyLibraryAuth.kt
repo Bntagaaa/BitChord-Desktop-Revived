@@ -54,7 +54,7 @@ internal object DesktopSpotifyLibraryAuth {
     @Volatile private var cachedSession: SessionInfo? = null
 
     private data class SessionInfo(val clientVersion: String, val deviceId: String)
-    private data class HarvestedToken(val token: String, val expiresAt: Long, val clientId: String?)
+    internal data class HarvestedToken(val token: String, val expiresAt: Long, val clientId: String?)
 
     suspend fun tokens(): SpotifyLibrary.Tokens? = withContext(Dispatchers.IO) {
         val cookie = DesktopSpotifyToken.cookie().ifBlank { return@withContext null }
@@ -116,13 +116,7 @@ internal object DesktopSpotifyLibraryAuth {
             cachedClientToken = null
             clientTokenExpiresAtMs = 0L
             cachedSession = null
-            val harvested = harvestViaWebEngine(cookie) ?: run {
-                // JavaFX WebKit may expose the document only after the Spotify player has
-                // fetched its token (or cannot execute its modern scripts at all).
-                // A locally installed Chromium is a fallback, not another account login.
-                DesktopTrackLog.log("spotify: JavaFX token capture unavailable; trying local Chromium")
-                DesktopSpotifyChromiumToken.harvest(cookie)?.let(::parseTokenPayload)
-            }
+            val harvested = harvestToken(cookie)
             if (harvested == null) {
                 DesktopTrackLog.log("spotify: no authenticated web-player token was obtained")
                 return@withLock null
@@ -136,12 +130,50 @@ internal object DesktopSpotifyLibraryAuth {
         }
     }
 
+    @Volatile
+    internal var fxAvailableProvider: () -> Boolean = { DesktopPoTokenWebView.available }
+
+    @Volatile
+    internal var fxStartedProvider: () -> Boolean = { DesktopPoTokenWebView.isStarted }
+
+    @Volatile
+    internal var chromiumAvailableProvider: () -> Boolean = { DesktopSpotifyChromiumToken.isAvailable() }
+
+    @Volatile
+    internal var webEngineHarvester: suspend (String) -> HarvestedToken? = { harvestViaWebEngine(it) }
+
+    @Volatile
+    internal var chromiumHarvester: suspend (String) -> HarvestedToken? = {
+        DesktopSpotifyChromiumToken.harvest(it)?.let(::parseTokenPayload)
+    }
+
+    /**
+     * Prefers short-lived out-of-process Chromium when JavaFX is not yet started so
+     * BitChord avoids retaining ~100–200 MB of JavaFX WebKit RAM when Chromium succeeds.
+     */
+    internal suspend fun harvestToken(cookie: String): HarvestedToken? {
+        val preferChromium = !fxStartedProvider() && chromiumAvailableProvider()
+        if (preferChromium) {
+            chromiumHarvester(cookie)?.let { return it }
+            DesktopTrackLog.log("spotify: Chromium capture failed; falling back to JavaFX WebView")
+            return webEngineHarvester(cookie)
+        }
+        return webEngineHarvester(cookie) ?: run {
+            DesktopTrackLog.log("spotify: JavaFX token capture unavailable; trying local Chromium")
+            chromiumHarvester(cookie)
+        }
+    }
+
     /**
      * Opens a fresh web-player profile, applies the user's saved session cookie, and observes the
      * real token response. The page may mint an anonymous token first; only an authenticated token
      * is accepted, matching the mobile implementation.
      */
-    private suspend fun harvestViaWebEngine(cookie: String): HarvestedToken? {
+    internal suspend fun harvestViaWebEngine(cookie: String): HarvestedToken? {
+        if (!fxAvailableProvider()) {
+            DesktopTrackLog.log("spotify: JavaFX toolkit unavailable for web-player token capture")
+            return null
+        }
         val result = CompletableDeferred<HarvestedToken?>()
         val engineReady = CompletableDeferred<Unit>()
         val profile = runCatching { Files.createTempDirectory("bitchord-spotify-token-") }.getOrNull()

@@ -365,6 +365,11 @@ class DesktopPoTokenWebView private constructor(
 
         private const val GENERATE_TIMEOUT_MS = 15_000L
 
+        /** Whether JavaFX has already been started in this process without triggering startup. */
+        @Volatile
+        var isStarted: Boolean = false
+            private set
+
         /** Whether JavaFX could be started in this process; checked once. */
         val available: Boolean by lazy { startFx() }
 
@@ -427,6 +432,7 @@ class DesktopPoTokenWebView private constructor(
             }
             Platform.setImplicitExit(false)
             started.await()
+            isStarted = true
             TrackLog.i(TAG, "JavaFX platform initialized successfully")
             true
         }.onFailure { TrackLog.w(TAG, "JavaFX unavailable, no PoTokens on this desktop: ${it.message}") }

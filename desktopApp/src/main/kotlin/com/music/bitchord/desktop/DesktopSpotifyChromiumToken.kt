@@ -36,6 +36,9 @@ import java.util.concurrent.TimeUnit
 internal object DesktopSpotifyChromiumToken {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
+    /** Whether a Chromium/Chrome/Edge binary is available for out-of-process token capture. */
+    fun isAvailable(): Boolean = findChromium() != null
+
     suspend fun harvest(cookie: String): String? = withContext(Dispatchers.IO) {
         val binary = findChromium() ?: return@withContext null
         val profile = runCatching { Files.createTempDirectory("bitchord-spotify-chromium-") }
@@ -210,7 +213,7 @@ internal object DesktopSpotifyChromiumToken {
             } + onPath(listOf("chrome.exe", "msedge.exe", "chromium.exe"))
         } else {
             onPath(listOf("google-chrome-stable", "google-chrome", "chromium",
-                "chromium-browser", "microsoft-edge"))
+                "chromium-browser", "microsoft-edge", "brave", "vivaldi"))
         }
         return candidates.firstOrNull(File::isFile)
     }
