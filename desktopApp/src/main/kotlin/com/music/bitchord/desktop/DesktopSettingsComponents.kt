@@ -345,15 +345,22 @@ internal fun <T> DesktopSettingsSegmentedControl(
 internal fun DesktopSettingsControl(
     title: String,
     subtitle: String? = null,
+    icon: ImageVector? = null,
     content: @Composable () -> Unit,
 ) {
     Column(
         Modifier.fillMaxWidth().padding(horizontal = RowInset, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column {
-            Text(title, color = DesktopForeground, style = MaterialTheme.typography.bodyLarge)
-            if (subtitle != null) Text(subtitle, color = DesktopSecondary, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                Icon(icon, null, tint = DesktopForeground, modifier = Modifier.size(GlyphSize))
+                Spacer(Modifier.width(GlyphGap))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, color = DesktopForeground, style = MaterialTheme.typography.bodyLarge)
+                if (subtitle != null) Text(subtitle, color = DesktopSecondary, style = MaterialTheme.typography.bodyMedium)
+            }
         }
         content()
     }
@@ -378,14 +385,16 @@ internal class DesktopSettingsRows(private val query: DesktopSettingsQuery, priv
         DesktopSettingsRow(title, subtitle, icon = icon, enabled = enabled, checked = checked, onClick = { onCheckedChange(!checked) })
     }
 
-    fun navigationRow(title: String, subtitle: String?, onClick: () -> Unit) =
-        row(title, subtitle) { DesktopSettingsRow(title, subtitle, onClick = onClick) }
+    fun navigationRow(title: String, subtitle: String?, icon: ImageVector? = null, onClick: () -> Unit) =
+        row(title, subtitle, icon = icon != null) { DesktopSettingsRow(title, subtitle, icon = icon, onClick = onClick) }
 
     fun iconRow(icon: ImageVector, title: String, subtitle: String?, onClick: (() -> Unit)? = null) =
         row(title, subtitle, icon = true) { DesktopSettingsRow(title, subtitle, icon = icon, onClick = onClick) }
 
-    fun choice(title: String, selected: String, keywords: String, onClick: () -> Unit) =
-        row(title, selected, keywords) { DesktopSettingsRow(title, value = selected, onClick = onClick) }
+    fun choice(title: String, selected: String, keywords: String, icon: ImageVector? = null, subtitle: String? = null, onClick: () -> Unit) =
+        row(title, selected, subtitle, keywords, icon = icon != null) {
+            DesktopSettingsRow(title, subtitle = subtitle, icon = icon, value = selected, onClick = onClick)
+        }
 }
 
 internal class DesktopSettingsQuery(query: String) {
