@@ -4240,6 +4240,8 @@ internal fun BitChordDesktopApp(
                 },
                 bottomBar = { compact ->
                     val current = selectedSong ?: liveQueue.current
+                    val muted by playbackEngine.muted.collectAsState()
+                    val pipOpen by pipController.open.collectAsState()
                     DesktopBottomChrome(
                         compact = compact,
                         destination = destination,
@@ -4250,7 +4252,11 @@ internal fun BitChordDesktopApp(
                         isLoading = playbackBuffering,
                         previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,
                         progress = if (playback.durationMs > 0L) playerPosition.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
-                        volume = playback.volume,
+                        volume = volume,
+                        muted = muted,
+                        onToggleMute = playbackEngine::toggleMute,
+                        pipOpen = pipOpen,
+                        audioOutputOpen = overlays.audioOutputAnchor != null,
                         shuffle = shuffle,
                         repeatMode = repeatMode,
                         sidePanel = overlays.sidePanel,
@@ -4291,7 +4297,10 @@ internal fun BitChordDesktopApp(
                         songMenu = if (current != null) {
                             { miniPlayerActions ->
                                 Box {
-                                    DesktopMoreButton(onClick = { miniPlayerMenuOpen = true })
+                                    DesktopMoreButton(
+                                        onClick = { miniPlayerMenuOpen = true },
+                                        tint = miniPlayerActionTint(miniPlayerMenuOpen),
+                                    )
                                     if (miniPlayerMenuOpen) {
                                         playerTrackMenu(current, onDismiss = { miniPlayerMenuOpen = false }, miniPlayerActions = miniPlayerActions)
                                     }
@@ -6397,6 +6406,10 @@ private fun DesktopBottomChrome(
     previousEnabled: Boolean,
     progress: Float,
     volume: Float,
+    muted: Boolean,
+    onToggleMute: () -> Unit,
+    pipOpen: Boolean,
+    audioOutputOpen: Boolean,
     shuffle: Boolean,
     repeatMode: DesktopRepeatMode,
     sidePanel: DesktopSidePanel?,
@@ -6432,6 +6445,10 @@ private fun DesktopBottomChrome(
                 previousEnabled = previousEnabled,
                 progress = progress,
                 volume = volume,
+                muted = muted,
+                onToggleMute = onToggleMute,
+                pipOpen = pipOpen,
+                audioOutputOpen = audioOutputOpen,
                 shuffle = shuffle,
                 repeatMode = repeatMode,
                 sidePanel = sidePanel,

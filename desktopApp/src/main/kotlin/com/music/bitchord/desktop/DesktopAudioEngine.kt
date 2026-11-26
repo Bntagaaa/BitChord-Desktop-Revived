@@ -146,6 +146,8 @@ class DesktopPlaybackEngine internal constructor(
 
     @Volatile private var playbackSpeed = 1f
     @Volatile private var volume = 1f
+    private val _muted = MutableStateFlow(false)
+    val muted: StateFlow<Boolean> = _muted.asStateFlow()
     @Volatile private var paused = true
     // Volatile, every one of them: these are set from the UI thread when a setting changes and read
     // from the audio thread on the next block.
@@ -784,10 +786,25 @@ class DesktopPlaybackEngine internal constructor(
         if (thread != null) commands += Command.TransitionSettingsChanged
     }
 
+    @Synchronized
     fun setVolume(value: Float) {
         volume = value.coerceIn(0f, 1f)
-        sink.gain = volume
+        applyOutputGain()
         _state.update { it.copy(volume = volume) }
+    }
+
+    @Synchronized
+    fun toggleMute() {
+        val muted = !_muted.value
+        applyOutputGain(muted)
+        _muted.value = muted
+    }
+
+    // The playback state and persistence continue to expose the selected level. Muting changes
+    // only the sink gain, including when a track starts or the audio device is reopened.
+    @Synchronized
+    private fun applyOutputGain(muted: Boolean? = null) {
+        sink.gain = if (muted ?: _muted.value) 0f else volume
     }
 
     /** Sets the source quality ceiling used the next time a track is resolved. */
@@ -2139,7 +2156,7 @@ class DesktopPlaybackEngine internal constructor(
             _state.update { it.copy(isPlaying = false, error = "No audio output: ${failure.message}") }
             return
         }
-        sink.gain = volume
+        applyOutputGain()
         framesWritten = sink.framesPlayed()
         speedProcessor = DesktopAudioSpeed(sink.format.channels, sink.format.sampleRate)
         spatial = DesktopSpatialAudio(sink.format.channels, sink.format.sampleRate)
@@ -2165,7 +2182,7 @@ class DesktopPlaybackEngine internal constructor(
         val positionUs = playhead.peek(framesWritten)
         sink.open(decoded.copy(bytesPerSample = precisionBytes(), isFloat = preferFloat))
             .onSuccess {
-                sink.gain = volume
+                applyOutputGain()
                 framesWritten = sink.framesPlayed()
                 buildChain()
                 // A reopened line counts frames from zero again, so the clock has to be rebased

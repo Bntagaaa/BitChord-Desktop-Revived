@@ -2,9 +2,9 @@ package com.music.bitchord.desktop
 
 import com.music.bitchord.desktop.icons.DesktopIcons
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -32,12 +32,16 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,17 +50,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -77,9 +86,9 @@ import bitchord.desktopapp.generated.resources.player_transport_next
 import bitchord.desktopapp.generated.resources.player_transport_pause
 import bitchord.desktopapp.generated.resources.player_transport_play
 import bitchord.desktopapp.generated.resources.player_transport_previous
+import bitchord.desktopapp.generated.resources.bin_volume_off
 import com.music.bitchord.ui.components.trackArtSize
 import com.music.bitchord.ui.icons.BitChordIcons
-import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 
 /** Extra desktop tools share the track's existing overflow, including at narrow widths. */
@@ -128,6 +137,10 @@ internal fun DesktopMiniPlayer(
     liked: Boolean = false,
     onToggleLike: (() -> Unit)? = null,
     songMenu: (@Composable (DesktopMiniPlayerMenuActions) -> Unit)? = null,
+    muted: Boolean = false,
+    onToggleMute: () -> Unit = {},
+    pipOpen: Boolean = false,
+    audioOutputOpen: Boolean = false,
 ) {
     val shape = RoundedCornerShape(percent = 50)
     val dockInteraction = remember { MutableInteractionSource() }
@@ -193,7 +206,7 @@ internal fun DesktopMiniPlayer(
                 ) {
                     if (!compact) DesktopToolbarButton(onClick = { onShuffleChange(!shuffle) }, size = transportSize) {
                         Icon(DesktopIcons.Player.Shuffle, "Shuffle",
-                            tint = if (shuffle) DesktopAccent else foreground, modifier = Modifier.size(19.dp))
+                            tint = miniPlayerActionTint(shuffle), modifier = Modifier.size(19.dp))
                     }
                     DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = transportSize) {
                         Icon(painterResource(Res.drawable.player_transport_previous), "Previous",
@@ -214,7 +227,7 @@ internal fun DesktopMiniPlayer(
                     if (!compact) DesktopToolbarButton(onClick = { onRepeatModeChange(repeatMode.next()) }, size = transportSize) {
                         Icon(if (repeatMode == DesktopRepeatMode.ONE) DesktopIcons.Player.RepeatOne
                             else DesktopIcons.Player.Repeat, "Repeat ${repeatMode.label()}",
-                            tint = if (repeatMode == DesktopRepeatMode.OFF) foreground else DesktopAccent,
+                            tint = miniPlayerActionTint(repeatMode != DesktopRepeatMode.OFF),
                             modifier = Modifier.size(19.dp))
                     }
                 }
@@ -231,6 +244,8 @@ internal fun DesktopMiniPlayer(
                     actions = menuActions, buttonSize = toolSize, volume = volume,
                     onVolumeChange = onVolumeChange,
                     onOpenAudioOutput = onOpenAudioOutput,
+                    muted = muted, onToggleMute = onToggleMute,
+                    pipOpen = pipOpen, audioOutputOpen = audioOutputOpen,
                 )
             }
             if (song == null) {
@@ -294,6 +309,10 @@ private fun DesktopMiniPlayerTrack(
     }
 }
 
+internal fun miniPlayerActionTint(active: Boolean): Color =
+    if (active) DesktopForeground else DesktopSecondary
+
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun DesktopMiniPlayerTools(
     song: Song?,
@@ -305,125 +324,178 @@ private fun DesktopMiniPlayerTools(
     volume: Float,
     onVolumeChange: (Float) -> Unit,
     onOpenAudioOutput: (Rect) -> Unit,
+    muted: Boolean,
+    onToggleMute: () -> Unit,
+    pipOpen: Boolean,
+    audioOutputOpen: Boolean,
 ) {
-    val toolsInteraction = remember { MutableInteractionSource() }
-    val toolsHovered by toolsInteraction.collectIsHoveredAsState()
-    val speakerInteraction = remember { MutableInteractionSource() }
-    val speakerHovered by speakerInteraction.collectIsHoveredAsState()
-    var volumeChanging by remember { mutableStateOf(false) }
-    var sliderFocused by remember { mutableStateOf(false) }
-    var speakerFocused by remember { mutableStateOf(false) }
-    var showVolume by remember { mutableStateOf(false) }
+    var regionHovered by remember { mutableStateOf(false) }
+    var dragging by remember { mutableStateOf(false) }
+    var volumeRequested by remember(muted) { mutableStateOf(false) }
+    var awaitingSpeakerEnter by remember { mutableStateOf(false) }
+    val showVolume = !muted && !awaitingSpeakerEnter && (volumeRequested || dragging)
     val duration = if (DesktopAppearanceSettings.reduceAnimation.value) 0 else 120
-    LaunchedEffect(toolsHovered, speakerHovered, speakerFocused, sliderFocused, volumeChanging) {
-        if (speakerHovered || speakerFocused || sliderFocused || volumeChanging) {
-            showVolume = true
-        } else if (!toolsHovered) {
-            delay(160)
-            showVolume = false
+    Row(Modifier.height(40.dp).testTag("mini-player-actions"), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(buttonSize), contentAlignment = Alignment.Center) {
+            if (song != null && songMenu != null) {
+                songMenu(actions)
+            } else if (actions.hasOverflow) {
+                DesktopMiniPlayerFallbackMenu(song != null, actions, buttonSize)
+            }
         }
-    }
-    val foreground = DesktopForeground
-    val actionSlots = if (actions.panelsInMenu) 2 else 4
-    Row(
-        Modifier.height(40.dp).hoverable(toolsInteraction).testTag("mini-player-actions"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Extra desktop tools stay in fixed slots outside the hover-volume swap.
-        // Preserve the original launchers, including the output picker's real anchor.
+        Box(Modifier.size(buttonSize), contentAlignment = Alignment.Center) {
+            if (song != null && onToggleLike != null) {
+                Box(Modifier.fillMaxSize().clip(CircleShape).desktopHoverWash()
+                    .toggleable(liked, role = Role.Checkbox, onValueChange = { onToggleLike() }),
+                    contentAlignment = Alignment.Center) {
+                    Icon(if (liked) DesktopIcons.Player.LikeFilled else DesktopIcons.Player.Like,
+                        if (liked) DesktopStrings["remove_from_liked", "Remove from Liked Music"] else DesktopStrings["like", "Like"],
+                        tint = miniPlayerActionTint(liked), modifier = Modifier.size(19.dp))
+                }
+            }
+        }
         if (!actions.secondaryInMenu) {
-            DesktopPipLauncher(actions.onOpenPip, enabled = song != null, tint = foreground, iconSize = 19.dp)
+            DesktopPipLauncher(actions.onOpenPip, enabled = song != null,
+                tint = miniPlayerActionTint(pipOpen).let { if (song == null) it.copy(alpha = 0.4f) else it },
+                iconSize = 19.dp)
             DesktopToolbarButton(onClick = actions.onOpenDetails, size = 32.dp) {
                 Icon(DesktopIcons.Status.Info, "Now playing details",
-                    tint = if (actions.sidePanel == DesktopSidePanel.DETAILS) DesktopAccent else foreground,
+                    tint = miniPlayerActionTint(actions.sidePanel == DesktopSidePanel.DETAILS),
                     modifier = Modifier.size(19.dp))
             }
         }
-        DesktopAudioOutputButton(onOpenAudioOutput, iconSize = 19.dp, tint = foreground)
-        Box(Modifier.width(buttonSize * actionSlots).height(40.dp), contentAlignment = Alignment.CenterEnd) {
-            androidx.compose.animation.AnimatedVisibility(!showVolume, enter = fadeIn(tween(duration)), exit = fadeOut(tween(duration))) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(buttonSize), contentAlignment = Alignment.Center) {
-                        if (song != null && onToggleLike != null) {
-                            Box(Modifier.fillMaxSize().clip(CircleShape).desktopHoverWash()
-                                .toggleable(liked, role = Role.Checkbox, onValueChange = { onToggleLike() }),
-                                contentAlignment = Alignment.Center) {
-                                Icon(if (liked) DesktopIcons.Player.LikeFilled else DesktopIcons.Player.Like,
-                                    if (liked) DesktopStrings["remove_from_liked", "Remove from Liked Music"] else DesktopStrings["like", "Like"],
-                                    tint = if (liked) DesktopAccent else foreground, modifier = Modifier.size(19.dp))
+
+        Row(
+            Modifier.height(40.dp)
+                .onPointerEvent(PointerEventType.Enter) { regionHovered = true }
+                .onPointerEvent(PointerEventType.Exit) {
+                    regionHovered = false
+                    if (!dragging) volumeRequested = false
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // At the narrowest widths Lyrics and Queue already live in More. Swap only the
+            // inline slots, so the track keeps the same width in both layouts.
+            val swapWidth = with(LocalDensity.current) {
+                val panelWidths = if (actions.panelsInMenu) 0 else 2 * buttonSize.roundToPx()
+                (DesktopAudioOutputButtonSize.roundToPx() + panelWidths).toDp()
+            }
+            Box(Modifier.width(swapWidth).height(40.dp), contentAlignment = Alignment.Center) {
+                Crossfade(
+                    targetState = showVolume,
+                    animationSpec = if (muted || awaitingSpeakerEnter) snap() else tween(duration),
+                ) { sliderVisible ->
+                    if (sliderVisible) {
+                        DesktopThinSlider(
+                            value = volume,
+                            onValueChange = {
+                                dragging = true
+                                onVolumeChange(it)
+                            },
+                            onValueChangeFinished = {
+                                dragging = false
+                                if (!regionHovered) volumeRequested = false
+                            },
+                            idleHeight = 4.dp,
+                            activeHeight = 7.dp,
+                            interactive = showVolume,
+                            modifier = Modifier.fillMaxWidth().then(if (showVolume) {
+                                Modifier.testTag("mini-player-volume")
+                                    .onKeyEvent { adjustMiniPlayerVolume(it, volume, onVolumeChange) }
+                                    .focusable()
+                                    .semantics {
+                                        contentDescription = "Volume"
+                                        progressBarRangeInfo = ProgressBarRangeInfo(volume.coerceIn(0f, 1f), 0f..1f)
+                                        setProgress { onVolumeChange(it.coerceIn(0f, 1f)); true }
+                                    }
+                            } else Modifier),
+                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            DesktopAudioOutputButton(onOpenAudioOutput, iconSize = 19.dp,
+                                tint = miniPlayerActionTint(audioOutputOpen), interactive = !showVolume)
+                            if (!actions.panelsInMenu) {
+                                MiniPlayerPanelButton(BitChordIcons.LyricsQuote, "Lyrics", DesktopSidePanel.LYRICS,
+                                    actions.sidePanel, buttonSize, !showVolume, actions.onOpenLyrics)
+                                MiniPlayerPanelButton(DesktopIcons.Player.Queue, "Queue", DesktopSidePanel.QUEUE,
+                                    actions.sidePanel, buttonSize, !showVolume, actions.onOpenQueue)
                             }
-                        }
-                    }
-                    Box(Modifier.size(buttonSize), contentAlignment = Alignment.Center) {
-                        if (song != null && songMenu != null) {
-                            songMenu(actions)
-                        } else if (actions.hasOverflow) {
-                            DesktopMiniPlayerFallbackMenu(song != null, actions, buttonSize)
-                        }
-                    }
-                    if (!actions.panelsInMenu) {
-                        DesktopToolbarButton(onClick = actions.onOpenLyrics, size = buttonSize) {
-                            Icon(BitChordIcons.LyricsQuote, "Lyrics",
-                                tint = if (actions.sidePanel == DesktopSidePanel.LYRICS) DesktopAccent else foreground,
-                                modifier = Modifier.size(19.dp))
-                        }
-                        DesktopToolbarButton(onClick = actions.onOpenQueue, size = buttonSize) {
-                            Icon(DesktopIcons.Player.Queue, "Queue",
-                                tint = if (actions.sidePanel == DesktopSidePanel.QUEUE) DesktopAccent else foreground,
-                                modifier = Modifier.size(19.dp))
                         }
                     }
                 }
             }
-            androidx.compose.animation.AnimatedVisibility(showVolume, enter = fadeIn(tween(duration)), exit = fadeOut(tween(duration))) {
-                // Reuse the original Revived thumb-free slider and its animated drag height.
-                DesktopThinSlider(
-                    value = volume,
-                    onValueChange = {
-                        volumeChanging = true
-                        onVolumeChange(it)
+
+            val volumeAction = if (muted) "Unmute" else "Mute"
+            TooltipBox(TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text(volumeAction) } },
+                state = rememberTooltipState(), focusable = false) {
+                DesktopToolbarButton(
+                    onClick = {
+                        awaitingSpeakerEnter = true
+                        volumeRequested = false
+                        dragging = false
+                        onToggleMute()
                     },
-                    onValueChangeFinished = { volumeChanging = false },
-                    idleHeight = 4.dp,
-                    activeHeight = 7.dp,
-                    modifier = Modifier.widthIn(max = 72.dp).fillMaxWidth()
-                        .testTag("mini-player-volume")
-                        .onFocusChanged { sliderFocused = it.isFocused }
-                        .onKeyEvent { event ->
-                            if (event.type != KeyEventType.KeyDown) false else {
-                                val next = when (event.key) {
-                                    Key.DirectionLeft, Key.DirectionDown -> volume - 0.05f
-                                    Key.DirectionRight, Key.DirectionUp -> volume + 0.05f
-                                    Key.MoveHome -> 0f
-                                    Key.MoveEnd -> 1f
-                                    else -> null
-                                }
-                                if (next == null) false else {
-                                    onVolumeChange(next.coerceIn(0f, 1f))
-                                    true
-                                }
+                    size = buttonSize,
+                    modifier = Modifier
+                        .onPointerEvent(PointerEventType.Enter) {
+                            if (!muted) {
+                                awaitingSpeakerEnter = false
+                                volumeRequested = true
                             }
                         }
-                        .focusable()
-                        .semantics {
-                            contentDescription = "Volume"
-                            progressBarRangeInfo = ProgressBarRangeInfo(volume.coerceIn(0f, 1f), 0f..1f)
-                            setProgress { onVolumeChange(it.coerceIn(0f, 1f)); true }
-                        },
-                )
+                        .onKeyEvent { !muted && adjustMiniPlayerVolume(it, volume, onVolumeChange) }
+                        .testTag("mini-player-volume-button"),
+                ) {
+                    if (muted) {
+                        Icon(painterResource(Res.drawable.bin_volume_off), volumeAction,
+                            tint = Color.White, modifier = Modifier.size(19.dp))
+                    } else {
+                        Icon(DesktopIcons.Audio.VolumeUp, volumeAction,
+                            tint = Color.White, modifier = Modifier.size(19.dp))
+                    }
+                }
             }
         }
-        // Volume and audio output have separate direct controls.
-        DesktopToolbarButton(
-            onClick = { showVolume = true }, size = buttonSize,
-            modifier = Modifier.hoverable(speakerInteraction)
-                .onFocusChanged { speakerFocused = it.isFocused }
-                .testTag("mini-player-volume-button"),
-        ) {
-            Icon(if (volume <= 0f) DesktopIcons.Audio.VolumeOff else DesktopIcons.Audio.VolumeUp,
-                "Volume control", tint = foreground, modifier = Modifier.size(19.dp))
-        }
     }
+}
+
+@Composable
+private fun MiniPlayerPanelButton(
+    icon: ImageVector,
+    label: String,
+    panel: DesktopSidePanel,
+    activePanel: DesktopSidePanel?,
+    size: Dp,
+    interactive: Boolean,
+    onClick: () -> Unit,
+) {
+    val glyph: @Composable () -> Unit = {
+        Icon(icon, label.takeIf { interactive }, tint = miniPlayerActionTint(activePanel == panel),
+            modifier = Modifier.size(19.dp))
+    }
+    if (interactive) {
+        DesktopToolbarButton(onClick = onClick, size = size, content = glyph)
+    } else {
+        Box(Modifier.size(size), contentAlignment = Alignment.Center) { glyph() }
+    }
+}
+
+private fun adjustMiniPlayerVolume(
+    event: KeyEvent,
+    volume: Float,
+    onVolumeChange: (Float) -> Unit,
+): Boolean {
+    if (event.type != KeyEventType.KeyDown) return false
+    val next = when (event.key) {
+        Key.DirectionLeft, Key.DirectionDown -> volume - 0.05f
+        Key.DirectionRight, Key.DirectionUp -> volume + 0.05f
+        Key.MoveHome -> 0f
+        Key.MoveEnd -> 1f
+        else -> return false
+    }
+    onVolumeChange(next.coerceIn(0f, 1f))
+    return true
 }
 
 @Composable
@@ -431,10 +503,11 @@ private fun DesktopMiniPlayerFallbackMenu(hasSong: Boolean, actions: DesktopMini
     var open by remember { mutableStateOf(false) }
     Box {
         if (hasSong) {
-            DesktopMoreButton(onClick = { open = true }, modifier = Modifier.size(buttonSize))
+            DesktopMoreButton(onClick = { open = true }, modifier = Modifier.size(buttonSize),
+                tint = miniPlayerActionTint(open))
         } else {
             DesktopToolbarButton(onClick = { open = true }, size = buttonSize) {
-                Icon(DesktopIcons.Settings.Tune, "Player options", tint = DesktopSecondary, modifier = Modifier.size(18.dp))
+                Icon(DesktopIcons.Settings.Tune, "Player options", tint = miniPlayerActionTint(open), modifier = Modifier.size(18.dp))
             }
         }
         if (open) DesktopMenuSurface(onDismiss = { open = false }) {

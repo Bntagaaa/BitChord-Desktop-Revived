@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
@@ -80,11 +81,15 @@ class DesktopMiniPlayerLayoutTest {
             val progress = onNodeWithTag("mini-player-progress", useUnmergedTree = true)
                 .fetchSemanticsNode().boundsInRoot
             val tools = onNodeWithTag("mini-player-actions").fetchSemanticsNode().boundsInRoot
-            onNodeWithContentDescription("Lyrics").assertIsDisplayed()
-            val directLabels = listOf("Picture in picture", "Now playing details", DesktopStrings["audio_output", "Audio output"])
-            val directBounds = directLabels.associateWith { label ->
+            val persistentLabels = listOf("More options", "Like", "Picture in picture", "Now playing details")
+            val replacedLabels = listOf(DesktopStrings["audio_output", "Audio output"], "Lyrics", "Queue")
+            val speaker = onNodeWithTag("mini-player-volume-button")
+            val speakerBounds = speaker.fetchSemanticsNode().boundsInRoot
+            val originalBounds = (persistentLabels + replacedLabels).associateWith { label ->
                 onNodeWithContentDescription(label).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             }
+            val centers = originalBounds.values.map { it.center.x } + speakerBounds.center.x
+            assertTrue(centers.zipWithNext().all { (left, right) -> left < right })
             assertEquals(760f, dock.width, 1f)
             assertEquals(58f, dock.height, 1f)
             assertEquals(track.left, progress.left, 1f)
@@ -93,15 +98,19 @@ class DesktopMiniPlayerLayoutTest {
                 "Progress belongs below the metadata, clear of the transport and tools")
             save(onRoot().captureToImage(), "wide-normal.png")
 
-            val speaker = onNodeWithTag("mini-player-volume-button")
             speaker.performMouseInput { enter(center) }
             mainClock.advanceTimeBy(300)
             val slider = onNodeWithTag("mini-player-volume")
             slider.assertIsDisplayed()
-            onNodeWithContentDescription("Lyrics").assertDoesNotExist()
-            directBounds.forEach { (label, bounds) ->
-                assertEquals(bounds, onNodeWithContentDescription(label).assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
+            replacedLabels.forEach { onNodeWithContentDescription(it).assertDoesNotExist() }
+            persistentLabels.forEach { label ->
+                assertEquals(originalBounds.getValue(label),
+                    onNodeWithContentDescription(label).assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
             }
+            assertEquals(speakerBounds, speaker.fetchSemanticsNode().boundsInRoot)
+            val sliderBounds = slider.fetchSemanticsNode().boundsInRoot
+            assertEquals(originalBounds.getValue(replacedLabels.first()).left, sliderBounds.left, 1f)
+            assertEquals(originalBounds.getValue(replacedLabels.last()).right, sliderBounds.right, 1f)
             slider.performMouseInput { moveTo(center) }
             mainClock.advanceTimeBy(250)
             slider.assertIsDisplayed()
@@ -112,12 +121,11 @@ class DesktopMiniPlayerLayoutTest {
                 .fetchSemanticsNode().boundsInRoot)
             save(onRoot().captureToImage(), "wide-volume-hover.png")
 
-            // Crossing from the speaker to the slider must keep it open; leaving
-            // the whole tools region must restore the actions after the grace period.
+            // Leaving the slider and speaker restores the original action slots.
             onNodeWithTag("scene").performMouseInput { moveTo(Offset(20f, 20f)) }
             mainClock.advanceTimeBy(400)
             slider.assertDoesNotExist()
-            onNodeWithContentDescription("Lyrics").assertIsDisplayed()
+            replacedLabels.forEach { onNodeWithContentDescription(it).assertIsDisplayed() }
 
             speaker.performMouseInput { moveTo(center) }
             mainClock.advanceTimeBy(300)
@@ -129,16 +137,173 @@ class DesktopMiniPlayerLayoutTest {
             }
             onNodeWithContentDescription("Picture in picture").performMouseInput { click(center) }
             onNodeWithContentDescription("Now playing details").performMouseInput { click(center) }
-            onNodeWithContentDescription(DesktopStrings["audio_output", "Audio output"]).performMouseInput { click(center) }
+            mainClock.advanceTimeBy(200)
+            onNodeWithContentDescription(replacedLabels.first()).performMouseInput { click(center) }
+            onNodeWithContentDescription("Lyrics").performMouseInput { click(center) }
+            onNodeWithContentDescription("Queue").performMouseInput { click(center) }
             runOnIdle {
                 assertTrue(events.volume > 0.6f, "Dragging the visible slider must change playback volume")
-                assertEquals(listOf("pip", "details", "audio"), events.actions)
+                assertEquals(listOf("pip", "details", "audio", "lyrics", "queue"), events.actions)
                 val anchor = assertNotNull(events.outputAnchor)
                 assertTrue(anchor.width > 0f && anchor.left >= tools.left && anchor.right <= dock.right)
             }
             onNodeWithTag("mini-player-track").performMouseInput { click(center) }
-            runOnIdle { assertEquals(listOf("pip", "details", "audio", "expand"), events.actions) }
+            runOnIdle { assertEquals(listOf("pip", "details", "audio", "lyrics", "queue", "expand"), events.actions) }
         }
+
+    @Test
+    fun clickMutesAndRequiresFreshSpeakerEnterAfterUnmute() =
+        runDesktopComposeUiTest(width = 840, height = 160) {
+            val events = PlayerEvents().apply { volume = 0.35f }
+            var song by mutableStateOf<Song?>(longSong)
+            setContent {
+                MaterialTheme(colorScheme = desktopColorScheme()) {
+                    Box(Modifier.fillMaxSize().background(DesktopBackground).testTag("scene"),
+                        contentAlignment = Alignment.Center) {
+                        PlayerFixture(events, song)
+                    }
+                }
+            }
+
+            val speaker = onNodeWithTag("mini-player-volume-button")
+            val slider = onNodeWithTag("mini-player-volume")
+            val scene = onNodeWithTag("scene")
+            val speakerBounds = speaker.fetchSemanticsNode().boundsInRoot
+            speaker.performMouseInput { enter(center) }
+            slider.assertIsDisplayed()
+            speaker.performMouseInput { click(center) }
+            slider.assertDoesNotExist()
+            onNodeWithContentDescription("Unmute").assertIsDisplayed()
+            onNodeWithContentDescription("Lyrics").assertIsDisplayed()
+            onNodeWithContentDescription("Queue").assertIsDisplayed()
+            assertEquals(speakerBounds, speaker.fetchSemanticsNode().boundsInRoot)
+            runOnIdle {
+                assertEquals(0.35f, events.volume)
+                song = null
+            }
+
+            scene.performMouseInput { moveTo(Offset(16f, 16f)) }
+            speaker.performMouseInput { moveTo(center) }
+            slider.assertDoesNotExist()
+            speaker.performMouseInput { click(center) }
+            onNodeWithContentDescription("Mute").assertIsDisplayed()
+            slider.assertDoesNotExist()
+            runOnIdle {
+                assertEquals(0.35f, events.volume)
+                song = longSong
+            }
+            slider.assertDoesNotExist()
+
+            scene.performMouseInput { moveTo(Offset(16f, 16f)) }
+            speaker.performMouseInput { moveTo(center) }
+            slider.assertIsDisplayed()
+            scene.performMouseInput { moveTo(Offset(16f, 16f)) }
+            slider.assertDoesNotExist()
+
+            // Also exercise a collapsed click without sending a pointer enter.
+            repeat(4) { speaker.performClick() }
+            onNodeWithContentDescription("Mute").assertIsDisplayed()
+            slider.assertDoesNotExist()
+        }
+
+    @Test
+    fun muteInterruptsBothDirectionsOfTheHoverFade() =
+        runDesktopComposeUiTest(width = 840, height = 160) {
+            val events = PlayerEvents()
+            mainClock.autoAdvance = false
+            setContent {
+                MaterialTheme(colorScheme = desktopColorScheme()) {
+                    Box(Modifier.fillMaxSize().testTag("scene"), contentAlignment = Alignment.Center) {
+                        PlayerFixture(events)
+                    }
+                }
+            }
+            mainClock.advanceTimeBy(200)
+            val speaker = onNodeWithTag("mini-player-volume-button")
+            val slider = onNodeWithTag("mini-player-volume")
+            val scene = onNodeWithTag("scene")
+
+            speaker.performMouseInput { enter(center) }
+            mainClock.advanceTimeBy(32)
+            slider.assertExists()
+            speaker.performMouseInput { click(center) }
+            mainClock.advanceTimeBy(32)
+            slider.assertDoesNotExist()
+            onNodeWithContentDescription("Lyrics").assertExists()
+            speaker.performClick()
+            mainClock.advanceTimeBy(200)
+            slider.assertDoesNotExist()
+
+            scene.performMouseInput { moveTo(Offset(16f, 16f)) }
+            speaker.performMouseInput { moveTo(center) }
+            mainClock.advanceTimeBy(200)
+            slider.assertIsDisplayed()
+            scene.performMouseInput { moveTo(Offset(16f, 16f)) }
+            mainClock.advanceTimeBy(32)
+            speaker.performClick()
+            mainClock.advanceTimeBy(32)
+            onNodeWithContentDescription("Unmute").assertExists()
+            onNodeWithContentDescription("Queue").assertExists()
+            slider.assertDoesNotExist()
+            mainClock.advanceTimeBy(200)
+            slider.assertDoesNotExist()
+        }
+
+    @Test
+    fun miniPlayerGivesInactiveAndActiveActionsTheReferenceTints() =
+        runDesktopComposeUiTest(width = 1536, height = 190) {
+            val events = PlayerEvents()
+            setContent {
+                CompositionLocalProvider(LocalDensity provides Density(2f)) {
+                    MaterialTheme(colorScheme = desktopColorScheme()) {
+                        Box(Modifier.fillMaxSize().background(DesktopBackground), contentAlignment = Alignment.Center) {
+                            PlayerFixture(events)
+                        }
+                    }
+                }
+            }
+            assertContainsTint(onNodeWithContentDescription("Mute"), Color.White)
+            runOnIdle { events.muted = true }
+            assertContainsTint(onNodeWithContentDescription("Unmute"), Color.White)
+
+            val labels = listOf("Shuffle", "Repeat Off", "Like", "Picture in picture", "Now playing details",
+                DesktopStrings["audio_output", "Audio output"], "Lyrics", "Queue", "More options")
+            labels.forEach { label ->
+                assertContainsTint(onNodeWithContentDescription(label).assertIsEnabled(), DesktopSecondary)
+            }
+            runOnIdle {
+                events.shuffle = true
+                events.repeatMode = DesktopRepeatMode.ALL
+                events.liked = true
+                events.pipOpen = true
+                events.audioOutputOpen = true
+                events.moreOpen = true
+            }
+            val activeLabels = listOf("Shuffle", "Repeat All", "Remove from Liked Music", "Picture in picture",
+                DesktopStrings["audio_output", "Audio output"], "More options")
+            activeLabels.forEach { label ->
+                assertContainsTint(onNodeWithContentDescription(label), DesktopForeground)
+            }
+            runOnIdle { events.repeatMode = DesktopRepeatMode.ONE }
+            assertContainsTint(onNodeWithContentDescription("Repeat One"), DesktopForeground)
+            for ((panel, label) in listOf(
+                DesktopSidePanel.DETAILS to "Now playing details",
+                DesktopSidePanel.LYRICS to "Lyrics",
+                DesktopSidePanel.QUEUE to "Queue",
+            )) {
+                runOnIdle { events.panel = panel }
+                assertContainsTint(onNodeWithContentDescription(label), DesktopForeground)
+            }
+        }
+
+    private fun assertContainsTint(node: SemanticsNodeInteraction, color: Color) {
+        val bitmap = node.captureToImage()
+        val pixels = bitmap.toPixelMap()
+        val expected = color.toArgb()
+        assertTrue((0 until bitmap.height).any { y ->
+            (0 until bitmap.width).any { x -> pixels[x, y].toArgb() == expected }
+        }, "No glyph pixel matched ${color.toArgb().toUInt().toString(16)}")
+    }
 
     @Test
     fun narrowOverflowKeepsDesktopToolsAndExistingSongActionsReachable() {
@@ -259,6 +424,12 @@ class DesktopMiniPlayerLayoutTest {
         var shuffle by mutableStateOf(false)
         var repeatMode by mutableStateOf(DesktopRepeatMode.OFF)
         var outputAnchor: Rect? = null
+        var muted by mutableStateOf(false)
+        var liked by mutableStateOf(false)
+        var pipOpen by mutableStateOf(false)
+        var audioOutputOpen by mutableStateOf(false)
+        var moreOpen by mutableStateOf(false)
+        var panel by mutableStateOf<DesktopSidePanel?>(null)
     }
 
     @Composable
@@ -267,7 +438,7 @@ class DesktopMiniPlayerLayoutTest {
         val menu: (@Composable (DesktopMiniPlayerMenuActions) -> Unit)? = if (song != null && withSongMenu) {
             { miniActions ->
                 Box {
-                    DesktopMoreButton(onClick = { menuOpen = true })
+                    DesktopMoreButton(onClick = { menuOpen = true }, tint = miniPlayerActionTint(menuOpen || events.moreOpen))
                     if (menuOpen) {
                         DesktopSongMenuFor(song, false, DesktopSongActions(
                             signedIn = true, disliked = false, downloaded = false, downloadInProgress = false,
@@ -283,14 +454,16 @@ class DesktopMiniPlayerLayoutTest {
         DesktopMiniPlayer(
             song = song, isPlaying = song != null, isLoading = false, previousEnabled = song != null,
             progress = 0.36f, volume = events.volume, shuffle = events.shuffle, repeatMode = events.repeatMode,
-            sidePanel = null, onExpand = { events.actions += "expand" }, onPlayPause = {}, onPrevious = {}, onNext = {},
+            sidePanel = events.panel, onExpand = { events.actions += "expand" }, onPlayPause = {}, onPrevious = {}, onNext = {},
             onShuffleChange = { events.shuffle = it; events.actions += "shuffle" },
             onRepeatModeChange = { events.repeatMode = it; events.actions += "repeat" },
             onVolumeChange = { events.volume = it },
             onOpenAudioOutput = { events.outputAnchor = it; events.actions += "audio" },
             onOpenLyrics = { events.actions += "lyrics" }, onOpenPip = { events.actions += "pip" },
             onOpenQueue = { events.actions += "queue" }, onOpenDetails = { events.actions += "details" },
-            onToggleLike = {}, songMenu = menu,
+            liked = events.liked, onToggleLike = { events.liked = !events.liked }, songMenu = menu,
+            muted = events.muted, onToggleMute = { events.muted = !events.muted },
+            pipOpen = events.pipOpen, audioOutputOpen = events.audioOutputOpen,
         )
     }
 
