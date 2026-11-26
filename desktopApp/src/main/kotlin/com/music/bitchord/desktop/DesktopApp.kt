@@ -6797,9 +6797,8 @@ internal fun DesktopFrame(
                             )
                             Column(Modifier.weight(1f).fillMaxHeight()) {
                                 // Only the legacy top player uses compact chrome at narrow widths.
-                                if (oldTopPlayerEnabled) {
-                                    topBar(narrow)
-                                } else if (integratedCaptionActive) {
+                                topBar(narrow)
+                                if (!oldTopPlayerEnabled && integratedCaptionActive) {
                                     Spacer(
                                         Modifier
                                             .fillMaxWidth()
