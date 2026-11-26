@@ -4251,6 +4251,8 @@ internal fun BitChordDesktopApp(
                 },
                 bottomBar = { compact ->
                     val current = selectedSong ?: liveQueue.current
+                    val muted by playbackEngine.muted.collectAsState()
+                    val pipOpen by pipController.open.collectAsState()
                     DesktopBottomChrome(
                         compact = compact,
                         destination = destination,
@@ -4261,7 +4263,11 @@ internal fun BitChordDesktopApp(
                         isLoading = playbackBuffering,
                         previousEnabled = liveQueue.hasPrevious || playerPosition.positionMs > BACK_RESTARTS_AFTER_MS,
                         progress = if (playback.durationMs > 0L) playerPosition.positionMs.toFloat() / playback.durationMs.toFloat() else 0f,
-                        volume = playback.volume,
+                        volume = volume,
+                        muted = muted,
+                        onToggleMute = playbackEngine::toggleMute,
+                        pipOpen = pipOpen,
+                        audioOutputOpen = overlays.audioOutputAnchor != null,
                         shuffle = shuffle,
                         repeatMode = repeatMode,
                         sidePanel = overlays.sidePanel,
@@ -4302,7 +4308,10 @@ internal fun BitChordDesktopApp(
                         songMenu = if (current != null) {
                             { miniPlayerActions ->
                                 Box {
-                                    DesktopMoreButton(onClick = { miniPlayerMenuOpen = true })
+                                    DesktopMoreButton(
+                                        onClick = { miniPlayerMenuOpen = true },
+                                        tint = miniPlayerActionTint(miniPlayerMenuOpen),
+                                    )
                                     if (miniPlayerMenuOpen) {
                                         playerTrackMenu(current, onDismiss = { miniPlayerMenuOpen = false }, miniPlayerActions = miniPlayerActions)
                                     }
@@ -4885,19 +4894,39 @@ internal fun BitChordDesktopApp(
                     LocalPullToRefreshEnabled provides false,
                     LocalShelfRowChrome provides DesktopShelfRowChrome,
                 ) {
-                DesktopPointerMenuHost<Song>(
-                    menu = { song, onDismiss ->
+                DesktopPointerMenuHost<DesktopPageSongMenuTarget>(
+                    menu = { target, onDismiss ->
+                        val song = target.song
+                        // Home shelves carry titles but not album/artist browse IDs. Resolve only
+                        // the clicked track, while its menu is mounted, never the whole feed.
+                        val menuSong = if (target.fromHome) {
+                            var resolved by remember(song, activeAccountId, activeProfileId) {
+                                mutableStateOf(song)
+                            }
+                            LaunchedEffect(song, activeAccountId, activeProfileId) {
+                                resolved = song.withDesktopHomeMenuLinks { videoId ->
+                                    withTimeoutOrNull(PLAYER_METADATA_TIMEOUT_MS) {
+                                        DesktopSearchClient.trackLinks(videoId).getOrNull()
+                                    }
+                                }
+                            }
+                            resolved
+                        } else song
                         DesktopSongMenuFor(
-                            song = song,
+                            song = menuSong,
                             liked = song.videoId in likedIds,
                             actions = songActionsFor(song),
                             onToggleLike = { toggleLike(song) },
                             onRevertToOriginal = null,
                             onUpgradeQuality = null,
                             onDismiss = onDismiss,
+                            showSleepTimer = !target.fromHome,
                         )
                     },
-                ) { openMenu ->
+                ) { openTarget ->
+                val openMenu: (Song) -> Unit = remember(openTarget) {
+                    { song -> openTarget(DesktopPageSongMenuTarget(song)) }
+                }
                 pageMenu = openMenu
                 Box(
                     Modifier
@@ -5357,7 +5386,11 @@ internal fun BitChordDesktopApp(
                             contentPadding = sharedPagePadding,
                             title = "Home",
                             signedIn = true,
-                            onItemLongPress = { item -> if (item.videoId != null) openMenu(item.toSong()) },
+                            onItemLongPress = { item ->
+                                if (item.videoId != null) {
+                                    openTarget(DesktopPageSongMenuTarget(item.toSong(), fromHome = true))
+                                }
+                            },
                             onLoadMore = ::loadMoreHome,
                             loadingMore = homeLoadingMore,
                             recentlyPlayedLoading = homeRecentsLoading && !DesktopContentPreferences.hideRecents,
@@ -6411,6 +6444,10 @@ private fun DesktopBottomChrome(
     previousEnabled: Boolean,
     progress: Float,
     volume: Float,
+    muted: Boolean,
+    onToggleMute: () -> Unit,
+    pipOpen: Boolean,
+    audioOutputOpen: Boolean,
     shuffle: Boolean,
     repeatMode: DesktopRepeatMode,
     sidePanel: DesktopSidePanel?,
@@ -6446,6 +6483,10 @@ private fun DesktopBottomChrome(
                 previousEnabled = previousEnabled,
                 progress = progress,
                 volume = volume,
+                muted = muted,
+                onToggleMute = onToggleMute,
+                pipOpen = pipOpen,
+                audioOutputOpen = audioOutputOpen,
                 shuffle = shuffle,
                 repeatMode = repeatMode,
                 sidePanel = sidePanel,

@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
@@ -23,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +30,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.CancellationException
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.ui.screens.LibraryGridPage
 import com.music.bitchord.sharedui.resources.Res as SharedUiRes
@@ -278,67 +279,102 @@ internal fun DesktopSpotifyImportDialog(
     var importProgress by remember { mutableStateOf("") }
     var importError by remember { mutableStateOf<String?>(null) }
     var importResult by remember { mutableStateOf<String?>(null) }
-            AlertDialog(
-                onDismissRequest = { if (!importBusy) onDismiss() },
-                title = { Text("Import Spotify playlist") },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Paste a Spotify playlist link or Spotify URI. Songs will be matched on YouTube Music.")
-                        OutlinedTextField(
-                            value = importUrl,
-                            onValueChange = { importUrl = it; importError = null; importResult = null },
-                            label = { Text("Spotify playlist URL") },
-                            singleLine = true,
-                            enabled = !importBusy,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Save to YouTube Music account", modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = importToAccount,
-                                onCheckedChange = { importToAccount = it },
-                                enabled = !importBusy,
-                            )
-                        }
-                        if (importBusy) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                Text(importProgress.ifBlank { "Importing…" })
-                            }
-                        }
-                        importError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                        importResult?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
+    val canImport = !importBusy && SpotifyImporter.extractPlaylistId(importUrl) != null
+    val startImport = {
+        if (canImport) {
+            importBusy = true
+            importError = null
+            importResult = null
+            importScope.launch {
+                try {
+                    importResult = onImport(importUrl, importToAccount) { message ->
+                        importScope.launch { importProgress = message }
                     }
-                },
-                confirmButton = {
-                    TextButton(
-                        enabled = !importBusy && SpotifyImporter.extractPlaylistId(importUrl) != null,
-                        onClick = {
-                            importBusy = true
-                            importError = null
-                            importResult = null
-                            importScope.launch {
-                                try {
-                                    importResult = onImport(importUrl, importToAccount) { message ->
-                                        importScope.launch { importProgress = message }
-                                    }
-                                    importUrl = ""
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (error: Exception) {
-                                    importError = error.message ?: "Import failed."
-                                } finally {
-                                    importBusy = false
-                                    importProgress = ""
-                                }
-                            }
-                        },
-                    ) { Text("Import") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { if (!importBusy) onDismiss() }, enabled = !importBusy) {
-                        Text("Close")
-                    }
-                },
+                    importUrl = ""
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    importError = error.message ?: "Import failed."
+                } finally {
+                    importBusy = false
+                    importProgress = ""
+                }
+            }
+        }
+    }
+
+    DesktopDialogFrame(onDismiss = { if (!importBusy) onDismiss() }) {
+        DesktopDialogHeading(
+            title = "Import Spotify playlist",
+            subtitle = "Paste a Spotify playlist link or Spotify URI. Songs will be matched on YouTube Music.",
+        )
+        Spacer(Modifier.height(16.dp))
+        DesktopDialogField(
+            value = importUrl,
+            onValueChange = { importUrl = it; importError = null; importResult = null },
+            placeholder = "Spotify playlist URL",
+            enabled = !importBusy,
+            onSubmit = startImport,
+            modifier = Modifier.focusRequester(focusRequester),
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Save to YouTube Music account",
+                style = MaterialTheme.typography.bodyMedium,
+                color = DesktopForeground,
+                modifier = Modifier.weight(1f),
             )
+            Switch(
+                checked = importToAccount,
+                onCheckedChange = { importToAccount = it },
+                enabled = !importBusy,
+            )
+        }
+        if (importBusy) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                CircularProgressIndicator(color = DesktopAccent, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text(
+                    importProgress.ifBlank { "Importing…" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DesktopSecondary,
+                )
+            }
+        }
+        importError?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = DesktopDestructive,
+                modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 8.dp),
+            )
+        }
+        importResult?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = DesktopAccent,
+                modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 8.dp),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        DesktopDialogButtons(
+            busy = false,
+            confirmLabel = "Import",
+            confirmEnabled = canImport,
+            dismissLabel = "Close",
+            onConfirm = startImport,
+            onDismiss = { if (!importBusy) onDismiss() },
+        )
+    }
 }

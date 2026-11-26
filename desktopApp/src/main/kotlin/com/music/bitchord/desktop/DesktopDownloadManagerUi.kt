@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,15 +53,21 @@ internal fun DesktopDownloadManagerDialog(onDismiss: () -> Unit) {
 
     DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 520) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
+            Modifier.fillMaxWidth().padding(start = 22.dp, end = 14.dp, top = 20.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(DesktopStrings["downloads", "Downloads"], style = MaterialTheme.typography.titleLarge, color = DesktopForeground)
+                Text(
+                    DesktopStrings["downloads", "Downloads"],
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = DesktopForeground,
+                )
                 Text(
                     summary(items.size, failed, busy),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = if (failed > 0 && !busy) DesktopDestructive else DesktopSecondary,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
             }
             if (busy) {
@@ -76,7 +83,11 @@ internal fun DesktopDownloadManagerDialog(onDismiss: () -> Unit) {
 
         if (items.isEmpty()) {
             Box(Modifier.fillMaxWidth().height(96.dp), contentAlignment = Alignment.Center) {
-                Text(DesktopStrings["nothing_downloading", "Nothing downloading."], color = DesktopSecondary)
+                Text(
+                    DesktopStrings["nothing_downloading", "Nothing downloading."],
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DesktopSecondary,
+                )
             }
         } else {
             LazyColumn(
@@ -87,10 +98,13 @@ internal fun DesktopDownloadManagerDialog(onDismiss: () -> Unit) {
                 items(items, key = { it.song.videoId }) { item -> DownloadRow(item) }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onDismiss) { Text(DesktopStrings["done", "Done"], color = DesktopForeground) }
+        Spacer(Modifier.height(8.dp))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onDismiss) { Text(DesktopStrings["done", "Done"], color = DesktopAccent) }
         }
     }
 }
@@ -98,7 +112,7 @@ internal fun DesktopDownloadManagerDialog(onDismiss: () -> Unit) {
 @Composable
 private fun DownloadRow(item: DesktopDownloadItem) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopArtwork(

@@ -89,8 +89,8 @@ internal fun DesktopPlaylistDialog(
             return@DesktopDialogFrame
         }
 
-        DialogHeading("Add to playlist", song?.let { "${it.title} — ${it.artist}" }.orEmpty())
-        error?.let { DialogError(it) }
+        DesktopDialogHeading("Add to playlist", song?.let { "${it.title} — ${it.artist}" }.orEmpty())
+        error?.let { DesktopDialogError(it) }
         DialogAction(BitChordIcons.Plus, "New playlist", enabled = !busy) { creating = true }
 
         if (signedIn && !canUseAccount) {
@@ -126,7 +126,7 @@ internal fun DesktopPlaylistDialog(
                 modifier = Modifier.heightIn(max = 320.dp).desktopTopScrollFade(playlistListState),
             ) {
                 if (account.isNotEmpty()) {
-                    item(key = "heading:account") { DialogSectionHeading("On your account") }
+                    item(key = "heading:account") { DesktopDialogSectionHeading("On your account") }
                     items(account.size, key = { account[it].playlistId }) { index ->
                         val playlist = account[index]
                         DialogAction(
@@ -138,7 +138,7 @@ internal fun DesktopPlaylistDialog(
                     }
                 }
                 if (localPlaylists.isNotEmpty()) {
-                    item(key = "heading:local") { DialogSectionHeading("On this computer") }
+                    item(key = "heading:local") { DesktopDialogSectionHeading("On this computer") }
                     items(localPlaylists.size, key = { localPlaylists[it].id }) { index ->
                         val playlist = localPlaylists[index]
                         DialogAction(
@@ -196,7 +196,7 @@ private fun NewPlaylistForm(
             )
         }
     }
-    error?.let { DialogError(it) }
+    error?.let { DesktopDialogError(it) }
 
     Row(
         Modifier
@@ -233,7 +233,7 @@ private fun NewPlaylistForm(
     }
 
     if (signedIn) {
-        DialogSectionHeading("Who can see it")
+        DesktopDialogSectionHeading("Who can see it")
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 22.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -274,8 +274,8 @@ internal fun DesktopRenamePlaylistDialog(
     val submit = { if (name.isNotBlank() && name.trim() != current && !busy) onRename(name.trim()) }
 
     DesktopDialogFrame(onDismiss = onDismiss) {
-        DialogHeading("Rename playlist", current)
-        error?.let { DialogError(it) }
+        DesktopDialogHeading("Rename playlist", current)
+        error?.let { DesktopDialogError(it) }
         Box(
             Modifier
                 .fillMaxWidth()
@@ -295,7 +295,7 @@ internal fun DesktopRenamePlaylistDialog(
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             )
         }
-        DialogButtons(
+        DesktopDialogButtons(
             busy = busy,
             confirmLabel = DesktopStrings["rename", "Rename"],
             confirmEnabled = name.isNotBlank() && name.trim() != current,
@@ -315,13 +315,13 @@ internal fun DesktopDeletePlaylistDialog(
     onDismiss: () -> Unit,
 ) {
     DesktopDialogFrame(onDismiss = onDismiss) {
-        DialogHeading(
+        DesktopDialogHeading(
             "Delete playlist",
             "“$title” will be removed from your YouTube Music account, on every " +
                 "device. The songs in it are not deleted.",
         )
-        error?.let { DialogError(it) }
-        DialogButtons(
+        error?.let { DesktopDialogError(it) }
+        DesktopDialogButtons(
             busy = busy,
             confirmLabel = DesktopStrings["delete", "Delete"],
             confirmEnabled = true,
@@ -329,86 +329,6 @@ internal fun DesktopDeletePlaylistDialog(
             onDismiss = onDismiss,
         )
     }
-}
-
-/**
- * The panel every dialog on this page sits in: the app's own glass over a scrim, rather than
- * Material's surface.
- */
-@Composable
-private fun DesktopDialogFrame(onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss,
-                ),
-        )
-        val shape = RoundedCornerShape(20.dp)
-        Box(
-            Modifier
-                .widthIn(max = 480.dp)
-                .fillMaxWidth()
-                .clip(shape)
-                .desktopBarGlass(shape),
-        ) {
-            // Swallows clicks that land on the panel's own background so they do not reach the
-            // scrim behind it and dismiss what was just clicked.
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                    ),
-            )
-            Column(Modifier.padding(bottom = 8.dp)) { content() }
-        }
-    }
-}
-
-@Composable
-private fun DialogHeading(title: String, subtitle: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = DesktopForeground,
-        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 20.dp),
-    )
-    if (subtitle.isNotBlank()) {
-        Text(
-            subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = DesktopSecondary,
-            modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 6.dp),
-        )
-    }
-}
-
-@Composable
-private fun DialogSectionHeading(text: String) {
-    Text(
-        text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = DesktopSecondary,
-        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 14.dp, bottom = 4.dp),
-    )
-}
-
-@Composable
-private fun DialogError(message: String) {
-    Text(
-        message,
-        style = MaterialTheme.typography.bodySmall,
-        color = DesktopAccent,
-        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 10.dp),
-    )
 }
 
 @Composable
@@ -440,30 +360,6 @@ private fun DialogAction(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun DialogButtons(
-    busy: Boolean,
-    confirmLabel: String,
-    confirmEnabled: Boolean,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (busy) {
-            CircularProgressIndicator(color = DesktopAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(12.dp))
-        }
-        TextButton(onClick = onDismiss, enabled = !busy) { Text(DesktopStrings["cancel", "Cancel"], color = DesktopSecondary) }
-        TextButton(onClick = onConfirm, enabled = confirmEnabled && !busy) {
-            Text(confirmLabel, color = if (confirmEnabled && !busy) DesktopAccent else DesktopSecondary)
         }
     }
 }
