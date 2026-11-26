@@ -2,6 +2,8 @@ package com.music.bitchord.desktop
 
 import com.music.bitchord.desktop.icons.DesktopIcons
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -19,6 +21,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -30,6 +35,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import bitchord.desktopapp.generated.resources.Res
+import bitchord.desktopapp.generated.resources.bitchord_logo_original
+import bitchord.desktopapp.generated.resources.logo
+import org.jetbrains.compose.resources.painterResource
 import com.music.bitchord.desktop.DesktopSettingsPage.*
 import com.music.bitchord.data.settings.AutomixPerformanceMode
 import com.music.bitchord.data.settings.PlayerTheme
@@ -173,6 +183,14 @@ internal fun DesktopSettingsScreen(
     }
     if (page in listOf(AUDIO_QUALITY, DOWNLOAD_QUALITY, OUTPUT_PRECISION, AUTOMIX_PERFORMANCE, FONT, APP_LANGUAGE)) return
 
+    val directSource by DesktopDirectSource.enabled.collectAsState()
+    val dolbyAtmosEnabled = DesktopCodecs.supportsDolbyAtmos
+    val dolbyAtmosSubtitle = if (dolbyAtmosEnabled) {
+        DesktopStrings["dolby_atmos_subtitle", "Play the more immersive, surround version of a song when there is one."]
+    } else {
+        DesktopStrings["dolby_atmos_unavailable", "This device can't play Atmos, so these songs play in their usual version"]
+    }
+
     val sections = DesktopSettingsSections(page, searching, settingsQuery)
     if (searching) {
         sections.section(INTEGRATIONS) {
@@ -188,13 +206,21 @@ internal fun DesktopSettingsScreen(
             navigationRow(LISTEN_TOGETHER.title, "Create or join a room by code, nickname, party size, custom server, queue and host controls") { onOpenPage(LISTEN_TOGETHER) }
         }
         sections.section(AUDIO_QUALITY) {
-            choice(AUDIO_QUALITY.title, audioQuality.label, audioSearch) { onOpenPage(AUDIO_QUALITY) }
-        }
-        sections.section(AUDIO_OUTPUT) {
-            val output by DesktopAudioDevices.selected.collectAsState()
-            choice(AUDIO_OUTPUT.title, DesktopAudioDevices.label(output), "output device system default speakers headphones sound card advanced") {
-                onOpenPage(AUDIO_OUTPUT)
-            }
+            toggle(
+                "Direct source stream",
+                "Start on a higher priority source; YouTube remains the fallback.",
+                directSource,
+                DesktopDirectSource::setEnabled,
+            )
+            choice(AUDIO_QUALITY.title, audioQuality.label, audioSearch, icon = DesktopIcons.Settings.Wifi) { onOpenPage(AUDIO_QUALITY) }
+            toggle(
+                DesktopStrings["dolby_atmos", "Dolby Atmos"],
+                dolbyAtmosSubtitle,
+                dolbyAtmos && dolbyAtmosEnabled,
+                onDolbyAtmosChange,
+                icon = DesktopIcons.Audio.SurroundSound,
+                enabled = dolbyAtmosEnabled,
+            )
         }
         sections.section(LICENSES) {
             navigationRow(LICENSES.title, "About BitChord and its open-source dependencies") { onOpenPage(LICENSES) }
@@ -248,23 +274,37 @@ internal fun DesktopSettingsScreen(
     }
 
     sections.section(DOWNLOADS) {
-        choice(DOWNLOAD_QUALITY.title, downloadOptions[downloadQuality] ?: downloadQuality, "offline Standard High Lossless") {
+        choice(
+            DOWNLOAD_QUALITY.title,
+            downloadOptions[downloadQuality] ?: downloadQuality,
+            "offline Standard High Lossless",
+            icon = BitChordIcons.Download,
+        ) {
             onOpenPage(DOWNLOAD_QUALITY)
         }
     }
 
     sections.section(PLAYBACK) {
+        val output by DesktopAudioDevices.selected.collectAsState()
+        val eqOn by DesktopEqualizerSettings.enabled.collectAsState()
         val videoBeta by DesktopVideoBeta.enabled.collectAsState()
-        toggle("Music video playback (Beta)",
-            "Experimental video player and audio/video switching. Off uses the classic audio player; video thumbnails stay widescreen.",
-            videoBeta, DesktopVideoBeta::setEnabled)
-        if (!automix) {
-            val title = DesktopStrings["crossfade", "Crossfade"]
-            row(title, "Fade transitions between songs") {
-                DesktopSettingsControl(title, if (crossfadeSeconds == 0) "Off" else "${crossfadeSeconds}s") {
-                    DesktopBareSlider(crossfadeSeconds.toFloat(), { onCrossfadeSecondsChange(it.toInt()) }, valueRange = 0f..12f, steps = 11)
-                }
+        row(OUTPUT_PRECISION.title, "Playing at $outputSummary", "PCM float bit-perfect lossless $outputSummary", icon = true) {
+            DesktopSettingsControl(OUTPUT_PRECISION.title, "Playing at $outputSummary", icon = DesktopIcons.Audio.GraphicEq) {
+                DesktopSettingsSegmentedControl(
+                    outputOptions.keys.toList(),
+                    outputPrecision,
+                    { outputOptions.getValue(it) },
+                    onOutputPrecisionChange,
+                )
             }
+        }
+        choice(
+            AUDIO_OUTPUT.title,
+            DesktopAudioDevices.label(output),
+            "output device system default speakers headphones sound card advanced",
+            icon = DesktopIcons.Audio.Speaker,
+        ) {
+            onOpenPage(AUDIO_OUTPUT)
         }
         toggle(
             DesktopStrings["automix", "Automix [BETA]"],
@@ -275,6 +315,7 @@ internal fun DesktopSettingsScreen(
             },
             automix,
             onAutomixChange,
+            icon = DesktopIcons.Status.Sparkles,
         )
         if (automix) {
             val title = DesktopStrings["automix_duration", "Automix duration"]
@@ -285,8 +326,14 @@ internal fun DesktopSettingsScreen(
                     Text(automixDuration.description, color = DesktopSecondary, style = MaterialTheme.typography.bodyMedium)
                 }
             }
+        } else {
+            val title = DesktopStrings["crossfade", "Crossfade"]
+            row(title, "Fade transitions between songs") {
+                DesktopSettingsControl(title, if (crossfadeSeconds == 0) "Off" else "${crossfadeSeconds}s") {
+                    DesktopBareSlider(crossfadeSeconds.toFloat(), { onCrossfadeSecondsChange(it.toInt()) }, valueRange = 0f..12f, steps = 11)
+                }
+            }
         }
-        choice(AUTOMIX_PERFORMANCE.title, automixPerformance.label(), automixSearch) { onOpenPage(AUTOMIX_PERFORMANCE) }
         toggle(
             "AutoMix artwork transition",
             "Dissolve artwork and blend the background during AutoMix",
@@ -299,12 +346,61 @@ internal fun DesktopSettingsScreen(
             automixMiniArtwork,
             onAutomixMiniArtworkChange,
         )
-        row("AutoMix models", "Download or delete analysis models") {
-            Column(Modifier.padding(horizontal = 16.dp)) { DesktopAutomixModelControls(onDelete = { onAutomixChange(false) }) }
+        row("AutoMix models", "Download or delete analysis models", icon = true) {
+            Column(Modifier.fillMaxWidth()) {
+                DesktopSettingsRow("AutoMix models", "Download or delete analysis models", icon = DesktopIcons.Actions.CheckCircle)
+                Column(Modifier.padding(start = 52.dp, end = 16.dp, bottom = 12.dp)) {
+                    DesktopAutomixModelControls(onDelete = { onAutomixChange(false) })
+                }
+            }
         }
-    }
-
-    sections.section(DESKTOP_PLAYBACK) {
+        choice(
+            AUTOMIX_PERFORMANCE.title,
+            automixPerformance.label(),
+            automixSearch,
+            icon = DesktopIcons.Settings.Sliders,
+            subtitle = DesktopStrings["automix_performance_subtitle", "Sets how much CPU background analysis may use"],
+        ) { onOpenPage(AUTOMIX_PERFORMANCE) }
+        toggle(
+            DesktopStrings["skip_silence", "Skip silence"],
+            DesktopStrings["d_shorten_long_gaps_rather_than_playing_them_out", "Shorten long gaps rather than playing them out"],
+            skipSilence,
+            onSkipSilenceChange,
+            icon = DesktopIcons.Audio.VolumeOff,
+        )
+        iconRow(
+            DesktopIcons.Player.SleepTimer,
+            "Sleep timer",
+            when {
+                sleepRemainingMs != null -> "${formatSleepTimer(sleepRemainingMs)} until playback pauses"
+                sleepAfterTrack -> "Pausing when this song ends"
+                else -> "Pause playback after a while"
+            },
+        ) { onSleepTimerCycle() }
+        toggle(
+            DesktopStrings["spatial_audio", "Spatial audio"],
+            DesktopStrings["spatial_audio_subtitle", "Widens stereo tracks for a more immersive feel"],
+            spatialAudio,
+            onSpatialAudioChange,
+            icon = DesktopIcons.Audio.Speaker,
+        )
+        val equalizerDetail = DesktopStrings["equalizer_subtitle", "Tone, seven bands and balance"]
+        row(EQUALIZER.title, equalizerDetail, "bass treble frequency presets manual dynamic width reset gain EQ", icon = true) {
+            DesktopSettingsRow(
+                EQUALIZER.title,
+                equalizerDetail,
+                icon = DesktopIcons.Settings.Sliders,
+                value = if (eqOn) "On" else "Off",
+                onClick = { onOpenPage(EQUALIZER) },
+            )
+        }
+        toggle(
+            "Music video playback (Beta)",
+            "Experimental video player and audio/video switching. Off uses the classic audio player; video thumbnails stay widescreen.",
+            videoBeta,
+            DesktopVideoBeta::setEnabled,
+            icon = DesktopIcons.Player.MusicVideo,
+        )
         toggle(
             DesktopStrings["autoplay", "Autoplay"],
             DesktopStrings["d_keep_the_music_going_with_similar_songs", "Keep the music going with similar songs"],
@@ -316,6 +412,7 @@ internal fun DesktopSettingsScreen(
             DesktopStrings["d_mix_the_order_of_the_current_queue", "Mix the order of the current queue"],
             shuffle,
             onShuffleChange,
+            icon = BitChordIcons.Shuffle,
         )
         iconRow(
             BitChordIcons.Repeat,
@@ -336,51 +433,6 @@ internal fun DesktopSettingsScreen(
             }
             onPlaybackSpeedChange(next)
         }
-        val directSource by DesktopDirectSource.enabled.collectAsState()
-        toggle("Direct source stream", "Start on a higher priority source; YouTube remains the fallback.", directSource, DesktopDirectSource::setEnabled)
-        iconRow(
-            DesktopIcons.Player.SleepTimer,
-            "Sleep timer",
-            when {
-                sleepRemainingMs != null -> "${formatSleepTimer(sleepRemainingMs)} until playback pauses"
-                sleepAfterTrack -> "Pausing when this song ends"
-                else -> "Pause playback after a while"
-            },
-        ) { onSleepTimerCycle() }
-    }
-
-    sections.section(AUDIO_PROCESSING) {
-        val eqOn by DesktopEqualizerSettings.enabled.collectAsState()
-        toggle(
-            DesktopStrings["skip_silence", "Skip silence"],
-            DesktopStrings["d_shorten_long_gaps_rather_than_playing_them_out", "Shorten long gaps rather than playing them out"],
-            skipSilence,
-            onSkipSilenceChange,
-        )
-        toggle(
-            DesktopStrings["spatial_audio", "Spatial audio"],
-            DesktopStrings["spatial_audio_subtitle", "Widens stereo tracks for a more immersive feel"],
-            spatialAudio,
-            onSpatialAudioChange,
-        )
-        toggle(
-            DesktopStrings["dolby_atmos", "Dolby Atmos"],
-            if (DesktopCodecs.supportsDolbyAtmos) {
-                "Prefer an add-on's immersive mix and decode E-AC-3 with FFmpeg"
-            } else {
-                DesktopStrings["dolby_atmos_unavailable", "This device can't play Atmos, so these songs play in their usual version"]
-            },
-            dolbyAtmos && DesktopCodecs.supportsDolbyAtmos,
-            onDolbyAtmosChange,
-            enabled = DesktopCodecs.supportsDolbyAtmos,
-        )
-        val equalizerDetail = DesktopStrings["equalizer_subtitle", "Tone, seven bands and balance"]
-        row(EQUALIZER.title, equalizerDetail, "bass treble frequency presets manual dynamic width reset gain EQ") {
-            DesktopSettingsRow(EQUALIZER.title, equalizerDetail, value = if (eqOn) "On" else "Off", onClick = { onOpenPage(EQUALIZER) })
-        }
-        choice(OUTPUT_PRECISION.title, outputOptions[outputPrecision] ?: outputPrecision, "PCM float bit-perfect lossless $outputSummary") {
-            onOpenPage(OUTPUT_PRECISION)
-        }
     }
 
     sections.section(CONTENT_PREFERENCES) {
@@ -388,16 +440,10 @@ internal fun DesktopSettingsScreen(
     }
 
     sections.section(APPEARANCE) {
-        toggle(
-            DesktopStrings["show_best_part", "Show Best Part"],
-            DesktopStrings["show_best_part_subtitle", "Show a shortcut to the most replayed part or chorus on the player artwork"],
-            showBestPart,
-            onShowBestPartChange,
-        )
         val themeTitle = "Theme"
         val themeSubtitle = "Follow your device appearance by default, or choose a theme."
-        row(themeTitle, themeSubtitle, "Light Dark System") {
-            DesktopSettingsControl(themeTitle, themeSubtitle) {
+        row(themeTitle, themeSubtitle, "Light Dark System", icon = true) {
+            DesktopSettingsControl(themeTitle, themeSubtitle, icon = DesktopIcons.Settings.Brightness) {
                 DesktopSettingsSegmentedControl(DesktopThemeMode.entries, DesktopTheme.mode, { it.label }, DesktopTheme::selectMode)
             }
         }
@@ -410,24 +456,101 @@ internal fun DesktopSettingsScreen(
                 DesktopTheme::updatePitchBlack,
             )
         }
-        choice(FONT.title, fontLabel(DesktopFontSettings.mode), fontSearch) { onOpenPage(FONT) }
-        val iconTitle = DesktopStrings["d_app_icon", "App icon"]
-        val iconSubtitle = DesktopStrings[
-            "d_app_icon_subtitle",
-            "Change the window and tray icon instantly. Your choice is saved independently of the theme.",
-        ]
-        row(iconTitle, iconSubtitle, "launcher window tray") {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text(iconTitle, fontWeight = FontWeight.Medium)
-                Text(iconSubtitle, color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
-                DesktopAppIconPicker()
-                Text(
-                    DesktopStrings[
-                        "d_app_icon_launcher_note",
-                        "Installed shortcuts and pinned launcher icons may keep the default Dark icon.",
-                    ],
-                    color = DesktopSecondary,
-                    style = MaterialTheme.typography.bodySmall,
+        choice(
+            FONT.title,
+            fontLabel(DesktopFontSettings.mode),
+            fontSearch,
+            icon = DesktopIcons.Settings.Font,
+            subtitle = fontDetail(DesktopFontSettings.mode),
+        ) { onOpenPage(FONT) }
+        toggle(
+            DesktopStrings["full_screen_cover_art", "Full-screen cover art"],
+            DesktopStrings["full_screen_cover_art_subtitle", "Runs the cover to the edges of the player instead of a square sleeve"],
+            fullBleedArtwork,
+            onFullBleedArtworkChange,
+            icon = DesktopIcons.Window.Fullscreen,
+        )
+        toggle(
+            DesktopStrings["show_best_part", "Show Best Part"],
+            DesktopStrings["show_best_part_subtitle", "Show a shortcut to the most replayed part or chorus on the player artwork"],
+            showBestPart,
+            onShowBestPartChange,
+            icon = BitChordIcons.MusicNote,
+        )
+        // Like the mobile segmented setting; preserve all three backdrop implementations.
+        val playerTheme by DesktopPlayerThemeSettings.theme.collectAsState()
+        row("Player theme", "Default Legacy Simple background mesh gradient blur", icon = true) {
+            val description = when (playerTheme) {
+                PlayerTheme.DEFAULT -> "The cover's own colours carry on below it."
+                PlayerTheme.LEGACY -> "Animated colours from the cover drift behind the player."
+                PlayerTheme.SIMPLE -> "A soft blur of the cover fills the player."
+            }
+            DesktopSettingsControl("Player theme", description, icon = DesktopIcons.Settings.Brightness) {
+                DesktopSettingsSegmentedControl(
+                    PlayerTheme.entries, playerTheme, { it.name.lowercase().replaceFirstChar(Char::uppercaseChar) },
+                    DesktopPlayerThemeSettings::setTheme,
+                )
+            }
+        }
+        toggle(
+            DesktopStrings["d_animated_canvas", "Animated canvas"],
+            DesktopStrings["d_show_motion_artwork_when_it_is_available", "Show motion artwork when it is available"],
+            animatedCanvas,
+            onAnimatedCanvasChange,
+            icon = DesktopIcons.Settings.Animation,
+        )
+        if (animatedCanvas || searching) {
+            navigationRow(
+                title = DesktopStrings["spotify_canvas_setup", "Spotify Canvas setup"],
+                subtitle = if (spotifyCanvasReady) {
+                    "Connected"
+                } else {
+                    "To use Spotify Canvas, provide your Spotify sp_dc cookie."
+                },
+                onClick = { onOpenPage(SPOTIFY_CANVAS) },
+            )
+        }
+        toggle(
+            DesktopStrings["synced_lyrics", "Synced lyrics"],
+            DesktopStrings["synced_lyrics_subtitle", "Lights up the words on the player as they're sung"],
+            syncedLyrics,
+            onSyncedLyricsChange,
+            icon = BitChordIcons.Lyrics,
+        )
+        // Nothing to choose between while the feature is off, and the sources are
+        // third-party services reached on the listener's connection.
+        if (syncedLyrics || searching) {
+            val animateLyricsWhileUnfocused by DesktopAppearanceSettings.animateLyricsWhileUnfocused.collectAsState()
+            if (syncedLyrics) toggle(
+                "Continue lyrics animation when unfocused",
+                "Keep synced lyrics moving on a visible second monitor. May use more CPU/GPU; stops when minimized or hidden.",
+                animateLyricsWhileUnfocused,
+                DesktopAppearanceSettings::setAnimateLyricsWhileUnfocused,
+            )
+            if (syncedLyrics) toggle(
+                DesktopStrings["d_blur_unfocused_lyrics", "Blur unfocused lyrics"],
+                DesktopStrings["d_keeps_the_spotlight_on_the_current_line", "Keeps the spotlight on the current line"],
+                lyricsBlur,
+                onLyricsBlurChange,
+                icon = DesktopIcons.Settings.BlurOn,
+            )
+            val sourceSummary = enabledLyricsSources.joinToString(", ").ifEmpty { "None. Lyrics will not be fetched." }
+            val providers = DesktopLyricsClient.sources.joinToString { "${it.name} ${it.detail}" }
+            row(LYRICS_SOURCES.title, sourceSummary, providers, "provider priority word-by-word syllable lyrics", icon = true) {
+                DesktopSettingsRow(
+                    LYRICS_SOURCES.title,
+                    sourceSummary,
+                    icon = DesktopIcons.Settings.Language,
+                    onClick = { onOpenPage(LYRICS_SOURCES) },
+                )
+            }
+            val translationLanguage by DesktopTranslationSetting.language.collectAsState()
+            row(TRANSLATION_LANGUAGE.title, DesktopTranslationSetting.describe(translationLanguage), "translate lyrics follow app language", icon = true) {
+                DesktopSettingsRow(
+                    TRANSLATION_LANGUAGE.title,
+                    icon = DesktopIcons.Settings.Translate,
+                    value = DesktopTranslationSetting.describe(translationLanguage),
+                    onClick = { onOpenPage(TRANSLATION_LANGUAGE) },
                 )
             }
         }
@@ -490,44 +613,6 @@ internal fun DesktopSettingsScreen(
             oldTopPlayerEnabled,
             DesktopAppearanceSettings::setEnableOldTopMusicPlayerStyle,
         )
-        toggle(
-            DesktopStrings["full_screen_cover_art", "Full-screen cover art"],
-            DesktopStrings["full_screen_cover_art_subtitle", "Runs the cover to the edges of the player instead of a square sleeve"],
-            fullBleedArtwork,
-            onFullBleedArtworkChange,
-        )
-        // Like the mobile segmented setting; preserve all three backdrop implementations.
-        val playerTheme by DesktopPlayerThemeSettings.theme.collectAsState()
-        row("Player theme", "Default Legacy Simple background mesh gradient blur") {
-            val description = when (playerTheme) {
-                PlayerTheme.DEFAULT -> "The cover's own colours carry on below it."
-                PlayerTheme.LEGACY -> "Animated colours from the cover drift behind the player."
-                PlayerTheme.SIMPLE -> "A soft blur of the cover fills the player."
-            }
-            DesktopSettingsControl("Player theme", description) {
-                DesktopSettingsSegmentedControl(
-                    PlayerTheme.entries, playerTheme, { it.name.lowercase().replaceFirstChar(Char::uppercaseChar) },
-                    DesktopPlayerThemeSettings::setTheme,
-                )
-            }
-        }
-        toggle(
-            DesktopStrings["d_animated_canvas", "Animated canvas"],
-            DesktopStrings["d_show_motion_artwork_when_it_is_available", "Show motion artwork when it is available"],
-            animatedCanvas,
-            onAnimatedCanvasChange,
-        )
-        if (animatedCanvas || searching) {
-            navigationRow(
-                title = DesktopStrings["spotify_canvas_setup", "Spotify Canvas setup"],
-                subtitle = if (spotifyCanvasReady) {
-                    "Connected"
-                } else {
-                    "To use Spotify Canvas, provide your Spotify sp_dc cookie."
-                },
-                onClick = { onOpenPage(SPOTIFY_CANVAS) },
-            )
-        }
     }
 
     sections.section(PERFORMANCE) {
@@ -536,12 +621,16 @@ internal fun DesktopSettingsScreen(
         toggle(
             DesktopStrings["reduce_animation", "Reduce animation"],
             "Limit interface motion and transitions.",
-            reduceAnimation, DesktopAppearanceSettings::setReduceAnimation,
+            reduceAnimation,
+            DesktopAppearanceSettings::setReduceAnimation,
+            icon = DesktopIcons.Settings.Animation,
         )
         toggle(
             "Reduce Blur",
             "Turn off blur effects across the interface for a lighter, more responsive experience.",
-            reduceBlur, DesktopAppearanceSettings::setReduceDynamicBlur,
+            reduceBlur,
+            DesktopAppearanceSettings::setReduceDynamicBlur,
+            icon = DesktopIcons.Settings.BlurOn,
         )
     }
 
@@ -609,51 +698,6 @@ internal fun DesktopSettingsScreen(
                 "Closing the main window opens the floating player while music continues",
                 pip.onClose, { value -> DesktopPipSettings.update { it.copy(onClose = value) } })
         }
-        val hideVolumeBar by DesktopAppearanceSettings.hideVolumeBar.collectAsState()
-        toggle(
-            DesktopStrings["hide_volume_bar", "Hide volume bar"],
-            DesktopStrings["hide_volume_bar_subtitle", "Removes the volume slider from the main player"],
-            hideVolumeBar,
-            DesktopAppearanceSettings::setHideVolumeBar,
-        )
-    }
-
-    sections.section(LYRICS) {
-        toggle(
-            DesktopStrings["synced_lyrics", "Synced lyrics"],
-            DesktopStrings["synced_lyrics_subtitle", "Lights up the words on the player as they're sung"],
-            syncedLyrics,
-            onSyncedLyricsChange,
-        )
-        // Nothing to choose between while the feature is off, and the sources are
-        // third-party services reached on the listener's connection.
-        if (syncedLyrics || searching) {
-            val animateLyricsWhileUnfocused by DesktopAppearanceSettings.animateLyricsWhileUnfocused.collectAsState()
-            if (syncedLyrics) toggle(
-                "Continue lyrics animation when unfocused",
-                "Keep synced lyrics moving on a visible second monitor. May use more CPU/GPU; stops when minimized or hidden.",
-                animateLyricsWhileUnfocused,
-                DesktopAppearanceSettings::setAnimateLyricsWhileUnfocused,
-            )
-            if (syncedLyrics) toggle(
-                DesktopStrings["d_blur_unfocused_lyrics", "Blur unfocused lyrics"],
-                DesktopStrings["d_keeps_the_spotlight_on_the_current_line", "Keeps the spotlight on the current line"],
-                lyricsBlur,
-                onLyricsBlurChange,
-            )
-            val sourceSummary = enabledLyricsSources.joinToString(", ").ifEmpty { "None. Lyrics will not be fetched." }
-            val providers = DesktopLyricsClient.sources.joinToString { "${it.name} ${it.detail}" }
-            row(LYRICS_SOURCES.title, sourceSummary, providers, "provider priority word-by-word syllable lyrics") {
-                DesktopSettingsRow(LYRICS_SOURCES.title, sourceSummary, onClick = { onOpenPage(LYRICS_SOURCES) })
-            }
-            val translationLanguage by DesktopTranslationSetting.language.collectAsState()
-            row(TRANSLATION_LANGUAGE.title, DesktopTranslationSetting.describe(translationLanguage), "translate lyrics follow app language") {
-                DesktopSettingsRow(
-                    TRANSLATION_LANGUAGE.title, value = DesktopTranslationSetting.describe(translationLanguage),
-                    onClick = { onOpenPage(TRANSLATION_LANGUAGE) },
-                )
-            }
-        }
     }
 
     sections.section(LOCAL_MUSIC) {
@@ -667,7 +711,7 @@ internal fun DesktopSettingsScreen(
         }
         if (DesktopLocalMusic.folder() != null) {
             iconRow(
-                BitChordIcons.Library,
+                DesktopIcons.Status.LibraryMusic,
                 DesktopStrings["use_all_audio_folders", "Use all audio folders"],
                 DesktopStrings["use_all_audio_folders_subtitle", "Remove the folder limit and scan music across the device"],
             ) {
@@ -684,6 +728,7 @@ internal fun DesktopSettingsScreen(
             ],
             filterNonMusicAudio,
             onFilterNonMusicAudioChange,
+            icon = BitChordIcons.MusicNote,
         )
     }
 
@@ -691,33 +736,31 @@ internal fun DesktopSettingsScreen(
         var limitMb by remember { mutableStateOf(DesktopMediaCache.limitMb()) }
         var cleared by remember { mutableStateOf<String?>(null) }
         val cacheScope = rememberCoroutineScope()
-        row(DesktopStrings["song_cache_limit", "Song cache limit"], "Keep downloaded audio on disk, media cache space") {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(DesktopStrings["song_cache_limit", "Song cache limit"], style = MaterialTheme.typography.bodyLarge)
-            Text(
-                if (limitMb > DesktopMediaCache.WARNING_MB) {
+        row(DesktopStrings["song_cache_limit", "Song cache limit"], "Keep downloaded audio on disk, media cache space", icon = true) {
+            DesktopSettingsControl(
+                title = DesktopStrings["song_cache_limit", "Song cache limit"],
+                subtitle = if (limitMb > DesktopMediaCache.WARNING_MB) {
                     "Keeps up to ${formatCacheSize(limitMb)} of downloaded audio on disk. " +
                         "This can take a noticeable share of your free space."
                 } else {
                     "Keeps media on disk. Playback audio ranges use a separate cache capped at 256 MB."
                 },
-                color = DesktopSecondary,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            DesktopBareSlider(
-                value = limitMb.toFloat(),
-                onValueChange = { limitMb = it.roundToInt() },
-                onValueChangeFinished = { DesktopMediaCache.setLimitMb(limitMb) },
-                valueRange = DesktopMediaCache.MIN_LIMIT_MB.toFloat()..
-                    DesktopMediaCache.MAX_LIMIT_MB.toFloat(),
-                steps = 18,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(formatCacheSize(limitMb), color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
-        }
+                icon = DesktopIcons.Settings.Storage,
+            ) {
+                DesktopBareSlider(
+                    value = limitMb.toFloat(),
+                    onValueChange = { limitMb = it.roundToInt() },
+                    onValueChangeFinished = { DesktopMediaCache.setLimitMb(limitMb) },
+                    valueRange = DesktopMediaCache.MIN_LIMIT_MB.toFloat()..
+                        DesktopMediaCache.MAX_LIMIT_MB.toFloat(),
+                    steps = 18,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(formatCacheSize(limitMb), color = DesktopSecondary, style = MaterialTheme.typography.bodySmall)
+            }
         }
         iconRow(
-            DesktopIcons.Actions.DeleteSweep,
+            DesktopIcons.Actions.Delete,
             "Clear song cache",
             cleared ?: "Frees space used by downloaded audio",
         ) {
@@ -729,7 +772,7 @@ internal fun DesktopSettingsScreen(
         }
         var imagesCleared by remember { mutableStateOf(false) }
         iconRow(
-            DesktopIcons.Actions.DeleteSweep,
+            DesktopIcons.Actions.Delete,
             "Clear image cache",
             if (imagesCleared) "Image cache cleared" else "Frees space used by album artwork",
         ) {
@@ -744,22 +787,52 @@ internal fun DesktopSettingsScreen(
             DesktopStrings["d_autoplay_wont_suggest_a_song_already_played_or_suggested", "AutoPlay won\u2019t suggest a song already played or suggested this session"],
             dontRepeatSuggestions,
             onDontRepeatSuggestionsChange,
+            icon = DesktopIcons.Settings.History,
         )
-    }
-
-    sections.section(LANGUAGE) {
-        choice(DesktopStrings["app_language", "App language"], DesktopStrings.languageLabel(), languageSearch) {
-            onOpenPage(APP_LANGUAGE)
-        }
-    }
-
-    sections.section(ADVANCED) {
+        val hideVolumeBar by DesktopAppearanceSettings.hideVolumeBar.collectAsState()
+        toggle(
+            DesktopStrings["hide_volume_bar", "Hide volume bar"],
+            DesktopStrings["hide_volume_bar_subtitle", "Removes the volume slider from the main player"],
+            hideVolumeBar,
+            DesktopAppearanceSettings::setHideVolumeBar,
+            icon = DesktopIcons.Audio.VolumeOff,
+        )
         toggle(
             DesktopStrings["show_nerd_stats", "Show stats for nerds"],
             DesktopStrings["show_nerd_stats_subtitle", "Codec, bitrate and sample rate on the player"],
             showNerdStats,
             onShowNerdStatsChange,
+            icon = DesktopIcons.Settings.BarChart,
         )
+        val iconTitle = DesktopStrings["d_app_icon", "App icon"]
+        val iconSubtitle = DesktopStrings[
+            "d_app_icon_subtitle",
+            "Change the window and tray icon instantly. Your choice is saved independently of the theme.",
+        ]
+        row(iconTitle, iconSubtitle, "launcher window tray", icon = true) {
+            DesktopSettingsControl(iconTitle, iconSubtitle, icon = DesktopIcons.Navigation.GridView) {
+                DesktopAppIconPicker()
+                Text(
+                    DesktopStrings[
+                        "d_app_icon_launcher_note",
+                        "Installed shortcuts and pinned launcher icons may keep the default Dark icon.",
+                    ],
+                    color = DesktopSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+
+    sections.section(LANGUAGE) {
+        choice(
+            DesktopStrings["app_language", "App language"],
+            DesktopStrings.languageLabel(),
+            languageSearch,
+            icon = DesktopIcons.Settings.Language,
+        ) {
+            onOpenPage(APP_LANGUAGE)
+        }
     }
 
     sections.section(APP_UPDATES) {
@@ -784,9 +857,22 @@ internal fun DesktopSettingsScreen(
             bottomScrollInset = bottomScrollInset,
         ) {
             if (overview) {
-                item("categories") { DesktopSettingsOverview(updater != null, audioQuality.label, onOpenPage) }
-                item("about") { DesktopSettingsFooter { onOpenPage(LICENSES) } }
+                item("categories") {
+                    DesktopSettingsOverview(
+                        audioQuality = audioQuality.label,
+                        directSource = directSource,
+                        onDirectSourceChange = DesktopDirectSource::setEnabled,
+                        dolbyAtmos = dolbyAtmos,
+                        dolbyAtmosEnabled = dolbyAtmosEnabled,
+                        dolbyAtmosSubtitle = dolbyAtmosSubtitle,
+                        onDolbyAtmosChange = onDolbyAtmosChange,
+                        onOpenPage = onOpenPage,
+                    )
+                }
             } else {
+                if (page == APP_UPDATES && !searching) {
+                    item("about_header") { DesktopAboutHeaderCard { onOpenPage(LICENSES) } }
+                }
                 sections.groups.forEach { (route, rows) ->
                     item(route.name) { rows.Content(route.title.takeIf { searching }) }
                 }
@@ -845,42 +931,75 @@ internal fun DesktopSettingsList(
     )
 }
 
-/** The centered About footer, matching the Android-style version wordmark. */
+/** The About BitChord header card shown at the top of the About BitChord settings page. */
 @Composable
-private fun DesktopSettingsFooter(onLicenses: () -> Unit) {
-    val version = remember { System.getProperty("bitchord.version") ?: "1.9.1" }
+private fun DesktopAboutHeaderCard(onLicenses: () -> Unit) {
+    val version = remember { System.getProperty("bitchord.version") ?: "1.10" }
     val linkStyles = TextLinkStyles(
-        style = SpanStyle(color = DesktopAccent, textDecoration = TextDecoration.Underline),
+        style = SpanStyle(color = DesktopForeground, textDecoration = TextDecoration.Underline),
     )
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .heightIn(min = 112.dp)
+            .settingsCard(),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        DesktopAboutVersionTitle(version = version, color = DesktopForeground)
-        Text(
-            text = buildAnnotatedString {
-                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
-                    append("GitHub")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
-                    append("Developer")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
-                    append("Discord")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Clickable("licenses", linkStyles) { onLicenses() }) {
-                    append("Licenses")
-                }
-                append("\n~YouTube Music Backend")
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = DesktopSecondary,
-            textAlign = TextAlign.Center,
-        )
+        Box(
+            modifier = Modifier
+                .width(136.dp)
+                .fillMaxHeight()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(DesktopForeground.copy(alpha = 0.06f), Color.Transparent),
+                    ),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(if (DesktopTheme.isLight) Res.drawable.logo else Res.drawable.bitchord_logo_original),
+                contentDescription = "BitChord",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(width = 56.dp, height = 38.dp),
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp, end = 24.dp, top = 22.dp, bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+        ) {
+            DesktopAboutVersionTitle(
+                version = version,
+                color = DesktopForeground,
+                textAlign = TextAlign.Start,
+                fontSize = 28.sp,
+            )
+            Text(
+                text = buildAnnotatedString {
+                    withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
+                        append("GitHub")
+                    }
+                    append(" ")
+                    withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
+                        append("Developer")
+                    }
+                    append(" ")
+                    withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
+                        append("Discord")
+                    }
+                    append(" ")
+                    withLink(LinkAnnotation.Clickable("licenses", linkStyles) { onLicenses() }) {
+                        append("Licenses")
+                    }
+                    append("  ~YouTube Music Backend")
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = DesktopSecondary,
+                textAlign = TextAlign.Start,
+            )
+        }
     }
 }
 

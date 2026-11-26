@@ -129,6 +129,7 @@ object DesktopIcons {
         val GraphicEq: ImageVector get() = SfStyleIcons.GraphicEq
         val Equalizer: ImageVector get() = SfStyleIcons.Tune
         val HighQuality: ImageVector get() = SfStyleIcons.HighQuality
+        val SurroundSound: ImageVector get() = SfStyleIcons.SurroundSound
         val Phone: ImageVector get() = SfStyleIcons.Phone
         val Tv: ImageVector get() = SfStyleIcons.Tv
         val Watch: ImageVector get() = SfStyleIcons.Watch
@@ -162,6 +163,15 @@ object DesktopIcons {
         val Bug: ImageVector get() = SfStyleIcons.Bug
         val Upgrade: ImageVector get() = SfStyleIcons.Upgrade
         val Appearance: ImageVector get() = SfStyleIcons.Appearance
+        val Wifi: ImageVector get() = SfStyleIcons.Wifi
+        val Sliders: ImageVector get() = SfStyleIcons.Sliders
+        val Font: ImageVector get() = SfStyleIcons.Font
+        val BlurOn: ImageVector get() = SfStyleIcons.BlurOn
+        val BarChart: ImageVector get() = SfStyleIcons.BarChart
+        val History: ImageVector get() = SfStyleIcons.History
+        val Brightness: ImageVector get() = SfStyleIcons.Brightness
+        val Animation: ImageVector get() = SfStyleIcons.Animation
+        val Miscellaneous: ImageVector get() = SfStyleIcons.Miscellaneous
     }
 
     object Status {
