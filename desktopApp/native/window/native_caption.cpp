@@ -18,6 +18,22 @@ namespace {
 constexpr wchar_t CAPTION_PROPERTY[] = L"BitChord.IntegratedCaption.v1";
 constexpr wchar_t CHILD_CAPTION_PROPERTY[] = L"BitChord.IntegratedCaptionChild.v1";
 
+JavaVM* g_caption_vm = nullptr;
+jclass g_caption_cls = nullptr;
+jmethodID g_state_method = nullptr;
+
+void notify_caption_state(int hovered, int pressed) {
+    if (g_caption_vm == nullptr || g_caption_cls == nullptr || g_state_method == nullptr) return;
+    JNIEnv* env = nullptr;
+    if (g_caption_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK || env == nullptr) {
+        return;
+    }
+    env->CallStaticVoidMethod(g_caption_cls, g_state_method, static_cast<jint>(hovered), static_cast<jint>(pressed));
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+}
+
 struct PixelRect {
     int left = 0;
     int top = 0;
@@ -36,7 +52,8 @@ struct CaptionState {
     int title_bar_height_px = 0;
     bool fullscreen = false;
     bool overlay_blocked = false;
-    LRESULT pressed_button = HTNOWHERE;
+    int hovered_button = 0;
+    int pressed_button = 0;
     HWND hovered_child = nullptr;
     PixelRect min_rect{};
     PixelRect max_rect{};
@@ -191,6 +208,24 @@ LRESULT CALLBACK child_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             }
             break;
         }
+
+        case WM_MOUSEMOVE: {
+            if (IsWindow(parent)) {
+                if (CaptionState* parent_state = get_state(parent)) {
+                    bool changed = false;
+                    {
+                        std::lock_guard<std::mutex> lock(parent_state->mutex);
+                        if (parent_state->hovered_button != 0 || parent_state->pressed_button != 0) {
+                            parent_state->hovered_button = 0;
+                            parent_state->pressed_button = 0;
+                            changed = true;
+                        }
+                    }
+                    if (changed) notify_caption_state(0, 0);
+                }
+            }
+            break;
+        }
     }
 
     return CallWindowProcW(original, hwnd, msg, wParam, lParam);
@@ -291,33 +326,65 @@ LRESULT CALLBACK caption_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
 
         case WM_NCMOUSEMOVE: {
             if (wParam == HTMINBUTTON || wParam == HTMAXBUTTON || wParam == HTCLOSE) {
+                const int btn = static_cast<int>(wParam);
+                int pressed = 0;
+                bool changed = false;
                 HWND target = nullptr;
                 {
                     std::lock_guard<std::mutex> lock(state->mutex);
+                    if (state->hovered_button != btn) {
+                        state->hovered_button = btn;
+                        changed = true;
+                    }
+                    pressed = state->pressed_button;
                     target = state->hovered_child;
                 }
-                if (target == nullptr || !IsWindow(target)) {
-                    target = hwnd;
+                if (changed) {
+                    notify_caption_state(btn, pressed);
                 }
-                POINT target_pt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-                ScreenToClient(target, &target_pt);
-                PostMessageW(target, WM_MOUSEMOVE, 0, MAKELPARAM(target_pt.x, target_pt.y));
+                if (target != nullptr && IsWindow(target)) {
+                    POINT target_pt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                    ScreenToClient(target, &target_pt);
+                    PostMessageW(target, WM_MOUSEMOVE, 0, MAKELPARAM(target_pt.x, target_pt.y));
+                }
 
                 TRACKMOUSEEVENT tme{};
                 tme.cbSize = sizeof(tme);
                 tme.dwFlags = TME_NONCLIENT | TME_LEAVE;
                 tme.hwndTrack = hwnd;
                 TrackMouseEvent(&tme);
+            } else {
+                int pressed = 0;
+                bool changed = false;
+                {
+                    std::lock_guard<std::mutex> lock(state->mutex);
+                    if (state->hovered_button != 0) {
+                        state->hovered_button = 0;
+                        changed = true;
+                    }
+                    pressed = state->pressed_button;
+                }
+                if (changed) {
+                    notify_caption_state(0, pressed);
+                }
             }
             break;
         }
 
         case WM_NCMOUSELEAVE: {
             HWND target = nullptr;
+            bool changed = false;
             {
                 std::lock_guard<std::mutex> lock(state->mutex);
                 target = state->hovered_child;
-                state->pressed_button = HTNOWHERE;
+                if (state->hovered_button != 0 || state->pressed_button != 0) {
+                    state->hovered_button = 0;
+                    state->pressed_button = 0;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                notify_caption_state(0, 0);
             }
             if (target != nullptr && IsWindow(target)) {
                 PostMessageW(target, WM_MOUSELEAVE, 0, 0);
@@ -327,8 +394,13 @@ LRESULT CALLBACK caption_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
 
         case WM_NCLBUTTONDOWN: {
             if (wParam == HTMINBUTTON || wParam == HTMAXBUTTON || wParam == HTCLOSE) {
-                std::lock_guard<std::mutex> lock(state->mutex);
-                state->pressed_button = static_cast<LRESULT>(wParam);
+                const int btn = static_cast<int>(wParam);
+                {
+                    std::lock_guard<std::mutex> lock(state->mutex);
+                    state->hovered_button = btn;
+                    state->pressed_button = btn;
+                }
+                notify_caption_state(btn, btn);
                 // Suppress legacy Windows non-client caption button painting; click executes on UP.
                 return 0;
             }
@@ -337,13 +409,17 @@ LRESULT CALLBACK caption_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
 
         case WM_NCLBUTTONUP: {
             if (wParam == HTMINBUTTON || wParam == HTMAXBUTTON || wParam == HTCLOSE) {
-                LRESULT pressed = HTNOWHERE;
+                const int btn = static_cast<int>(wParam);
+                int pressed = 0;
+                int hovered = 0;
                 {
                     std::lock_guard<std::mutex> lock(state->mutex);
                     pressed = state->pressed_button;
-                    state->pressed_button = HTNOWHERE;
+                    hovered = state->hovered_button;
+                    state->pressed_button = 0;
                 }
-                if (pressed == static_cast<LRESULT>(wParam)) {
+                notify_caption_state(hovered, 0);
+                if (pressed == btn) {
                     if (wParam == HTMINBUTTON) {
                         PostMessageW(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
                     } else if (wParam == HTMAXBUTTON) {
@@ -367,8 +443,21 @@ extern "C" {
 
 JNIEXPORT jboolean JNICALL
 Java_com_music_bitchord_desktop_DesktopWindowsNativeCaption_nativeAttach(
-    JNIEnv*, jclass, jlong hwndPtr, jint titleBarHeightPx
+    JNIEnv* env, jclass clazz, jlong hwndPtr, jint titleBarHeightPx
 ) {
+    if (g_caption_vm == nullptr) {
+        env->GetJavaVM(&g_caption_vm);
+    }
+    if (g_caption_cls == nullptr && clazz != nullptr) {
+        g_caption_cls = reinterpret_cast<jclass>(env->NewGlobalRef(clazz));
+        if (g_caption_cls != nullptr) {
+            g_state_method = env->GetStaticMethodID(g_caption_cls, "onCaptionButtonState", "(II)V");
+            if (env->ExceptionCheck()) {
+                env->ExceptionClear();
+                g_state_method = nullptr;
+            }
+        }
+    }
     HWND hwnd = reinterpret_cast<HWND>(static_cast<intptr_t>(hwndPtr));
     if (!IsWindow(hwnd)) return JNI_FALSE;
 

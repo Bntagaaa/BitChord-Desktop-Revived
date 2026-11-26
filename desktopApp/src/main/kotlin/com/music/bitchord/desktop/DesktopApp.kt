@@ -3950,6 +3950,8 @@ internal fun BitChordDesktopApp(
         ) {
             val homePanelOverlaysFeed = destination == DesktopDestination.LISTEN_NOW &&
                 overlays.settingsPage == null && !overlays.replay && openedArtist == null && openedCollection == null
+            val artistPageVisible = openedArtist != null &&
+                overlays.settingsPage == null && !overlays.replay && openedBrowse == null
             DesktopFrame(
                 // The phone's page is black, not the near-black of its cards.
                 containerColor = DesktopBackground,
@@ -3962,6 +3964,7 @@ internal fun BitChordDesktopApp(
                 onSidebarDrawerOpenChange = { sidebarDrawerOpen = it },
                 hasFloatingPlayer = !oldTopPlayerEnabled,
                 homePanelOverlay = homePanelOverlaysFeed,
+                fullBleedTop = artistPageVisible,
                 menuPortal = menuPortal,
                 onMenuClosed = { runCatching { shortcutRootFocusRequester.requestFocus() } },
                 // Only Replay dresses itself; everywhere else the chrome sits on the plain surface.
@@ -6712,6 +6715,7 @@ internal fun DesktopFrame(
     containerColor: Color,
     hasFloatingPlayer: Boolean,
     homePanelOverlay: Boolean,
+    fullBleedTop: Boolean = false,
     menuPortal: DesktopMenuPortalState,
     onMenuClosed: () -> Unit,
     modifier: Modifier = Modifier,
@@ -6798,7 +6802,7 @@ internal fun DesktopFrame(
                             Column(Modifier.weight(1f).fillMaxHeight()) {
                                 // Only the legacy top player uses compact chrome at narrow widths.
                                 topBar(narrow)
-                                if (!oldTopPlayerEnabled && integratedCaptionActive) {
+                                if (!oldTopPlayerEnabled && integratedCaptionActive && !fullBleedTop) {
                                     Spacer(
                                         Modifier
                                             .fillMaxWidth()

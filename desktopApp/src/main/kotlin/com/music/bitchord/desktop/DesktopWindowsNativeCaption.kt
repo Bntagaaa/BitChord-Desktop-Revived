@@ -211,8 +211,23 @@ internal object DesktopWindowsNativeCaption {
         interactiveRects: IntArray,
     )
 
+    @JvmStatic
+    fun onCaptionButtonState(hovered: Int, pressed: Int) {
+        hoveredHitTest = hovered
+        pressedHitTest = pressed
+    }
+
+    var hoveredHitTest by mutableStateOf(0)
+        private set
+    var pressedHitTest by mutableStateOf(0)
+        private set
+
     private const val LIBRARY = "bitchord_window"
 }
+
+private const val HT_MIN_BUTTON = 8
+private const val HT_MAX_BUTTON = 9
+private const val HT_CLOSE = 20
 
 private object WindowsCaptionIconFont {
     const val GLYPH_MINIMIZE = "\uE921"
@@ -276,14 +291,19 @@ internal fun DesktopWindowsCaptionButtons(
         DesktopWindowsNativeCaption.setOverlayBlocked(reg.overlayBlocked)
     }
 
+    val hoveredHitTest = DesktopWindowsNativeCaption.hoveredHitTest
+    val pressedHitTest = DesktopWindowsNativeCaption.pressedHitTest
+
     CompositionLocalProvider(LocalDensity provides captionDensity) {
         Row(modifier = modifier.height(height), verticalAlignment = Alignment.CenterVertically) {
             CaptionButton(
                 width = DesktopWindowsCaptionMetrics.BUTTON_WIDTH,
                 height = height,
+                nativeHovered = hoveredHitTest == HT_MIN_BUTTON,
+                nativePressed = pressedHitTest == HT_MIN_BUTTON,
                 defaultIconColor = defaultIconTint,
-                hoverColor = foreground.copy(alpha = 0.06f),
-                pressedColor = foreground.copy(alpha = 0.04f),
+                hoverColor = foreground.copy(alpha = 0.09f),
+                pressedColor = foreground.copy(alpha = 0.13f),
                 onPositioned = { registry?.minRect = it },
                 onClick = onMinimize,
             ) { iconColor ->
@@ -304,9 +324,11 @@ internal fun DesktopWindowsCaptionButtons(
             CaptionButton(
                 width = DesktopWindowsCaptionMetrics.BUTTON_WIDTH,
                 height = height,
+                nativeHovered = hoveredHitTest == HT_MAX_BUTTON,
+                nativePressed = pressedHitTest == HT_MAX_BUTTON,
                 defaultIconColor = defaultIconTint,
-                hoverColor = foreground.copy(alpha = 0.06f),
-                pressedColor = foreground.copy(alpha = 0.04f),
+                hoverColor = foreground.copy(alpha = 0.09f),
+                pressedColor = foreground.copy(alpha = 0.13f),
                 onPositioned = { registry?.maxRect = it },
                 onClick = onToggleMaximize,
             ) { iconColor ->
@@ -355,6 +377,8 @@ internal fun DesktopWindowsCaptionButtons(
             CaptionButton(
                 width = DesktopWindowsCaptionMetrics.BUTTON_WIDTH,
                 height = height,
+                nativeHovered = hoveredHitTest == HT_CLOSE,
+                nativePressed = pressedHitTest == HT_CLOSE,
                 defaultIconColor = defaultIconTint,
                 hoverColor = Color(0xFFC42B1C),
                 pressedColor = Color(0xFFB22719),
@@ -411,6 +435,8 @@ private fun CaptionGlyphText(
 private fun CaptionButton(
     width: Dp,
     height: Dp,
+    nativeHovered: Boolean,
+    nativePressed: Boolean,
     defaultIconColor: Color,
     hoverColor: Color,
     pressedColor: Color,
@@ -420,8 +446,10 @@ private fun CaptionButton(
     icon: @Composable (Color) -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
-    val pressed by interactionSource.collectIsPressedAsState()
+    val pointerHovered by interactionSource.collectIsHoveredAsState()
+    val pointerPressed by interactionSource.collectIsPressedAsState()
+    val hovered = pointerHovered || nativeHovered
+    val pressed = pointerPressed || nativePressed
     val background = when {
         pressed -> pressedColor
         hovered -> hoverColor
