@@ -25,7 +25,7 @@
 </div>
 
 > [!IMPORTANT]
-> **Independent community project.** This repository continues development of the original PC/desktop app after its discontinuation upstream. It is a fork of [BitChord by @kushagrasinghx](https://github.com/kushagrasinghx/BitChord), but it is **not an official continuation** and is not endorsed, maintained, or supported by the original creator or upstream maintainers. We respect the original work, preserve its attribution and license, and welcome community contributions.
+> BitChord Desktop Revived is an unofficial fork of the original BitChord desktop app. I maintain and release Revived independently. I don’t collaborate with the teams behind other BitChord forks and am not affiliated with them. The credits in this README acknowledge specific code or ideas used in Revived. You can find builds I publish for Revived on the GitHub Releases page.
 
 
 
