@@ -17,8 +17,8 @@ from update import SHA_LINE, VERSION_LINE, PKGBUILD, change_one
 
 
 def prepare(version: str, deb_file: Path) -> tuple[Path, str]:
-    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
-        raise ValueError("Version must be MAJOR.MINOR.PATCH")
+    if not re.fullmatch(r"[0-9]+\.[0-9]+(\.[0-9]+)?", version):
+        raise ValueError("Version must be MAJOR.MINOR or MAJOR.MINOR.PATCH")
     expected_filename = f"BitChord-{version}-linux-amd64.deb"
     if deb_file.name != expected_filename or not deb_file.is_file():
         raise ValueError(f"Expected built Debian artifact named {expected_filename}")
