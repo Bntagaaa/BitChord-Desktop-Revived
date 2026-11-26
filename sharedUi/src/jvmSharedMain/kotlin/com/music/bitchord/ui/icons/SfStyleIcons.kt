@@ -638,6 +638,16 @@ object SfStyleIcons {
         }
     }
 
+    /** Three filled dots from rounded_more_horiz.svg, without a surrounding ring. */
+    val MoreHorizontalRounded: ImageVector by lazy {
+        vector("rounded_more_horiz") {
+            addPath(
+                pathData = PathParser().parsePathString("M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z").toNodes(),
+                fill = ink,
+            )
+        }
+    }
+
     val MoreVertical: ImageVector by lazy {
         vector("sf_more_vertical") {
             fillPath {

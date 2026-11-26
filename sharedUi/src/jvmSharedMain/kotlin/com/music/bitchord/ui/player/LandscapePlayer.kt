@@ -460,9 +460,11 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
             )) {
             val liked = likeStatus == LikeStatus.LIKE
             CircleGlyph(
-                // Desktop follows the current mobile star for the Liked
-                // playlist; retain the fork's old heart on Android.
+                // Use the supplied bin_star / bin_star_fill vectors on desktop.
+                // Preserve the existing icon selection on other platforms.
                 icon = when {
+                    desktop && liked -> SfStyleIcons.StarFilled
+                    desktop -> SfStyleIcons.Star
                     PlayerPlatform.host.mobileTextChrome && liked -> BitChordIcons.StarFilled
                     PlayerPlatform.host.mobileTextChrome -> BitChordIcons.Star
                     liked -> BitChordIcons.HeartFilled
@@ -478,7 +480,11 @@ internal fun LandscapeTrackActions(song: Song, signedIn: Boolean, likeStatus: Li
             Spacer(Modifier.width(8.dp))
         }
         CircleGlyph(
-            icon = if (showRevertCue) SfStyleIcons.Undo else SfStyleIcons.MoreHorizontal,
+            icon = when {
+                showRevertCue -> SfStyleIcons.Undo
+                desktop -> SfStyleIcons.MoreHorizontalRounded
+                else -> SfStyleIcons.MoreHorizontal
+            },
             contentDescription = stringResource(Res.string.more),
             onClick = onOpenMenu,
         )

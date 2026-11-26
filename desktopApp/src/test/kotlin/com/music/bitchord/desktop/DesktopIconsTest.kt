@@ -3,6 +3,7 @@ package com.music.bitchord.desktop
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.music.bitchord.desktop.icons.DesktopIcons
 import com.music.bitchord.ui.icons.BitChordIcons
+import com.music.bitchord.ui.icons.SfStyleIcons
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
@@ -146,6 +147,24 @@ class DesktopIconsTest {
         )
 
         entries.forEach { (name, vector) -> assertValidVector(name, vector) }
+    }
+
+    @Test
+    fun suppliedPlayerActionVectorsKeepTheirOriginalViewports() {
+        assertSame(SfStyleIcons.Star, DesktopIcons.Player.Like)
+        assertSame(SfStyleIcons.StarFilled, DesktopIcons.Player.LikeFilled)
+        for (star in listOf(SfStyleIcons.Star, SfStyleIcons.StarFilled)) {
+            assertValidVector(star.name, star)
+            assertEquals(31f, star.viewportWidth)
+            assertEquals(31f, star.viewportHeight)
+        }
+
+        val more = SfStyleIcons.MoreHorizontalRounded
+        assertValidVector("Rounded player more", more)
+        assertEquals(24f, more.viewportWidth)
+        assertEquals(24f, more.viewportHeight)
+        assertEquals(1, more.root.size)
+        assertNotSame(SfStyleIcons.MoreHorizontal, more)
     }
 
     @Test
