@@ -132,6 +132,7 @@ internal fun DesktopSettingsScreen(
     onTestSource: (DesktopSourceConfig) -> Unit,
 ) {
     var editingSource by remember { mutableStateOf<DesktopSourceConfig?>(null) }
+    var pendingResetMode by remember { mutableStateOf<DesktopResetMode?>(null) }
     val sourceProbeKey = sourceConfigs
         .filter { it.kind.needsServer && it.isComplete }
         .joinToString { "${it.id}@${it.baseUrl}" }
@@ -823,6 +824,42 @@ internal fun DesktopSettingsScreen(
                 )
             }
         }
+        val resetSettingsTitle = DesktopStrings["d_reset_settings", "Reset settings"]
+        val resetSettingsSubtitle = DesktopStrings[
+            "d_reset_settings_subtitle",
+            "Restore all settings to defaults while keeping accounts, playlists, history, and downloads",
+        ]
+        row(
+            resetSettingsTitle,
+            resetSettingsSubtitle,
+            "reset restore defaults configuration conflict",
+            icon = true,
+        ) {
+            DesktopSettingsRow(
+                resetSettingsTitle,
+                subtitle = resetSettingsSubtitle,
+                icon = DesktopIcons.Actions.Refresh,
+                onClick = { pendingResetMode = DesktopResetMode.SETTINGS_ONLY },
+            )
+        }
+        val resetAllTitle = DesktopStrings["d_reset_all_app_data", "Reset all app data"]
+        val resetAllSubtitle = DesktopStrings[
+            "d_reset_all_app_data_subtitle",
+            "Clear all settings, accounts, playlists, listening stats, and caches",
+        ]
+        row(
+            resetAllTitle,
+            resetAllSubtitle,
+            "reset factory clear all data accounts cache",
+            icon = true,
+        ) {
+            DesktopSettingsRow(
+                resetAllTitle,
+                subtitle = resetAllSubtitle,
+                icon = DesktopIcons.Actions.DeleteSweep,
+                onClick = { pendingResetMode = DesktopResetMode.ALL_DATA },
+            )
+        }
     }
 
     sections.section(LANGUAGE) {
@@ -906,6 +943,13 @@ internal fun DesktopSettingsScreen(
                 editingSource = null
             },
             onTest = onTestSource,
+        )
+    }
+
+    pendingResetMode?.let { mode ->
+        DesktopResetConfirmationDialog(
+            mode = mode,
+            onDismiss = { pendingResetMode = null },
         )
     }
 }
@@ -1293,6 +1337,88 @@ private fun DesktopSourceEditorDialog(
                 Text(
                     DesktopStrings["save", "Save"],
                     color = if (canAct) DesktopAccent else DesktopSecondary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopResetConfirmationDialog(
+    mode: DesktopResetMode,
+    onDismiss: () -> Unit,
+) {
+    var resetting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val title = when (mode) {
+        DesktopResetMode.SETTINGS_ONLY -> DesktopStrings["d_reset_settings_confirm_title", "Reset settings?"]
+        DesktopResetMode.ALL_DATA -> DesktopStrings["d_reset_all_confirm_title", "Reset all app data?"]
+    }
+    val body = when (mode) {
+        DesktopResetMode.SETTINGS_ONLY -> DesktopStrings[
+            "d_reset_settings_confirm_body",
+            "All appearance, audio, playback, source, and window settings will be restored to their defaults. Your accounts, playlists, liked songs, history, listening stats, and downloads will be kept.\n\nBitChord will restart automatically.",
+        ]
+        DesktopResetMode.ALL_DATA -> DesktopStrings[
+            "d_reset_all_confirm_body",
+            "All settings, signed-in accounts, playlists, history, listening stats, and cached media/images will be permanently cleared. Saved audio files in your Music/BitChord folder will not be deleted.\n\nBitChord will restart automatically.",
+        ]
+    }
+    val confirmLabel = when (mode) {
+        DesktopResetMode.SETTINGS_ONLY -> DesktopStrings["d_reset_settings_confirm_action", "Reset & Restart"]
+        DesktopResetMode.ALL_DATA -> DesktopStrings["d_reset_all_confirm_action", "Reset All & Restart"]
+    }
+
+    DesktopDialogFrame(onDismiss = { if (!resetting) onDismiss() }) {
+        DesktopDialogHeading(title)
+        Text(
+            body,
+            color = DesktopSecondary,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 22.dp),
+        )
+        errorMessage?.let { error ->
+            Text(
+                error,
+                color = DesktopDestructive,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 12.dp),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onDismiss, enabled = !resetting) {
+                Text(DesktopStrings["cancel", "Cancel"], color = DesktopSecondary)
+            }
+            TextButton(
+                enabled = !resetting,
+                onClick = {
+                    resetting = true
+                    errorMessage = null
+                    scope.launch(Dispatchers.IO) {
+                        when (mode) {
+                            DesktopResetMode.SETTINGS_ONLY -> DesktopSettingsReset.resetSettings()
+                            DesktopResetMode.ALL_DATA -> DesktopSettingsReset.resetAllAppData()
+                        }
+                        val error = DesktopSettingsReset.relaunchApplication()
+                        if (error != null) {
+                            withContext(Dispatchers.Main) {
+                                resetting = false
+                                errorMessage = error
+                            }
+                        }
+                    }
+                },
+            ) {
+                Text(
+                    if (resetting) DesktopStrings["d_resetting", "Restarting…"] else confirmLabel,
+                    color = DesktopDestructive,
                 )
             }
         }
