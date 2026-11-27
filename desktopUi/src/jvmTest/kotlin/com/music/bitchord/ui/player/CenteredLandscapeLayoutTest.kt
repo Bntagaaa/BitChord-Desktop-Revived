@@ -42,23 +42,24 @@ class CenteredLandscapeLayoutTest {
     @Test
     fun geometryCentersInMainAndShiftsLeftInSplit() {
         val g = centeredLandscapeGeometry(
-            width = 1100,
-            height = 800,
+            width = 1600,
+            height = 900,
             inset = 30,
             controlsHeight = 180,
             reservedControlsHeight = 200,
             bottomBarHeight = 44,
-            stackGap = 14,
+            stackGap = 22,
             bottomGap = 16,
-            maxArtSize = 420,
+            maxContentWidth = 1200,
+            maxArtSize = 520,
             minControlsWidth = 280,
         )
-        assertEquals(420, g.artworkSize)
-        assertEquals(420, g.stackWidth)
-        assertEquals((1100 - 420) / 2, g.centeredStackX)
+        assertEquals(520, g.artworkSize)
+        assertEquals(520, g.stackWidth)
+        assertEquals((1600 - 520) / 2, g.centeredStackX)
         assertTrue(g.leftStackX < g.centeredStackX, "Left column position must lie left of centered position")
-        assertTrue(g.leftStackX + g.stackWidth <= 550, "Left column stack must stay within left half")
-        assertEquals(550 + 30, g.rightPaneLeft)
+        assertTrue(g.leftStackX + g.stackWidth <= 800, "Left column stack must stay within left half")
+        assertEquals(200 + 600 + 30, g.rightPaneLeft)
     }
 
     @Test
@@ -116,8 +117,8 @@ class CenteredLandscapeLayoutTest {
 
             val bottomLeft = onNodeWithTag("centered-bottom-left").getUnclippedBoundsInRoot()
             val bottomRight = onNodeWithTag("centered-bottom-right").getUnclippedBoundsInRoot()
-            assertTrue(bottomLeft.right < 550.dp)
-            assertTrue(bottomRight.left > 550.dp)
+            assertEquals(24f, bottomLeft.left.value, 1f)
+            assertEquals(1100f - 24f, bottomRight.right.value, 1f)
 
             onNodeWithContentDescription("Lyrics").performClick()
             mainClock.advanceTimeBy(180)

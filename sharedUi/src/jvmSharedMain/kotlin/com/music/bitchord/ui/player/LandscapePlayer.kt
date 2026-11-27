@@ -95,7 +95,7 @@ internal val LANDSCAPE_ART_CORNER = 10.dp
 private val LandscapeArtShape = RoundedCornerShape(LANDSCAPE_ART_CORNER)
 
 /** Room above the landscape columns for the sheet's drag handle. */
-private val LANDSCAPE_HANDLE_STRIP = 24.dp
+internal val LANDSCAPE_HANDLE_STRIP = 24.dp
 
 /**
  * The player in a landscape window — a tablet, or a phone on its side. See

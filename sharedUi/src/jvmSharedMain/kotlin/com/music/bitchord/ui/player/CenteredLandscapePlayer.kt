@@ -52,7 +52,8 @@ import org.jetbrains.compose.resources.stringResource
 
 private enum class CenteredSlot { Artwork, Controls, Panes, BottomLeft, BottomRight, VolumePopup }
 
-private val CENTERED_MAX_ART_SIZE = 420.dp
+private val CENTERED_MAX_CONTENT_WIDTH = 1200.dp
+private val CENTERED_MAX_ART_SIZE = 520.dp
 private val CENTERED_MIN_CONTROLS_WIDTH = 280.dp
 
 internal data class CenteredLandscapeGeometry(
@@ -61,6 +62,7 @@ internal data class CenteredLandscapeGeometry(
     val stackTop: Int,
     val centeredStackX: Int,
     val leftStackX: Int,
+    val rightPaneContainerLeft: Int,
     val rightPaneLeft: Int,
     val rightPaneWidth: Int,
     val bottomBarTop: Int,
@@ -75,11 +77,14 @@ internal fun centeredLandscapeGeometry(
     bottomBarHeight: Int,
     stackGap: Int,
     bottomGap: Int,
+    maxContentWidth: Int,
     maxArtSize: Int,
     minControlsWidth: Int,
 ): CenteredLandscapeGeometry {
-    val leftWidth = width / 2
-    val rightWidth = width - leftWidth
+    val contentWidth = minOf(width, maxContentWidth)
+    val contentLeft = (width - contentWidth) / 2
+    val leftWidth = contentWidth / 2
+    val rightWidth = contentWidth - leftWidth
     val leftContentWidth = (leftWidth - inset * 2).coerceAtLeast(0)
     val stackAreaHeight = (height - bottomBarHeight - bottomGap).coerceAtLeast(0)
     val effectiveControlsHeight = maxOf(controlsHeight, reservedControlsHeight)
@@ -89,14 +94,15 @@ internal fun centeredLandscapeGeometry(
     val stackHeight = artSize + stackGap + controlsHeight
     val stackTop = ((stackAreaHeight - stackHeight) / 2).coerceAtLeast(0)
     val centeredStackX = ((width - stackWidth) / 2).coerceAtLeast(inset)
-    val leftStackX = inset + ((leftContentWidth - stackWidth) / 2).coerceAtLeast(0)
+    val leftStackX = contentLeft + inset + ((leftContentWidth - stackWidth) / 2).coerceAtLeast(0)
     return CenteredLandscapeGeometry(
         artworkSize = artSize,
         stackWidth = stackWidth,
         stackTop = stackTop,
         centeredStackX = centeredStackX,
         leftStackX = leftStackX,
-        rightPaneLeft = leftWidth + inset,
+        rightPaneContainerLeft = contentLeft + leftWidth,
+        rightPaneLeft = contentLeft + leftWidth + inset,
         rightPaneWidth = (rightWidth - inset * 2).coerceAtLeast(0),
         bottomBarTop = (height - bottomBarHeight).coerceAtLeast(0),
     )
@@ -124,7 +130,7 @@ internal fun CenteredLandscapePlayerLayout(
     queuePane: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LandscapePlayerShell(background = background, modifier = modifier) { compact, gutter, reduceMotion, containerModifier ->
+    LandscapePlayerShell(background = background, modifier = modifier) { compact, gutter, reduceMotion, _ ->
         CenteredLandscapePlayerColumns(
             pane = pane,
             compact = compact,
@@ -142,7 +148,12 @@ internal fun CenteredLandscapePlayerLayout(
             volumeLevel = volumeLevel,
             lyricsPane = lyricsPane,
             queuePane = queuePane,
-            modifier = containerModifier,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    top = LANDSCAPE_HANDLE_STRIP,
+                    bottom = if (compact) 8.dp else 20.dp,
+                ),
         )
     }
 }
@@ -190,11 +201,14 @@ internal fun CenteredLandscapePlayerColumns(
     SubcomposeLayout(modifier.testTag("centered-landscape-columns")) { constraints ->
         val width = constraints.maxWidth
         val height = constraints.maxHeight
-        val leftWidth = width / 2
-        val rightWidth = width - leftWidth
+        val maxContentPx = CENTERED_MAX_CONTENT_WIDTH.roundToPx()
+        val contentWidth = minOf(width, maxContentPx)
+        val leftWidth = contentWidth / 2
+        val rightWidth = contentWidth - leftWidth
         val inset = gutter.roundToPx().coerceAtMost(minOf(leftWidth, rightWidth) / 2)
+        val cornerInset = (if (compact) 16.dp else 24.dp).roundToPx().coerceAtMost(width / 4)
         val leftContentWidth = (leftWidth - inset * 2).coerceAtLeast(0)
-        val stackGap = (if (compact) 8.dp else 14.dp).roundToPx()
+        val stackGap = (if (compact) 10.dp else 22.dp).roundToPx()
         val controlGap = (if (compact) 4.dp else 10.dp).roundToPx()
         val bottomGap = (if (compact) 8.dp else 16.dp).roundToPx()
         val maxArtPx = CENTERED_MAX_ART_SIZE.roundToPx()
@@ -284,6 +298,7 @@ internal fun CenteredLandscapePlayerColumns(
             bottomBarHeight = bottomBarHeight,
             stackGap = stackGap,
             bottomGap = bottomGap,
+            maxContentWidth = maxContentPx,
             maxArtSize = maxArtPx,
             minControlsWidth = minControlsWidthPx,
         )
@@ -357,17 +372,17 @@ internal fun CenteredLandscapePlayerColumns(
                 geometry.stackTop + art.height + stackGap,
             )
             if (pane != PlayerPane.Main || paneFraction > 0f) {
-                rightPane.placeRelative(leftWidth, 0)
+                rightPane.placeRelative(geometry.rightPaneContainerLeft, 0)
             }
-            bottomLeft.placeRelative(inset, geometry.bottomBarTop)
+            bottomLeft.placeRelative(cornerInset, geometry.bottomBarTop)
             bottomRight.placeRelative(
-                (width - inset - bottomRight.width).coerceAtLeast(0),
+                (width - cornerInset - bottomRight.width).coerceAtLeast(0),
                 geometry.bottomBarTop,
             )
             if (volume != null && volumeOpen && volumePopup.width > 0) {
                 val popupGap = 10.dp.roundToPx()
                 volumePopup.placeRelative(
-                    (width - inset - volumePopup.width).coerceAtLeast(inset),
+                    (width - cornerInset - volumePopup.width).coerceAtLeast(cornerInset),
                     (geometry.bottomBarTop - volumePopup.height - popupGap).coerceAtLeast(0),
                 )
             }
