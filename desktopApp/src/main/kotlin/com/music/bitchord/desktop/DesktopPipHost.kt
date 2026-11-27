@@ -19,12 +19,12 @@ internal class DesktopPipHost(val controller: DesktopPipController = DesktopPipC
 
 /** Must be a sibling of the main Window: a hidden Window pauses its parent composition. */
 @Composable
-internal fun DesktopPipHostWindow(host: DesktopPipHost) {
+internal fun DesktopPipHostWindow(host: DesktopPipHost, x11WindowScale: Int?) {
     val session = host.session ?: return
     val open by host.controller.open.collectAsState()
     if (!open) return
     // Engine position samples do not belong in the window presentation.
     val presentation by remember(session) { derivedStateOf { session.presentation() } }
     DesktopPipWindow(host.controller, presentation, session.position,
-        session.onPlayPause, session.onPrevious, session.onNext, session.onSeek)
+        session.onPlayPause, session.onPrevious, session.onNext, session.onSeek, x11WindowScale)
 }

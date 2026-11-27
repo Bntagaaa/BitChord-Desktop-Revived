@@ -42,7 +42,7 @@ jobs:
       - name: Set up X11 for native PiP validation
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb xsettingsd
 
       - name: Verify canonical AutoMix files and distributed model hashes
         run: python3 tools/automix-validation/verify-upstream.py
@@ -55,6 +55,7 @@ jobs:
       - name: Tests
         env:
           BITCHORD_PIP_NATIVE_TEST: '1'
+          BITCHORD_XSETTINGS_TEST: '1'
         shell: bash
         run: xvfb-run -a ./gradlew :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | tee desktop-tests.log
 

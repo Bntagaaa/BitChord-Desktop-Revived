@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import com.music.bitchord.playback.PlaybackPosition
@@ -30,6 +31,7 @@ internal fun DesktopPipWindow(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
+    x11WindowScale: Int? = null,
 ) {
     val open by controller.open.collectAsState()
     if (!open) return
@@ -126,15 +128,24 @@ internal fun DesktopPipWindow(
                     }
                 }
             }
-            MaterialTheme(colorScheme = desktopColorScheme(), typography = desktopTypography()) {
-                // Remove the image/lyric composition while iconified. Playback remains owned by app.
-                if (!state.isMinimized) DesktopPipUi(presentation, position, preferences, reduceBlur, reduceAnimation,
-                    onRestore = controller::restore, onClose = { controller.close(raise) },
-                    onPin = { DesktopPipSettings.update { it.copy(pinned = !it.pinned) } },
-                    onLyrics = { DesktopPipSettings.update { it.copy(lyrics = !it.lyrics) } },
-                    onPlayPause = onPlayPause, onPrevious = onPrevious, onNext = onNext, onSeek = onSeek,
-                    pinSupported = pinSupported)
-                else Box(Modifier.fillMaxSize())
+            val systemDensity = LocalDensity.current
+            // PiP sizes controls from its own compact viewport. Apply the same X11 system
+            // scale as the main window and retain PiP's independent sizing from that viewport.
+            val pipDensity = remember(systemDensity, x11WindowScale) {
+                desktopContentDensity(systemDensity, 100, x11WindowScale)
+            }
+            LogDesktopWindowScale("pip", native, systemDensity, pipDensity, 100, x11WindowScale)
+            CompositionLocalProvider(LocalDensity provides pipDensity) {
+                MaterialTheme(colorScheme = desktopColorScheme(), typography = desktopTypography()) {
+                    // Remove the image/lyric composition while iconified. Playback remains owned by app.
+                    if (!state.isMinimized) DesktopPipUi(presentation, position, preferences, reduceBlur, reduceAnimation,
+                        onRestore = controller::restore, onClose = { controller.close(raise) },
+                        onPin = { DesktopPipSettings.update { it.copy(pinned = !it.pinned) } },
+                        onLyrics = { DesktopPipSettings.update { it.copy(lyrics = !it.lyrics) } },
+                        onPlayPause = onPlayPause, onPrevious = onPrevious, onNext = onNext, onSeek = onSeek,
+                        pinSupported = pinSupported)
+                    else Box(Modifier.fillMaxSize())
+                }
             }
         }
     }
