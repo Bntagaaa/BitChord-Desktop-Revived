@@ -8,8 +8,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -122,6 +124,7 @@ internal fun CenteredLandscapePlayerLayout(
     background: @Composable (Modifier) -> Unit,
     artwork: @Composable (Modifier) -> Unit,
     header: @Composable (compact: Boolean, active: Boolean) -> Unit,
+    lyricStrip: (@Composable () -> Unit)?,
     scrubber: @Composable () -> Unit,
     transport: @Composable (compact: Boolean) -> Unit,
     volume: (@Composable () -> Unit)?,
@@ -142,6 +145,7 @@ internal fun CenteredLandscapePlayerLayout(
             onToggleQueue = onToggleQueue,
             artwork = artwork,
             header = { active -> header(compact, active) },
+            lyricStrip = lyricStrip,
             scrubber = scrubber,
             transport = { transport(compact) },
             volume = volume,
@@ -177,6 +181,7 @@ internal fun CenteredLandscapePlayerColumns(
     onToggleQueue: () -> Unit,
     artwork: @Composable (Modifier) -> Unit,
     header: @Composable (active: Boolean) -> Unit,
+    lyricStrip: (@Composable () -> Unit)?,
     scrubber: @Composable () -> Unit,
     transport: @Composable () -> Unit,
     volume: (@Composable () -> Unit)?,
@@ -261,7 +266,7 @@ internal fun CenteredLandscapePlayerColumns(
 
         val bottomBarHeight = maxOf(bottomLeft.height, bottomRight.height)
         val stackAreaHeight = (height - bottomBarHeight - bottomGap).coerceAtLeast(0)
-        val reservedControlsPx = (if (compact) 180.dp else 212.dp).roundToPx()
+        val reservedControlsPx = (if (compact) 204.dp else 238.dp).roundToPx()
         val prelimArtSize = minOf(
             leftContentWidth,
             (stackAreaHeight - reservedControlsPx - stackGap).coerceAtLeast(0),
@@ -277,6 +282,15 @@ internal fun CenteredLandscapePlayerColumns(
             ) {
                 header(pane != PlayerPane.Queue)
                 Spacer(Modifier.height(controlGap.toDp()))
+                AnimatedVisibility(
+                    visible = lyricStrip != null && pane != PlayerPane.Lyrics,
+                    enter = if (reduceMotion) EnterTransition.None else fadeIn(tween(180)) + expandVertically(tween(220)),
+                    exit = if (reduceMotion) ExitTransition.None else fadeOut(tween(140)) + shrinkVertically(tween(220)),
+                ) {
+                    Box(Modifier.fillMaxWidth().testTag("centered-lyric-strip")) {
+                        lyricStrip?.invoke()
+                    }
+                }
                 scrubber()
                 Spacer(Modifier.height(controlGap.toDp()))
                 transport()
@@ -307,8 +321,9 @@ internal fun CenteredLandscapePlayerColumns(
             Box(Modifier.testTag("landscape-artwork")) { artwork(Modifier.fillMaxSize()) }
         }.single().measure(Constraints.fixed(geometry.artworkSize, geometry.artworkSize))
 
-        val paneBottomPadding = (bottomBarHeight + bottomGap).toDp()
+        val stackBottom = geometry.stackTop + art.height + stackGap + controls.height
         val paneTopPadding = geometry.stackTop.toDp()
+        val paneBottomPadding = (height - stackBottom).coerceAtLeast(bottomBarHeight + bottomGap).toDp()
         val rightPane = subcompose(CenteredSlot.Panes) {
             AnimatedContent(
                 targetState = pane,
@@ -330,7 +345,7 @@ internal fun CenteredLandscapePlayerColumns(
                         )
                         .testTag(if (shown == PlayerPane.Lyrics) "landscape-lyrics-body" else "landscape-other-pane")
                         .then(if (shown == PlayerPane.Main) Modifier.clearAndSetSemantics {} else Modifier)
-                        .then(if (shown == PlayerPane.Lyrics) Modifier.landscapeLyricEdges() else Modifier),
+                        .then(if (shown == PlayerPane.Lyrics) Modifier.landscapeLyricEdges(fadeBottom = false) else Modifier),
                 ) {
                     when (shown) {
                         PlayerPane.Main -> Unit

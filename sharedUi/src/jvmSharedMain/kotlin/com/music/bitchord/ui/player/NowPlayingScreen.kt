@@ -2228,6 +2228,22 @@ fun NowPlayingScreen(
                         )
                     }
                 }
+                val landscapeLyricStrip: (@Composable () -> Unit)? = if (syncedLyricsEnabled) {
+                    {
+                        CurrentLyricStrip(
+                            lines = lyricsTranslation.displayedLyrics,
+                            trackKey = song.videoId,
+                            playhead = lyricsPlayhead,
+                            isPlaying = isPlaying && position.advancing && !panelOpen,
+                            durationMs = durationMs,
+                            lyricsUnavailable = lyricsUnavailable,
+                            loadingText = lyricsLoadingText,
+                            onClick = openLyrics,
+                        )
+                    }
+                } else {
+                    null
+                }
                 val landscapeQueuePane: @Composable () -> Unit = {
                     InlineQueue(
                         queue = queue,
@@ -2254,22 +2270,7 @@ fun NowPlayingScreen(
                         mainPane = { compact ->
                             LandscapeMainPane(
                                 compact = compact,
-                                lyricStrip = if (syncedLyricsEnabled) {
-                                    {
-                                        CurrentLyricStrip(
-                                            lines = lyricsTranslation.displayedLyrics,
-                                            trackKey = song.videoId,
-                                            playhead = lyricsPlayhead,
-                                            isPlaying = isPlaying && position.advancing && !panelOpen,
-                                            durationMs = durationMs,
-                                            lyricsUnavailable = lyricsUnavailable,
-                                            loadingText = lyricsLoadingText,
-                                            onClick = openLyrics,
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
+                                lyricStrip = landscapeLyricStrip,
                                 scrubber = landscapeScrubber,
                                 transport = {
                                     TransportRow(
@@ -2314,6 +2315,7 @@ fun NowPlayingScreen(
                                 },
                             )
                         },
+                        lyricStrip = landscapeLyricStrip,
                         scrubber = landscapeScrubber,
                         transport = { compact ->
                             CenteredTransportRow(

@@ -88,6 +88,9 @@ class CenteredLandscapeLayoutTest {
                         header = { _ ->
                             Box(Modifier.fillMaxWidth().height(48.dp)) { Text("Song Title") }
                         },
+                        lyricStrip = {
+                            Box(Modifier.fillMaxWidth().height(24.dp)) { Text("Current lyric line") }
+                        },
                         scrubber = {
                             Box(Modifier.fillMaxWidth().height(44.dp))
                         },
@@ -119,6 +122,7 @@ class CenteredLandscapeLayoutTest {
             val bottomRight = onNodeWithTag("centered-bottom-right").getUnclippedBoundsInRoot()
             assertEquals(24f, bottomLeft.left.value, 1f)
             assertEquals(1100f - 24f, bottomRight.right.value, 1f)
+            onNodeWithTag("centered-lyric-strip").assertIsDisplayed()
 
             onNodeWithContentDescription("Lyrics").performClick()
             mainClock.advanceTimeBy(180)
@@ -132,8 +136,13 @@ class CenteredLandscapeLayoutTest {
             mainClock.advanceTimeBy(300)
             waitForIdle()
             val settledArt = onNodeWithTag("landscape-artwork").getUnclippedBoundsInRoot()
+            val settledControls = onNodeWithTag("centered-stack-controls").getUnclippedBoundsInRoot()
+            val lyricsPaneBounds = onNodeWithTag("test-lyrics-pane").getUnclippedBoundsInRoot()
             assertTrue(settledArt.right <= 550.dp, "Settled artwork must sit in the left column")
+            onNodeWithTag("centered-lyric-strip").assertDoesNotExist()
             onNodeWithTag("test-lyrics-pane").assertIsDisplayed()
+            assertEquals(settledArt.top.value, lyricsPaneBounds.top.value, 2f)
+            assertEquals(settledControls.bottom.value, lyricsPaneBounds.bottom.value, 2f)
 
             onNodeWithContentDescription("Volume").performClick()
             mainClock.advanceTimeBy(200)
