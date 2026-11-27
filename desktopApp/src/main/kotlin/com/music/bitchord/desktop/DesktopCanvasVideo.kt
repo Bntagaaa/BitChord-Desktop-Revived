@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -107,6 +108,7 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
     if (!rendered) return
     val bottomFade = spec.bottomFade
     val bottomFadeEndPx = spec.bottomFadeEndPx
+    val fadeCache = remember(bottomFade, bottomFadeEndPx) { FadeBrushCache() }
     Canvas(
         modifier = modifier.graphicsLayer {
             this.alpha = alpha * presentationAlpha()
@@ -135,16 +137,30 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
         if (bottomFade > 0.001f) {
             val endY = bottomFadeEndPx?.coerceIn(0f, size.height) ?: size.height
             drawRect(
-                brush = Brush.verticalGradient(
-                    0f to Color.Black,
-                    1f to Color.Transparent,
-                    startY = endY * (1f - bottomFade.coerceAtMost(1f)),
-                    endY = endY,
-                ),
+                brush = fadeCache.brushFor(size.height, bottomFade, endY),
                 topLeft = Offset.Zero,
                 size = size,
                 blendMode = BlendMode.DstIn,
             )
+        }
+    }
+}
+
+private class FadeBrushCache {
+    private var lastHeight = -1f
+    private var lastBrush: Brush? = null
+
+    fun brushFor(height: Float, bottomFade: Float, endY: Float): Brush {
+        val existing = lastBrush
+        if (existing != null && lastHeight == height) return existing
+        return Brush.verticalGradient(
+            0f to Color.Black,
+            1f to Color.Transparent,
+            startY = endY * (1f - bottomFade.coerceAtMost(1f)),
+            endY = endY,
+        ).also {
+            lastHeight = height
+            lastBrush = it
         }
     }
 }

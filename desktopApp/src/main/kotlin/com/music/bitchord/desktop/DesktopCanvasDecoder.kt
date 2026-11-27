@@ -80,6 +80,9 @@ internal class DesktopCanvasDecoder(
     override var frameTimeMs: Long = 0L
         private set
 
+    override var loopGeneration: Int = 0
+        private set
+
     /** Seconds per frame, from the stream's own rate; used to pace playback. */
     override var frameIntervalMillis: Long = 40L
         private set
@@ -93,7 +96,8 @@ internal class DesktopCanvasDecoder(
 
     override fun open(url: String, headers: Map<String, String>): Result<Unit> = runCatching {
         DesktopAudioDecoder.ensureNetworkReady()
-        val source = if (preferMotionRendition && url.substringBefore('?').endsWith(".m3u8", ignoreCase = true)) {
+        val isHttp = url.startsWith("https://", ignoreCase = true) || url.startsWith("http://", ignoreCase = true)
+        val source = if (preferMotionRendition && isHttp && url.substringBefore('?').endsWith(".m3u8", ignoreCase = true)) {
             val key = "$maxEdge|$url"
             val remembered = if (headers.isEmpty()) synchronized(variants) { variants[key] } else null
             remembered ?: canvasGet(url, headers)?.let { selectContinuedArtistVariant(url, it, maxEdge) }
@@ -139,10 +143,21 @@ internal class DesktopCanvasDecoder(
                 0,
             )
         }
+        val isLocalManifest = isManifest(source) && !source.startsWith("http://", ignoreCase = true) && !source.startsWith("https://", ignoreCase = true)
+        if (isLocalManifest) {
+            av_dict_set(options, "protocol_whitelist", "file,http,https,tcp,tls,crypto,data", 0)
+            av_dict_set(options, "allowed_extensions", "ALL", 0)
+            av_dict_set(options, "allowed_segment_extensions", "ALL", 0)
+        }
         av_dict_set(options, "rw_timeout", "15000000", 0)
 
+        val openTarget = when {
+            windowed -> null as String?
+            isLocalManifest -> source.replace('\\', '/')
+            else -> source
+        }
         val status = try {
-            avformat_open_input(opened, if (windowed) null as String? else source, null, options)
+            avformat_open_input(opened, openTarget, null, options)
         } finally { av_dict_free(options) }
         if (status < 0 && windowed && wrapper?.source?.unsupportedRange == true) {
             close()
@@ -187,6 +202,10 @@ internal class DesktopCanvasDecoder(
         if (!loopAtEnd) {
             context.thread_count(Runtime.getRuntime().availableProcessors().coerceIn(2, 6))
             context.thread_type(AVCodecContext.FF_THREAD_FRAME or AVCodecContext.FF_THREAD_SLICE)
+        } else if (maxOf(parameters.width(), parameters.height()) > maxEdge) {
+            // Two frame threads parallelize single-slice H.264 >540p clips with minimal buffer RAM.
+            context.thread_count(2)
+            context.thread_type(AVCodecContext.FF_THREAD_FRAME)
         }
         check(avcodec_open2(context, decoder, null as AVDictionary?) >= 0) { "decoder refused to open" }
 
@@ -284,9 +303,13 @@ internal class DesktopCanvasDecoder(
         if (timeBase <= 0) return false
         readDeadline = System.nanoTime() + IO_TIMEOUT_NANOS
         val timestamp = (millis / 1000.0 / timeBase).toLong() + streamStart
-        if (av_seek_frame(opened, streamIndex, timestamp, AVSEEK_FLAG_BACKWARD) < 0) return false
+        val sought = av_seek_frame(opened, streamIndex, timestamp, AVSEEK_FLAG_BACKWARD) >= 0 ||
+            (millis == 0L && av_seek_frame(opened, -1, 0L, AVSEEK_FLAG_BACKWARD) >= 0)
+        if (!sought) return false
         avcodec_flush_buffers(context)
         draining = false
+        frameTimeMs = millis
+        if (millis == 0L) loopGeneration++
         return true
     }
 

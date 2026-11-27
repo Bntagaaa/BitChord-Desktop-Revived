@@ -26,11 +26,11 @@ internal class MotionVideoPresentation {
     var latest by mutableStateOf<MotionVideoFrameInfo?>(null)
     var lease: MotionVideoSessions.Lease? = null
 
-    fun withFrame(read: (VideoFrame) -> Unit) = lease?.withFrame(read)
+    fun withFrame(markDrawn: Boolean = true, read: (VideoFrame) -> Unit) = lease?.withFrame(markDrawn, read)
 
     fun sample(maxEdge: Int): ImageBitmap? {
         var bitmap: ImageBitmap? = null
-        withFrame { bitmap = it.sample(maxEdge) }
+        withFrame(markDrawn = false) { bitmap = it.sample(maxEdge) }
         return bitmap
     }
 }
@@ -90,7 +90,7 @@ internal fun DesktopMotionArtwork(
     } else modifier) {
         size?.let { dimensions ->
             val painter = remember(presentation, dimensions) {
-                VideoSurfacePainter(dimensions, { presentation.latest }, { presentation.withFrame(it) })
+                VideoSurfacePainter(dimensions, { presentation.latest }, { presentation.withFrame(read = it) })
             }
             Image(painter, null, Modifier.fillMaxSize(), contentScale = contentScale)
         }
