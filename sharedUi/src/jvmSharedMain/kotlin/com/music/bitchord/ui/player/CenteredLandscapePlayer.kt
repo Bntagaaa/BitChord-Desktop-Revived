@@ -327,21 +327,23 @@ internal fun CenteredLandscapePlayerColumns(
         }.single().measure(Constraints.fixed(rightWidth, height))
 
         val volumePopup = subcompose(CenteredSlot.VolumePopup) {
-            AnimatedVisibility(
-                visible = volume != null && volumeOpen,
-                enter = fadeIn(tween(140)),
-                exit = fadeOut(tween(120)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(236.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.72f))
-                        .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                        .testTag("centered-volume-popup"),
+            Box {
+                AnimatedVisibility(
+                    visible = volume != null && volumeOpen,
+                    enter = fadeIn(tween(140)),
+                    exit = fadeOut(tween(120)),
                 ) {
-                    volume?.invoke()
+                    Box(
+                        modifier = Modifier
+                            .width(236.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.Black.copy(alpha = 0.72f))
+                            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                            .testTag("centered-volume-popup"),
+                    ) {
+                        volume?.invoke()
+                    }
                 }
             }
         }.single().measure(Constraints(maxWidth = width, maxHeight = height))
