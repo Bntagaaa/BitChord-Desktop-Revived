@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import java.awt.Toolkit
 import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
@@ -78,29 +79,25 @@ class DesktopDisplayScalingTest {
 
     @Test
     fun xToolkitReceivesWindowScaleChangesFromXSettings() {
-        if (System.getenv("BITCHORD_XSETTINGS_TEST") != "1") return
+        val config = System.getenv("BITCHORD_XSETTINGSD_CONFIG")?.let { Path.of(it) } ?: return
+        val daemonPid = requireNotNull(System.getenv("BITCHORD_XSETTINGSD_PID"))
 
         val toolkit = Toolkit.getDefaultToolkit()
         val events = LinkedBlockingQueue<Int>()
         val stop = assertNotNull(toolkit.observeX11WindowScale { if (it != null) events.offer(it) })
-        val config = Files.createTempFile("bitchord-xsettings-", ".conf")
         try {
-            Files.writeString(config, "Gdk/WindowScalingFactor 2\n")
-            val daemon = ProcessBuilder("xsettingsd", "-c", config.toString())
-                .redirectErrorStream(true)
-                .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-                .start()
-            try {
-                assertEquals(2, events.poll(15, TimeUnit.SECONDS), "Initial XSettings owner and scale")
-                Files.writeString(config, "Gdk/WindowScalingFactor 1\n")
-                assertEquals(0, ProcessBuilder("kill", "-HUP", daemon.pid().toString()).start().waitFor())
-                assertEquals(1, events.poll(15, TimeUnit.SECONDS), "Updated XSettings scale")
-            } finally {
-                daemon.destroyForcibly().waitFor(5, TimeUnit.SECONDS)
-            }
+            assertEquals(1, events.poll(15, TimeUnit.SECONDS), "Initial XSettings scale")
+            setXSettingsScale(config, daemonPid, 2)
+            assertEquals(2, events.poll(15, TimeUnit.SECONDS), "Updated XSettings scale")
+            setXSettingsScale(config, daemonPid, 1)
+            assertEquals(1, events.poll(15, TimeUnit.SECONDS), "Restored XSettings scale")
         } finally {
             stop()
-            Files.deleteIfExists(config)
         }
+    }
+
+    private fun setXSettingsScale(config: Path, daemonPid: String, scale: Int) {
+        Files.writeString(config, "Gdk/WindowScalingFactor $scale\n")
+        assertEquals(0, ProcessBuilder("kill", "-HUP", daemonPid).start().waitFor())
     }
 }
