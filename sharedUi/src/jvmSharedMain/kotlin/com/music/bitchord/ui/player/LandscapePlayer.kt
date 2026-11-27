@@ -50,6 +50,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -118,21 +119,10 @@ private val LANDSCAPE_HANDLE_STRIP = 24.dp
  * three while its backdrop still runs underneath them.
  */
 @Composable
-internal fun LandscapePlayerLayout(
-    pane: PlayerPane,
-    trackKey: String,
+internal fun LandscapePlayerShell(
     background: @Composable (Modifier) -> Unit,
-    /** The sleeve; handed a modifier that already fixes its square size. */
-    artwork: @Composable (Modifier) -> Unit,
-    /** The row under the sleeve, emitted into its column. */
-    actions: @Composable () -> Unit,
-    /** Kept mounted across pane switches; its text moves independently of the controls. */
-    header: @Composable (compact: Boolean, active: Boolean) -> Unit,
-    /** Credits and transport. [compact] is a phone-height window. */
-    mainPane: @Composable (compact: Boolean) -> Unit,
-    lyricsPane: @Composable () -> Unit,
-    queuePane: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    content: @Composable (compact: Boolean, gutter: Dp, reduceMotion: Boolean, containerModifier: Modifier) -> Unit,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         background(Modifier.fillMaxSize())
@@ -146,20 +136,11 @@ internal fun LandscapePlayerLayout(
             val compact = maxHeight < LANDSCAPE_COMPACT_HEIGHT
             val gutter = if (compact) LANDSCAPE_GUTTER_COMPACT else PLAYER_GUTTER
             val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
-            LandscapePlayerColumns(
-                pane = pane,
-                trackKey = trackKey,
-                compact = compact,
-                gutter = gutter,
-                reduceMotion = reduceMotion,
-                artwork = artwork,
-                actions = actions,
-                header = { active -> header(compact, active) },
-                mainPane = { mainPane(compact) },
-                lyricsPane = lyricsPane,
-                queuePane = queuePane,
-                boundLyricsToArtwork = PlayerPlatform.host.musicVideoFullscreen != null,
-                modifier = Modifier
+            content(
+                compact,
+                gutter,
+                reduceMotion,
+                Modifier
                     .widthIn(max = LANDSCAPE_PLAYER_MAX_WIDTH)
                     .fillMaxSize()
                     .padding(
@@ -187,6 +168,42 @@ internal fun LandscapePlayerLayout(
                     ),
             )
         }
+    }
+}
+
+@Composable
+internal fun LandscapePlayerLayout(
+    pane: PlayerPane,
+    trackKey: String,
+    background: @Composable (Modifier) -> Unit,
+    /** The sleeve; handed a modifier that already fixes its square size. */
+    artwork: @Composable (Modifier) -> Unit,
+    /** The row under the sleeve, emitted into its column. */
+    actions: @Composable () -> Unit,
+    /** Kept mounted across pane switches; its text moves independently of the controls. */
+    header: @Composable (compact: Boolean, active: Boolean) -> Unit,
+    /** Credits and transport. [compact] is a phone-height window. */
+    mainPane: @Composable (compact: Boolean) -> Unit,
+    lyricsPane: @Composable () -> Unit,
+    queuePane: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LandscapePlayerShell(background = background, modifier = modifier) { compact, gutter, reduceMotion, containerModifier ->
+        LandscapePlayerColumns(
+            pane = pane,
+            trackKey = trackKey,
+            compact = compact,
+            gutter = gutter,
+            reduceMotion = reduceMotion,
+            artwork = artwork,
+            actions = actions,
+            header = { active -> header(compact, active) },
+            mainPane = { mainPane(compact) },
+            lyricsPane = lyricsPane,
+            queuePane = queuePane,
+            boundLyricsToArtwork = PlayerPlatform.host.musicVideoFullscreen != null,
+            modifier = containerModifier,
+        )
     }
 }
 

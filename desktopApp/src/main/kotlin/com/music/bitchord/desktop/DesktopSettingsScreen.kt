@@ -43,6 +43,7 @@ import bitchord.desktopapp.generated.resources.logo
 import org.jetbrains.compose.resources.painterResource
 import com.music.bitchord.desktop.DesktopSettingsPage.*
 import com.music.bitchord.data.settings.AutomixPerformanceMode
+import com.music.bitchord.data.settings.PlayerLayout
 import com.music.bitchord.data.settings.PlayerTheme
 import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.screens.desktopTopScrollFade
@@ -490,6 +491,19 @@ internal fun DesktopSettingsScreen(
                 DesktopSettingsSegmentedControl(
                     PlayerTheme.entries, playerTheme, { it.name.lowercase().replaceFirstChar(Char::uppercaseChar) },
                     DesktopPlayerThemeSettings::setTheme,
+                )
+            }
+        }
+        val playerLayout by DesktopPlayerLayoutSettings.layout.collectAsState()
+        row("Player layout", "Classic Centered split fullscreen expanded player", icon = true) {
+            val description = when (playerLayout) {
+                PlayerLayout.CLASSIC -> "Two-column split with controls beside the cover."
+                PlayerLayout.CENTERED -> "Centered player column that slides left when lyrics or queue open."
+            }
+            DesktopSettingsControl("Player layout", description, icon = DesktopIcons.Settings.Appearance) {
+                DesktopSettingsSegmentedControl(
+                    PlayerLayout.entries, playerLayout, { it.name.lowercase().replaceFirstChar(Char::uppercaseChar) },
+                    DesktopPlayerLayoutSettings::setLayout,
                 )
             }
         }
