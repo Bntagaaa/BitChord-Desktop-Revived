@@ -892,11 +892,7 @@ internal fun PlayerActionRow(
                         )
                     }
                 } else {
-                    OutputPartyPill(
-                        onOutput = onOpenOutput,
-                        onParty = onListenTogether,
-                        onOpenMembers = onOpenListenTogetherMembers,
-                    )
+                    AirPlayOutputButton(onOutput = onOpenOutput)
                 }
             }
             if (queueButtonVisible) Box(Modifier.align(Alignment.CenterEnd)) {
@@ -1114,15 +1110,6 @@ private val PILL_SEGMENT_WIDTH = 64.dp
  * tall, at most 85% wide — either in its own drawable or by
  * [PILL_OUTPUT_WIDE_SIZE] / [PILL_OUTPUT_TALL_SIZE] for the Material ones.
  */
-private val PILL_OUTPUT_SIZE = 23.dp
-private val PILL_PARTY_SIZE = 22.dp
-
-/** Cast and Tv run 92% of their box wide; at 23dp they read bigger than the rest. */
-private val PILL_OUTPUT_WIDE_SIZE = 21.dp
-
-/** Watch is drawn the full height of its box. */
-private val PILL_OUTPUT_TALL_SIZE = 17.dp
-
 /** What a segment's glyph is drawn at when it has no optical quirk to correct. */
 private val PILL_ICON_SIZE = 24.dp
 
@@ -1176,99 +1163,24 @@ private fun PillDivider() {
 }
 
 /**
- * The two ends of "where is this playing": the output capsule.
- *
- * Both halves answer the same question and so belong to one control rather than
- * two glyphs that happen to sit side by side — the device the sound leaves by
- * (see [rememberOutputGlyph]), the party for which *people* it reaches.
- *
- * Video vs audio-only used to live here as a third segment; it now lives in
- * the player's own three-dot menu, beside Revert to original and Upgrade
- * quality — the same kind of choice, offered the same way. This capsule is
- * back to the two icons it always otherwise had, at their original spacing.
+ * Standalone AirPlay audio output button shared by [PlayerActionRow] and
+ * [CenteredLandscapePlayerColumns].
  */
 @Composable
-private fun OutputPartyPill(
+internal fun AirPlayOutputButton(
     onOutput: (Rect?) -> Unit,
-    onParty: () -> Unit,
-    /** Who's in it, before the settings page — see [ListenTogetherMembersSheet]. */
-    onOpenMembers: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val badge = rememberPartyBadge()
-    val output = rememberOutputGlyph()
     var outputBounds by remember { mutableStateOf<Rect?>(null) }
-    Pill {
-        Box(Modifier.onGloballyPositioned { outputBounds = it.boundsInRoot() }) {
-        PillSegment(
-            icon = output.icon,
-            iconSize = output.size,
+    Box(modifier.onGloballyPositioned { outputBounds = it.boundsInRoot() }) {
+        BottomGlyph(
+            icon = BitChordIcons.AirPlay,
             contentDescription = stringResource(Res.string.audio_output),
             onClick = { onOutput(outputBounds) },
             vibrant = true,
         )
-        }
-        PillDivider()
-        PillSegment(
-            // Person rather than Groups: the three-person glyph is drawn half
-            // the height of Headphones and wider than the segment holding it,
-            // so the two halves of the capsule never looked like a pair.
-            icon = SfStyleIcons.Person,
-            iconSize = PILL_PARTY_SIZE,
-            // The count is here and nowhere else: spoken, it is the whole
-            // point of the control; drawn, it would cost the capsule its
-            // symmetry for something the caption below already implies.
-            contentDescription = if (badge.inParty) {
-                stringResource(Res.string.listen_together_open_count, badge.members)
-            } else {
-                stringResource(Res.string.listen_together_open)
-            },
-            // Already in a party, this opens who's in it rather than the
-            // settings page directly; there is nothing to create or join once
-            // there is a party, so [onParty] only ever fires beforehand.
-            onClick = if (badge.inParty) onOpenMembers else onParty,
-            highlighted = badge.inParty,
-            trailingLabel = badge.members.takeIf { badge.inParty }?.toString(),
-        )
     }
 }
-
-/**
- * What the output segment shows: the thing the music is coming out of, the way
- * Apple Music's AirPlay button does — the phone, buds, a speaker — rather than
- * headphones whatever is actually playing it.
- *
- * Off-device first: while casting or on the watch, the phone's own route is
- * not where anybody is listening.
- */
-@Composable
-private fun rememberOutputGlyph(): OutputGlyph {
-    val cast by PlayerPlatform.host.castState.collectAsStateWithLifecycle()
-    val watch by PlayerPlatform.host.watchOutput.collectAsStateWithLifecycle()
-    val active = rememberAudioOutputs().firstOrNull { it.isActive }
-    return when {
-        cast.connectedName != null -> OutputGlyph(SfStyleIcons.CastConnected, PILL_OUTPUT_WIDE_SIZE)
-        watch.active -> OutputGlyph(SfStyleIcons.Watch, PILL_OUTPUT_TALL_SIZE)
-        else -> when (active?.kind) {
-            // No active row is the phone too — the caption under the pill
-            // says "This phone" in the same case.
-            null, AudioOutputKind.PHONE -> OutputGlyph(vectorResource(Res.drawable.ic_output_phone))
-            AudioOutputKind.BLUETOOTH -> when (active.form) {
-                BluetoothForm.BUDS -> OutputGlyph(vectorResource(Res.drawable.ic_output_buds))
-                BluetoothForm.SPEAKER -> OutputGlyph(vectorResource(Res.drawable.ic_output_speaker))
-                BluetoothForm.CAR -> OutputGlyph(SfStyleIcons.Car)
-                // Headphones doubles as the neutral "some audio device" glyph:
-                // a device that won't say what it is gets that, not a guess.
-                BluetoothForm.HEADPHONES, BluetoothForm.UNKNOWN -> OutputGlyph(SfStyleIcons.Headphones)
-            }
-            AudioOutputKind.WIRED, AudioOutputKind.USB -> OutputGlyph(SfStyleIcons.Headphones)
-            AudioOutputKind.HDMI -> OutputGlyph(SfStyleIcons.Tv, PILL_OUTPUT_WIDE_SIZE)
-            AudioOutputKind.OTHER -> OutputGlyph(vectorResource(Res.drawable.ic_output_speaker))
-        }
-    }
-}
-
-/** An output glyph and the size that makes it match the others — see [PILL_OUTPUT_SIZE]. */
-private data class OutputGlyph(val icon: ImageVector, val size: Dp = PILL_OUTPUT_SIZE)
 
 /**
  * One control inside a [Pill] — [BottomGlyph]'s twin, squared off.

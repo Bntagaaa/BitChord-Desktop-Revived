@@ -2298,6 +2298,7 @@ fun NowPlayingScreen(
                         queueButtonVisible = !desktopVideo,
                         onToggleLyrics = toggleLyrics,
                         onToggleQueue = toggleQueue,
+                        onOpenOutput = openAnchoredAudioOutput,
                         background = landscapeBackground,
                         artwork = landscapeArtworkSlot,
                         header = { compact, active ->

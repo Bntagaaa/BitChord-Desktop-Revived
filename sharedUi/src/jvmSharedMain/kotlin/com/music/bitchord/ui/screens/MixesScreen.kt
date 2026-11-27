@@ -114,7 +114,7 @@ fun MixesScreen(
                         modifier = Modifier.padding(
                             start = PAGE_GUTTER,
                             end = PAGE_GUTTER,
-                            top = if (compactHeadings) 0.dp else 8.dp,
+                            top = if (LocalDesktopIntegratedTitleBar.current) 0.dp else 8.dp,
                             bottom = if (compactHeadings) 8.dp else 14.dp,
                         ),
                     )

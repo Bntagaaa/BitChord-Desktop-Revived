@@ -68,7 +68,7 @@ internal fun DesktopAudioOutputButton(
 ) {
     val glyph: @Composable () -> Unit = {
         Icon(
-            DesktopIcons.Audio.Headphones,
+            DesktopIcons.Audio.AirPlay,
             if (interactive) DesktopStrings["audio_output", "Audio output"] else null,
             tint = tint,
             modifier = Modifier.size(iconSize),
