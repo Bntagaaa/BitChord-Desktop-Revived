@@ -144,9 +144,9 @@ LRESULT hit_test_window(HWND hwnd, CaptionState* state, POINT screen_pt) {
     POINT client_pt = screen_pt;
     ScreenToClient(hwnd, &client_pt);
 
-    if (close_rect.contains(client_pt.x, client_pt.y)) return HTCLOSE;
+    if (close_rect.contains(client_pt.x, client_pt.y)) return HTCLIENT;
     if (max_rect.contains(client_pt.x, client_pt.y)) return HTMAXBUTTON;
-    if (min_rect.contains(client_pt.x, client_pt.y)) return HTMINBUTTON;
+    if (min_rect.contains(client_pt.x, client_pt.y)) return HTCLIENT;
 
     if (overlay_blocked) {
         return HTCLIENT;
