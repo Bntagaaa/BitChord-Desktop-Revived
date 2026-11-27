@@ -2318,19 +2318,15 @@ fun NowPlayingScreen(
                         lyricStrip = landscapeLyricStrip,
                         scrubber = landscapeScrubber,
                         transport = { compact ->
-                            CenteredTransportRow(
+                            TransportRow(
                                 isPlaying = isPlaying,
                                 isLoading = isLoading || audioVersionSwitching,
                                 previousEnabled = !controlsLocked &&
                                     (hasPrevious || pastRestartPoint),
                                 nextEnabled = !controlsLocked && hasNext,
-                                shuffleEnabled = shuffleEnabled,
-                                repeatMode = repeatMode,
                                 onPrevious = onPrevious,
                                 onPlayPause = onPlayPause,
                                 onNext = onNext,
-                                onToggleShuffle = onToggleShuffle,
-                                onCycleRepeat = onCycleRepeat,
                                 compact = compact,
                             )
                         },
@@ -2338,6 +2334,16 @@ fun NowPlayingScreen(
                         volumeLevel = { volume.level.value },
                         lyricsPane = landscapeLyricsPane,
                         queuePane = landscapeQueuePane,
+                        queueFooter = {
+                            QueueModesPill(
+                                shuffleEnabled = shuffleEnabled,
+                                repeatMode = repeatMode,
+                                autoplayEnabled = autoplayEnabled,
+                                onToggleShuffle = onToggleShuffle,
+                                onCycleRepeat = onCycleRepeat,
+                                onToggleAutoplay = onToggleAutoplay,
+                            )
+                        },
                     )
                 }
                 playerOverlays()

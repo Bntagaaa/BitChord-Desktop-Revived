@@ -38,31 +38,33 @@ internal class LandscapeLyricsChrome {
 }
 internal val LocalLandscapeLyricsChrome = compositionLocalOf<LandscapeLyricsChrome?> { null }
 
-/** A fixed hover target; only the visible lyric viewport gives space to the footer. */
+/** A fixed hover target; only the visible viewport gives space to the footer. */
 @Composable
-internal fun LandscapeLyricsFrame(
+internal fun LandscapeHoverFooterFrame(
     revealControlsOnHover: Boolean,
     controlsPinned: Boolean,
     reduceMotion: Boolean,
+    frameTestTag: String,
+    viewportTestTag: String,
+    chrome: LandscapeLyricsChrome? = null,
     modifier: Modifier = Modifier,
-    lyrics: @Composable BoxScope.() -> Unit,
+    content: @Composable BoxScope.() -> Unit,
     controls: @Composable () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var hasFocus by remember { mutableStateOf(false) }
     var keyboardFocused by remember { mutableStateOf(false) }
-    val chrome = LocalLandscapeLyricsChrome.current
     SideEffect { chrome?.bodyActive = hovered || keyboardFocused || controlsPinned }
     DisposableEffect(chrome) { onDispose { chrome?.bodyActive = false } }
     val visible = !revealControlsOnHover || hovered || keyboardFocused || controlsPinned || chrome?.headerHovered == true
     val reveal by animateFloatAsState(
         if (visible) 1f else 0f,
         if (reduceMotion) snap() else tween(LANDSCAPE_CHROME_MOTION_MS),
-        label = "landscapeLyricsControls",
+        label = "landscapeHoverFooterControls",
     )
     Layout(
-        modifier = modifier.fillMaxSize().testTag("landscape-lyrics-frame").then(
+        modifier = modifier.fillMaxSize().testTag(frameTestTag).then(
             if (revealControlsOnHover) Modifier.clipLandscapeLyricsVertically() else Modifier,
         ).then(
             if (revealControlsOnHover) Modifier
@@ -79,15 +81,15 @@ internal fun LandscapeLyricsFrame(
         ),
         content = {
             Layout(
-                modifier = Modifier.testTag("landscape-lyrics-viewport").then(
+                modifier = Modifier.testTag(viewportTestTag).then(
                     if (revealControlsOnHover) Modifier.landscapeLyricEdges(fadeTop = false) else Modifier,
                 ),
-                content = { Box(Modifier.fillMaxSize(), content = lyrics) },
+                content = { Box(Modifier.fillMaxSize(), content = content) },
             ) { measurables, bounds ->
-                // Keep the lyric renderer's own viewport/scroll anchor unchanged while
+                // Keep the inner renderer's own viewport/scroll anchor unchanged while
                 // hovering. Its clipping parent gets shorter, not its text or scroll state.
-                val content = measurables.single().measure(Constraints.fixed(bounds.maxWidth, bounds.maxHeight))
-                layout(bounds.maxWidth, bounds.minHeight) { content.placeRelative(0, 0) }
+                val child = measurables.single().measure(Constraints.fixed(bounds.maxWidth, bounds.maxHeight))
+                layout(bounds.maxWidth, bounds.minHeight) { child.placeRelative(0, 0) }
             }
             Column(Modifier.then(if (visible) Modifier else Modifier.clearAndSetSemantics {})) {
                 controls()
@@ -109,4 +111,27 @@ internal fun LandscapeLyricsFrame(
             if (reserved > 0) footer.placeRelativeWithLayer(0, viewportHeight) { alpha = reveal }
         }
     }
+}
+
+/** A fixed hover target; only the visible lyric viewport gives space to the footer. */
+@Composable
+internal fun LandscapeLyricsFrame(
+    revealControlsOnHover: Boolean,
+    controlsPinned: Boolean,
+    reduceMotion: Boolean,
+    modifier: Modifier = Modifier,
+    lyrics: @Composable BoxScope.() -> Unit,
+    controls: @Composable () -> Unit,
+) {
+    LandscapeHoverFooterFrame(
+        revealControlsOnHover = revealControlsOnHover,
+        controlsPinned = controlsPinned,
+        reduceMotion = reduceMotion,
+        frameTestTag = "landscape-lyrics-frame",
+        viewportTestTag = "landscape-lyrics-viewport",
+        chrome = LocalLandscapeLyricsChrome.current,
+        modifier = modifier,
+        content = lyrics,
+        controls = controls,
+    )
 }

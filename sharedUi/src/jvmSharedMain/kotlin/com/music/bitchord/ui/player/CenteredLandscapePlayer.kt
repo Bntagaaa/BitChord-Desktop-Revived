@@ -131,6 +131,7 @@ internal fun CenteredLandscapePlayerLayout(
     volumeLevel: () -> Float,
     lyricsPane: @Composable () -> Unit,
     queuePane: @Composable () -> Unit,
+    queueFooter: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LandscapePlayerShell(background = background, modifier = modifier) { compact, gutter, reduceMotion, _ ->
@@ -152,6 +153,7 @@ internal fun CenteredLandscapePlayerLayout(
             volumeLevel = volumeLevel,
             lyricsPane = lyricsPane,
             queuePane = queuePane,
+            queueFooter = queueFooter,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
@@ -188,6 +190,7 @@ internal fun CenteredLandscapePlayerColumns(
     volumeLevel: () -> Float,
     lyricsPane: @Composable () -> Unit,
     queuePane: @Composable () -> Unit,
+    queueFooter: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var volumeOpen by remember { mutableStateOf(false) }
@@ -266,7 +269,7 @@ internal fun CenteredLandscapePlayerColumns(
 
         val bottomBarHeight = maxOf(bottomLeft.height, bottomRight.height)
         val stackAreaHeight = (height - bottomBarHeight - bottomGap).coerceAtLeast(0)
-        val reservedControlsPx = (if (compact) 204.dp else 238.dp).roundToPx()
+        val reservedControlsPx = (if (compact) 224.dp else 266.dp).roundToPx()
         val prelimArtSize = minOf(
             leftContentWidth,
             (stackAreaHeight - reservedControlsPx - stackGap).coerceAtLeast(0),
@@ -350,7 +353,25 @@ internal fun CenteredLandscapePlayerColumns(
                     when (shown) {
                         PlayerPane.Main -> Unit
                         PlayerPane.Lyrics -> lyricsPane()
-                        PlayerPane.Queue -> queuePane()
+                        PlayerPane.Queue -> LandscapeHoverFooterFrame(
+                            revealControlsOnHover = true,
+                            controlsPinned = false,
+                            reduceMotion = reduceMotion,
+                            frameTestTag = "centered-queue-frame",
+                            viewportTestTag = "centered-queue-viewport",
+                            content = { queuePane() },
+                            controls = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 10.dp)
+                                        .testTag("centered-queue-footer"),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    queueFooter()
+                                }
+                            },
+                        )
                     }
                 }
             }

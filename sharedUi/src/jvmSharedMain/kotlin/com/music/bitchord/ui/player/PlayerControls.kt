@@ -573,163 +573,6 @@ internal fun TransportRow(
     }
 }
 
-/**
- * Five-button transport row (shuffle, previous, play/pause, next, repeat)
- * for the centered landscape player layout.
- */
-@Composable
-internal fun CenteredTransportRow(
-    isPlaying: Boolean,
-    isLoading: Boolean,
-    previousEnabled: Boolean,
-    nextEnabled: Boolean,
-    shuffleEnabled: Boolean,
-    repeatMode: Int,
-    onPrevious: () -> Unit,
-    onPlayPause: () -> Unit,
-    onNext: () -> Unit,
-    onToggleShuffle: () -> Unit,
-    onCycleRepeat: () -> Unit,
-    compact: Boolean = false,
-) {
-    val playSize = if (compact) 44.dp else 52.dp
-    val playTouch = if (compact) 56.dp else 64.dp
-    val skipSize = if (compact) 34.dp else 40.dp
-    val skipTouch = if (compact) 42.dp else 48.dp
-    val reduceAnimation = LocalPlayerReduceMotion.current
-    val animationsActive = LocalPlayerTransportMotionActive.current
-    val previousMotion = rememberPlayerSkipMotion(active = animationsActive, reduceMotion = reduceAnimation)
-    val nextMotion = rememberPlayerSkipMotion(active = animationsActive, reduceMotion = reduceAnimation)
-    val playVector = vectorResource(Res.drawable.ic_player_play)
-    val pauseVector = vectorResource(Res.drawable.ic_player_pause)
-    val playPauseMotion = rememberExpandedPlayPauseMotion(
-        isPlaying = isPlaying,
-        active = animationsActive && !isLoading && playVector.root.size > 0 && pauseVector.root.size > 0,
-        reduceMotion = reduceAnimation,
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(
-            if (compact) 14.dp else 20.dp,
-            Alignment.CenterHorizontally,
-        ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TransportModeGlyph(
-            icon = BitChordIcons.Shuffle,
-            contentDescription = stringResource(
-                if (shuffleEnabled) Res.string.shuffle_on else Res.string.shuffle_off,
-            ),
-            active = shuffleEnabled,
-            haptic = if (shuffleEnabled) Haptic.ToggleOff else Haptic.ToggleOn,
-            tapWindowMs = SHUFFLE_TAP_WINDOW_MS,
-            onClick = onToggleShuffle,
-        )
-        TransportGlyph(
-            icon = Res.drawable.ic_player_previous,
-            contentDescription = stringResource(Res.string.widget_previous),
-            size = skipSize,
-            touchSize = skipTouch,
-            heightScale = PLAYER_SKIP_HEIGHT_SCALE,
-            onClick = onPrevious,
-            enabled = previousEnabled,
-            haptic = Haptic.SkipPrevious,
-            skipMotion = previousMotion,
-            skipPrevious = true,
-        )
-        if (isLoading) {
-            Box(Modifier.size(playTouch), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(if (compact) 28.dp else 34.dp),
-                )
-            }
-        } else {
-            TransportGlyph(
-                icon = if (isPlaying) Res.drawable.ic_player_pause else Res.drawable.ic_player_play,
-                contentDescription = stringResource(if (isPlaying) Res.string.pause else Res.string.play),
-                size = playSize,
-                touchSize = playTouch,
-                onClick = onPlayPause,
-                haptic = if (isPlaying) Haptic.Pause else Haptic.Resume,
-                playPauseMotion = playPauseMotion,
-            )
-        }
-        TransportGlyph(
-            icon = Res.drawable.ic_player_next,
-            contentDescription = stringResource(Res.string.widget_next),
-            size = skipSize,
-            touchSize = skipTouch,
-            heightScale = PLAYER_SKIP_HEIGHT_SCALE,
-            onClick = onNext,
-            enabled = nextEnabled,
-            haptic = Haptic.SkipNext,
-            skipMotion = nextMotion,
-        )
-        TransportModeGlyph(
-            icon = if (repeatMode == RepeatModes.ONE) BitChordIcons.RepeatOne else BitChordIcons.Repeat,
-            contentDescription = when (repeatMode) {
-                RepeatModes.ONE -> stringResource(Res.string.repeat_one)
-                RepeatModes.ALL -> stringResource(Res.string.repeat_all)
-                else -> stringResource(Res.string.repeat_off)
-            },
-            active = repeatMode != RepeatModes.OFF,
-            haptic = when (repeatMode) {
-                RepeatModes.OFF -> Haptic.ToggleOn
-                RepeatModes.ONE -> Haptic.ToggleOff
-                else -> Haptic.Select
-            },
-            onClick = onCycleRepeat,
-        )
-    }
-}
-
-@Composable
-private fun TransportModeGlyph(
-    icon: ImageVector,
-    contentDescription: String,
-    active: Boolean,
-    haptic: Haptic,
-    onClick: () -> Unit,
-    tapWindowMs: Long = 0L,
-) {
-    val haptics = rememberHaptics()
-    val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
-    val desktop = PlayerPlatform.host.mobileTextChrome
-    val tint = when {
-        active -> Color.White
-        desktop -> playerSecondaryColor(0.55f)
-        else -> LocalPlayerTint.current.copy(alpha = 0.55f)
-    }
-    Box(
-        modifier = Modifier
-            .size(38.dp)
-            .clip(CircleShape)
-            .background(if (active) Color.White.copy(alpha = 0.16f) else Color.Transparent)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) {
-                val now = uptimeMillis()
-                if (now - lastTap.longValue >= tapWindowMs) {
-                    lastTap.longValue = now
-                    haptics.play(haptic)
-                    onClick()
-                }
-            }
-            .semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(20.dp),
-        )
-    }
-}
-
 /** ThinSlider's fixed touch target at the volume bar's size: 10dp + 22dp. */
 internal val VOLUME_ROW_HEIGHT = 32.dp
 
@@ -845,52 +688,14 @@ internal fun PlayerActionRow(
                 label = "playerBottomPill",
             ) { showQueueModes ->
                 if (showQueueModes) {
-                    // Spaced the same as the output/party capsule, so the two
-                    // read as one control growing a segment.
-                    Pill {
-                        PillSegment(
-                            icon = BitChordIcons.Shuffle,
-                            contentDescription = stringResource(
-                                if (shuffleEnabled) Res.string.shuffle_on else Res.string.shuffle_off,
-                            ),
-                            onClick = onToggleShuffle,
-                            highlighted = shuffleEnabled,
-                            haptic = if (shuffleEnabled) Haptic.ToggleOff else Haptic.ToggleOn,
-                            tapWindowMs = SHUFFLE_TAP_WINDOW_MS,
-                        )
-                        PillDivider()
-                        PillSegment(
-                            icon = if (repeatMode == RepeatModes.ONE) null else BitChordIcons.Repeat,
-                            label = if (repeatMode == RepeatModes.ONE) "1" else null,
-                            contentDescription = when (repeatMode) {
-                                RepeatModes.ONE -> stringResource(Res.string.repeat_one)
-                                RepeatModes.ALL -> stringResource(Res.string.repeat_all)
-                                else -> stringResource(Res.string.repeat_off)
-                            },
-                            onClick = onCycleRepeat,
-                            highlighted = repeatMode != RepeatModes.OFF,
-                            // Three states, so the buzz tracks the edges of the
-                            // cycle: leaving off rises, returning to off falls,
-                            // and the step between the two repeat modes is just
-                            // a selection.
-                            haptic = when (repeatMode) {
-                                RepeatModes.OFF -> Haptic.ToggleOn
-                                RepeatModes.ONE -> Haptic.ToggleOff
-                                else -> Haptic.Select
-                            },
-                        )
-                        PillDivider()
-                        PillSegment(
-                            icon = BitChordIcons.Infinity,
-                            contentDescription = stringResource(
-                                if (autoplayEnabled) Res.string.autoplay_on else Res.string.autoplay_off,
-                            ),
-                            onClick = onToggleAutoplay,
-                            highlighted = autoplayEnabled,
-                            haptic = if (autoplayEnabled) Haptic.ToggleOff else Haptic.ToggleOn,
-                            tapWindowMs = AUTOPLAY_TAP_WINDOW_MS,
-                        )
-                    }
+                    QueueModesPill(
+                        shuffleEnabled = shuffleEnabled,
+                        repeatMode = repeatMode,
+                        autoplayEnabled = autoplayEnabled,
+                        onToggleShuffle = onToggleShuffle,
+                        onCycleRepeat = onCycleRepeat,
+                        onToggleAutoplay = onToggleAutoplay,
+                    )
                 } else {
                     OutputPartyPill(
                         onOutput = onOpenOutput,
@@ -910,6 +715,65 @@ internal fun PlayerActionRow(
                 )
             }
         }
+    }
+}
+
+/** Three-button playback-mode capsule (Shuffle, Repeat, AutoPlay) shared by [PlayerActionRow] and the centered Queue hover footer. */
+@Composable
+internal fun QueueModesPill(
+    shuffleEnabled: Boolean,
+    repeatMode: Int,
+    autoplayEnabled: Boolean,
+    onToggleShuffle: () -> Unit,
+    onCycleRepeat: () -> Unit,
+    onToggleAutoplay: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Spaced the same as the output/party capsule, so the two
+    // read as one control growing a segment.
+    Pill(modifier) {
+        PillSegment(
+            icon = BitChordIcons.Shuffle,
+            contentDescription = stringResource(
+                if (shuffleEnabled) Res.string.shuffle_on else Res.string.shuffle_off,
+            ),
+            onClick = onToggleShuffle,
+            highlighted = shuffleEnabled,
+            haptic = if (shuffleEnabled) Haptic.ToggleOff else Haptic.ToggleOn,
+            tapWindowMs = SHUFFLE_TAP_WINDOW_MS,
+        )
+        PillDivider()
+        PillSegment(
+            icon = if (repeatMode == RepeatModes.ONE) null else BitChordIcons.Repeat,
+            label = if (repeatMode == RepeatModes.ONE) "1" else null,
+            contentDescription = when (repeatMode) {
+                RepeatModes.ONE -> stringResource(Res.string.repeat_one)
+                RepeatModes.ALL -> stringResource(Res.string.repeat_all)
+                else -> stringResource(Res.string.repeat_off)
+            },
+            onClick = onCycleRepeat,
+            highlighted = repeatMode != RepeatModes.OFF,
+            // Three states, so the buzz tracks the edges of the
+            // cycle: leaving off rises, returning to off falls,
+            // and the step between the two repeat modes is just
+            // a selection.
+            haptic = when (repeatMode) {
+                RepeatModes.OFF -> Haptic.ToggleOn
+                RepeatModes.ONE -> Haptic.ToggleOff
+                else -> Haptic.Select
+            },
+        )
+        PillDivider()
+        PillSegment(
+            icon = BitChordIcons.Infinity,
+            contentDescription = stringResource(
+                if (autoplayEnabled) Res.string.autoplay_on else Res.string.autoplay_off,
+            ),
+            onClick = onToggleAutoplay,
+            highlighted = autoplayEnabled,
+            haptic = if (autoplayEnabled) Haptic.ToggleOff else Haptic.ToggleOn,
+            tapWindowMs = AUTOPLAY_TAP_WINDOW_MS,
+        )
     }
 }
 

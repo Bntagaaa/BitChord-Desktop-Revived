@@ -17,6 +17,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import java.lang.reflect.Proxy
@@ -107,6 +108,9 @@ class CenteredLandscapeLayoutTest {
                         queuePane = {
                             Box(Modifier.fillMaxSize().testTag("test-queue-pane")) { Text("Queue") }
                         },
+                        queueFooter = {
+                            Box(Modifier.fillMaxWidth().height(44.dp).testTag("test-queue-footer")) { Text("Modes") }
+                        },
                     )
                 }
             }
@@ -148,6 +152,23 @@ class CenteredLandscapeLayoutTest {
             mainClock.advanceTimeBy(200)
             waitForIdle()
             onNodeWithTag("centered-volume-popup").assertIsDisplayed()
+
+            onNodeWithContentDescription("Up next").performClick()
+            mainClock.advanceTimeBy(400)
+            waitForIdle()
+            onNodeWithTag("test-queue-pane").assertIsDisplayed()
+            onNodeWithTag("centered-queue-footer").assertDoesNotExist()
+            val idleQueueBounds = onNodeWithTag("centered-queue-viewport").getUnclippedBoundsInRoot()
+
+            onNodeWithTag("centered-queue-frame").performMouseInput { enter(center) }
+            mainClock.advanceTimeBy(250)
+            waitForIdle()
+            onNodeWithTag("centered-queue-footer").assertIsDisplayed()
+            val hoveredQueueBounds = onNodeWithTag("centered-queue-viewport").getUnclippedBoundsInRoot()
+            assertTrue(
+                hoveredQueueBounds.bottom < idleQueueBounds.bottom,
+                "Queue viewport should shrink on hover to make room for the 3-button pill",
+            )
         }
     }
 }
