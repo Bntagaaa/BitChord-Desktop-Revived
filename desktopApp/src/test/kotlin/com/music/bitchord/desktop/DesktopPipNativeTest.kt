@@ -69,7 +69,7 @@ class DesktopPipNativeTest {
         try {
             DesktopPipSettings.update { it.copy(lyrics = true, bounds = DesktopPipBounds(80, 80, 500, 340)) }
             application(exitProcessOnExit = false) {
-                DesktopPipHostWindow(host)
+                DesktopPipHostWindow(host, x11WindowScale = null)
                 Window(onCloseRequest = {}, visible = mainVisible.value, title = "PiP track test owner") {
                     LaunchedEffect(Unit) {
                         lyrics.follow(snapshotFlow {
