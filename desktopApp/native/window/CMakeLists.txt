@@ -10,8 +10,8 @@ foreach(suffix "" _DEBUG _RELEASE _RELWITHDEBINFO _MINSIZEREL)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY${suffix} ${CMAKE_BINARY_DIR})
 endforeach()
 
-# Keep the WASAPI/JNI DLL; only the custom frame subclass has been retired.
-add_library(bitchord_window SHARED window_jni.cpp)
+# Keep the WASAPI/JNI DLL and Windows integrated caption subclass together.
+add_library(bitchord_window SHARED window_jni.cpp native_caption.cpp)
 set_target_properties(bitchord_window PROPERTIES PREFIX "")
 
 if(DEFINED ENV{JAVA_HOME})
@@ -24,7 +24,7 @@ else()
     target_include_directories(bitchord_window PRIVATE ${JNI_INCLUDE_DIRS})
 endif()
 
-target_link_libraries(bitchord_window PRIVATE user32 ole32 uuid)
+target_link_libraries(bitchord_window PRIVATE user32 ole32 uuid dwmapi)
 
 if(MINGW)
     # The desktop app loads this DLL from its private runtime directory. Gradle daemons and

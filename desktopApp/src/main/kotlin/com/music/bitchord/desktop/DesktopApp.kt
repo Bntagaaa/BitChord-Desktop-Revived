@@ -5769,14 +5769,20 @@ internal fun DesktopTopBar(
     val mixPulse = rememberMixPulse({ mixBlend.value }, enabled = !reduceAnimation)
     val currentProgress by rememberUpdatedState(progress)
 
-    // This is the application toolbar. Windows owns a separate system caption above it.
+    val fullScreen by DesktopWindowMode.fullScreen.collectAsState()
+    val captionInsetEnd = DesktopWindowsCaptionMetrics.captionInsetEnd(
+        isWindows = DesktopPlatform.isWindows,
+        isFullscreen = fullScreen,
+    )
+
     // Render the whole bar as a flat, opaque theme surface even if dynamic blur is enabled.
     BoxWithConstraints(Modifier.fillMaxWidth().height(64.dp)) {
-        // The top player adapts to the actual space beside the sidebar, not the
-        // sidebar's rail breakpoint. The current track must never disappear.
-        val fullControls = DesktopTopBarWidthPolicy.showFullControls(maxWidth.value)
-        val showCompactSkip = DesktopTopBarWidthPolicy.showCompactSkipControls(maxWidth.value)
-        val showCompactPanels = DesktopTopBarWidthPolicy.showCompactSidePanels(maxWidth.value)
+        // The top player adapts to the actual space beside the sidebar (minus any integrated caption
+        // buttons on Windows), not the sidebar's rail breakpoint. The current track must never disappear.
+        val availableWidthDp = (maxWidth.value - captionInsetEnd.value).coerceAtLeast(0f)
+        val fullControls = DesktopTopBarWidthPolicy.showFullControls(availableWidthDp)
+        val showCompactSkip = DesktopTopBarWidthPolicy.showCompactSkipControls(availableWidthDp)
+        val showCompactPanels = DesktopTopBarWidthPolicy.showCompactSidePanels(availableWidthDp)
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             Row(
@@ -5784,13 +5790,14 @@ internal fun DesktopTopBar(
                     .weight(1f)
                     .fillMaxHeight()
                     .background(DesktopTheme.palette.chromeSurface)
-                    .padding(start = 14.dp, end = 12.dp),
+                    .padding(start = 14.dp, end = 12.dp + captionInsetEnd),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Brand, navigation and account switching live in the sidebar.
                 // The legacy top bar hosts playback controls only.
                 if (fullControls) {
                     Row(
+                        modifier = Modifier.registerTitleBarInteractive("topbar_transport"),
                         horizontalArrangement = Arrangement.spacedBy(0.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -5861,6 +5868,7 @@ internal fun DesktopTopBar(
                                 .widthIn(min = 300.dp, max = 520.dp)
                                 .fillMaxWidth()
                                 .height(46.dp)
+                                .registerTitleBarInteractive("topbar_track_card")
                                 .border(1.dp, DesktopForeground.copy(alpha = 0.06f), RoundedCornerShape(4.dp))
                                 .clip(RoundedCornerShape(4.dp))
                                 .clickable(onClick = onOpenNowPlaying),
@@ -5929,6 +5937,10 @@ internal fun DesktopTopBar(
                 } else {
                     // Narrow desktop windows retain transport and track information.
                     // Lower-priority controls give way before the song title does.
+                    Row(
+                        modifier = Modifier.registerTitleBarInteractive("topbar_compact_transport"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                     if (showCompactSkip) {
                         DesktopToolbarButton(onClick = onPrevious, enabled = previousEnabled, size = 32.dp) {
                             Icon(
@@ -5965,11 +5977,13 @@ internal fun DesktopTopBar(
                             )
                         }
                     }
+                    }
                     Surface(
                         modifier = Modifier
                             .weight(1f)
                             .padding(start = 8.dp, end = 4.dp)
                             .height(46.dp)
+                            .registerTitleBarInteractive("topbar_compact_track")
                             .border(1.dp, DesktopForeground.copy(alpha = 0.06f), RoundedCornerShape(4.dp))
                             .clip(RoundedCornerShape(4.dp))
                             .clickable(onClick = onOpenNowPlaying),
@@ -6030,6 +6044,7 @@ internal fun DesktopTopBar(
                 }
 
                 Row(
+                    modifier = Modifier.registerTitleBarInteractive("topbar_right_controls"),
                     horizontalArrangement = Arrangement.spacedBy(1.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -6170,7 +6185,10 @@ private fun DesktopSidebar(
         ) {
             if (collapsed) {
                 Box(Modifier.fillMaxWidth().height(35.dp), contentAlignment = Alignment.Center) {
-                    IconButton(onClick = onToggleCollapse) {
+                    IconButton(
+                        onClick = onToggleCollapse,
+                        modifier = Modifier.registerTitleBarInteractive("sidebar_toggle_collapsed"),
+                    ) {
                         Image(
                             painter = painterResource(Res.drawable.bitchord_logo_original),
                             contentDescription = "Expand sidebar",
@@ -6204,7 +6222,10 @@ private fun DesktopSidebar(
                     colorFilter = ColorFilter.tint(DesktopForeground),
                 )
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onToggleCollapse, modifier = Modifier.size(28.dp)) {
+                IconButton(
+                    onClick = onToggleCollapse,
+                    modifier = Modifier.size(28.dp).registerTitleBarInteractive("sidebar_toggle_expanded"),
+                ) {
                     Icon(DesktopIcons.Navigation.ChevronLeft, "Collapse sidebar", tint = DesktopSecondary, modifier = Modifier.size(20.dp))
                 }
             }
@@ -6709,9 +6730,30 @@ internal fun DesktopFrame(
     val menuHaze = remember { HazeState() }
     menuPortal.onClosed = onMenuClosed
     val oldTopPlayerEnabled by DesktopAppearanceSettings.enableOldTopMusicPlayerStyle.collectAsState()
+    val fullScreen by DesktopWindowMode.fullScreen.collectAsState()
+    val placement by DesktopWindowMode.placement.collectAsState()
+    val integratedCaptionActive = DesktopWindowsCaptionMetrics.isIntegratedTitleBarActive(
+        isWindows = DesktopPlatform.isWindows,
+        isFullscreen = fullScreen,
+    )
+    val hitTestRegistry = remember { DesktopTitleBarHitTestRegistry() }
+    val windowActions = LocalDesktopWindowActions.current
+    val density = LocalDensity.current
+    val titleBarHeight = if (oldTopPlayerEnabled) {
+        DesktopWindowsCaptionMetrics.TOP_PLAYER_HEIGHT
+    } else {
+        DesktopWindowsCaptionMetrics.INTEGRATED_TITLE_BAR_HEIGHT
+    }
+    LaunchedEffect(integratedCaptionActive, titleBarHeight, density) {
+        if (DesktopPlatform.isWindows) {
+            val heightPx = if (integratedCaptionActive) with(density) { titleBarHeight.roundToPx() } else 0
+            DesktopWindowsNativeCaption.setTitleBarHeight(heightPx)
+        }
+    }
     CompositionLocalProvider(
         LocalDesktopHaze provides haze,
         LocalDesktopMenuPortal provides menuPortal,
+        LocalDesktopTitleBarHitTestRegistry provides hitTestRegistry,
     ) {
         Box(modifier.fillMaxSize().background(containerColor).desktopMenuPointer(menuPortal)) {
             // Preserve blur for the floating player; the sidebar itself remains opaque.
@@ -6743,7 +6785,15 @@ internal fun DesktopFrame(
                             )
                             Column(Modifier.weight(1f).fillMaxHeight()) {
                                 // Only the legacy top player uses compact chrome at narrow widths.
-                                topBar(narrow)
+                                if (oldTopPlayerEnabled) {
+                                    topBar(narrow)
+                                } else if (integratedCaptionActive) {
+                                    Spacer(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(DesktopWindowsCaptionMetrics.INTEGRATED_TITLE_BAR_HEIGHT),
+                                    )
+                                }
                                 DesktopPageWithSidePanel(
                                     overlayPanel = homePanelOverlay,
                                     modifier = Modifier.fillMaxWidth().weight(1f),
@@ -6827,6 +6877,16 @@ internal fun DesktopFrame(
                     }
                     overlay()
                 }
+            }
+            if (integratedCaptionActive && windowActions != null) {
+                DesktopWindowsCaptionButtons(
+                    isMaximized = placement == androidx.compose.ui.window.WindowPlacement.Maximized,
+                    height = DesktopWindowsCaptionMetrics.INTEGRATED_TITLE_BAR_HEIGHT,
+                    onMinimize = windowActions.onMinimize,
+                    onToggleMaximize = windowActions.onToggleMaximize,
+                    onClose = windowActions.onClose,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                )
             }
             // Menus overlay the entire client area. They must never take space in the Column.
             CompositionLocalProvider(LocalDesktopHaze provides menuHaze) {
