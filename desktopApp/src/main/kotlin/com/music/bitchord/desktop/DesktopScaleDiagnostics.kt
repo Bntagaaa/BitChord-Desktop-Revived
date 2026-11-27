@@ -75,13 +75,16 @@ internal fun LogDesktopWindowScale(
         val configuration = window.graphicsConfiguration ?: return@LaunchedEffect
         val transform = configuration.defaultTransform
         val bounds = configuration.bounds
-        val insets = toolkit.getScreenInsets(configuration)
-        val mode = configuration.device.displayMode
+        val insets = runCatching { toolkit.getScreenInsets(configuration) }.getOrNull()
+        val mode = runCatching { configuration.device.displayMode }.getOrNull()
+        val available = insets?.let {
+            "${bounds.x + it.left},${bounds.y + it.top},${bounds.width - it.left - it.right},${bounds.height - it.top - it.bottom}"
+        }
+        val dpi = runCatching { toolkit.screenResolution }.getOrNull()
         val message = "[scale] window=$name toolkit=${toolkit.javaClass.name} renderer=${window.renderApi} " +
-            "displayMode=${mode.width}x${mode.height} logicalBounds=${bounds.x},${bounds.y},${bounds.width},${bounds.height} " +
-            "availableBounds=${bounds.x + insets.left},${bounds.y + insets.top}," +
-            "${bounds.width - insets.left - insets.right},${bounds.height - insets.top - insets.bottom} " +
-            "awtTransform=${transform.scaleX}x${transform.scaleY} dpi=${toolkit.screenResolution} " +
+            "displayMode=${mode?.let { "${it.width}x${it.height}" }} " +
+            "logicalBounds=${bounds.x},${bounds.y},${bounds.width},${bounds.height} availableBounds=$available " +
+            "awtTransform=${transform.scaleX}x${transform.scaleY} dpi=$dpi " +
             "x11WindowScale=$x11WindowScale systemDensity=${system.density} fontScale=${system.fontScale} " +
             "appZoom=$zoomPercent effectiveDensity=${effective.density} " +
             "contentToAwtPixelRatio=${effective.density / transform.scaleX} " +

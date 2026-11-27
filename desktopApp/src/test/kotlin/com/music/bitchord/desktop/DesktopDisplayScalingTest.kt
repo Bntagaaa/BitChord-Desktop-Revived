@@ -55,7 +55,6 @@ class DesktopDisplayScalingTest {
     fun liveScaleChangesResizeLayoutAndKeepMouseHitTestingAligned() = runDesktopComposeUiTest(
         width = 240,
         height = 180,
-        density = Density(1f),
     ) {
         val x11Scale = mutableStateOf(1)
         var clickCount = 0
