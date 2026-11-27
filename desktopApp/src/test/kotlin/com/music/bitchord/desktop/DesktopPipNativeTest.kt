@@ -18,6 +18,7 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.playback.PlaybackPosition
 import java.awt.Dimension
 import java.awt.EventQueue
+import java.awt.Point
 import java.awt.Robot
 import java.awt.event.WindowEvent
 import java.io.File
@@ -167,6 +168,18 @@ class DesktopPipNativeTest {
         fun nodes(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::nodes)
         fun node(tag: String) = pip()?.semanticsOwners?.flatMap { nodes(it.unmergedRootSemanticsNode) }
             ?.singleOrNull { it.config.getOrNull(SemanticsProperties.TestTag) == tag }
+        fun geometry() = pip()?.let { native ->
+            "window=${native.bounds} insets=${native.insets} client=${native.contentPane.size} " +
+                "root=${node("pip-root")?.boundsInRoot} play=${node("pip-play")?.boundsInRoot} " +
+                "awt=${native.graphicsConfiguration.defaultTransform} clicks=$plays"
+        } ?: "PiP is unavailable"
+        fun capture(name: String) {
+            pip()?.takeIf { it.isShowing }?.let { native ->
+                val evidence = File("build/reports/pip-rebuild/$name.png")
+                evidence.parentFile.mkdirs()
+                ImageIO.write(Robot().createScreenCapture(native.bounds), "png", evidence)
+            }
+        }
         try {
             DesktopPipSettings.update { it.copy(lyrics = false, bounds = DesktopPipBounds(80, 80, 500, 340)) }
             controller.show()
@@ -177,7 +190,7 @@ class DesktopPipNativeTest {
                     try {
                         suspend fun await(label: String, predicate: () -> Boolean) {
                             repeat(150) { if (predicate()) return; delay(30) }
-                            error("native PiP scaling timed out: $label")
+                            error("native PiP scaling timed out: $label; ${geometry()}")
                         }
                         await("mapped frame") { pip()?.isShowing == true && node("pip-play") != null }
                         val native = pip()!!
@@ -194,13 +207,21 @@ class DesktopPipNativeTest {
                             await("minimum at $factor") { native.minimumSize == expectedMinimum }
                             native.size = Dimension(1, 1) // AWT must clamp an undersized resize.
                             await("client at $factor") {
-                                native.contentPane.width >= clientWidth && native.contentPane.height >= clientHeight &&
+                                // setSize updates the outer bounds before AWT lays out its children.
+                                // Both the old contentPane and old Compose root can still agree;
+                                // require them to match the new native client before choosing a click.
+                                val actualInsets = native.insets
+                                val actualClientWidth = native.width - actualInsets.left - actualInsets.right
+                                val actualClientHeight = native.height - actualInsets.top - actualInsets.bottom
+                                native.size == expectedMinimum &&
+                                    native.contentPane.width == actualClientWidth && native.contentPane.height == actualClientHeight &&
+                                    actualClientWidth >= clientWidth && actualClientHeight >= clientHeight &&
                                     node("pip-action-Close picture in picture")?.boundsInRoot?.let {
                                         kotlin.math.abs(it.width - 28f * factor) < 1.1f
                                     } == true &&
                                     node("pip-root")?.boundsInRoot?.let {
-                                        kotlin.math.abs(it.width - native.contentPane.width * transform.scaleX) < 1.1 &&
-                                            kotlin.math.abs(it.height - native.contentPane.height * transform.scaleY) < 1.1
+                                        kotlin.math.abs(it.width - actualClientWidth * transform.scaleX) < 1.1 &&
+                                            kotlin.math.abs(it.height - actualClientHeight * transform.scaleY) < 1.1
                                     } == true
                             }
                             val root = assertNotNull(node("pip-root")).boundsInRoot
@@ -214,21 +235,25 @@ class DesktopPipNativeTest {
                             }
                             val play = assertNotNull(node("pip-play")).boundsInRoot.center
                             val origin = native.contentPane.locationOnScreen
+                            val target = Point(origin.x + (play.x / transform.scaleX).roundToInt(),
+                                origin.y + (play.y / transform.scaleY).roundToInt())
+                            assertTrue(native.bounds.contains(target), "Native click $target is outside ${geometry()}")
+                            capture("native-scale-${(factor * 100).toInt()}")
+                            println("PIP_SCALING factor=$factor target=$target ${geometry()}")
                             val previousPlays = plays
                             Robot().apply {
-                                mouseMove(origin.x + (play.x / transform.scaleX).roundToInt(),
-                                    origin.y + (play.y / transform.scaleY).roundToInt())
+                                mouseMove(target.x, target.y)
                                 mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
                                 mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
                             }
                             await("native click at $factor") { plays == previousPlays + 1 }
                             assertSame(native, pip(), "Changing scale must retain the native PiP window")
-                            val evidence = File("build/reports/pip-rebuild/native-scale-${(factor * 100).toInt()}.png")
-                            evidence.parentFile.mkdirs()
-                            ImageIO.write(Robot().createScreenCapture(native.bounds), "png", evidence)
                         }
                         println("PIP_SCALING PASS 100/125/150/175/200/100 minimum-client/native-clicks/same-peer")
-                    } catch (error: Throwable) { failure = error }
+                    } catch (error: Throwable) {
+                        failure = error
+                        runCatching { capture("native-scale-failure") }
+                    }
                     finally { controller.dispose(); exitApplication() }
                 }
             }
