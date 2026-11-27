@@ -26,11 +26,11 @@ internal class MotionVideoPresentation {
     var latest by mutableStateOf<MotionVideoFrameInfo?>(null)
     var lease: MotionVideoSessions.Lease? = null
 
-    fun withFrame(markDrawn: Boolean = true, read: (VideoFrame) -> Unit) = lease?.withFrame(markDrawn, read)
+    fun withFrame(read: (VideoFrame) -> Unit) = lease?.withFrame(read)
 
     fun sample(maxEdge: Int): ImageBitmap? {
         var bitmap: ImageBitmap? = null
-        withFrame(markDrawn = false) { bitmap = it.sample(maxEdge) }
+        withFrame { bitmap = it.sample(maxEdge) }
         return bitmap
     }
 }

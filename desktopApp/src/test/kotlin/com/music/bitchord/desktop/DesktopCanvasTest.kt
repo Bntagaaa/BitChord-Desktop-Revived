@@ -193,7 +193,7 @@ class DesktopCanvasTest {
         assertTrue(java.nio.file.Files.isReadable(playlist))
         val contents = java.nio.file.Files.readString(playlist)
         assertFalse(contents.contains("http://"), "rewritten playlist must reference local files")
-        assertTrue(contents.contains("file:"), "rewritten playlist must use file URIs for cross-platform FFmpeg")
+        assertFalse(contents.contains("file:"), "FFmpeg must resolve sibling paths on Windows")
         assertEquals(playlist, DesktopCanvasCache.hlsFileIfCached(url, 540), "second call should hit local cache")
         assertEquals(playlist, DesktopCanvasCache.hlsFileFor(url, 540), "hlsFileFor should reuse local cache")
     }

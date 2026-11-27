@@ -116,18 +116,20 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
             if (bottomFade > 0.001f) compositingStrategy = CompositingStrategy.Offscreen
         },
     ) {
-        val clipAspect = presentation.latest?.size?.let { it.width / it.height } ?: return@Canvas
-        val viewAspect = size.width / size.height
-        val fit = spec.contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f
-        val (drawWidth, drawHeight) = when {
-            fit && clipAspect > viewAspect -> size.width to size.width / clipAspect
-            fit -> size.height * clipAspect to size.height
-            clipAspect > viewAspect -> size.height * clipAspect to size.height
-            else -> size.width to size.width / clipAspect
-        }
-        val left = (size.width - drawWidth) / 2f
-        val top = if (fit && spec.alignPortraitTop) 0f else (size.height - drawHeight) / 2f
+        // Observe each frame's publication, then calculate the crop from the frame being drawn.
+        if (presentation.latest == null) return@Canvas
         presentation.withFrame { image ->
+            val clipAspect = image.width.toFloat() / image.height
+            val viewAspect = size.width / size.height
+            val fit = spec.contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f
+            val (drawWidth, drawHeight) = when {
+                fit && clipAspect > viewAspect -> size.width to size.width / clipAspect
+                fit -> size.height * clipAspect to size.height
+                clipAspect > viewAspect -> size.height * clipAspect to size.height
+                else -> size.width to size.width / clipAspect
+            }
+            val left = (size.width - drawWidth) / 2f
+            val top = if (fit && spec.alignPortraitTop) 0f else (size.height - drawHeight) / 2f
             val drawn = with(image) {
                 drawFrame(Rect.makeXYWH(left.roundToInt().toFloat(), top.roundToInt().toFloat(),
                     drawWidth.roundToInt().toFloat(), drawHeight.roundToInt().toFloat()))

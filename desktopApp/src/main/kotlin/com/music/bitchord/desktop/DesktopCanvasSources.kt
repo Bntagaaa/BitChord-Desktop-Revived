@@ -18,6 +18,7 @@ import java.nio.file.Files
 import java.text.Normalizer
 import java.time.Duration
 import java.util.Locale
+import java.util.concurrent.locks.ReentrantLock
 
 /**
  * Where motion artwork comes from.
@@ -76,9 +77,7 @@ private val canvasClient: HttpClient = HttpClient.newBuilder()
     .build()
 
 /**
- * A plain GET returning the body, or null for anything that isn't a 2xx or that throws.
- *
- * Canvas is decoration: no provider failure is allowed to reach the player.
+ * A plain GET that returns null on a provider failure and preserves interruption for cancellation.
  */
 internal fun canvasGet(url: String, headers: Map<String, String> = emptyMap()): String? = runCatching {
     val builder = HttpRequest.newBuilder(URI.create(url))
@@ -87,7 +86,7 @@ internal fun canvasGet(url: String, headers: Map<String, String> = emptyMap()): 
     headers.forEach { (name, value) -> builder.header(name, value) }
     val response = canvasClient.send(builder.GET().build(), HttpResponse.BodyHandlers.ofString())
     if (response.statusCode() in 200..299) response.body() else null
-}.getOrNull()
+}.onFailure { if (it is InterruptedException) throw it }.getOrNull()
 
 private fun query(base: String, params: List<Pair<String, String>>): String =
     params.joinToString("&", prefix = "$base?") { (name, value) ->
@@ -401,6 +400,7 @@ internal object DesktopAppleMusicCanvas {
     @Volatile private var tokenExpiresAtMs = 0L
     @Volatile private var retryTokenAfterMs = 0L
     private val rejected = mutableSetOf<String>()
+    private val tokenLock = ReentrantLock()
 
     fun warmToken() {
         runCatching { token() }
@@ -436,22 +436,30 @@ internal object DesktopAppleMusicCanvas {
         when {
             response.statusCode() in 200..299 -> response.body()
             response.statusCode() == 401 -> {
-                synchronized(this) {
+                withTokenLock {
                     rejected += bearer
                     if (cachedToken == bearer) {
                         cachedToken = null
                         tokenExpiresAtMs = 0L
+                        runCatching { Files.deleteIfExists(tokenCachePath()) }
                     }
-                    runCatching { Files.deleteIfExists(tokenCachePath()) }
                 }
                 null
             }
             else -> null
         }
-    }.getOrNull()
+    }.onFailure { if (it is InterruptedException) throw it }.getOrNull()
 
-    @Synchronized
-    private fun token(): String? {
+    private inline fun <T> withTokenLock(action: () -> T): T {
+        tokenLock.lockInterruptibly()
+        try {
+            return action()
+        } finally {
+            tokenLock.unlock()
+        }
+    }
+
+    private fun token(): String? = withTokenLock {
         val now = System.currentTimeMillis()
         cachedToken?.let { if (it !in rejected && now < tokenExpiresAtMs - 60_000) return it }
         readPersistedToken(now)?.let { (jwt, exp) ->

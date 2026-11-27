@@ -2163,8 +2163,9 @@ internal fun BitChordDesktopApp(
         )
     }
 
-    LaunchedEffect(selectedSong?.videoId, selectedSong?.albumName, selectedSong?.isVideo, animatedCanvas) {
-        val current = selectedSong
+    val canvasSong = selectedSong?.withDesktopPlayerMetadata(trackLinks)
+    LaunchedEffect(canvasSong?.videoId, canvasSong?.albumName, canvasSong?.isVideo, animatedCanvas) {
+        val current = canvasSong
         if (current == null || !animatedCanvas || current.isVideo) {
             canvas = null
             return@LaunchedEffect

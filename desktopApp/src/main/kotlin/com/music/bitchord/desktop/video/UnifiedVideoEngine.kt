@@ -7,9 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -87,88 +85,115 @@ internal object UnifiedVideoEngine {
 
     private suspend fun loopMotion(
         source: MotionVideoSource,
-        publish: (VideoFrame) -> Unit,
+        publish: (VideoFrame) -> Boolean,
         running: StateFlow<Boolean>,
     ) {
-        // A manifest can fail to rewind. Limit retries without changing the normal native loop path.
+        val context = currentCoroutineContext()
         val candidates = listOfNotNull(source.url, source.fallbackUrl).distinct()
         for (candidate in candidates) {
+            val manifest = isManifest(candidate)
+            val hls = isHlsManifest(candidate)
             var emptyPasses = 0
-            var everShown = false
-            val maxEmpty = { if (everShown) 4 else 2 }
-            while (currentCoroutineContext().isActive && emptyPasses < maxEmpty()) {
+            var clipSize: Size? = null
+            var cacheRejected = false
+            var warmRequested = false
+            var frameEndsAtNanos = 0L
+
+            // Allow fallback only until a candidate has successfully presented a frame.
+            while (context.isActive && (clipSize != null || emptyPasses < 2)) {
                 running.first { it }
-                val path = runInterruptible {
-                    if (isManifest(candidate)) {
-                        DesktopCanvasCache.hlsFileIfCached(candidate, source.maxEdge)?.toAbsolutePath()?.toString()
-                            ?: run {
-                                DesktopCanvasCache.warmHlsInBackground(candidate, source.maxEdge)
-                                DesktopCanvasCache.resolveHlsMediaUrl(candidate, source.maxEdge)
-                            }
-                    } else {
-                        DesktopCanvasCache.fileFor(candidate)?.toAbsolutePath()?.toString()
+                val cached = if (hls && !cacheRejected) {
+                    runInterruptible { DesktopCanvasCache.hlsFileIfCached(candidate, source.maxEdge) }
+                } else null
+                val path = cached?.toAbsolutePath()?.toString() ?: runInterruptible {
+                    when {
+                        hls -> DesktopCanvasCache.resolveHlsMediaUrl(candidate, source.maxEdge)
+                        manifest -> candidate
+                        else -> DesktopCanvasCache.fileFor(candidate)?.toAbsolutePath()?.toString()
                     }
                 }
-                if (path == null) break
-                val context = currentCoroutineContext()
-                context.ensureActive()
-                val decoder = backend.decoder(
-                    source.maxEdge,
-                    loop = true,
-                    owner = context[Job],
-                    preferMotionRendition = true,
+                if (path == null) {
+                    emptyPasses++
+                    delay(RETRY_DELAY_MS)
+                    continue
+                }
+
+                val decoder = FfmpegVideoBackend.decoder(
+                    source.maxEdge, loop = true, owner = context[Job], preferMotionRendition = true,
                 )
                 var shown = false
                 try {
                     runInterruptible { decoder.open(path).getOrThrow() }
+                    val openedSize = Size(decoder.width.toFloat(), decoder.height.toFloat())
+                    check(clipSize == null || clipSize == openedSize) { "motion video changed dimensions" }
+
                     var clockOriginNanos = 0L
                     var firstPtsMs = 0L
-                    var seenLoopGeneration = decoder.loopGeneration
+                    var nextFramePtsMs = 0L
+                    var generation = decoder.loopGeneration
                     while (context.isActive) {
                         if (!running.value) {
                             running.first { it }
                             clockOriginNanos = 0L
+                            frameEndsAtNanos = 0L
                         }
-                        motion.awaitDrawIfBehind(source)
-                        val frame = decoder.nextFrame { pts ->
-                            context.ensureActive()
-                            if (clockOriginNanos == 0L || decoder.loopGeneration != seenLoopGeneration) {
-                                seenLoopGeneration = decoder.loopGeneration
-                                clockOriginNanos = System.nanoTime()
-                                firstPtsMs = pts
-                                true
-                            } else {
-                                val targetPts = firstPtsMs + (System.nanoTime() - clockOriginNanos) / 1_000_000L
-                                pts + decoder.frameIntervalMillis >= targetPts
+                        // The HLS demuxer can report a successful seek and still yield no frames.
+                        // Open a fresh demuxer at each HLS EOF and give the disk cache first refusal.
+                        val frame = decoder.nextMotionFrame(
+                            rewindAtEnd = !manifest,
+                            accept = { pts ->
+                                context.ensureActive()
+                                val now = System.nanoTime()
+                                if (clockOriginNanos == 0L || generation != decoder.loopGeneration) {
+                                    generation = decoder.loopGeneration
+                                    clockOriginNanos = maxOf(now, frameEndsAtNanos)
+                                    firstPtsMs = pts
+                                    nextFramePtsMs = pts
+                                }
+                                val targetPts = firstPtsMs + (now - clockOriginNanos) / 1_000_000L
+                                pts >= nextFramePtsMs - 1 && pts + decoder.frameIntervalMillis >= targetPts
+                            },
+                            awaitPresentation = {
+                                val pts = decoder.frameTimeMs
+                                val elapsedMs = (System.nanoTime() - clockOriginNanos) / 1_000_000L
+                                val waitMs = (pts - firstPtsMs - elapsedMs).coerceIn(0L, 200L)
+                                if (waitMs > 0) delay(waitMs)
+                                context.ensureActive()
+                            },
+                        ) ?: break
+                        if (publish(frame)) {
+                            shown = true
+                            clipSize = openedSize
+                            val pts = decoder.frameTimeMs
+                            nextFramePtsMs = maxOf(nextFramePtsMs + DesktopCanvasDecoder.MIN_INTERVAL_MS, pts + 1)
+                            frameEndsAtNanos = clockOriginNanos +
+                                (pts - firstPtsMs + decoder.frameIntervalMillis) * 1_000_000L
+                            if (hls && cached == null && !cacheRejected && !warmRequested) {
+                                warmRequested = true
+                                DesktopCanvasCache.warmHlsInBackground(candidate, source.maxEdge)
                             }
-                        } ?: break
-                        val pts = decoder.frameTimeMs
-                        if (clockOriginNanos == 0L || decoder.loopGeneration != seenLoopGeneration) {
-                            seenLoopGeneration = decoder.loopGeneration
-                            clockOriginNanos = System.nanoTime()
-                            firstPtsMs = pts
                         }
-                        val targetPts = firstPtsMs + (System.nanoTime() - clockOriginNanos) / 1_000_000L
-                        val waitMs = (pts - targetPts - VSYNC_LEAD_MS).coerceIn(0L, 200L)
-                        if (waitMs > 0L) delay(waitMs)
-                        publish(frame)
-                        shown = true
-                        everShown = true
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: Exception) {
-                    DesktopTrackLog.log("motion video: ${failure.javaClass.simpleName}")
+                    DesktopTrackLog.log("motion video: ${failure.message}")
                 } finally {
                     decoder.close()
                 }
+                context.ensureActive()
+                if (cached != null && !shown) {
+                    runInterruptible { DesktopCanvasCache.discardHlsPlaylist(cached) }
+                    cacheRejected = true
+                    continue
+                }
                 emptyPasses = if (shown) 0 else emptyPasses + 1
-                delay(if (shown) 16L else 750L)
+                if (!shown) delay(RETRY_DELAY_MS)
             }
         }
     }
 
-    private const val VSYNC_LEAD_MS = 8L
+    private const val RETRY_DELAY_MS = 750L
 
 }
 
@@ -176,7 +201,7 @@ internal object UnifiedVideoEngine {
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class MotionVideoSessions(
     private val scope: CoroutineScope,
-    private val play: suspend (MotionVideoSource, (VideoFrame) -> Unit, StateFlow<Boolean>) -> Unit,
+    private val play: suspend (MotionVideoSource, (VideoFrame) -> Boolean, StateFlow<Boolean>) -> Unit,
 ) : AutoCloseable {
     private var closed = false
     private val sessions = mutableMapOf<MotionVideoSource, Entry>()
@@ -185,8 +210,6 @@ internal class MotionVideoSessions(
         val frame = MutableStateFlow<VideoFrame?>(null)
         val presentation = MutableStateFlow<MotionVideoFrameInfo?>(null)
         var sequence = 0L
-        var awaitingDraw = false
-        val drawSignal = Channel<Unit>(Channel.CONFLATED)
         val running = MutableStateFlow(false)
         val views = mutableMapOf<Any, Boolean>()
         lateinit var job: Job
@@ -195,18 +218,18 @@ internal class MotionVideoSessions(
     internal class Lease(
         val frame: StateFlow<VideoFrame?>,
         val presentation: StateFlow<MotionVideoFrameInfo?>,
-        private val read: ((VideoFrame) -> Unit, Boolean) -> Unit,
+        private val read: ((VideoFrame) -> Unit) -> Unit,
         private val update: (Boolean) -> Unit,
         private val release: () -> Unit,
     ) : AutoCloseable {
-        fun withFrame(markDrawn: Boolean = true, readFrame: (VideoFrame) -> Unit) = read(readFrame, markDrawn)
+        fun withFrame(readFrame: (VideoFrame) -> Unit) = read(readFrame)
         fun running(value: Boolean) = update(value)
         override fun close() = release()
     }
 
     @Synchronized
     fun attach(source: MotionVideoSource, running: Boolean): Lease {
-        if (closed) return Lease(MutableStateFlow(null), MutableStateFlow(null), { _, _ -> }, {}, {})
+        if (closed) return Lease(MutableStateFlow(null), MutableStateFlow(null), {}, {}, {})
         val previous = sessions[source]
         val entry = previous?.takeIf { it.views.isNotEmpty() } ?: Entry().also { created ->
             sessions[source] = created
@@ -221,41 +244,27 @@ internal class MotionVideoSessions(
         entry.views[token] = running
         entry.running.value = entry.views.containsValue(true)
         return Lease(
-            entry.frame, entry.presentation, { read, markDrawn -> readFrame(entry, token, markDrawn, read) },
+            entry.frame, entry.presentation, { readFrame(entry, token, it) },
             { setRunning(entry, token, it) }, { release(source, entry, token) },
         )
     }
 
     @Synchronized
-    private fun publish(entry: Entry, next: VideoFrame) {
+    private fun publish(entry: Entry, next: VideoFrame): Boolean {
         if (entry.views.isEmpty() || !entry.running.value) {
             next.close()
-            return
+            return false
         }
         val old = entry.frame.value
         entry.frame.value = next
-        entry.drawSignal.tryReceive()
-        entry.awaitingDraw = true
         entry.presentation.value = MotionVideoFrameInfo(next.intrinsicSize, ++entry.sequence)
         old?.close()
+        return true
     }
 
     @Synchronized
-    private fun readFrame(entry: Entry, token: Any, markDrawn: Boolean, read: (VideoFrame) -> Unit) {
-        if (token in entry.views) {
-            entry.frame.value?.let(read)
-            if (markDrawn && entry.awaitingDraw) {
-                entry.awaitingDraw = false
-                entry.drawSignal.trySend(Unit)
-            }
-        }
-    }
-
-    suspend fun awaitDrawIfBehind(source: MotionVideoSource) {
-        val entry = synchronized(this) {
-            sessions[source]?.takeIf { it.awaitingDraw && it.views.isNotEmpty() && it.running.value }
-        } ?: return
-        withTimeoutOrNull(33L) { entry.drawSignal.receive() }
+    private fun readFrame(entry: Entry, token: Any, read: (VideoFrame) -> Unit) {
+        if (token in entry.views) entry.frame.value?.let(read)
     }
 
     @Synchronized
@@ -277,8 +286,6 @@ internal class MotionVideoSessions(
     private fun clearFrame(entry: Entry) {
         val old = entry.frame.value
         entry.frame.value = null
-        entry.awaitingDraw = false
-        entry.drawSignal.trySend(Unit)
         entry.presentation.value = null
         old?.close()
     }

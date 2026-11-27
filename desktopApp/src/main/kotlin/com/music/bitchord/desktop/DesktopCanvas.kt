@@ -4,14 +4,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import com.music.bitchord.data.model.Song
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -208,7 +211,7 @@ object DesktopCanvasClient {
         }
         val flightKey = "$key|album=$withAlbum"
         val deferred = synchronized(inFlight) {
-            inFlight[flightKey] ?: lookupScope.async {
+            inFlight[flightKey] ?: lookupScope.async(start = CoroutineStart.LAZY) {
                 try {
                     val found = lookUp()
                     synchronized(cache) {
@@ -221,7 +224,10 @@ object DesktopCanvasClient {
                 } finally {
                     inFlight.remove(flightKey)
                 }
-            }.also { inFlight[flightKey] = it }
+            }.also {
+                inFlight[flightKey] = it
+                it.start()
+            }
         }
         return deferred.await()
     }
@@ -231,44 +237,39 @@ object DesktopCanvasClient {
      * match that survives [accept]. If a lower-priority source already answered, higher-priority
      * sources only get a short grace window so a slow Apple lookup never stalls a ready Tidal clip.
      */
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private suspend fun firstHit(
-        vararg sources: suspend () -> DesktopCanvasArtwork?,
+        vararg sources: () -> DesktopCanvasArtwork?,
         accept: (DesktopCanvasArtwork) -> Boolean,
     ): DesktopCanvasArtwork? = coroutineScope {
-        val jobs = sources.map { source ->
+        val ready = Channel<Int>(sources.size)
+        val jobs = sources.mapIndexed { index, source ->
             async(Dispatchers.IO) {
-                withTimeoutOrNull(PROVIDER_TIMEOUT_MS) {
-                    runCatching { source() }.getOrNull()?.takeIf(accept)
+                val hit = withTimeoutOrNull(PROVIDER_TIMEOUT_MS) {
+                    try {
+                        runInterruptible { source() }?.takeIf(accept)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        null
+                    }
                 }
+                ready.trySend(index)
+                hit
             }
         }
-        val firstReady = CompletableDeferred<Int>()
-        jobs.forEachIndexed { index, job ->
-            job.invokeOnCompletion {
-                if (!job.isCancelled && runCatching { job.getCompleted() }.getOrNull() != null) {
-                    firstReady.complete(index)
-                }
-            }
-        }
-        val winnerIndex = withTimeoutOrNull(PROVIDER_TIMEOUT_MS) {
-            firstReady.await()
-            val graceDeadline = System.nanoTime() + PRIORITY_GRACE_MS * 1_000_000L
-            for (i in jobs.indices) {
-                val remainingMs = ((graceDeadline - System.nanoTime()) / 1_000_000L).coerceAtLeast(1L)
-                val hit = if (jobs[i].isCompleted) {
-                    runCatching { jobs[i].getCompleted() }.getOrNull()
-                } else {
-                    withTimeoutOrNull(remainingMs) { jobs[i].await() }
-                }
-                if (hit != null) return@withTimeoutOrNull i
+        try {
+            repeat(jobs.size) {
+                val index = ready.receive()
+                val hit = jobs[index].await() ?: return@repeat
+                val preferred = jobs.take(index)
+                return@coroutineScope withTimeoutOrNull(PRIORITY_GRACE_MS) {
+                    preferred.firstNotNullOfOrNull { it.await() }
+                } ?: preferred.firstNotNullOfOrNull { if (it.isCompleted) it.await() else null } ?: hit
             }
             null
+        } finally {
+            jobs.forEach { it.cancel() }
         }
-        val result = winnerIndex?.let { idx -> runCatching { jobs[idx].getCompleted() }.getOrNull() }
-            ?: jobs.firstNotNullOfOrNull { job -> runCatching { job.await() }.getOrNull() }
-        jobs.forEach { if (it.isActive) it.cancel() }
-        result
     }
 
     private const val PROVIDER_TIMEOUT_MS = 4_500L
@@ -296,6 +297,9 @@ internal fun isManifest(url: String): Boolean {
     val path = url.substringBefore('?').substringBefore('#').lowercase()
     return path.endsWith(".m3u8") || path.endsWith(".mpd")
 }
+
+internal fun isHlsManifest(url: String): Boolean =
+    url.substringBefore('?').substringBefore('#').endsWith(".m3u8", ignoreCase = true)
 
 /** The clip itself, on disk. */
 internal object DesktopCanvasCache {
@@ -347,6 +351,11 @@ internal object DesktopCanvasCache {
         return DesktopMediaCache.existing(cacheKey, "m3u8")?.takeIf(::segmentsPresent)
     }
 
+    fun discardHlsPlaylist(path: Path) {
+        runCatching { Files.deleteIfExists(path) }
+            .onFailure { DesktopTrackLog.log("motion HLS cache removal failed: ${it.javaClass.simpleName}") }
+    }
+
     fun resolveHlsMediaUrl(url: String, maxEdge: Int): String {
         val cacheKey = "$maxEdge|$url"
         synchronized(resolvedVariants) { resolvedVariants[cacheKey] }?.let { return it }
@@ -384,7 +393,7 @@ internal object DesktopCanvasCache {
     /**
      * Resolves an HLS motion playlist to the smallest variant covering [maxEdge] and caches its
      * media playlist + segments in [DesktopMediaCache] so loops and replays stay local.
-     * Uses `file:///` URIs so FFmpeg's HLS demuxer resolves local segments reliably on Windows.
+     * Uses sibling filenames so FFmpeg resolves them against the playlist on Windows and Unix.
      * Returns null for encrypted/unsupported playlists so the caller can fall back to streaming.
      */
     fun hlsFileFor(url: String, maxEdge: Int): Path? {
@@ -392,8 +401,8 @@ internal object DesktopCanvasCache {
         hlsFileIfCached(url, maxEdge)?.let { return it }
         return runCatching {
             val mediaUrl = resolveHlsMediaUrl(url, maxEdge)
-            val mediaBody = canvasGet(mediaUrl, mapOf("User-Agent" to DESKTOP_CANVAS_UA)) ?: return null
-            if (!mediaBody.contains("#EXTINF:") || mediaBody.contains("#EXT-X-KEY:")) return null
+            val mediaBody = canvasGet(mediaUrl, mapOf("User-Agent" to DESKTOP_CANVAS_UA)) ?: return@runCatching null
+            if (!mediaBody.contains("#EXTINF:") || mediaBody.contains("#EXT-X-KEY:")) return@runCatching null
 
             val baseUri = URI.create(mediaUrl)
             val lines = mediaBody.lines()
@@ -404,22 +413,22 @@ internal object DesktopCanvasCache {
                     when {
                         trimmed.startsWith("#EXT-X-MAP:") -> {
                             val uriMatch = Regex("""URI="([^"]+)"""").find(trimmed)
-                            val rawUri = uriMatch?.groupValues?.get(1) ?: return null
+                            val rawUri = uriMatch?.groupValues?.get(1) ?: return@runCatching null
                             val resolved = baseUri.resolve(rawUri).toString()
-                            val file = downloadSegment(resolved, segmentExtension(resolved, "mp4")) ?: return null
-                            add(trimmed.replace(uriMatch.value, """URI="${file.toUri()}""""))
+                            val file = downloadSegment(resolved, segmentExtension(resolved, "mp4")) ?: return@runCatching null
+                            add(trimmed.replace(uriMatch.value, """URI="${file.fileName}""""))
                         }
                         trimmed.isEmpty() || trimmed.startsWith("#") -> add(rawLine)
                         else -> {
-                            if (++segmentCount > MAX_HLS_SEGMENTS) return null
+                            if (++segmentCount > MAX_HLS_SEGMENTS) return@runCatching null
                             val resolved = baseUri.resolve(trimmed).toString()
-                            val file = downloadSegment(resolved, segmentExtension(resolved, "ts")) ?: return null
-                            add(file.toUri().toString())
+                            val file = downloadSegment(resolved, segmentExtension(resolved, "ts")) ?: return@runCatching null
+                            add(file.fileName.toString())
                         }
                     }
                 }
             }
-            if (segmentCount == 0) return null
+            if (segmentCount == 0) return@runCatching null
 
             val target = DesktopMediaCache.pathFor(cacheKey, "m3u8")
             val staging = Files.createTempDirectory(target.parent, "hls-")
@@ -431,11 +440,10 @@ internal object DesktopCanvasCache {
                 Files.deleteIfExists(tempPlaylist)
                 Files.deleteIfExists(staging)
             }
-            DesktopMediaCache.trim()
             target
         }.onFailure {
             DesktopTrackLog.log("motion HLS cache failed: ${it.javaClass.simpleName}")
-        }.getOrNull()
+        }.getOrNull().also { DesktopMediaCache.trim() }
     }
 
     private fun segmentsPresent(playlist: Path): Boolean = runCatching {
