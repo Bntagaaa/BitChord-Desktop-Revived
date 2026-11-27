@@ -1,6 +1,7 @@
 <div align="center">
 
-<img width="1920" height="1080" alt="Dekstop (3)" src="https://github.com/user-attachments/assets/4ae53a09-b7e7-4dc2-b676-d348401ce8ff" />
+<img width="1920" height="1080" alt="Dekstop(1)" src="https://github.com/user-attachments/assets/e70aae3c-8388-4957-bf9f-e4eac9a78dac" />
+
 
 <br>
 <br>
