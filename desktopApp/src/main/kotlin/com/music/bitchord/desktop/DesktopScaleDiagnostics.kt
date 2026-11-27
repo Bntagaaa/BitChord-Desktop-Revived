@@ -56,7 +56,7 @@ internal fun LogDesktopWindowScale(
     system: Density,
     effective: Density,
     zoomPercent: Int,
-    x11WindowScale: Int?,
+    x11WindowScale: Float?,
 ) {
     if (!DesktopScaleDiagnostics.enabled) return
 
@@ -81,11 +81,15 @@ internal fun LogDesktopWindowScale(
             "${bounds.x + it.left},${bounds.y + it.top},${bounds.width - it.left - it.right},${bounds.height - it.top - it.bottom}"
         }
         val dpi = runCatching { toolkit.screenResolution }.getOrNull()
+        val xsettingsWindowScale = toolkit.getDesktopProperty(X11_WINDOW_SCALE_PROPERTY)
+        val xsettingsUnscaledDpi = toolkit.getDesktopProperty(X11_UNSCALED_DPI_PROPERTY)
         val message = "[scale] window=$name toolkit=${toolkit.javaClass.name} renderer=${window.renderApi} " +
             "displayMode=${mode?.let { "${it.width}x${it.height}" }} " +
             "logicalBounds=${bounds.x},${bounds.y},${bounds.width},${bounds.height} availableBounds=$available " +
             "awtTransform=${transform.scaleX}x${transform.scaleY} dpi=$dpi " +
-            "x11WindowScale=$x11WindowScale systemDensity=${system.density} fontScale=${system.fontScale} " +
+            "x11WindowScale=$x11WindowScale kde=${isKdeDesktop()} " +
+            "xsettingsWindowScale=$xsettingsWindowScale xsettingsUnscaledDpi=$xsettingsUnscaledDpi " +
+            "systemDensity=${system.density} fontScale=${system.fontScale} " +
             "appZoom=$zoomPercent effectiveDensity=${effective.density} " +
             "contentToAwtPixelRatio=${effective.density / transform.scaleX} " +
             "containerPx=${container.width}x${container.height}"

@@ -8,6 +8,7 @@ on:
     branches:
       - fix/1.9.2-landscape-lyrics-track-header
       - fix/1.9.3-pipewire-output-switch
+      - fix/1.10.1-linux-hidpi-scaling
   workflow_call:
     inputs:
       version:
@@ -68,6 +69,8 @@ jobs:
             version="1.9.2-landscape-${GITHUB_SHA:0:8}"
           elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_NAME" == "fix/1.9.3-pipewire-output-switch" ]]; then
             version="1.9.3-audio-${GITHUB_SHA:0:8}"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_NAME" == "fix/1.10.1-linux-hidpi-scaling" ]]; then
+            version="1.10.1-hidpi-${GITHUB_SHA:0:8}"
           fi
           if [[ ! "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
             echo "::error::Version label may only contain letters, digits, '.', '_' and '-' (max 64 characters)."

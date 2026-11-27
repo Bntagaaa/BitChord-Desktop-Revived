@@ -1,8 +1,11 @@
 package com.music.bitchord.desktop
 
+import java.awt.Dimension
 import java.awt.GraphicsEnvironment
+import java.awt.Insets
 import java.awt.Rectangle
 import java.awt.Toolkit
+import kotlin.math.ceil
 
 internal data class DesktopPipBounds(val x: Int, val y: Int, val width: Int, val height: Int)
 
@@ -10,6 +13,26 @@ internal data class DesktopPipBounds(val x: Int, val y: Int, val width: Int, val
 internal object DesktopPipGeometry {
     const val MIN_WIDTH = 340
     const val MIN_HEIGHT = 210
+
+    /** Keep the compact controls in dp while the native minimum remains in AWT coordinates. */
+    fun minimumSize(
+        contentDensity: Float,
+        awtScaleX: Double,
+        awtScaleY: Double,
+        frameInsets: Insets,
+        workArea: Rectangle,
+    ): Dimension {
+        val density = contentDensity.takeIf { it.isFinite() && it > 0f }?.toDouble() ?: 1.0
+        fun minimum(clientDp: Int, nativeScale: Double, decorations: Int, legacyMinimum: Int, available: Int): Int {
+            val scale = nativeScale.takeIf { it.isFinite() && it > 0.0 } ?: 1.0
+            val client = ceil(clientDp * density / scale).toInt()
+            return maxOf(legacyMinimum, client + decorations).coerceAtMost(available.coerceAtLeast(1))
+        }
+        return Dimension(
+            minimum(320, awtScaleX, frameInsets.left + frameInsets.right, MIN_WIDTH, workArea.width),
+            minimum(180, awtScaleY, frameInsets.top + frameInsets.bottom, MIN_HEIGHT, workArea.height),
+        )
+    }
 
     fun screens(): List<Rectangle> = runCatching {
         GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices.map { device ->
