@@ -44,10 +44,10 @@ class DesktopMotionHlsTest {
 
     @Test
     fun sessionSwitchesFromStreamingToCacheAndKeepsLooping() = withOrigin { origin ->
-        withSession(origin) { lease ->
+        withSession(origin.source()) { lease ->
             lease.awaitSquareFrame(1)
             assertTrue(origin.remoteRequests.get() > 0, "the first pass must stream")
-            awaitCache(origin)
+            awaitCache(origin.primary)
             origin.online.set(false)
             lease.awaitSquareFrame(36)
             assertEquals(0, origin.fallbackRequests.get())
@@ -56,9 +56,9 @@ class DesktopMotionHlsTest {
 
     @Test
     fun corruptCacheAfterFirstFrameRetriesTheProvenPrimary() = withOrigin { origin ->
-        withSession(origin) { lease ->
+        withSession(origin.source()) { lease ->
             lease.awaitSquareFrame(1)
-            val playlist = awaitCache(origin)
+            val playlist = awaitCache(origin.primary)
             val corrupt = "#EXTM3U\n#EXT-X-ENDLIST\n"
             Files.writeString(playlist, corrupt)
             val requests = origin.remoteRequests.get()
@@ -69,8 +69,17 @@ class DesktopMotionHlsTest {
         }
     }
 
-    private fun withSession(origin: Origin, block: suspend (MotionVideoSessions.Lease) -> Unit) = runBlocking {
-        val source = MotionVideoSource(origin.primary, origin.fallback, EDGE, MotionVideoSource.Clock.NowPlaying)
+    @Test
+    fun missingPrimaryUsesFallbackAfterOneDownloadAttempt() = withOrigin { origin ->
+        withSession(origin.source(origin.missingMp4)) { lease ->
+            val frame = withTimeout(5_000) { lease.presentation.first { it != null } }
+            assertEquals(Size(36f, 48f), assertNotNull(frame).size)
+            assertEquals(1, origin.missingRequests.get())
+            awaitCache(origin.fallback)
+        }
+    }
+
+    private fun withSession(source: MotionVideoSource, block: suspend (MotionVideoSessions.Lease) -> Unit) = runBlocking {
         try {
             UnifiedVideoEngine.motion(source, running = true).use { block(it) }
         } finally {
@@ -95,8 +104,8 @@ class DesktopMotionHlsTest {
         }
     }
 
-    private suspend fun awaitCache(origin: Origin) = withTimeout(5_000) {
-        val target = DesktopMediaCache.pathFor("$EDGE|${origin.primary}", "m3u8")
+    private suspend fun awaitCache(url: String) = withTimeout(5_000) {
+        val target = DesktopMediaCache.pathFor("$EDGE|$url", "m3u8")
         while (!Files.isRegularFile(target)) delay(10)
         target
     }
@@ -104,9 +113,14 @@ class DesktopMotionHlsTest {
     private class Origin(base: String) {
         val primary = "$base/square.m3u8"
         val fallback = "$base/tall.m3u8"
+        val missingMp4 = "$base/missing.mp4"
         val online = AtomicBoolean(true)
         val remoteRequests = AtomicInteger()
         val fallbackRequests = AtomicInteger()
+        val missingRequests = AtomicInteger()
+
+        fun source(primaryUrl: String = primary) =
+            MotionVideoSource(primaryUrl, fallback, EDGE, MotionVideoSource.Clock.NowPlaying)
     }
 
     private fun withOrigin(block: (Origin) -> Unit) {
@@ -114,6 +128,11 @@ class DesktopMotionHlsTest {
         val prefix = "/${UUID.randomUUID()}"
         val base = "http://127.0.0.1:${server.address.port}$prefix"
         val origin = Origin(base)
+        server.createContext("$prefix/missing.mp4") { exchange ->
+            origin.missingRequests.incrementAndGet()
+            exchange.sendResponseHeaders(404, -1)
+            exchange.close()
+        }
         for ((name, segmentLength) in listOf("square" to 757, "tall" to 747)) {
             val segment = checkNotNull(javaClass.getResourceAsStream("/video/$name.m4s")).use { it.readBytes() }
             val master = """

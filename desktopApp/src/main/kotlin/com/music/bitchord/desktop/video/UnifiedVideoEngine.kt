@@ -113,7 +113,7 @@ internal object UnifiedVideoEngine {
                     }
                 }
                 if (path == null) {
-                    emptyPasses++
+                    if (clipSize == null) break
                     delay(RETRY_DELAY_MS)
                     continue
                 }
