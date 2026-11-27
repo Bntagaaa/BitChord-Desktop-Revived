@@ -663,7 +663,14 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
     val compactHeadings = LocalDesktopCompactHeadings.current
     val style = if (compactHeadings) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayLarge
     val logoHeight = with(LocalDensity.current) { (style.fontSize * LOGO_TO_FONT).toDp() }
-    Column(modifier = modifier.padding(horizontal = PAGE_GUTTER, vertical = 8.dp)) {
+    Column(
+        modifier = modifier.padding(
+            start = PAGE_GUTTER,
+            end = PAGE_GUTTER,
+            top = if (compactHeadings) 0.dp else 8.dp,
+            bottom = 8.dp,
+        ),
+    ) {
         if (!compactHeadings) {
             Icon(
                 painter = painterResource(Res.drawable.ic_logo),

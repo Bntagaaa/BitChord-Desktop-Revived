@@ -48,8 +48,10 @@ internal object DesktopWindowsFullscreen {
                 }
                 saved = old
                 current = window
+                DesktopWindowsNativeCaption.setFullscreen(true)
             } else if (current === window) {
                 val old = saved ?: return false
+                DesktopWindowsNativeCaption.setFullscreen(false)
                 api.SetWindowLongW(hwnd, STYLE, old.style)
                 api.SetWindowPos(hwnd, null, old.bounds.x, old.bounds.y, old.bounds.width, old.bounds.height,
                     FRAMECHANGED or NOZORDER or NOOWNERZORDER)

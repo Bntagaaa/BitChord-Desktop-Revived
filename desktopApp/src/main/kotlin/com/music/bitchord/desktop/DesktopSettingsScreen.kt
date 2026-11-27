@@ -645,7 +645,7 @@ internal fun DesktopSettingsScreen(
                 DesktopAppearanceSettings::setMicaSidebar,
             )
         }
-        if (DesktopPlatform.isWindows) {
+        if (false && DesktopPlatform.isWindows) {
             val backdropChoice by DesktopWindowBackdrop.selected.collectAsState()
             val backdropActive by DesktopWindowBackdrop.captionActive.collectAsState()
             val materialTitle = "Native title bar material"

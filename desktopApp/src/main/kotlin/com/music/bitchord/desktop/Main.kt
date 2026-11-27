@@ -355,7 +355,10 @@ private fun desktopMain(
             }
         }
         DisposableEffect(composeWindow) {
-            onDispose { DesktopWindowsCaptionAppearance.detach(composeWindow) }
+            onDispose {
+                DesktopWindowsCaptionAppearance.detach(composeWindow)
+                if (DesktopPlatform.isWindows) DesktopWindowsNativeCaption.detach(composeWindow)
+            }
         }
         LaunchedEffect(raiseRequest) {
             if (raiseRequest == 0L) return@LaunchedEffect
@@ -389,6 +392,9 @@ private fun desktopMain(
                 repeat(10) {
                     if (DesktopWindowsCaptionAppearance.attach(composeWindow)) {
                         DesktopWindowBackdrop.apply()
+                        val initialTitleBarPx = (DesktopWindowsCaptionMetrics.INTEGRATED_TITLE_BAR_HEIGHT.value *
+                            composeWindow.graphicsConfiguration.defaultTransform.scaleY).roundToInt()
+                        DesktopWindowsNativeCaption.attach(composeWindow, initialTitleBarPx)
                         return@LaunchedEffect
                     }
                     delay(50)
@@ -428,9 +434,21 @@ private fun desktopMain(
             windowFocused = lyricsWindowFocused,
             animateWhenUnfocused = animateLyricsWhileUnfocused,
         )
+        val windowActions = remember(state) {
+            DesktopWindowActions(
+                onMinimize = { state.isMinimized = true },
+                onToggleMaximize = { DesktopWindowMode.toggleMaximized() },
+                onClose = { if (DesktopWindowVisibility.onCloseRequest()) exitApplication() },
+            )
+        }
+        val captionSystemDensity = remember(systemDensity) {
+            Density(systemDensity.density, fontScale = 1f)
+        }
         CompositionLocalProvider(
             LocalDensity provides uiDensity,
+            LocalDesktopSystemDensity provides captionSystemDensity,
             LocalLyricAnimationAllowed provides lyricsAnimationAllowed,
+            LocalDesktopWindowActions provides windowActions,
         ) {
             ProvideDesktopPresentationLifecycle(visible && !state.isMinimized) {
                 DesktopFlyoutHost {

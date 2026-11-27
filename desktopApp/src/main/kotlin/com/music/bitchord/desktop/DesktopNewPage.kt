@@ -72,14 +72,14 @@ internal fun DesktopNewPage(
         state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = 8.dp,
+            top = 0.dp,
             bottom = contentPadding.calculateBottomPadding() + 24.dp,
         ),
     ) {
         item(key = "new-page-title") {
             Text(
                 text = "New",
-                modifier = Modifier.padding(horizontal = PAGE_GUTTER, vertical = 8.dp),
+                modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, top = 0.dp, bottom = 8.dp),
                 style = if (LocalDesktopCompactHeadings.current) {
                     MaterialTheme.typography.headlineLarge
                 } else {
