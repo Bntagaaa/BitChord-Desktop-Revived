@@ -2,6 +2,7 @@ package com.music.bitchord.ui.player
 
 import com.music.bitchord.ui.icons.SfStyleIcons
 
+import com.music.bitchord.data.settings.PlayerLayout
 import com.music.bitchord.data.settings.PlayerTheme
 
 import androidx.compose.animation.animateColorAsState
@@ -902,6 +903,7 @@ fun NowPlayingScreen(
     // v1.5's backdrop, kept behind a switch — see [PlayerSettings.legacyMeshGradient].
     val legacyMesh by PlayerSettings.legacyMeshGradient.collectAsStateWithLifecycle()
     val selectedPlayerTheme by PlayerSettings.playerTheme.collectAsStateWithLifecycle()
+    val selectedPlayerLayout by PlayerSettings.playerLayout.collectAsStateWithLifecycle()
     // Keep Android's pre-existing Legacy toggle working; desktop uses the three-way setting.
     val playerBackdropTheme = if (legacyMesh) PlayerTheme.LEGACY else selectedPlayerTheme
     // The backdrop's colours, taken off the artwork's own arrangement rather
@@ -2074,212 +2076,270 @@ fun NowPlayingScreen(
             }
 
             Box(modifier = modifier.fillMaxSize().then(dockHost)) {
-                LandscapePlayerLayout(
-                    trackKey = song.videoId,
-                    pane = when {
-                        lyricsOpen -> PlayerPane.Lyrics
-                        queueOpen -> PlayerPane.Queue
-                        else -> PlayerPane.Main
-                    },
-                    background = { backgroundModifier ->
-                        // On desktop the expanded player is usually landscape. Give
-                        // each theme its own backdrop, using the existing cached
-                        // low-resolution CPU blur for Simple (and the Default fallback).
-                        val backdropModifier = backgroundModifier.hazeSource(playerHaze)
-                        Box(backdropModifier) {
-                            when (playerBackdropTheme) {
-                                PlayerTheme.DEFAULT ->
-                                    if (artMesh != null) {
-                                        ArtworkMeshBackdrop(
-                                            mesh = artMesh,
-                                            seam = 0.dp,
-                                            modifier = Modifier.matchParentSize(),
-                                        )
-                                    } else fullArtworkBlurContent(Modifier.matchParentSize())
-                                PlayerTheme.LEGACY -> MeshGradientBackground(
-                                    palette = rememberArtworkColors(remoteArt, canvasFrame),
-                                    trackKey = song.videoId,
-                                    modifier = Modifier.matchParentSize(),
-                                )
-                                PlayerTheme.SIMPLE -> fullArtworkBlurContent(Modifier.matchParentSize())
-                            }
-                            PlayerPlatform.host.AutoMixAmbient(song, playerBackdropTheme, Modifier.matchParentSize())
+                val activePane = when {
+                    lyricsOpen -> PlayerPane.Lyrics
+                    queueOpen -> PlayerPane.Queue
+                    else -> PlayerPane.Main
+                }
+                val landscapeBackground: @Composable (Modifier) -> Unit = { backgroundModifier ->
+                    // On desktop the expanded player is usually landscape. Give
+                    // each theme its own backdrop, using the existing cached
+                    // low-resolution CPU blur for Simple (and the Default fallback).
+                    val backdropModifier = backgroundModifier.hazeSource(playerHaze)
+                    Box(backdropModifier) {
+                        when (playerBackdropTheme) {
+                            PlayerTheme.DEFAULT ->
+                                if (artMesh != null) {
+                                    ArtworkMeshBackdrop(
+                                        mesh = artMesh,
+                                        seam = 0.dp,
+                                        modifier = Modifier.matchParentSize(),
+                                    )
+                                } else fullArtworkBlurContent(Modifier.matchParentSize())
+                            PlayerTheme.LEGACY -> MeshGradientBackground(
+                                palette = rememberArtworkColors(remoteArt, canvasFrame),
+                                trackKey = song.videoId,
+                                modifier = Modifier.matchParentSize(),
+                            )
+                            PlayerTheme.SIMPLE -> fullArtworkBlurContent(Modifier.matchParentSize())
                         }
-                    },
-                    artwork = { artworkModifier ->
-                        LandscapeArtwork(
-                            artRequest = art.request,
-                            artLoaded = art.loaded,
-                            onArtState = art::onState,
-                            canvas = canvas,
-                            canvasRendered = canvasRendered,
-                            isPlaying = isPlaying,
-                            onCanvasRenderedChange = onCanvasRenderedChange,
-                            playbackIdentity = song.videoId,
-                            // A clip decoding behind a player on its way to the
-                            // bar is work nobody sees — see [dockMoving].
-                            pausedForTransition = dockMoving,
-                            sleeveShape = landscapeArtShape,
-                            // Let go of on the way to the mini player, whose
-                            // cover sits flat in its bar.
-                            shadowFraction = dockT,
-                            artworkOverlay = {
-                                if (!dockMoving) PlayerPlatform.host.AutoMixArtwork(song, canvasRendered, Modifier.matchParentSize())
-                            },
-                            modifier = artworkModifier
-                                .then(
-                                    if (dock != null) {
-                                        Modifier.onGloballyPositioned { dockFrame.landscapeArt = it }
-                                    } else {
-                                        Modifier
-                                    },
-                                )
-                                // While it docks the sleeve is drawn by the player
-                                // itself, over everything and outside the player's
-                                // fade — see [dockHost] — at the place and size
-                                // [landscapeDockPose] gives it.
-                                .drawWithContent {
-                                    val pose = if (docking()) landscapeDockPose() else null
-                                    if (pose != null) {
-                                        dockFrame.portalLeft = pose.left
-                                        dockFrame.portalTop = pose.top
-                                        dockFrame.portalScale = pose.scale
-                                        sleeveLayer.record { this@drawWithContent.drawContent() }
-                                    } else {
-                                        if (docking()) {
-                                            // Nowhere to fly to this frame: the
-                                            // portal draws nothing rather than a
-                                            // stale copy.
-                                            dockFrame.portalScale = 0f
-                                        }
-                                        drawContent()
-                                    }
-                                }
-                                .then(skipSwipeGesture)
-                                .graphicsLayer {
-                                    // The paused shrink and the swipe nudge are
-                                    // let go of on the way, as the portrait
-                                    // sleeve's are: the cover does neither.
-                                    val t = dockT()
-                                    val scale = if (t >= 1f) landscapeArtScale else 1f + (landscapeArtScale - 1f) * t
-                                    scaleX = scale
-                                    scaleY = scale
-                                    translationX = if (t >= 1f) swipeSettle.value else swipeSettle.value * t
-                                }
-                                // With a panel up the sleeve is the way back to
-                                // the player, as the portrait thumbnail is.
-                                .clickable(
-                                    enabled = panelOpen,
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) {
-                                    queueOpen = false
-                                    closeLyrics()
+                        PlayerPlatform.host.AutoMixAmbient(song, playerBackdropTheme, Modifier.matchParentSize())
+                    }
+                }
+                val landscapeArtworkSlot: @Composable (Modifier) -> Unit = { artworkModifier ->
+                    LandscapeArtwork(
+                        artRequest = art.request,
+                        artLoaded = art.loaded,
+                        onArtState = art::onState,
+                        canvas = canvas,
+                        canvasRendered = canvasRendered,
+                        isPlaying = isPlaying,
+                        onCanvasRenderedChange = onCanvasRenderedChange,
+                        playbackIdentity = song.videoId,
+                        // A clip decoding behind a player on its way to the
+                        // bar is work nobody sees — see [dockMoving].
+                        pausedForTransition = dockMoving,
+                        sleeveShape = landscapeArtShape,
+                        // Let go of on the way to the mini player, whose
+                        // cover sits flat in its bar.
+                        shadowFraction = dockT,
+                        artworkOverlay = {
+                            if (!dockMoving) PlayerPlatform.host.AutoMixArtwork(song, canvasRendered, Modifier.matchParentSize())
+                        },
+                        modifier = artworkModifier
+                            .then(
+                                if (dock != null) {
+                                    Modifier.onGloballyPositioned { dockFrame.landscapeArt = it }
+                                } else {
+                                    Modifier
                                 },
-                        ) {
-                            // The stats belong to the player, not to the sleeve, so
-                            // they leave it along with the rest of the player.
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
-                                    // Faded with the player rather than flown with
-                                    // the sleeve: the cover in the bar has none.
-                                    .graphicsLayer { alpha = if (panelOpen) 0f else dockFade() },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                SleeveNerdStats(song)
-                                if (showBestPart && !panelOpen && !docking()) {
-                                    BestPartButton(onClick = seekBestPart)
+                            )
+                            // While it docks the sleeve is drawn by the player
+                            // itself, over everything and outside the player's
+                            // fade — see [dockHost] — at the place and size
+                            // [landscapeDockPose] gives it.
+                            .drawWithContent {
+                                val pose = if (docking()) landscapeDockPose() else null
+                                if (pose != null) {
+                                    dockFrame.portalLeft = pose.left
+                                    dockFrame.portalTop = pose.top
+                                    dockFrame.portalScale = pose.scale
+                                    sleeveLayer.record { this@drawWithContent.drawContent() }
+                                } else {
+                                    if (docking()) {
+                                        // Nowhere to fly to this frame: the
+                                        // portal draws nothing rather than a
+                                        // stale copy.
+                                        dockFrame.portalScale = 0f
+                                    }
+                                    drawContent()
                                 }
                             }
+                            .then(skipSwipeGesture)
+                            .graphicsLayer {
+                                // The paused shrink and the swipe nudge are
+                                // let go of on the way, as the portrait
+                                // sleeve's are: the cover does neither.
+                                val t = dockT()
+                                val scale = if (t >= 1f) landscapeArtScale else 1f + (landscapeArtScale - 1f) * t
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = if (t >= 1f) swipeSettle.value else swipeSettle.value * t
+                            }
+                            // With a panel up the sleeve is the way back to
+                            // the player, as the portrait thumbnail is.
+                            .clickable(
+                                enabled = panelOpen,
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                queueOpen = false
+                                closeLyrics()
+                            },
+                    ) {
+                        // The stats belong to the player, not to the sleeve, so
+                        // they leave it along with the rest of the player.
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                                // Faded with the player rather than flown with
+                                // the sleeve: the cover in the bar has none.
+                                .graphicsLayer { alpha = if (panelOpen) 0f else dockFade() },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            SleeveNerdStats(song)
+                            if (showBestPart && !panelOpen && !docking()) {
+                                BestPartButton(onClick = seekBestPart)
+                            }
                         }
-                    },
-                    actions = playerActions,
-                    header = landscapeTrackHeader,
-                    mainPane = { compact ->
-                        LandscapeMainPane(
-                            compact = compact,
-                            lyricStrip = if (syncedLyricsEnabled) {
-                                {
-                                    CurrentLyricStrip(
-                                        lines = lyricsTranslation.displayedLyrics,
-                                        trackKey = song.videoId,
-                                        playhead = lyricsPlayhead,
-                                        isPlaying = isPlaying && position.advancing && !panelOpen,
-                                        durationMs = durationMs,
-                                        lyricsUnavailable = lyricsUnavailable,
-                                        loadingText = lyricsLoadingText,
-                                        onClick = openLyrics,
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                            scrubber = {
-                                PlayerScrubber(
-                                    shown = shown,
-                                    durationMs = durationMs,
-                                    loading = versionAligning || audioVersionSwitching,
-                                    mixing = mixing && !scrub.scrubbing,
-                                    transitionWindow = transitionWindow
-                                        ?.takeIf { !scrub.scrubbing && it.end > it.start }
-                                        ?.let { it.start..it.end },
-                                    onScrub = onScrub,
-                                    onScrubFinished = onScrubFinished,
-                                ) {
-                                    PlaybackQualityLabel(
-                                        song = song,
-                                        isLoading = isLoading,
-                                        modifier = Modifier
-                                            .align(Alignment.Center)
-                                            .padding(horizontal = 8.dp),
-                                    )
-                                }
-                            },
-                            transport = {
-                                TransportRow(
-                                    isPlaying = isPlaying,
-                                    isLoading = isLoading || audioVersionSwitching,
-                                    previousEnabled = !controlsLocked &&
-                                        (hasPrevious || pastRestartPoint),
-                                    nextEnabled = !controlsLocked && hasNext,
-                                    onPrevious = onPrevious,
-                                    onPlayPause = onPlayPause,
-                                    onNext = onNext,
-                                    compact = compact,
-                                )
-                            },
-                            volume = if (hideVolumeBar) {
-                                null
-                            } else {
-                                {
-                                    VolumeRow(
-                                        value = { volume.level.value },
-                                        onValueChange = onVolumeChange,
-                                        onValueChangeFinished = onVolumeChangeFinished,
-                                    )
-                                }
-                            },
+                    }
+                }
+                val landscapeScrubber: @Composable () -> Unit = {
+                    PlayerScrubber(
+                        shown = shown,
+                        durationMs = durationMs,
+                        loading = versionAligning || audioVersionSwitching,
+                        mixing = mixing && !scrub.scrubbing,
+                        transitionWindow = transitionWindow
+                            ?.takeIf { !scrub.scrubbing && it.end > it.start }
+                            ?.let { it.start..it.end },
+                        onScrub = onScrub,
+                        onScrubFinished = onScrubFinished,
+                    ) {
+                        PlaybackQualityLabel(
+                            song = song,
+                            isLoading = isLoading,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(horizontal = 8.dp),
                         )
-                    },
-                    lyricsPane = landscapeLyricsPane,
-                    queuePane = {
-                        InlineQueue(
-                            queue = queue,
-                            currentIndex = queueIndex,
-                            autoplayEnabled = autoplayEnabled,
-                            controlsLocked = controlsLocked,
-                            onJumpTo = onJumpTo,
-                            onRemove = onRemoveFromQueue,
-                            onMove = onMoveInQueue,
-                            onClear = onClearQueue,
-                            onDragActiveChange = onQueueDragActiveChange,
-                            modifier = Modifier.fillMaxSize(),
+                    }
+                }
+                val landscapeVolume: (@Composable () -> Unit)? = if (hideVolumeBar) {
+                    null
+                } else {
+                    {
+                        VolumeRow(
+                            value = { volume.level.value },
+                            onValueChange = onVolumeChange,
+                            onValueChangeFinished = onVolumeChangeFinished,
                         )
-                    },
-                )
+                    }
+                }
+                val landscapeLyricStrip: (@Composable () -> Unit)? = if (syncedLyricsEnabled) {
+                    {
+                        CurrentLyricStrip(
+                            lines = lyricsTranslation.displayedLyrics,
+                            trackKey = song.videoId,
+                            playhead = lyricsPlayhead,
+                            isPlaying = isPlaying && position.advancing && !panelOpen,
+                            durationMs = durationMs,
+                            lyricsUnavailable = lyricsUnavailable,
+                            loadingText = lyricsLoadingText,
+                            onClick = openLyrics,
+                        )
+                    }
+                } else {
+                    null
+                }
+                val landscapeQueuePane: @Composable () -> Unit = {
+                    InlineQueue(
+                        queue = queue,
+                        currentIndex = queueIndex,
+                        autoplayEnabled = autoplayEnabled,
+                        controlsLocked = controlsLocked,
+                        onJumpTo = onJumpTo,
+                        onRemove = onRemoveFromQueue,
+                        onMove = onMoveInQueue,
+                        onClear = onClearQueue,
+                        onDragActiveChange = onQueueDragActiveChange,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                when (selectedPlayerLayout) {
+                    PlayerLayout.CLASSIC -> LandscapePlayerLayout(
+                        trackKey = song.videoId,
+                        pane = activePane,
+                        background = landscapeBackground,
+                        artwork = landscapeArtworkSlot,
+                        actions = playerActions,
+                        header = landscapeTrackHeader,
+                        mainPane = { compact ->
+                            LandscapeMainPane(
+                                compact = compact,
+                                lyricStrip = landscapeLyricStrip,
+                                scrubber = landscapeScrubber,
+                                transport = {
+                                    TransportRow(
+                                        isPlaying = isPlaying,
+                                        isLoading = isLoading || audioVersionSwitching,
+                                        previousEnabled = !controlsLocked &&
+                                            (hasPrevious || pastRestartPoint),
+                                        nextEnabled = !controlsLocked && hasNext,
+                                        onPrevious = onPrevious,
+                                        onPlayPause = onPlayPause,
+                                        onNext = onNext,
+                                        compact = compact,
+                                    )
+                                },
+                                volume = landscapeVolume,
+                            )
+                        },
+                        lyricsPane = landscapeLyricsPane,
+                        queuePane = landscapeQueuePane,
+                    )
+
+                    PlayerLayout.CENTERED -> CenteredLandscapePlayerLayout(
+                        pane = activePane,
+                        lyricsEnabled = !desktopVideo,
+                        queueButtonVisible = !desktopVideo,
+                        onToggleLyrics = toggleLyrics,
+                        onToggleQueue = toggleQueue,
+                        background = landscapeBackground,
+                        artwork = landscapeArtworkSlot,
+                        header = { compact, active ->
+                            LandscapeTrackHeader(
+                                compact = compact,
+                                song = song,
+                                caption = null,
+                                onOpenCaption = openPlaybackOrigin,
+                                onOpenAlbum = onOpenAlbum,
+                                onOpenArtist = onOpenArtist,
+                                active = active,
+                                reduceMotion = reducePlayerMotion,
+                                actions = {
+                                    LandscapeTrackActions(song, signedIn, likeStatus, showRevertCue, onToggleLike, onOpenMenu)
+                                },
+                            )
+                        },
+                        lyricStrip = landscapeLyricStrip,
+                        scrubber = landscapeScrubber,
+                        transport = { compact ->
+                            CenteredTransportRow(
+                                isPlaying = isPlaying,
+                                isLoading = isLoading || audioVersionSwitching,
+                                previousEnabled = !controlsLocked &&
+                                    (hasPrevious || pastRestartPoint),
+                                nextEnabled = !controlsLocked && hasNext,
+                                shuffleEnabled = shuffleEnabled,
+                                repeatMode = repeatMode,
+                                onPrevious = onPrevious,
+                                onPlayPause = onPlayPause,
+                                onNext = onNext,
+                                onToggleShuffle = onToggleShuffle,
+                                onCycleRepeat = onCycleRepeat,
+                                compact = compact,
+                            )
+                        },
+                        volume = landscapeVolume,
+                        volumeLevel = { volume.level.value },
+                        lyricsPane = landscapeLyricsPane,
+                        queuePane = landscapeQueuePane,
+                    )
+                }
                 playerOverlays()
             }
         } else {

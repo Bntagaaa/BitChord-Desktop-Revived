@@ -37,6 +37,14 @@ enum class PlayerTheme {
     SIMPLE,
 }
 
+/** The expanded landscape player arrangement on desktop. */
+enum class PlayerLayout {
+    /** Two-column split with controls on the right and a centered bottom dock. */
+    CLASSIC,
+    /** Centered player column that slides left when lyrics or queue open. */
+    CENTERED,
+}
+
 /** The surface that was last open inside the expanded player. */
 enum class LastPlayerScreen {
     MAIN,
