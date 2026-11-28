@@ -142,6 +142,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -819,6 +820,11 @@ fun NowPlayingScreen(
         onSeek(adjustedLyricsSeekTarget(lineTimeMs, lyricsOffsetMs))
     }
     val hideVolumeBar by PlayerSettings.hideVolumeBar.collectAsStateWithLifecycle()
+    // The lyric slot above the scrubber: the tallest line it holds — titleMedium's
+    // own line box — and the 4dp each of them is padded by above and below.
+    val lyricSlotHeight = with(density) {
+        MaterialTheme.typography.titleMedium.lineHeight.takeIf { it.isSpecified }?.toDp() ?: 24.dp
+    } + 8.dp
     val hideSongStatus by PlayerSettings.hideSongStatus.collectAsStateWithLifecycle()
 
     // Animated cover art: the looping video some labels publish alongside a
@@ -2230,16 +2236,21 @@ fun NowPlayingScreen(
                 }
                 val landscapeLyricStrip: (@Composable () -> Unit)? = if (syncedLyricsEnabled) {
                     {
-                        CurrentLyricStrip(
-                            lines = lyricsTranslation.displayedLyrics,
-                            trackKey = song.videoId,
-                            playhead = lyricsPlayhead,
-                            isPlaying = isPlaying && position.advancing && !panelOpen,
-                            durationMs = durationMs,
-                            lyricsUnavailable = lyricsUnavailable,
-                            loadingText = lyricsLoadingText,
-                            onClick = openLyrics,
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(lyricSlotHeight),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            CurrentLyricStrip(
+                                lines = lyricsTranslation.displayedLyrics,
+                                trackKey = song.videoId,
+                                playhead = lyricsPlayhead,
+                                isPlaying = isPlaying && position.advancing && !panelOpen,
+                                durationMs = durationMs,
+                                lyricsUnavailable = lyricsUnavailable,
+                                loadingText = lyricsLoadingText,
+                                onClick = openLyrics,
+                            )
+                        }
                     }
                 } else {
                     null
@@ -4014,42 +4025,47 @@ fun NowPlayingScreen(
                     // accompanied by a dedicated lyrics button in the bottom row. Its
                     // one-line slot remains, invisibly, so opening lyrics cannot grow
                     // the half-player merely to make room for the source label.
-                    if (!lyricsOpen && syncedLyricsEnabled) {
-                        CurrentLyricStrip(
-                            lines = lyricsTranslation.displayedLyrics,
-                            trackKey = song.videoId,
-                            playhead = lyricsPlayhead,
-                            isPlaying = isPlaying && position.advancing,
-                            durationMs = durationMs,
-                            lyricsUnavailable = lyricsUnavailable,
-                            loadingText = lyricsLoadingText,
-                            // Still visible over the queue, so still a valid way in:
-                            // opens the same full lyrics panel it always has, closing
-                            // the queue behind it the same way the "Up next" glyph
-                            // closes lyrics behind the queue.
-                            onClick = openLyrics,
-                        )
-                    }
-                    if (!lyricsOpen && !syncedLyricsEnabled) {
-                        Text(
-                            text = "\u00A0",
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .offset(y = 6.dp)
-                                .padding(vertical = 4.dp),
-                        )
-                    }
-                    if (lyricsOpen) {
-                        LyricsStatusWithChange(
-                            status = lyricsTranslation.status,
-                            onStatusClick = { showLyricsProviders = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .offset(y = 6.dp)
-                                .padding(vertical = 4.dp),
-                        )
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(lyricSlotHeight),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        if (!lyricsOpen && syncedLyricsEnabled) {
+                            CurrentLyricStrip(
+                                lines = lyricsTranslation.displayedLyrics,
+                                trackKey = song.videoId,
+                                playhead = lyricsPlayhead,
+                                isPlaying = isPlaying && position.advancing,
+                                durationMs = durationMs,
+                                lyricsUnavailable = lyricsUnavailable,
+                                loadingText = lyricsLoadingText,
+                                // Still visible over the queue, so still a valid way in:
+                                // opens the same full lyrics panel it always has, closing
+                                // the queue behind it the same way the "Up next" glyph
+                                // closes lyrics behind the queue.
+                                onClick = openLyrics,
+                            )
+                        }
+                        if (!lyricsOpen && !syncedLyricsEnabled) {
+                            Text(
+                                text = "\u00A0",
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .offset(y = 6.dp)
+                                    .padding(vertical = 4.dp),
+                            )
+                        }
+                        if (lyricsOpen) {
+                            LyricsStatusWithChange(
+                                status = lyricsTranslation.status,
+                                onStatusClick = { showLyricsProviders = true },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .offset(y = 6.dp)
+                                    .padding(vertical = 4.dp),
+                            )
+                        }
                     }
                     val transitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
                     PlayerScrubber(

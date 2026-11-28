@@ -85,6 +85,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
@@ -238,6 +240,23 @@ private val GLOW_RADIUS = 6.dp
  * padding and row spacing.
  */
 private val GLOW_ROOM = 10.dp
+
+/** Applies group alpha while leaving [outset] available for draw overflow. */
+private fun Modifier.alphaLayerWithOutset(alpha: () -> Float, outset: Dp): Modifier = drawWithCache {
+    val outsetPx = outset.toPx()
+    val bounds = Rect(-outsetPx, -outsetPx, size.width + outsetPx, size.height + outsetPx)
+    val paint = Paint()
+    onDrawWithContent {
+        paint.alpha = alpha()
+        val canvas = drawContext.canvas
+        canvas.saveLayer(bounds, paint)
+        try {
+            drawContent()
+        } finally {
+            canvas.restore()
+        }
+    }
+}
 
 /**
  * How the answering vocal is drawn: smaller than the lead and a shade behind
@@ -658,7 +677,17 @@ internal class LyricPlayhead(
      * without saying so would look like a reading gone wrong.
      */
     val discontinuity: Long
-        get() = (position.seeks.toLong() shl 32) or (offsetMs.value.toLong() and 0xFFFF_FFFFL)
+        get() = (position.sampledSeeks.toLong() shl 32) or (offsetMs.value.toLong() and 0xFFFF_FFFFL)
+
+    fun reading(isPlaying: Boolean): LyricClockReading {
+        val sampledAt = sampledAtNanos
+        return LyricClockReading(
+            positionMs = positionMs,
+            sampledAtMs = if (sampledAt > 0L) nanosToMs(sampledAt) else Double.NaN,
+            discontinuity = discontinuity,
+            isPlaying = (position.isPlaying ?: isPlaying) && position.advancing,
+        )
+    }
 }
 
 @Composable
@@ -700,14 +729,14 @@ private fun rememberLyricClock(
     }
     val engine = remember(trackKey) { LyricClock(clock.longValue) }
 
-    // Not moving: each reading is the truth, including a seek made while paused.
-    // Followed off the snapshot rather than read here, so a reading recomposes
-    // nothing.
-    if (!isPlaying) {
-        LaunchedEffect(engine, playhead) {
-            snapshotFlow { playhead.positionMs }.collect { positionMs ->
-                engine.hold(positionMs, nanosToMs(System.nanoTime()))
-                clock.longValue = positionMs
+    // Observe transport state with the reading, not the lifetime of a paused composition branch.
+    // Includes stopped seeks/offset changes even when the reported position itself is unchanged.
+    // Preserve desktop floating-window visibility and unfocused lyric animation policy.
+    val foreground = visibleOverride ?: LocalLyricAnimationAllowed.current ?: rememberIsForeground()
+    LaunchedEffect(engine, playhead, isPlaying, foreground) {
+        snapshotFlow { playhead.reading(isPlaying) }.collect { reading ->
+            engine.observe(reading, nanosToMs(System.nanoTime()), foreground)?.let {
+                clock.longValue = it
             }
         }
     }
@@ -724,9 +753,6 @@ private fun rememberLyricClock(
     // One loop for the whole run, reading the playhead itself. Keyed on the
     // reading instead, every reading restarted it, and each restart spent a
     // frame waiting for its first frame time — a hitch twice a second.
-    // A desktop window can explicitly opt in while unfocused; Android still follows
-    // its normal activity lifecycle, and floating lyrics keep their visibility override.
-    val foreground = visibleOverride ?: LocalLyricAnimationAllowed.current ?: rememberIsForeground()
     LaunchedEffect(engine, playhead, isPlaying, foreground) {
         if (!isPlaying || !foreground) return@LaunchedEffect
         engine.restart()
@@ -738,13 +764,7 @@ private fun rememberLyricClock(
                 // two are seconds apart and the real clock is used instead.
                 val system = System.nanoTime()
                 val now = if (abs(system - frameNanos) < SAME_CLOCK_NANOS) frameNanos else system
-                val sampledAt = playhead.sampledAtNanos
-                clock.longValue = engine.frame(
-                    nowMs = nanosToMs(now),
-                    reportedMs = playhead.positionMs,
-                    sampledAtMs = if (sampledAt > 0L) nanosToMs(sampledAt) else Double.NaN,
-                    discontinuity = playhead.discontinuity,
-                )
+                clock.longValue = engine.frame(nanosToMs(now), playhead.reading(isPlaying))
             }
         }
     }
@@ -785,6 +805,7 @@ private fun SweptLyricLine(
     glowAlpha: Float = 0f,
     glowRadius: Dp = GLOW_RADIUS,
     glowRoom: Dp = 0.dp,
+    glowLayerOutset: Dp = 0.dp,
     feather: Boolean = false,
     rise: Boolean = true,
     alignEnd: Boolean = false,
@@ -908,14 +929,18 @@ private fun SweptLyricLine(
             modifier = riseAgainst(room),
         )
         if (glowAlpha > 0.01f) {
+            val glowAlphaLayer = if (glowLayerOutset > 0.dp) {
+                Modifier.alphaLayerWithOutset(alpha = { glowAlpha }, outset = glowLayerOutset)
+            } else {
+                Modifier.graphicsLayer { alpha = glowAlpha }
+            }
             Text(
                 text = line.text,
                 style = style,
                 color = color,
                 maxLines = maxLines,
                 overflow = overflow,
-                modifier = Modifier
-                    .graphicsLayer { alpha = glowAlpha }
+                modifier = glowAlphaLayer
                     .blur(glowRadius, BlurredEdgeTreatment.Unbounded)
                     .then(room)
                     // Each letter is masked to its own brightness with DstIn,
@@ -2889,13 +2914,22 @@ private fun CurrentLyricLine(
     // own text direction so alignment and sweep geometry match what Compose would
     // produce for that paragraph.  LTR rows keep the chevron on the right; RTL
     // rows put it on the left (mirrored) and right-align the text.
+    val reduceDynamicBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val lyricsBlur by PlayerSettings.lyricsBlur.collectAsStateWithLifecycle()
+    val glowing = !reduceAnimation && !reduceDynamicBlur && lyricsBlur &&
+        renderEffectBlurSupported
+    val glow by animateFloatAsState(
+        targetValue = if (glowing) GLOW_ALPHA else 0f,
+        animationSpec = tween(durationMillis = 420),
+        label = "stripLyricGlow",
+    )
     val stripRtl = isRtl(text)
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (stripRtl) Arrangement.End else Arrangement.Start,
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .then(if (glow > 0.01f) Modifier else Modifier.clip(RoundedCornerShape(8.dp)))
             .clickable(onClick = onClick)
             .padding(vertical = 4.dp),
     ) {
@@ -2939,8 +2973,7 @@ private fun CurrentLyricLine(
             // slides off, and the one arriving is at full strength from its
             // first frame. A single fade on the row would hand the old line the
             // new line's alpha the instant the index changed.
-            val fading = Modifier.graphicsLayer {
-                if (itemInstrumental) return@graphicsLayer
+            val lineAlpha: () -> Float = {
                 val start = lines.getOrNull(itemIndex)?.timeMs ?: 0L
                 val end = lines.getOrNull(itemIndex + 1)?.timeMs
                     ?: durationMs.takeIf { it > start }
@@ -2948,7 +2981,14 @@ private fun CurrentLyricLine(
                 val fade = ((end - start) * LYRIC_FADE_FRACTION)
                     .coerceIn(LYRIC_FADE_MIN_MS, LYRIC_FADE_MAX_MS)
                 val remaining = (end - clock.longValue).toFloat()
-                alpha = 0.78f * (remaining / fade).coerceIn(0f, 1f)
+                0.78f * (remaining / fade).coerceIn(0f, 1f)
+            }
+            val fading = if (!itemInstrumental && swept != null && itemIndex == index && glow > 0.01f) {
+                Modifier.alphaLayerWithOutset(alpha = lineAlpha, outset = GLOW_ROOM)
+            } else {
+                Modifier.graphicsLayer {
+                    if (!itemInstrumental) alpha = lineAlpha()
+                }
             }
             if (swept != null) {
                 SweptLyricLine(
@@ -2958,6 +2998,9 @@ private fun CurrentLyricLine(
                     dimAlpha = UNSUNG_ALPHA_STRIP,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    glowAlpha = if (itemIndex == index) glow else 0f,
+                    glowLayerOutset = GLOW_ROOM,
+                    feather = itemIndex == index,
                     rise = false,
                     modifier = fading,
                 )
