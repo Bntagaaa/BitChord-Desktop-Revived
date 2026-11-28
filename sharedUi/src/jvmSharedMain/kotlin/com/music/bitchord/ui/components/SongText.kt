@@ -85,15 +85,6 @@ fun ExplicitSongTitle(
             )
         }
         if (song.isExplicit == true) {
-            Text(
-                text = "E",
-                style = MaterialTheme.typography.labelSmall,
-                color = color,
-                modifier = Modifier
-                    .border(1.dp, color.copy(alpha = 0.72f), RoundedCornerShape(2.dp))
-                    .padding(horizontal = 3.dp),
-            )
-
             Spacer(Modifier.width(6.dp))
             ExplicitBadge(badgeColor)
         }
