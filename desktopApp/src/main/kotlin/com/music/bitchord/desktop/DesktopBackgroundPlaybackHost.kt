@@ -77,9 +77,13 @@ internal fun DesktopBackgroundPlaybackHost(
     LaunchedEffect(service) {
         service.engine.state.collect { state ->
             service.pipPlayback.value = state
-            service.position.report(state.positionMs, state.positionSampledAtNanos)
-            service.position.seeks = state.seeks
-            service.position.advancing = !state.awaitingAudio
+            service.position.report(
+                positionMs = state.positionMs,
+                sampledAtNanos = state.positionSampledAtNanos,
+                isPlaying = state.isPlaying,
+                seekIdentity = state.seeks,
+                advancing = !state.awaitingAudio,
+            )
             DesktopPlayerHost.videoClock.value = state
         }
     }
