@@ -786,10 +786,12 @@ internal fun VolumeRow(
     }
 }
 
+private enum class ActionRowMode { OUTPUT, PARTY, QUEUE }
+
 /**
- * Lyrics, standalone audio output, and queue. The queue's three-mode capsule
- * grows from the centre, with the edge glyphs moving in sync. Listen Together
- * is intentionally not part of the desktop output control.
+ * Lyrics, audio output and queue. A lone output glyph becomes a two-segment
+ * capsule while in a Jam, preserving access to the live member count.
+ * The Centered layout uses [AirPlayOutputButton] directly and is unaffected.
  */
 @Composable
 internal fun PlayerActionRow(
@@ -810,6 +812,12 @@ internal fun PlayerActionRow(
     /** Opens [ListenTogetherMembersSheet] rather than settings directly. */
     onOpenListenTogetherMembers: () -> Unit,
 ) {
+    val badge = rememberPartyBadge()
+    val mode = when {
+        queueOpen -> ActionRowMode.QUEUE
+        badge.inParty -> ActionRowMode.PARTY
+        else -> ActionRowMode.OUTPUT
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // Match upstream's optical spacing: the standalone output is spaced as
         // if a two-up pill held it; opening the queue moves both sides outward.
@@ -817,7 +825,7 @@ internal fun PlayerActionRow(
         val closeIn = actionRowInset(maxWidth, 2) - edgeInset
         val reduceMotion = LocalPlayerReduceMotion.current
         val compactness = animateFloatAsState(
-            targetValue = if (queueOpen) 0f else 1f,
+            targetValue = if (mode == ActionRowMode.OUTPUT) 1f else 0f,
             animationSpec = tween(if (reduceMotion) 0 else 220),
             label = "actionRowCompact",
         )
@@ -840,7 +848,7 @@ internal fun PlayerActionRow(
                 )
             }
             AnimatedContent(
-                targetState = queueOpen,
+                targetState = mode,
                 transitionSpec = {
                     (fadeIn(tween(180, delayMillis = 140)) togetherWith fadeOut(tween(140)))
                         // Unclipped: the capsule's own rounded ends are what
@@ -849,8 +857,8 @@ internal fun PlayerActionRow(
                         .using(SizeTransform(clip = false) { _, _ -> tween(220) })
                 },
                 label = "playerBottomPill",
-            ) { showQueueModes ->
-                if (showQueueModes) {
+            ) { currentMode ->
+                if (currentMode == ActionRowMode.QUEUE) {
                     // Keep the playback modes centred as the output expands.
                     Pill {
                         PillSegment(
@@ -896,6 +904,12 @@ internal fun PlayerActionRow(
                             tapWindowMs = AUTOPLAY_TAP_WINDOW_MS,
                         )
                     }
+                } else if (currentMode == ActionRowMode.PARTY) {
+                    ActivePartyOutputPill(
+                        members = badge.members,
+                        onOutput = onOpenOutput,
+                        onOpenMembers = onOpenListenTogetherMembers,
+                    )
                 } else {
                     AirPlayOutputButton(onOutput = onOpenOutput)
                 }
@@ -1182,6 +1196,41 @@ internal fun AirPlayOutputButton(
             contentDescription = stringResource(Res.string.audio_output),
             onClick = { onOutput(outputBounds) },
             vibrant = true,
+        )
+    }
+}
+
+/**
+ * Regular player's active-Jam capsule. Reuse the existing output menu and
+ * member sheet, with the same optical sizes and SF-style person icon as the
+ * original two-segment control. Do not add this capsule to Centered.
+ */
+@Composable
+private fun ActivePartyOutputPill(
+    members: Int,
+    onOutput: (Rect?) -> Unit,
+    onOpenMembers: () -> Unit,
+) {
+    val output = rememberAudioOutputGlyph()
+    var outputBounds by remember { mutableStateOf<Rect?>(null) }
+    Pill {
+        Box(Modifier.onGloballyPositioned { outputBounds = it.boundsInRoot() }) {
+            PillSegment(
+                icon = output.icon,
+                iconSize = output.pillSize,
+                contentDescription = stringResource(Res.string.audio_output),
+                onClick = { onOutput(outputBounds) },
+                vibrant = true,
+            )
+        }
+        PillDivider()
+        PillSegment(
+            icon = SfStyleIcons.Person,
+            iconSize = 22.dp,
+            contentDescription = stringResource(Res.string.listen_together_open_count, members),
+            onClick = onOpenMembers,
+            highlighted = true,
+            trailingLabel = members.toString(),
         )
     }
 }
