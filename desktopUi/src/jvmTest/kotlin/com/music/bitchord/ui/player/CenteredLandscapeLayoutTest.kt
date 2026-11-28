@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import java.lang.reflect.Proxy
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -31,6 +32,10 @@ private fun withCenteredTestHost(block: () -> Unit) {
     ) { _, method, _ ->
         when (method.name) {
             "getMobileTextChrome" -> true
+            "getCastState" -> MutableStateFlow(CastUi())
+            "getWatchOutput" -> MutableStateFlow(WatchOutputUi())
+            "rememberAudioOutputs" -> emptyList<AudioOutputDevice>()
+            // In particular, this host must never be asked for Listen Together state.
             else -> error("Unexpected PlayerHost access in centered layout test: ${method.name}")
         }
     } as PlayerHost
@@ -67,6 +72,7 @@ class CenteredLandscapeLayoutTest {
         runDesktopComposeUiTest(width = 1100, height = 800) {
             mainClock.autoAdvance = false
             val pane = mutableStateOf(PlayerPane.Main)
+            var openedOutput = false
             setContent {
                 MaterialTheme {
                     CenteredLandscapePlayerColumns(
@@ -76,6 +82,7 @@ class CenteredLandscapeLayoutTest {
                         reduceMotion = false,
                         lyricsEnabled = true,
                         queueButtonVisible = true,
+                        onOpenOutput = { openedOutput = true },
                         onToggleLyrics = {
                             pane.value = if (pane.value == PlayerPane.Lyrics) PlayerPane.Main else PlayerPane.Lyrics
                         },
@@ -127,6 +134,9 @@ class CenteredLandscapeLayoutTest {
             val volumeGlyph = onNodeWithContentDescription("Volume").getUnclippedBoundsInRoot()
             assertTrue(queueGlyph.right <= outputGlyph.left, "Queue must precede AirPlay")
             assertTrue(outputGlyph.right <= volumeGlyph.left, "AirPlay must precede Volume")
+            assertEquals(44f, outputGlyph.width.value, 1f)
+            onNodeWithContentDescription("Audio output").performClick()
+            assertTrue(openedOutput, "The standalone output button must open its existing picker")
             onNodeWithTag("centered-lyric-strip").assertIsDisplayed()
 
             onNodeWithContentDescription("Lyrics").performClick()

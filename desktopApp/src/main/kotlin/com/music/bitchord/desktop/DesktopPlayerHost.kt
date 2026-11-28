@@ -20,6 +20,7 @@ import com.music.bitchord.data.settings.SmartAnalysis
 import com.music.bitchord.data.settings.TransitionWindow
 import com.music.bitchord.ui.player.AudioOutputDevice
 import com.music.bitchord.ui.player.AudioOutputKind
+import com.music.bitchord.ui.player.BluetoothForm
 import com.music.bitchord.ui.player.CanvasVideoSpec
 import com.music.bitchord.ui.player.LyricsRomanizationResult
 import com.music.bitchord.ui.player.LyricsTranslationResult
@@ -126,25 +127,37 @@ internal object DesktopPlayerHost : PlayerHost {
     @Volatile
     private var listed: List<String> = emptyList()
 
+    // Both the floating and fullscreen players observe this list. Enumerate only
+    // once per device-change event, off the UI thread (pactl may be slow).
+    private val outputDevices by lazy {
+        DesktopAudioDevices.changes
+            .map { withContext(Dispatchers.IO) { DesktopAudioDevices.available() } }
+            .stateIn(scope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }
+
     @Composable
     override fun rememberAudioOutputs(): List<AudioOutputDevice> {
         val selected by DesktopAudioDevices.selected.collectAsState()
-        val changes by DesktopAudioDevices.changes.collectAsState()
-        val devices = remember(changes) { DesktopAudioDevices.available() }
+        val devices by outputDevices.collectAsState()
         return remember(selected, devices) {
-            val ids = listOf(DesktopAudioDevices.SYSTEM_DEFAULT) + devices.map { it.id }
+            val defaultId = DesktopAudioDevices.SYSTEM_DEFAULT
+            val ids = listOf(defaultId) + devices.map { it.id }
+            // An unavailable saved mixer already falls back to the system default.
+            val activeId = selected.takeIf { it in ids } ?: defaultId
             listed = ids
             ids.mapIndexed { index, id ->
-                val name = if (id == DesktopAudioDevices.SYSTEM_DEFAULT) {
+                val name = if (id == defaultId) {
                     DesktopStrings["d_system_default", "System default"]
                 } else {
                     devices.first { it.id == id }.name
                 }
+                val (kind, form) = classifyDesktopAudioOutput(id, name)
                 AudioOutputDevice(
                     id = index,
                     name = name,
-                    kind = kindOf(name),
-                    isActive = id == selected,
+                    kind = kind,
+                    isActive = id == activeId,
+                    form = form,
                 )
             }
         }
@@ -298,16 +311,35 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     private const val KEY_LYRICS_OFFSET = "lyrics_offset_ms"
 }
 
-/** Which glyph a mixer gets, from the only thing Java Sound says about it: its name. */
-private fun kindOf(name: String): AudioOutputKind {
-    val n = name.lowercase(Locale.ROOT)
-    return when {
-        "bluetooth" in n || "airpods" in n || "buds" in n -> AudioOutputKind.BLUETOOTH
+/**
+ * Desktop endpoints do not expose Android's AudioDeviceInfo form factor. Use the
+ * endpoint id as well as its display name (bluez_output identifies Linux Bluetooth).
+ * System default is intentionally the AirPlay glyph: the app follows the OS and
+ * cannot reliably infer which physical device an arbitrary default mixer represents.
+ */
+internal fun classifyDesktopAudioOutput(id: String, name: String): Pair<AudioOutputKind, BluetoothForm> {
+    if (id == DesktopAudioDevices.SYSTEM_DEFAULT) return AudioOutputKind.PHONE to BluetoothForm.UNKNOWN
+    val n = "$id $name".lowercase(Locale.ROOT)
+    val buds = "buds" in n || "airpods" in n || "true wireless" in n || "earbuds" in n
+    val bluetooth = "bluetooth" in n || "bluez" in n || buds
+    if (bluetooth) {
+        val form = when {
+            Regex("""\b(car|automotive|android auto)\b""").containsMatchIn(n) -> BluetoothForm.CAR
+            "airpods max" in n -> BluetoothForm.HEADPHONES
+            buds -> BluetoothForm.BUDS
+            "speaker" in n || "soundbar" in n -> BluetoothForm.SPEAKER
+            "headphone" in n || "headset" in n || "hands-free" in n -> BluetoothForm.HEADPHONES
+            else -> BluetoothForm.UNKNOWN
+        }
+        return AudioOutputKind.BLUETOOTH to form
+    }
+    val kind = when {
+        "hdmi" in n || "displayport" in n || "display audio" in n || "nvidia" in n -> AudioOutputKind.HDMI
         "usb" in n || "dac" in n -> AudioOutputKind.USB
-        "hdmi" in n || "display" in n || "nvidia" in n -> AudioOutputKind.HDMI
-        "headphone" in n || "headset" in n -> AudioOutputKind.WIRED
+        "headphone" in n || "headset" in n || "earphone" in n || "earpods" in n -> AudioOutputKind.WIRED
         else -> AudioOutputKind.OTHER
     }
+    return kind to BluetoothForm.UNKNOWN
 }
 
 private fun DesktopAudioPipeline.toOutputFormat(): OutputFormatUi {

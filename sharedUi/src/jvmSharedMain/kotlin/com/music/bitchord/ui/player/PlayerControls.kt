@@ -787,11 +787,9 @@ internal fun VolumeRow(
 }
 
 /**
- * Lyrics, the capsule, and the queue — the row both layouts end on.
- *
- * The capsule swaps: output and party normally, the three playback modes while
- * the queue is up, since that is when they are what you are about to reach for.
- * It stays centred between the two glyphs either way.
+ * Lyrics, standalone audio output, and queue. The queue's three-mode capsule
+ * grows from the centre, with the edge glyphs moving in sync. Listen Together
+ * is intentionally not part of the desktop output control.
  */
 @Composable
 internal fun PlayerActionRow(
@@ -813,16 +811,24 @@ internal fun PlayerActionRow(
     onOpenListenTogetherMembers: () -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        // Sized for the wider of the two capsules — the three-up one — in both
-        // states. Computed for whichever was on screen it would change as they
-        // swap, and the lyrics and queue glyphs would slide with it.
-        val widestRow = BOTTOM_ACTION_SIZE * 2 + pillWidth(3)
-        val edgeInset = ((maxWidth - widestRow) / 4).coerceAtLeast(0.dp)
+        // Match upstream's optical spacing: the standalone output is spaced as
+        // if a two-up pill held it; opening the queue moves both sides outward.
+        val edgeInset = actionRowInset(maxWidth, 3)
+        val closeIn = actionRowInset(maxWidth, 2) - edgeInset
+        val reduceMotion = LocalPlayerReduceMotion.current
+        val compactness = animateFloatAsState(
+            targetValue = if (queueOpen) 0f else 1f,
+            animationSpec = tween(if (reduceMotion) 0 else 220),
+            label = "actionRowCompact",
+        )
         Box(
             modifier = Modifier.fillMaxWidth().padding(horizontal = edgeInset),
             contentAlignment = Alignment.Center,
         ) {
-            if (lyricsEnabled) Box(Modifier.align(Alignment.CenterStart)) {
+            if (lyricsEnabled) Box(
+                Modifier.align(Alignment.CenterStart)
+                    .offset { IntOffset((closeIn.toPx() * compactness.value).roundToInt(), 0) },
+            ) {
                 BottomGlyph(
                     icon = BitChordIcons.LyricsQuote,
                     contentDescription = stringResource(if (lyricsOpen) Res.string.close_lyrics else Res.string.open_lyrics),
@@ -845,8 +851,7 @@ internal fun PlayerActionRow(
                 label = "playerBottomPill",
             ) { showQueueModes ->
                 if (showQueueModes) {
-                    // Spaced the same as the output/party capsule, so the two
-                    // read as one control growing a segment.
+                    // Keep the playback modes centred as the output expands.
                     Pill {
                         PillSegment(
                             icon = BitChordIcons.Shuffle,
@@ -895,7 +900,10 @@ internal fun PlayerActionRow(
                     AirPlayOutputButton(onOutput = onOpenOutput)
                 }
             }
-            if (queueButtonVisible) Box(Modifier.align(Alignment.CenterEnd)) {
+            if (queueButtonVisible) Box(
+                Modifier.align(Alignment.CenterEnd)
+                    .offset { IntOffset(-(closeIn.toPx() * compactness.value).roundToInt(), 0) },
+            ) {
                 BottomGlyph(
                     icon = BitChordIcons.Queue,
                     contentDescription = stringResource(Res.string.up_next),
@@ -1082,6 +1090,7 @@ private val PLAYER_PRESS_CIRCLE_DIAMETER = 60.dp
 private const val PLAYER_SKIP_HEIGHT_SCALE = 0.85f
 
 private val BOTTOM_ACTION_SIZE = 44.dp
+private val BOTTOM_ICON_SIZE = 26.dp
 
 /**
  * The lit lyrics/queue tile, measured off Apple Music's: the glyph fills about
@@ -1100,22 +1109,15 @@ private const val BOTTOM_ACTIVE_TILE_ALPHA = 0.62f
 // the capsule lopsided or shifts the queue control beside it.
 private val PILL_SEGMENT_WIDTH = 64.dp
 
-/**
- * Optical sizes, not equal ones.
- *
- * Headphones is a tall, narrow glyph and Person a taller, narrower one, so
- * drawn at the same nominal size the second reads as the bigger of the two.
- * These are the numbers at which they look like a matched pair. Every other
- * output glyph is fitted to the box Headphones fills at that size — 75% of it
- * tall, at most 85% wide — either in its own drawable or by
- * [PILL_OUTPUT_WIDE_SIZE] / [PILL_OUTPUT_TALL_SIZE] for the Material ones.
- */
 /** What a segment's glyph is drawn at when it has no optical quirk to correct. */
 private val PILL_ICON_SIZE = 24.dp
 
 /** How wide a capsule of [segments] comes out, dividers included. */
 private fun pillWidth(segments: Int): Dp =
     PILL_SEGMENT_WIDTH * segments + 1.dp * (segments - 1)
+
+internal fun actionRowInset(maxWidth: Dp, segments: Int): Dp =
+    ((maxWidth - BOTTOM_ACTION_SIZE * 2 - pillWidth(segments)) / 4).coerceAtLeast(0.dp)
 
 /**
  * A row of controls joined into one capsule.
@@ -1163,7 +1165,7 @@ private fun PillDivider() {
 }
 
 /**
- * Standalone AirPlay audio output button shared by [PlayerActionRow] and
+ * Standalone adaptive audio output button shared by [PlayerActionRow] and
  * [CenteredLandscapePlayerColumns].
  */
 @Composable
@@ -1171,10 +1173,12 @@ internal fun AirPlayOutputButton(
     onOutput: (Rect?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val output = rememberAudioOutputGlyph()
     var outputBounds by remember { mutableStateOf<Rect?>(null) }
     Box(modifier.onGloballyPositioned { outputBounds = it.boundsInRoot() }) {
         BottomGlyph(
-            icon = BitChordIcons.AirPlay,
+            icon = output.icon,
+            iconSize = output.standaloneSize,
             contentDescription = stringResource(Res.string.audio_output),
             onClick = { onOutput(outputBounds) },
             vibrant = true,
@@ -1203,7 +1207,7 @@ private fun PillSegment(
     loading: Boolean = false,
     /** See [BottomGlyph], where the same window means the same thing. */
     tapWindowMs: Long = 0L,
-    /** Per-segment override — see [OutputPartyPill]'s three-up capsule. */
+    /** Per-segment width override. */
     width: Dp = PILL_SEGMENT_WIDTH,
     /** Only the output icon is dodge-blended, as in mobile. */
     vibrant: Boolean = false,
@@ -1370,7 +1374,7 @@ internal fun OutputCaption(
     }
 }
 
-/** The three fields of a party the player draws — see [OutputPartyPill]. */
+/** The three fields of a party the player draws. */
 private data class PartyBadge(
     val inParty: Boolean,
     val members: Int,
@@ -1442,6 +1446,7 @@ internal fun BottomGlyph(
     tapWindowMs: Long = 0L,
     /** Lyrics, queue and standalone output use mobile's vibrant glyph ink. */
     vibrant: Boolean = false,
+    iconSize: Dp = BOTTOM_ICON_SIZE,
 ) {
     val haptics = rememberHaptics()
     // Read only from the click handler, never during composition, so writing it
@@ -1504,7 +1509,7 @@ internal fun BottomGlyph(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(26.dp).vibrantDiscChrome(vibrantIcon),
+                modifier = Modifier.size(iconSize).vibrantDiscChrome(vibrantIcon),
             )
         } else if (label != null) {
             Text(
