@@ -114,9 +114,17 @@ class DesktopPipUiTest {
             onNodeWithTag("pip-active-lyric").assertTextEquals("A quieter kind of morning")
             runOnIdle { DesktopPlayerSettings.lyricsOffsetMs.value=-2000 }
             onNodeWithTag("pip-active-lyric").assertTextEquals("Keep the music close")
-            runOnIdle { position.report(9000) }
+            runOnIdle {
+                // The floating-player fixture is paused; model the user's seek explicitly.
+                position.seeks++
+                position.report(9000)
+            }
             onNodeWithTag("pip-active-lyric").assertTextEquals("Every note finds a place")
-            runOnIdle { DesktopPlayerSettings.lyricsOffsetMs.value=0; position.report(500) }
+            runOnIdle {
+                DesktopPlayerSettings.lyricsOffsetMs.value=0
+                position.seeks++
+                position.report(500)
+            }
             onNodeWithTag("pip-active-lyric").assertTextEquals("Intro")
         } finally { DesktopPlayerSettings.lyricsOffsetMs.value=old }
     }
