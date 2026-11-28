@@ -134,7 +134,7 @@ class CenteredLandscapeLayoutTest {
             val volumeGlyph = onNodeWithContentDescription("Volume").getUnclippedBoundsInRoot()
             assertTrue(queueGlyph.right <= outputGlyph.left, "Queue must precede AirPlay")
             assertTrue(outputGlyph.right <= volumeGlyph.left, "AirPlay must precede Volume")
-            assertEquals(44f, outputGlyph.width.value, 1f)
+            assertEquals(44f, (outputGlyph.right - outputGlyph.left).value, 1f)
             onNodeWithContentDescription("Audio output").performClick()
             assertTrue(openedOutput, "The standalone output button must open its existing picker")
             onNodeWithTag("centered-lyric-strip").assertIsDisplayed()
