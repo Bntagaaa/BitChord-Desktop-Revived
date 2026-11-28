@@ -278,7 +278,11 @@ class DesktopLandscapePlayerTest {
             assertEquals(viewport, onNodeWithTag("landscape-lyrics-viewport").getUnclippedBoundsInRoot())
 
             if (verifyScroll) {
-                runOnIdle { playhead.report(0) }
+                runOnIdle {
+                    // The fixture is paused; mark each simulated jump as an explicit seek.
+                    playhead.seeks++
+                    playhead.report(0)
+                }
                 mainClock.advanceTimeBy(2000)
                 waitForIdle()
                 val firstRow = onNodeWithTag("lyrics-row-0").getUnclippedBoundsInRoot()
@@ -286,7 +290,10 @@ class DesktopLandscapePlayerTest {
                 assertTrue((firstRow.top - frame.top).value in 0f..60f,
                     "The opening lyric starts at the top instead of leaving half the cover empty")
                 saveLandscapePlayerScreenshot(onRoot().captureToImage(), "$width-lyrics-start.png")
-                runOnIdle { playhead.report(200_000) }
+                runOnIdle {
+                    playhead.seeks++
+                    playhead.report(200_000)
+                }
                 mainClock.advanceTimeBy(2000)
                 waitForIdle()
                 val laterRow = onNodeWithTag("lyrics-row-10").getUnclippedBoundsInRoot()
@@ -294,7 +301,11 @@ class DesktopLandscapePlayerTest {
                     (laterRow.top.value + laterRow.bottom.value) / 2f, 3f,
                     "Later lyrics settle in the center once preceding rows fill the upper half")
                 saveLandscapePlayerScreenshot(onRoot().captureToImage(), "$width-lyrics-later.png")
-                runOnIdle { playhead.report(0) }
+                runOnIdle {
+                    // The fixture is paused; mark each simulated jump as an explicit seek.
+                    playhead.seeks++
+                    playhead.report(0)
+                }
                 mainClock.advanceTimeBy(2000)
                 waitForIdle()
                 assertEquals(firstRow.top.value,
