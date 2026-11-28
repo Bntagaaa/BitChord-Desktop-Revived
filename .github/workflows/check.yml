@@ -42,7 +42,7 @@ jobs:
       - name: Set up X11 for native PiP validation
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb xsettingsd
 
       - name: Verify canonical AutoMix files and distributed model hashes
         run: python3 tools/automix-validation/verify-upstream.py
@@ -56,7 +56,17 @@ jobs:
         env:
           BITCHORD_PIP_NATIVE_TEST: '1'
         shell: bash
-        run: xvfb-run -a ./gradlew :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain 2>&1 | tee desktop-tests.log
+        run: |
+          xvfb-run -a bash -e -c '
+            settings_dir=$(mktemp -d)
+            export BITCHORD_XSETTINGSD_CONFIG="$settings_dir/xsettings.conf"
+            printf "Gdk/WindowScalingFactor 1\n" > "$BITCHORD_XSETTINGSD_CONFIG"
+            xsettingsd -c "$BITCHORD_XSETTINGSD_CONFIG" &
+            export BITCHORD_XSETTINGSD_PID=$!
+            trap "kill $BITCHORD_XSETTINGSD_PID 2>/dev/null || true; rm -rf \"$settings_dir\"" EXIT
+            timeout 10s bash -c "until dump_xsettings >/dev/null 2>&1; do sleep 0.1; done"
+            ./gradlew :shared:jvmTest :desktopRuntime:test :desktopUi:jvmTest :desktopApp:test "-Pbitchord.version=test-visua" --console=plain
+          ' 2>&1 | tee desktop-tests.log
 
       - name: Report test failures
         if: failure()

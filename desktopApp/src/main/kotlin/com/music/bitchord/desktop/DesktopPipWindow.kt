@@ -6,16 +6,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import com.music.bitchord.playback.PlaybackPosition
-import java.awt.Dimension
 import java.awt.EventQueue
+import java.awt.Rectangle
 import java.awt.Toolkit
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.awt.event.HierarchyEvent
 import java.awt.event.HierarchyListener
+import java.beans.PropertyChangeListener
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import org.jetbrains.compose.resources.painterResource
@@ -30,6 +32,7 @@ internal fun DesktopPipWindow(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
+    x11WindowScale: Float? = null,
 ) {
     val open by controller.open.collectAsState()
     if (!open) return
@@ -72,10 +75,15 @@ internal fun DesktopPipWindow(
                 }
             }) {
             val native = window
+            val systemDensity = LocalDensity.current
+            // PiP keeps its own compact layout and does not inherit the main window's zoom.
+            val pipDensity = remember(systemDensity, x11WindowScale) {
+                desktopContentDensity(systemDensity, 100, x11WindowScale)
+            }
+            val currentDensity by rememberUpdatedState(pipDensity.density)
             val currentRequest by rememberUpdatedState(raise)
             DisposableEffect(native) {
-                native.minimumSize = Dimension(minOf(DesktopPipGeometry.MIN_WIDTH, initial.width),
-                    minOf(DesktopPipGeometry.MIN_HEIGHT, initial.height))
+                updatePipMinimumSize(native, currentDensity)
                 val listener = object : WindowAdapter() {
                     override fun windowLostFocus(event: WindowEvent) { spaceHeld = false }
                     override fun windowClosed(event: WindowEvent) { controller.close(currentRequest) }
@@ -85,29 +93,32 @@ internal fun DesktopPipWindow(
                         controller.close(currentRequest)
                     }
                 }
+                val configuration = PropertyChangeListener { updatePipMinimumSize(native, currentDensity) }
                 native.addWindowListener(listener)
                 native.addWindowFocusListener(listener)
                 native.addHierarchyListener(hierarchy)
+                native.addPropertyChangeListener("graphicsConfiguration", configuration)
                 onDispose {
                     native.removeWindowListener(listener)
                     native.removeWindowFocusListener(listener)
                     native.removeHierarchyListener(hierarchy)
+                    native.removePropertyChangeListener("graphicsConfiguration", configuration)
                     val bounds = native.bounds
                     if (bounds.width > 0 && bounds.height > 0) DesktopPipSettings.update {
                         it.copy(bounds = DesktopPipBounds(bounds.x, bounds.y, bounds.width, bounds.height))
                     }
                 }
             }
+            LaunchedEffect(native, pipDensity) {
+                withFrameNanos { }
+                updatePipMinimumSize(native, pipDensity.density)
+            }
             LaunchedEffect(native, raise) {
                 repeat(6) {
                     withFrameNanos { }
                     if (native.isShowing) {
-                        // Native captions/borders consume space: preserve the compact client area
-                        // on Windows and WM themes with thicker decorations, not just under Xvfb.
-                        val insets = native.insets
-                        native.minimumSize = Dimension(
-                            maxOf(DesktopPipGeometry.MIN_WIDTH, 320 + insets.left + insets.right),
-                            maxOf(DesktopPipGeometry.MIN_HEIGHT, 180 + insets.top + insets.bottom))
+                        // Insets are final only once the native frame is mapped.
+                        updatePipMinimumSize(native, currentDensity)
                         controller.windowReady(raise)
                         return@LaunchedEffect
                     }
@@ -126,16 +137,33 @@ internal fun DesktopPipWindow(
                     }
                 }
             }
-            MaterialTheme(colorScheme = desktopColorScheme(), typography = desktopTypography()) {
-                // Remove the image/lyric composition while iconified. Playback remains owned by app.
-                if (!state.isMinimized) DesktopPipUi(presentation, position, preferences, reduceBlur, reduceAnimation,
-                    onRestore = controller::restore, onClose = { controller.close(raise) },
-                    onPin = { DesktopPipSettings.update { it.copy(pinned = !it.pinned) } },
-                    onLyrics = { DesktopPipSettings.update { it.copy(lyrics = !it.lyrics) } },
-                    onPlayPause = onPlayPause, onPrevious = onPrevious, onNext = onNext, onSeek = onSeek,
-                    pinSupported = pinSupported)
-                else Box(Modifier.fillMaxSize())
+            LogDesktopWindowScale("pip", native, systemDensity, pipDensity, 100, x11WindowScale)
+            CompositionLocalProvider(LocalDensity provides pipDensity) {
+                MaterialTheme(colorScheme = desktopColorScheme(), typography = desktopTypography()) {
+                    // Remove the image/lyric composition while iconified. Playback remains owned by app.
+                    if (!state.isMinimized) DesktopPipUi(presentation, position, preferences, reduceBlur, reduceAnimation,
+                        onRestore = controller::restore, onClose = { controller.close(raise) },
+                        onPin = { DesktopPipSettings.update { it.copy(pinned = !it.pinned) } },
+                        onLyrics = { DesktopPipSettings.update { it.copy(lyrics = !it.lyrics) } },
+                        onPlayPause = onPlayPause, onPrevious = onPrevious, onNext = onNext, onSeek = onSeek,
+                        pinSupported = pinSupported)
+                    else Box(Modifier.fillMaxSize())
+                }
             }
         }
     }
+}
+
+private fun updatePipMinimumSize(window: java.awt.Window, contentDensity: Float) {
+    val configuration = window.graphicsConfiguration ?: return
+    val workArea = Rectangle(configuration.bounds)
+    runCatching { Toolkit.getDefaultToolkit().getScreenInsets(configuration) }.getOrNull()?.let {
+        workArea.width -= it.left + it.right
+        workArea.height -= it.top + it.bottom
+    }
+    val transform = configuration.defaultTransform
+    val minimum = DesktopPipGeometry.minimumSize(
+        contentDensity, transform.scaleX, transform.scaleY, window.insets, workArea,
+    )
+    if (window.minimumSize != minimum) window.minimumSize = minimum
 }

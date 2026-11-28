@@ -89,6 +89,10 @@ private fun desktopMain(
     playbackService: DesktopPlaybackService,
 ) = application {
     val startup = remember { DesktopStartup() }
+    val x11WindowScale by rememberX11WindowScale()
+    if (DesktopScaleDiagnostics.enabled) {
+        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { DesktopScaleDiagnostics.logEnvironment() } }
+    }
     var backgroundReady by remember { mutableStateOf(false) }
     DesktopStartupDiagnostics.once(DesktopStartupDiagnostics.Milestone.AWT_READY)
     DisposableEffect(Unit) { onDispose { DesktopApplicationResources.close() } }
@@ -152,7 +156,7 @@ private fun desktopMain(
     }
     // Background transport services and PiP stay independent of main-window visibility.
     if (backgroundReady) DesktopBackgroundPlaybackHost(playbackService, pipHost)
-    DesktopPipHostWindow(pipHost)
+    DesktopPipHostWindow(pipHost, x11WindowScale)
     // Keep the main Window IN composition when hidden to tray or PiP, just like 1.9.3.
     // Its Compose page state, Home scroll and native peer survive show/hide cycles.
     // The playback engine stays process-owned; no stream or UI reconstruction on restore.
@@ -417,13 +421,12 @@ private fun desktopMain(
                 )
             }
         }
-        // Apply app-wide UI scale inside Compose, preserving native window frame sizing
-        // and the monitor/accessibility font scale. Flyouts share the same density.
         val uiScalePercent by DesktopUiScaleSettings.percent.collectAsState()
         val systemDensity = LocalDensity.current
-        val uiDensity = remember(systemDensity, uiScalePercent) {
-            Density(systemDensity.density * (uiScalePercent / 100f), systemDensity.fontScale)
+        val uiDensity = remember(systemDensity, uiScalePercent, x11WindowScale) {
+            desktopContentDensity(systemDensity, uiScalePercent, x11WindowScale)
         }
+        LogDesktopWindowScale("main", composeWindow, systemDensity, uiDensity, uiScalePercent, x11WindowScale)
         // Only lyrics can opt out of the focus-based frame limiter; when the main window is
         // minimized or hidden, keep the frame loop suspended regardless of the preference.
         val animateLyricsWhileUnfocused by DesktopAppearanceSettings.animateLyricsWhileUnfocused.collectAsState()

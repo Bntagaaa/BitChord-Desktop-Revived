@@ -16,13 +16,17 @@ import androidx.compose.ui.window.application
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.playback.PlaybackPosition
+import java.awt.Dimension
 import java.awt.EventQueue
+import java.awt.Point
 import java.awt.Robot
 import java.awt.event.WindowEvent
 import java.io.File
 import javax.imageio.ImageIO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CompletableDeferred
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 import kotlin.test.*
 
 /** Opt-in real AWT window lifecycle under X11/Xvfb; no account/network/playback session created. */
@@ -56,8 +60,10 @@ class DesktopPipNativeTest {
             val bounds = node.boundsInRoot
             val native = pip()!!
             val point = native.contentPane.locationOnScreen
+            val transform = native.graphicsConfiguration.defaultTransform
             Robot().apply {
-                mouseMove(point.x + bounds.center.x.toInt(), point.y + bounds.center.y.toInt())
+                mouseMove(point.x + (bounds.center.x / transform.scaleX).roundToInt(),
+                    point.y + (bounds.center.y / transform.scaleY).roundToInt())
                 mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
                 mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
             }
@@ -69,7 +75,7 @@ class DesktopPipNativeTest {
         try {
             DesktopPipSettings.update { it.copy(lyrics = true, bounds = DesktopPipBounds(80, 80, 500, 340)) }
             application(exitProcessOnExit = false) {
-                DesktopPipHostWindow(host)
+                DesktopPipHostWindow(host, x11WindowScale = null)
                 Window(onCloseRequest = {}, visible = mainVisible.value, title = "PiP track test owner") {
                     LaunchedEffect(Unit) {
                         lyrics.follow(snapshotFlow {
@@ -141,6 +147,120 @@ class DesktopPipNativeTest {
             failure?.let { throw it }
         } finally {
             DesktopPipSettings.update { before }; DesktopPipSettings.flush()
+        }
+    }
+
+    @Test fun `fractional content scaling preserves minimum controls and native mouse targets`() {
+        if (System.getenv("BITCHORD_PIP_NATIVE_TEST") != "1") return
+        com.music.bitchord.ui.player.PlayerPlatform.install(DesktopPlayerHost)
+        val before = DesktopPipSettings.state.value
+        val scale = mutableStateOf<Float?>(1f)
+        val controller = DesktopPipController({ true }, {}, {}, { true })
+        val position = PlaybackPosition().apply { report(5000) }
+        val model = DesktopPipState(
+            Song("scale-fixture", "Scale fixture", "BitChord", null),
+            false, false, false, 180000, true, true, false, "scale-fixture", null, false, null,
+        )
+        var plays = 0
+        var failure: Throwable? = null
+        fun pip() = java.awt.Window.getWindows().filterIsInstance<ComposeWindow>()
+            .singleOrNull { it.title == "BitChord · Picture in picture" && it.isDisplayable }
+        fun nodes(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::nodes)
+        fun node(tag: String) = pip()?.semanticsOwners?.flatMap { nodes(it.unmergedRootSemanticsNode) }
+            ?.singleOrNull { it.config.getOrNull(SemanticsProperties.TestTag) == tag }
+        fun geometry() = pip()?.let { native ->
+            "window=${native.bounds} insets=${native.insets} client=${native.contentPane.size} " +
+                "root=${node("pip-root")?.boundsInRoot} play=${node("pip-play")?.boundsInRoot} " +
+                "awt=${native.graphicsConfiguration.defaultTransform} clicks=$plays"
+        } ?: "PiP is unavailable"
+        fun capture(name: String) {
+            pip()?.takeIf { it.isShowing }?.let { native ->
+                val evidence = File("build/reports/pip-rebuild/$name.png")
+                evidence.parentFile.mkdirs()
+                ImageIO.write(Robot().createScreenCapture(native.bounds), "png", evidence)
+            }
+        }
+        try {
+            DesktopPipSettings.update { it.copy(lyrics = false, bounds = DesktopPipBounds(80, 80, 500, 340)) }
+            controller.show()
+            application(exitProcessOnExit = false) {
+                Window(onCloseRequest = {}, visible = false, title = "PiP scale test owner") {}
+                DesktopPipWindow(controller, model, position, { plays++ }, {}, {}, {}, x11WindowScale = scale.value)
+                LaunchedEffect(Unit) {
+                    try {
+                        suspend fun await(label: String, predicate: () -> Boolean) {
+                            repeat(150) { if (predicate()) return; delay(30) }
+                            error("native PiP scaling timed out: $label; ${geometry()}")
+                        }
+                        await("mapped frame") { pip()?.isShowing == true && node("pip-play") != null }
+                        val native = pip()!!
+                        for (factor in listOf(1f, 1.25f, 1.5f, 1.75f, 2f, 1f)) {
+                            scale.value = factor
+                            val transform = native.graphicsConfiguration.defaultTransform
+                            val clientWidth = ceil(320 * factor / transform.scaleX).toInt()
+                            val clientHeight = ceil(180 * factor / transform.scaleY).toInt()
+                            val insets = native.insets
+                            val expectedMinimum = Dimension(
+                                maxOf(340, clientWidth + insets.left + insets.right),
+                                maxOf(210, clientHeight + insets.top + insets.bottom),
+                            )
+                            await("minimum at $factor") { native.minimumSize == expectedMinimum }
+                            native.size = Dimension(1, 1) // AWT must clamp an undersized resize.
+                            await("client at $factor") {
+                                // setSize updates the outer bounds before AWT lays out its children.
+                                // Both the old contentPane and old Compose root can still agree;
+                                // require them to match the new native client before choosing a click.
+                                val actualInsets = native.insets
+                                val actualClientWidth = native.width - actualInsets.left - actualInsets.right
+                                val actualClientHeight = native.height - actualInsets.top - actualInsets.bottom
+                                native.size == expectedMinimum &&
+                                    native.contentPane.width == actualClientWidth && native.contentPane.height == actualClientHeight &&
+                                    actualClientWidth >= clientWidth && actualClientHeight >= clientHeight &&
+                                    node("pip-action-Close picture in picture")?.boundsInRoot?.let {
+                                        kotlin.math.abs(it.width - 28f * factor) < 1.1f
+                                    } == true &&
+                                    node("pip-root")?.boundsInRoot?.let {
+                                        kotlin.math.abs(it.width - actualClientWidth * transform.scaleX) < 1.1 &&
+                                            kotlin.math.abs(it.height - actualClientHeight * transform.scaleY) < 1.1
+                                    } == true
+                            }
+                            val root = assertNotNull(node("pip-root")).boundsInRoot
+                            for (tag in listOf("pip-play", "pip-previous", "pip-next", "pip-seek", "pip-action-Close picture in picture")) {
+                                val bounds = assertNotNull(node(tag), "$tag at $factor").boundsInRoot
+                                assertTrue(bounds.width > 0f && bounds.height > 0f, "$tag is clipped at $factor")
+                                assertTrue(bounds.left >= root.left - .5f && bounds.right <= root.right + .5f,
+                                    "$tag exceeds client width at $factor: $bounds / $root")
+                                assertTrue(bounds.top >= root.top - .5f && bounds.bottom <= root.bottom + .5f,
+                                    "$tag exceeds client height at $factor: $bounds / $root")
+                            }
+                            val play = assertNotNull(node("pip-play")).boundsInRoot.center
+                            val origin = native.contentPane.locationOnScreen
+                            val target = Point(origin.x + (play.x / transform.scaleX).roundToInt(),
+                                origin.y + (play.y / transform.scaleY).roundToInt())
+                            assertTrue(native.bounds.contains(target), "Native click $target is outside ${geometry()}")
+                            capture("native-scale-${(factor * 100).toInt()}")
+                            println("PIP_SCALING factor=$factor target=$target ${geometry()}")
+                            val previousPlays = plays
+                            Robot().apply {
+                                mouseMove(target.x, target.y)
+                                mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                                mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                            }
+                            await("native click at $factor") { plays == previousPlays + 1 }
+                            assertSame(native, pip(), "Changing scale must retain the native PiP window")
+                        }
+                        println("PIP_SCALING PASS 100/125/150/175/200/100 minimum-client/native-clicks/same-peer")
+                    } catch (error: Throwable) {
+                        failure = error
+                        runCatching { capture("native-scale-failure") }
+                    }
+                    finally { controller.dispose(); exitApplication() }
+                }
+            }
+            failure?.let { throw it }
+        } finally {
+            DesktopPipSettings.update { before }
+            DesktopPipSettings.flush()
         }
     }
 
