@@ -501,12 +501,7 @@ internal fun DesktopSettingsScreen(
                 PlayerLayout.CLASSIC -> "Two-column split with controls beside the cover."
                 PlayerLayout.CENTERED -> "Centered player column that slides left when lyrics or queue open."
             }
-            DesktopSettingsControl("Player layout", description, icon = DesktopIcons.Settings.Appearance) {
-                DesktopSettingsSegmentedControl(
-                    PlayerLayout.entries, playerLayout, { it.name.lowercase().replaceFirstChar(Char::uppercaseChar) },
-                    DesktopPlayerLayoutSettings::setLayout,
-                )
-            }
+            DesktopPlayerLayoutPicker(playerLayout, description, DesktopPlayerLayoutSettings::setLayout)
         }
         toggle(
             DesktopStrings["d_animated_canvas", "Animated canvas"],
