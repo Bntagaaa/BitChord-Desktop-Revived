@@ -72,6 +72,10 @@ internal fun DesktopBackgroundPlaybackHost(
         mpris.start()
         onDispose { mpris.stop() }
     }
+    DisposableEffect(service) {
+        DesktopConnectHost.attach(service)
+        onDispose { DesktopConnectHost.detach(service) }
+    }
 
     // Preserve the player's clock, metadata and lyrics while the main UI is hidden.
     LaunchedEffect(service) {
@@ -113,8 +117,9 @@ internal fun DesktopBackgroundPlaybackHost(
         }
     }
     LaunchedEffect(
-        playback.song?.videoId, playback.isPlaying, playback.durationMs,
-        playback.volume, playback.error, shuffle, repeatMode, rate,
+        playback.song?.videoId, playback.isPlaying, playback.isLoading, playback.awaitingAudio,
+        playback.durationMs, playback.seeks, playback.volume, playback.error,
+        shuffle, repeatMode, rate, DesktopPlayerHost.volumeLevel.collectAsState().value,
     ) {
         mpris.update(
             playback = service.engine.state.value,
@@ -126,6 +131,11 @@ internal fun DesktopBackgroundPlaybackHost(
             },
             rate = rate.toDouble(),
         )
+        DesktopConnectHost.onPlaybackChanged()
+    }
+    val liveQueue by service.liveQueue
+    LaunchedEffect(liveQueue) {
+        DesktopConnectHost.onQueueChanged()
     }
     LaunchedEffect(playback.song?.videoId, playback.isPlaying, playback.durationMs) {
         val state = service.engine.state.value

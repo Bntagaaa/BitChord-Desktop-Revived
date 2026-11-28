@@ -236,6 +236,10 @@ internal object DesktopPlayerHost : PlayerHost {
         messages.value = message
     }
 
+    /** Opens the LAN Connect pairing panel from anywhere in the shared player chrome. */
+    @Volatile
+    var onOpenConnect: (() -> Unit)? = null
+
     /** The desktop's signal-chain readout, supplied by the window that has the engine. */
     @Volatile
     var pipelineDialog: (@Composable (onDismiss: () -> Unit) -> Unit)? = null

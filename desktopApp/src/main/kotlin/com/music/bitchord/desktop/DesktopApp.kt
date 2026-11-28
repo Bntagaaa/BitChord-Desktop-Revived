@@ -2015,6 +2015,54 @@ internal fun BitChordDesktopApp(
                 autoplayJob = null
                 autoplaySeed = null
             },
+            onLoadRemoteQueue = { tracks, index, positionMs, play, remoteRepeat ->
+                val songs = DesktopQueue.adopt(liveQueue.songs, tracks.map { it.toDesktopConnectSong() })
+                if (songs.isNotEmpty()) {
+                    val safeIndex = index.coerceIn(songs.indices)
+                    liveQueue = DesktopQueue(songs, safeIndex).trimmed()
+                    preShuffleOrder = emptyList()
+                    remoteRepeat?.let { mode ->
+                        repeatMode = when (mode.uppercase()) {
+                            "ONE" -> DesktopRepeatMode.ONE
+                            "ALL" -> DesktopRepeatMode.ALL
+                            else -> DesktopRepeatMode.OFF
+                        }
+                        persistence.saveString("repeat_mode", repeatMode.name)
+                    }
+                    liveQueue.current?.let { target ->
+                        selectedSong = target
+                        history = (listOf(target) + history.filterNot { it.videoId == target.videoId }).take(50)
+                        playbackEngine.load(target, play, startAtMs = positionMs.coerceAtLeast(0L))
+                        saveQueue()
+                        persistence.saveHistory(history)
+                        partySyncHolder[0]?.onLocalIntent(target.videoId)
+                        scope.launch { DesktopScrobbling.updateNowPlaying(target) }
+                    }
+                }
+            },
+            onUpdateRemoteUpcoming = { tracks ->
+                val updated = liveQueue.withPartyUpcoming(tracks.map { it.toDesktopConnectSong() })
+                if (updated !== liveQueue) {
+                    liveQueue = updated
+                    saveQueue()
+                }
+            },
+            onJumpToRemote = { videoId, index, positionMs, play ->
+                val targetIndex = index?.takeIf { it in liveQueue.songs.indices && liveQueue.songs[it].videoId == videoId }
+                    ?: liveQueue.songs.indices.firstOrNull { liveQueue.songs[it].videoId == videoId }
+                if (targetIndex != null) {
+                    liveQueue = liveQueue.copy(index = targetIndex)
+                    liveQueue.current?.let { target ->
+                        selectedSong = target
+                        history = (listOf(target) + history.filterNot { it.videoId == target.videoId }).take(50)
+                        playbackEngine.load(target, play, startAtMs = positionMs.coerceAtLeast(0L))
+                        saveQueue()
+                        persistence.saveHistory(history)
+                        partySyncHolder[0]?.onLocalIntent(target.videoId)
+                        scope.launch { DesktopScrobbling.updateNowPlaying(target) }
+                    }
+                }
+            },
         )
         playbackService.attach(callbacks)
         onDispose { playbackService.detach(callbacks) }
@@ -3646,6 +3694,7 @@ internal fun BitChordDesktopApp(
             volume = it
             persistence.saveString("volume", it.toString())
         }
+        DesktopPlayerHost.onOpenConnect = { openSettingsPage(DesktopSettingsPage.CONNECT) }
     }
 
     // The engine's measured stream, as the player's quality badge and stats line read it.
@@ -4974,6 +5023,7 @@ internal fun BitChordDesktopApp(
                                                 autoplayEnabled = autoplay,
                                                 onDismiss = ::goBack,
                                             )
+                                            DesktopSettingsPage.CONNECT -> DesktopConnectDialog(onDismiss = ::goBack)
                                             DesktopSettingsPage.LYRICS_SOURCES -> DesktopLyricsSourcesDialog(
                                                 order = lyricsOrder,
                                                 enabled = lyricsOn,
