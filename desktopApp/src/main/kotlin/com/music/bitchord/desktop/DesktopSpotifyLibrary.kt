@@ -34,6 +34,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.ui.screens.LibraryGridPage
+import com.music.bitchord.ui.screens.LocalDesktopIntegratedTitleBar
 import com.music.bitchord.sharedui.resources.Res as SharedUiRes
 import com.music.bitchord.sharedui.resources.spotify_logo
 import org.jetbrains.compose.resources.painterResource
@@ -184,9 +185,15 @@ internal fun DesktopSpotifyLibraryPage(
     onImport: suspend (String, Boolean, (String) -> Unit) -> String,
 ) {
     var showImport by remember { mutableStateOf(false) }
+    val integratedTitleBar = LocalDesktopIntegratedTitleBar.current
     Column(Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 0.dp, bottom = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(
+                start = 24.dp,
+                end = 24.dp,
+                top = if (integratedTitleBar) 0.dp else 16.dp,
+                bottom = if (integratedTitleBar) 12.dp else 16.dp,
+            ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {

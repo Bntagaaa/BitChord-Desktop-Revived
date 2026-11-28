@@ -29,6 +29,7 @@ import com.music.bitchord.ui.LocalPullToRefreshEnabled
 import com.music.bitchord.ui.screens.ExploreScreen
 import com.music.bitchord.ui.screens.HomeScreen
 import com.music.bitchord.ui.screens.LocalDesktopCompactHeadings
+import com.music.bitchord.ui.screens.LocalDesktopIntegratedTitleBar
 import com.music.bitchord.ui.screens.desktopTopScrollFade
 import com.music.bitchord.ui.screens.CompactTrackRow
 import com.music.bitchord.ui.screens.LibraryGridPage
@@ -6781,10 +6782,12 @@ internal fun DesktopFrame(
         }
     }
     hitTestRegistry.overlayBlocked = menuPortal.entry.value != null
+    val hasIntegratedTitleBarSpacer = !oldTopPlayerEnabled && integratedCaptionActive && !fullBleedTop
     CompositionLocalProvider(
         LocalDesktopHaze provides haze,
         LocalDesktopMenuPortal provides menuPortal,
         LocalDesktopTitleBarHitTestRegistry provides hitTestRegistry,
+        LocalDesktopIntegratedTitleBar provides hasIntegratedTitleBarSpacer,
     ) {
         Box(modifier.fillMaxSize().background(containerColor).desktopMenuPointer(menuPortal)) {
             // Preserve blur for the floating player; the sidebar itself remains opaque.

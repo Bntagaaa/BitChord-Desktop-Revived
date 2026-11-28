@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.testTag
@@ -121,6 +122,7 @@ internal fun CenteredLandscapePlayerLayout(
     queueButtonVisible: Boolean,
     onToggleLyrics: () -> Unit,
     onToggleQueue: () -> Unit,
+    onOpenOutput: (Rect?) -> Unit = {},
     background: @Composable (Modifier) -> Unit,
     artwork: @Composable (Modifier) -> Unit,
     header: @Composable (compact: Boolean, active: Boolean) -> Unit,
@@ -143,6 +145,7 @@ internal fun CenteredLandscapePlayerLayout(
             queueButtonVisible = queueButtonVisible,
             onToggleLyrics = onToggleLyrics,
             onToggleQueue = onToggleQueue,
+            onOpenOutput = onOpenOutput,
             artwork = artwork,
             header = { active -> header(compact, active) },
             lyricStrip = lyricStrip,
@@ -179,6 +182,7 @@ internal fun CenteredLandscapePlayerColumns(
     queueButtonVisible: Boolean,
     onToggleLyrics: () -> Unit,
     onToggleQueue: () -> Unit,
+    onOpenOutput: (Rect?) -> Unit = {},
     artwork: @Composable (Modifier) -> Unit,
     header: @Composable (active: Boolean) -> Unit,
     lyricStrip: (@Composable () -> Unit)?,
@@ -251,6 +255,7 @@ internal fun CenteredLandscapePlayerColumns(
                         vibrant = true,
                     )
                 }
+                AirPlayOutputButton(onOutput = onOpenOutput)
                 if (volume != null) {
                     val muted = volumeLevel() <= 0f
                     BottomGlyph(

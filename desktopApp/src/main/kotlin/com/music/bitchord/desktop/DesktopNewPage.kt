@@ -48,6 +48,7 @@ import com.music.bitchord.ui.components.ArtworkHoverMode
 import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.screens.CompactTrackRow
 import com.music.bitchord.ui.screens.LocalDesktopCompactHeadings
+import com.music.bitchord.ui.screens.LocalDesktopIntegratedTitleBar
 import com.music.bitchord.ui.icons.BitChordIcons
 
 /**
@@ -68,18 +69,24 @@ internal fun DesktopNewPage(
 ) {
     val shelves = (state as? UiState.Success)?.data.orEmpty().filter { it.items.isNotEmpty() }
 
+    val integratedTitleBar = LocalDesktopIntegratedTitleBar.current
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = 0.dp,
+            top = if (integratedTitleBar) 0.dp else 8.dp,
             bottom = contentPadding.calculateBottomPadding() + 24.dp,
         ),
     ) {
         item(key = "new-page-title") {
             Text(
                 text = "New",
-                modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, top = 0.dp, bottom = 8.dp),
+                modifier = Modifier.padding(
+                    start = PAGE_GUTTER,
+                    end = PAGE_GUTTER,
+                    top = if (integratedTitleBar) 0.dp else 8.dp,
+                    bottom = 8.dp,
+                ),
                 style = if (LocalDesktopCompactHeadings.current) {
                     MaterialTheme.typography.headlineLarge
                 } else {

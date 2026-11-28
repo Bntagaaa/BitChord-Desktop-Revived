@@ -131,6 +131,8 @@
     <string name="hdmi_output">HDMI</string>
     <string name="personal_phone">%1$s’s Phone</string>
     <string name="this_phone">This phone</string>
+    <string name="personal_desktop">%1$s’s Desktop</string>
+    <string name="this_desktop">This Desktop</string>
     <string name="albums">Albums</string>
     <string name="artists">Artists</string>
     <string name="card_plays_format">%1$s plays</string>

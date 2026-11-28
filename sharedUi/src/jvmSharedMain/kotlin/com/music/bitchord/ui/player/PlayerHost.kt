@@ -42,6 +42,9 @@ interface PlayerHost {
     /** Enable the current mobile player's white/additive text treatment on desktop only. */
     val mobileTextChrome: Boolean get() = false
 
+    /** Use a desktop rather than phone label for the local/default audio route. */
+    val desktopOutputLabels: Boolean get() = false
+
     /** A Canvas already settled for [song], without a lookup. */
     fun cachedCanvas(song: Song): CanvasArtwork?
 

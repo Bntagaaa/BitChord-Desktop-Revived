@@ -116,6 +116,9 @@ import com.music.bitchord.ui.player.MeshPalette
 /** Desktop-only typography; Android keeps the original larger styles. */
 val LocalDesktopCompactHeadings = staticCompositionLocalOf { false }
 
+/** True when a platform titlebar spacer already sits directly above desktop page content (e.g. Windows integrated caption). */
+val LocalDesktopIntegratedTitleBar = staticCompositionLocalOf { false }
+
 /** Stable edge masking for desktop scrollable content. The mask is alpha-only, independent of the
  * foreground/background palette, and therefore looks correct in dark, light and Follow System.
  *
@@ -667,7 +670,7 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
         modifier = modifier.padding(
             start = PAGE_GUTTER,
             end = PAGE_GUTTER,
-            top = if (compactHeadings) 0.dp else 8.dp,
+            top = if (LocalDesktopIntegratedTitleBar.current) 0.dp else 8.dp,
             bottom = 8.dp,
         ),
     ) {

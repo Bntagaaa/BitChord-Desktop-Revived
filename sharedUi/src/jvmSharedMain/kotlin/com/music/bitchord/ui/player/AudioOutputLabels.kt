@@ -5,44 +5,36 @@ import com.music.bitchord.sharedui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * What to call an output on screen.
- *
- * Bluetooth and USB devices carry their own name and keep it. The phone's own
- * speaker and a pair of wired headphones do not — `productName` gives the
- * *phone's* model for both, which is why the caption used to read "SM-S911B"
- * — so those get a label from here instead.
+ * Keep the names of external audio routes; use a platform-specific label for
+ * the local/default route. On desktop PHONE represents the OS-managed default,
+ * not a physical phone, and its picker name ("System default") is not the
+ * personal output caption.
  */
 @Composable
-internal fun outputLabel(device: AudioOutputDevice, accountName: String?): String {
+internal fun outputLabel(
+    device: AudioOutputDevice?,
+    accountName: String?,
+    desktop: Boolean = PlayerPlatform.host.desktopOutputLabels,
+): String {
     val firstName = accountName?.trim()?.split(Regex("\\s+"))?.firstOrNull()?.takeIf { it.isNotBlank() }
+    val name = device?.name.orEmpty()
+    val localDesktop = desktop && device?.kind == AudioOutputKind.PHONE
     return when {
-        device.name.isNotBlank() -> device.name
-        device.kind == AudioOutputKind.WIRED -> stringResource(Res.string.wired_headphones)
-        device.kind == AudioOutputKind.USB -> stringResource(Res.string.usb_audio)
-        device.kind == AudioOutputKind.HDMI -> stringResource(Res.string.hdmi_output)
-        firstName != null -> stringResource(Res.string.personal_phone, firstName)
-        else -> stringResource(Res.string.this_phone)
+        !localDesktop && name.isNotBlank() -> name
+        device?.kind == AudioOutputKind.WIRED -> stringResource(Res.string.wired_headphones)
+        device?.kind == AudioOutputKind.USB -> stringResource(Res.string.usb_audio)
+        device?.kind == AudioOutputKind.HDMI -> stringResource(Res.string.hdmi_output)
+        firstName != null -> stringResource(
+            if (desktop) Res.string.personal_desktop else Res.string.personal_phone,
+            firstName,
+        )
+        else -> stringResource(if (desktop) Res.string.this_desktop else Res.string.this_phone)
     }
 }
 
-/**
- * The name of whatever is playing the music, for the line under the transport.
- *
- * Derived from the same list the picker shows, so the two can never disagree —
- * which they did constantly when this read `android.media.MediaRouter`'s
- * selected route and the picker read the audio devices.
- */
+/** The active route's name for the caption under the transport. */
 @Composable
 internal fun rememberAudioOutputName(accountName: String?): String {
-    val outputs = rememberAudioOutputs()
-    val active = outputs.firstOrNull { it.isActive }
-        ?: return if (accountName.isNullOrBlank()) {
-            stringResource(Res.string.this_phone)
-        } else {
-            stringResource(
-                Res.string.personal_phone,
-                accountName.trim().split(Regex("\\s+")).first(),
-            )
-        }
+    val active = rememberAudioOutputs().firstOrNull { it.isActive }
     return outputLabel(active, accountName)
 }

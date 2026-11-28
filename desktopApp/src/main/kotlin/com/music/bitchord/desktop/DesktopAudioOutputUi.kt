@@ -55,6 +55,7 @@ import com.music.bitchord.sharedui.resources.audio_output_playing
 import com.music.bitchord.sharedui.resources.audio_pipeline
 import com.music.bitchord.sharedui.resources.cast
 import com.music.bitchord.ui.player.ThinSlider
+import com.music.bitchord.ui.player.rememberAudioOutputGlyph
 import org.jetbrains.compose.resources.stringResource
 
 internal val DesktopAudioOutputButtonSize = 32.dp
@@ -66,12 +67,15 @@ internal fun DesktopAudioOutputButton(
     tint: Color = DesktopSecondary,
     interactive: Boolean = true,
 ) {
+    // Keep the floating AirPlay size (19dp at its call sites) and existing tint,
+    // while applying the same optical ratios and route selection as fullscreen.
+    val output = rememberAudioOutputGlyph(DesktopPlayerHost)
     val glyph: @Composable () -> Unit = {
         Icon(
-            DesktopIcons.Audio.Headphones,
+            output.icon,
             if (interactive) DesktopStrings["audio_output", "Audio output"] else null,
             tint = tint,
-            modifier = Modifier.size(iconSize),
+            modifier = Modifier.size(output.sizeForAirPlay(iconSize).coerceAtMost(DesktopAudioOutputButtonSize)),
         )
     }
     if (interactive) {

@@ -786,12 +786,12 @@ internal fun VolumeRow(
     }
 }
 
+private enum class ActionRowMode { OUTPUT, PARTY, QUEUE }
+
 /**
- * Lyrics, the capsule, and the queue — the row both layouts end on.
- *
- * The capsule swaps: output and party normally, the three playback modes while
- * the queue is up, since that is when they are what you are about to reach for.
- * It stays centred between the two glyphs either way.
+ * Lyrics, audio output and queue. A lone output glyph becomes a two-segment
+ * capsule while in a Jam, preserving access to the live member count.
+ * The Centered layout uses [AirPlayOutputButton] directly and is unaffected.
  */
 @Composable
 internal fun PlayerActionRow(
@@ -812,17 +812,31 @@ internal fun PlayerActionRow(
     /** Opens [ListenTogetherMembersSheet] rather than settings directly. */
     onOpenListenTogetherMembers: () -> Unit,
 ) {
+    val badge = rememberPartyBadge()
+    val mode = when {
+        queueOpen -> ActionRowMode.QUEUE
+        badge.inParty -> ActionRowMode.PARTY
+        else -> ActionRowMode.OUTPUT
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        // Sized for the wider of the two capsules — the three-up one — in both
-        // states. Computed for whichever was on screen it would change as they
-        // swap, and the lyrics and queue glyphs would slide with it.
-        val widestRow = BOTTOM_ACTION_SIZE * 2 + pillWidth(3)
-        val edgeInset = ((maxWidth - widestRow) / 4).coerceAtLeast(0.dp)
+        // Match upstream's optical spacing: the standalone output is spaced as
+        // if a two-up pill held it; opening the queue moves both sides outward.
+        val edgeInset = actionRowInset(maxWidth, 3)
+        val closeIn = actionRowInset(maxWidth, 2) - edgeInset
+        val reduceMotion = LocalPlayerReduceMotion.current
+        val compactness = animateFloatAsState(
+            targetValue = if (mode == ActionRowMode.OUTPUT) 1f else 0f,
+            animationSpec = tween(if (reduceMotion) 0 else 220),
+            label = "actionRowCompact",
+        )
         Box(
             modifier = Modifier.fillMaxWidth().padding(horizontal = edgeInset),
             contentAlignment = Alignment.Center,
         ) {
-            if (lyricsEnabled) Box(Modifier.align(Alignment.CenterStart)) {
+            if (lyricsEnabled) Box(
+                Modifier.align(Alignment.CenterStart)
+                    .offset { IntOffset((closeIn.toPx() * compactness.value).roundToInt(), 0) },
+            ) {
                 BottomGlyph(
                     icon = BitChordIcons.LyricsQuote,
                     contentDescription = stringResource(if (lyricsOpen) Res.string.close_lyrics else Res.string.open_lyrics),
@@ -834,7 +848,7 @@ internal fun PlayerActionRow(
                 )
             }
             AnimatedContent(
-                targetState = queueOpen,
+                targetState = mode,
                 transitionSpec = {
                     (fadeIn(tween(180, delayMillis = 140)) togetherWith fadeOut(tween(140)))
                         // Unclipped: the capsule's own rounded ends are what
@@ -843,10 +857,9 @@ internal fun PlayerActionRow(
                         .using(SizeTransform(clip = false) { _, _ -> tween(220) })
                 },
                 label = "playerBottomPill",
-            ) { showQueueModes ->
-                if (showQueueModes) {
-                    // Spaced the same as the output/party capsule, so the two
-                    // read as one control growing a segment.
+            ) { currentMode ->
+                if (currentMode == ActionRowMode.QUEUE) {
+                    // Keep the playback modes centred as the output expands.
                     Pill {
                         PillSegment(
                             icon = BitChordIcons.Shuffle,
@@ -891,15 +904,20 @@ internal fun PlayerActionRow(
                             tapWindowMs = AUTOPLAY_TAP_WINDOW_MS,
                         )
                     }
-                } else {
-                    OutputPartyPill(
+                } else if (currentMode == ActionRowMode.PARTY) {
+                    ActivePartyOutputPill(
+                        members = badge.members,
                         onOutput = onOpenOutput,
-                        onParty = onListenTogether,
                         onOpenMembers = onOpenListenTogetherMembers,
                     )
+                } else {
+                    AirPlayOutputButton(onOutput = onOpenOutput)
                 }
             }
-            if (queueButtonVisible) Box(Modifier.align(Alignment.CenterEnd)) {
+            if (queueButtonVisible) Box(
+                Modifier.align(Alignment.CenterEnd)
+                    .offset { IntOffset(-(closeIn.toPx() * compactness.value).roundToInt(), 0) },
+            ) {
                 BottomGlyph(
                     icon = BitChordIcons.Queue,
                     contentDescription = stringResource(Res.string.up_next),
@@ -1086,6 +1104,7 @@ private val PLAYER_PRESS_CIRCLE_DIAMETER = 60.dp
 private const val PLAYER_SKIP_HEIGHT_SCALE = 0.85f
 
 private val BOTTOM_ACTION_SIZE = 44.dp
+private val BOTTOM_ICON_SIZE = 26.dp
 
 /**
  * The lit lyrics/queue tile, measured off Apple Music's: the glyph fills about
@@ -1104,31 +1123,15 @@ private const val BOTTOM_ACTIVE_TILE_ALPHA = 0.62f
 // the capsule lopsided or shifts the queue control beside it.
 private val PILL_SEGMENT_WIDTH = 64.dp
 
-/**
- * Optical sizes, not equal ones.
- *
- * Headphones is a tall, narrow glyph and Person a taller, narrower one, so
- * drawn at the same nominal size the second reads as the bigger of the two.
- * These are the numbers at which they look like a matched pair. Every other
- * output glyph is fitted to the box Headphones fills at that size — 75% of it
- * tall, at most 85% wide — either in its own drawable or by
- * [PILL_OUTPUT_WIDE_SIZE] / [PILL_OUTPUT_TALL_SIZE] for the Material ones.
- */
-private val PILL_OUTPUT_SIZE = 23.dp
-private val PILL_PARTY_SIZE = 22.dp
-
-/** Cast and Tv run 92% of their box wide; at 23dp they read bigger than the rest. */
-private val PILL_OUTPUT_WIDE_SIZE = 21.dp
-
-/** Watch is drawn the full height of its box. */
-private val PILL_OUTPUT_TALL_SIZE = 17.dp
-
 /** What a segment's glyph is drawn at when it has no optical quirk to correct. */
 private val PILL_ICON_SIZE = 24.dp
 
 /** How wide a capsule of [segments] comes out, dividers included. */
 private fun pillWidth(segments: Int): Dp =
     PILL_SEGMENT_WIDTH * segments + 1.dp * (segments - 1)
+
+internal fun actionRowInset(maxWidth: Dp, segments: Int): Dp =
+    ((maxWidth - BOTTOM_ACTION_SIZE * 2 - pillWidth(segments)) / 4).coerceAtLeast(0.dp)
 
 /**
  * A row of controls joined into one capsule.
@@ -1176,99 +1179,61 @@ private fun PillDivider() {
 }
 
 /**
- * The two ends of "where is this playing": the output capsule.
- *
- * Both halves answer the same question and so belong to one control rather than
- * two glyphs that happen to sit side by side — the device the sound leaves by
- * (see [rememberOutputGlyph]), the party for which *people* it reaches.
- *
- * Video vs audio-only used to live here as a third segment; it now lives in
- * the player's own three-dot menu, beside Revert to original and Upgrade
- * quality — the same kind of choice, offered the same way. This capsule is
- * back to the two icons it always otherwise had, at their original spacing.
+ * Standalone adaptive audio output button shared by [PlayerActionRow] and
+ * [CenteredLandscapePlayerColumns].
  */
 @Composable
-private fun OutputPartyPill(
+internal fun AirPlayOutputButton(
     onOutput: (Rect?) -> Unit,
-    onParty: () -> Unit,
-    /** Who's in it, before the settings page — see [ListenTogetherMembersSheet]. */
-    onOpenMembers: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val badge = rememberPartyBadge()
-    val output = rememberOutputGlyph()
+    val output = rememberAudioOutputGlyph()
     var outputBounds by remember { mutableStateOf<Rect?>(null) }
-    Pill {
-        Box(Modifier.onGloballyPositioned { outputBounds = it.boundsInRoot() }) {
-        PillSegment(
+    Box(modifier.onGloballyPositioned { outputBounds = it.boundsInRoot() }) {
+        BottomGlyph(
             icon = output.icon,
-            iconSize = output.size,
+            iconSize = output.standaloneSize,
             contentDescription = stringResource(Res.string.audio_output),
             onClick = { onOutput(outputBounds) },
             vibrant = true,
-        )
-        }
-        PillDivider()
-        PillSegment(
-            // Person rather than Groups: the three-person glyph is drawn half
-            // the height of Headphones and wider than the segment holding it,
-            // so the two halves of the capsule never looked like a pair.
-            icon = SfStyleIcons.Person,
-            iconSize = PILL_PARTY_SIZE,
-            // The count is here and nowhere else: spoken, it is the whole
-            // point of the control; drawn, it would cost the capsule its
-            // symmetry for something the caption below already implies.
-            contentDescription = if (badge.inParty) {
-                stringResource(Res.string.listen_together_open_count, badge.members)
-            } else {
-                stringResource(Res.string.listen_together_open)
-            },
-            // Already in a party, this opens who's in it rather than the
-            // settings page directly; there is nothing to create or join once
-            // there is a party, so [onParty] only ever fires beforehand.
-            onClick = if (badge.inParty) onOpenMembers else onParty,
-            highlighted = badge.inParty,
-            trailingLabel = badge.members.takeIf { badge.inParty }?.toString(),
         )
     }
 }
 
 /**
- * What the output segment shows: the thing the music is coming out of, the way
- * Apple Music's AirPlay button does — the phone, buds, a speaker — rather than
- * headphones whatever is actually playing it.
- *
- * Off-device first: while casting or on the watch, the phone's own route is
- * not where anybody is listening.
+ * Regular player's active-Jam capsule. Reuse the existing output menu and
+ * member sheet, with the same optical sizes and SF-style person icon as the
+ * original two-segment control. Do not add this capsule to Centered.
  */
 @Composable
-private fun rememberOutputGlyph(): OutputGlyph {
-    val cast by PlayerPlatform.host.castState.collectAsStateWithLifecycle()
-    val watch by PlayerPlatform.host.watchOutput.collectAsStateWithLifecycle()
-    val active = rememberAudioOutputs().firstOrNull { it.isActive }
-    return when {
-        cast.connectedName != null -> OutputGlyph(SfStyleIcons.CastConnected, PILL_OUTPUT_WIDE_SIZE)
-        watch.active -> OutputGlyph(SfStyleIcons.Watch, PILL_OUTPUT_TALL_SIZE)
-        else -> when (active?.kind) {
-            // No active row is the phone too — the caption under the pill
-            // says "This phone" in the same case.
-            null, AudioOutputKind.PHONE -> OutputGlyph(vectorResource(Res.drawable.ic_output_phone))
-            AudioOutputKind.BLUETOOTH -> when (active.form) {
-                BluetoothForm.BUDS -> OutputGlyph(vectorResource(Res.drawable.ic_output_buds))
-                BluetoothForm.SPEAKER -> OutputGlyph(vectorResource(Res.drawable.ic_output_speaker))
-                BluetoothForm.CAR -> OutputGlyph(SfStyleIcons.Car)
-                // Headphones doubles as the neutral "some audio device" glyph:
-                // a device that won't say what it is gets that, not a guess.
-                BluetoothForm.HEADPHONES, BluetoothForm.UNKNOWN -> OutputGlyph(SfStyleIcons.Headphones)
-            }
-            AudioOutputKind.WIRED, AudioOutputKind.USB -> OutputGlyph(SfStyleIcons.Headphones)
-            AudioOutputKind.HDMI -> OutputGlyph(SfStyleIcons.Tv, PILL_OUTPUT_WIDE_SIZE)
-            AudioOutputKind.OTHER -> OutputGlyph(vectorResource(Res.drawable.ic_output_speaker))
+private fun ActivePartyOutputPill(
+    members: Int,
+    onOutput: (Rect?) -> Unit,
+    onOpenMembers: () -> Unit,
+) {
+    val output = rememberAudioOutputGlyph()
+    var outputBounds by remember { mutableStateOf<Rect?>(null) }
+    Pill {
+        Box(Modifier.onGloballyPositioned { outputBounds = it.boundsInRoot() }) {
+            PillSegment(
+                icon = output.icon,
+                iconSize = output.pillSize,
+                contentDescription = stringResource(Res.string.audio_output),
+                onClick = { onOutput(outputBounds) },
+                vibrant = true,
+            )
         }
+        PillDivider()
+        PillSegment(
+            icon = SfStyleIcons.Person,
+            iconSize = 22.dp,
+            contentDescription = stringResource(Res.string.listen_together_open_count, members),
+            onClick = onOpenMembers,
+            highlighted = true,
+            trailingLabel = members.toString(),
+        )
     }
 }
-
-/** An output glyph and the size that makes it match the others — see [PILL_OUTPUT_SIZE]. */
-private data class OutputGlyph(val icon: ImageVector, val size: Dp = PILL_OUTPUT_SIZE)
 
 /**
  * One control inside a [Pill] — [BottomGlyph]'s twin, squared off.
@@ -1291,7 +1256,7 @@ private fun PillSegment(
     loading: Boolean = false,
     /** See [BottomGlyph], where the same window means the same thing. */
     tapWindowMs: Long = 0L,
-    /** Per-segment override — see [OutputPartyPill]'s three-up capsule. */
+    /** Per-segment width override. */
     width: Dp = PILL_SEGMENT_WIDTH,
     /** Only the output icon is dodge-blended, as in mobile. */
     vibrant: Boolean = false,
@@ -1458,7 +1423,7 @@ internal fun OutputCaption(
     }
 }
 
-/** The three fields of a party the player draws — see [OutputPartyPill]. */
+/** The three fields of a party the player draws. */
 private data class PartyBadge(
     val inParty: Boolean,
     val members: Int,
@@ -1530,6 +1495,7 @@ internal fun BottomGlyph(
     tapWindowMs: Long = 0L,
     /** Lyrics, queue and standalone output use mobile's vibrant glyph ink. */
     vibrant: Boolean = false,
+    iconSize: Dp = BOTTOM_ICON_SIZE,
 ) {
     val haptics = rememberHaptics()
     // Read only from the click handler, never during composition, so writing it
@@ -1592,7 +1558,7 @@ internal fun BottomGlyph(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(26.dp).vibrantDiscChrome(vibrantIcon),
+                modifier = Modifier.size(iconSize).vibrantDiscChrome(vibrantIcon),
             )
         } else if (label != null) {
             Text(
