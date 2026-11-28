@@ -121,6 +121,8 @@ internal object DesktopWindowsNativeCaption {
 
     private var attachedWindow: Window? = null
     private var hwndPtr: Long = 0L
+    var attachedRevision by mutableStateOf(0)
+        private set
 
     fun attach(window: Window, titleBarHeightPx: Int): Boolean {
         if (!available || window !is Frame || window.isUndecorated || !window.isDisplayable) return false
@@ -131,6 +133,7 @@ internal object DesktopWindowsNativeCaption {
         if (ok) {
             attachedWindow = window
             hwndPtr = pointer
+            attachedRevision++
         }
         return ok
     }
@@ -213,8 +216,15 @@ internal object DesktopWindowsNativeCaption {
 
     @JvmStatic
     fun onCaptionButtonState(hovered: Int, pressed: Int) {
-        hoveredHitTest = hovered
-        pressedHitTest = pressed
+        if (java.awt.EventQueue.isDispatchThread()) {
+            hoveredHitTest = hovered
+            pressedHitTest = pressed
+        } else {
+            java.awt.EventQueue.invokeLater {
+                hoveredHitTest = hovered
+                pressedHitTest = pressed
+            }
+        }
     }
 
     var hoveredHitTest by mutableStateOf(0)
@@ -272,6 +282,7 @@ internal fun DesktopWindowsCaptionButtons(
     val captionFontFamily = WindowsCaptionIconFont.family
 
     LaunchedEffect(
+        DesktopWindowsNativeCaption.attachedRevision,
         registry?.minRect,
         registry?.maxRect,
         registry?.closeRect,
@@ -286,7 +297,7 @@ internal fun DesktopWindowsCaptionButtons(
         )
     }
 
-    LaunchedEffect(registry?.overlayBlocked) {
+    LaunchedEffect(DesktopWindowsNativeCaption.attachedRevision, registry?.overlayBlocked) {
         val reg = registry ?: return@LaunchedEffect
         DesktopWindowsNativeCaption.setOverlayBlocked(reg.overlayBlocked)
     }

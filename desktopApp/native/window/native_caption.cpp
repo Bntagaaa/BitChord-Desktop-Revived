@@ -124,9 +124,10 @@ LRESULT hit_test_window(HWND hwnd, CaptionState* state, POINT screen_pt) {
         if (GetWindowRect(hwnd, &win_rect)) {
             const int bx = border_x(hwnd);
             const int by = border_y(hwnd);
+            const int top_by = std::min(by, MulDiv(5, static_cast<int>(window_dpi(hwnd)), 96));
             const bool on_left = screen_pt.x >= win_rect.left && screen_pt.x < win_rect.left + bx;
             const bool on_right = screen_pt.x < win_rect.right && screen_pt.x >= win_rect.right - bx;
-            const bool on_top = screen_pt.y >= win_rect.top && screen_pt.y < win_rect.top + by;
+            const bool on_top = screen_pt.y >= win_rect.top && screen_pt.y < win_rect.top + top_by;
             const bool on_bottom = screen_pt.y < win_rect.bottom && screen_pt.y >= win_rect.bottom - by;
 
             if (on_top && on_left) return HTTOPLEFT;
@@ -143,9 +144,9 @@ LRESULT hit_test_window(HWND hwnd, CaptionState* state, POINT screen_pt) {
     POINT client_pt = screen_pt;
     ScreenToClient(hwnd, &client_pt);
 
-    if (close_rect.contains(client_pt.x, client_pt.y)) return HTCLOSE;
-    if (max_rect.contains(client_pt.x, client_pt.y)) return HTMAXBUTTON;
-    if (min_rect.contains(client_pt.x, client_pt.y)) return HTMINBUTTON;
+    if (close_rect.contains(client_pt.x, client_pt.y)) return HTCLIENT;
+    if (max_rect.contains(client_pt.x, client_pt.y)) return HTCLIENT;
+    if (min_rect.contains(client_pt.x, client_pt.y)) return HTCLIENT;
 
     if (overlay_blocked) {
         return HTCLIENT;
@@ -429,6 +430,35 @@ LRESULT CALLBACK caption_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
                     }
                 }
                 return 0;
+            }
+            break;
+        }
+
+        case WM_CAPTURECHANGED: {
+            bool changed = false;
+            {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                if (state->pressed_button != 0) {
+                    state->pressed_button = 0;
+                    changed = true;
+                }
+            }
+            if (changed) notify_caption_state(state->hovered_button, 0);
+            break;
+        }
+
+        case WM_ACTIVATE: {
+            if (LOWORD(wParam) == WA_INACTIVE) {
+                bool changed = false;
+                {
+                    std::lock_guard<std::mutex> lock(state->mutex);
+                    if (state->hovered_button != 0 || state->pressed_button != 0) {
+                        state->hovered_button = 0;
+                        state->pressed_button = 0;
+                        changed = true;
+                    }
+                }
+                if (changed) notify_caption_state(0, 0);
             }
             break;
         }

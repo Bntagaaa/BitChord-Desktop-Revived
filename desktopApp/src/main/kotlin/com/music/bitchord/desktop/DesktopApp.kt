@@ -6755,7 +6755,13 @@ internal fun DesktopFrame(
     val density = LocalDensity.current
     val systemDensity = LocalDesktopSystemDensity.current ?: density
     val integratedTitleBarSpacerHeight = DesktopWindowsCaptionMetrics.integratedTitleBarHeight(uiScalePercent)
-    LaunchedEffect(integratedCaptionActive, oldTopPlayerEnabled, density, systemDensity) {
+    LaunchedEffect(
+        DesktopWindowsNativeCaption.attachedRevision,
+        integratedCaptionActive,
+        oldTopPlayerEnabled,
+        density,
+        systemDensity,
+    ) {
         if (DesktopPlatform.isWindows) {
             val heightPx = when {
                 !integratedCaptionActive -> 0
