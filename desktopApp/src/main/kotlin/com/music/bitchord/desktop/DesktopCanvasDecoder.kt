@@ -80,6 +80,9 @@ internal class DesktopCanvasDecoder(
     override var frameTimeMs: Long = 0L
         private set
 
+    override var loopGeneration: Int = 0
+        private set
+
     /** Seconds per frame, from the stream's own rate; used to pace playback. */
     override var frameIntervalMillis: Long = 40L
         private set
@@ -93,11 +96,8 @@ internal class DesktopCanvasDecoder(
 
     override fun open(url: String, headers: Map<String, String>): Result<Unit> = runCatching {
         DesktopAudioDecoder.ensureNetworkReady()
-        val source = if (preferMotionRendition && url.substringBefore('?').endsWith(".m3u8", ignoreCase = true)) {
-            val key = "$maxEdge|$url"
-            val remembered = if (headers.isEmpty()) synchronized(variants) { variants[key] } else null
-            remembered ?: canvasGet(url, headers)?.let { selectContinuedArtistVariant(url, it, maxEdge) }
-                ?.also { if (headers.isEmpty()) synchronized(variants) { variants[key] = it } } ?: url
+        val source = if (isManifest(url) && url.startsWith("file:", ignoreCase = true)) {
+            java.nio.file.Path.of(java.net.URI.create(url)).toString()
         } else url
         val remoteStream = !loopAtEnd &&
             !isManifest(source) &&
@@ -139,10 +139,20 @@ internal class DesktopCanvasDecoder(
                 0,
             )
         }
+        val isLocalManifest = isManifest(source) && !source.startsWith("http://", ignoreCase = true) && !source.startsWith("https://", ignoreCase = true)
+        if (isLocalManifest) {
+            av_dict_set(options, "protocol_whitelist", "file,http,https,tcp,tls,crypto,data", 0)
+            av_dict_set(options, "allowed_extensions", "ALL", 0)
+        }
         av_dict_set(options, "rw_timeout", "15000000", 0)
 
+        val openTarget = when {
+            windowed -> null as String?
+            isLocalManifest -> source.replace('\\', '/')
+            else -> source
+        }
         val status = try {
-            avformat_open_input(opened, if (windowed) null as String? else source, null, options)
+            avformat_open_input(opened, openTarget, null, options)
         } finally { av_dict_free(options) }
         if (status < 0 && windowed && wrapper?.source?.unsupportedRange == true) {
             close()
@@ -187,6 +197,10 @@ internal class DesktopCanvasDecoder(
         if (!loopAtEnd) {
             context.thread_count(Runtime.getRuntime().availableProcessors().coerceIn(2, 6))
             context.thread_type(AVCodecContext.FF_THREAD_FRAME or AVCodecContext.FF_THREAD_SLICE)
+        } else if (maxOf(parameters.width(), parameters.height()) > maxEdge) {
+            // Two frame threads parallelize single-slice H.264 >540p clips with minimal buffer RAM.
+            context.thread_count(2)
+            context.thread_type(AVCodecContext.FF_THREAD_FRAME)
         }
         check(avcodec_open2(context, decoder, null as AVDictionary?) >= 0) { "decoder refused to open" }
 
@@ -213,8 +227,20 @@ internal class DesktopCanvasDecoder(
         frame = av_frame_alloc()
     }
 
-    /** Decode directly into immutable frame storage owned by Skia. */
-    override fun nextFrame(accept: (Long) -> Boolean): VideoFrame? {
+    override fun nextFrame(accept: (Long) -> Boolean): VideoFrame? =
+        decodeNext(rewindAtEnd = loopAtEnd, accept)?.let(::convertFrame)
+
+    suspend fun nextMotionFrame(
+        rewindAtEnd: Boolean,
+        accept: (Long) -> Boolean,
+        awaitPresentation: suspend () -> Unit,
+    ): VideoFrame? {
+        val decoded = decodeNext(rewindAtEnd, accept) ?: return null
+        awaitPresentation()
+        return convertFrame(decoded)
+    }
+
+    private fun decodeNext(rewindAtEnd: Boolean, accept: (Long) -> Boolean): AVFrame? {
         val container = format ?: return null
         val context = codec ?: return null
         val pkt = packet ?: return null
@@ -226,22 +252,11 @@ internal class DesktopCanvasDecoder(
                 frameTimeMs = if (decoded.best_effort_timestamp() != AV_NOPTS_VALUE) {
                     ((decoded.best_effort_timestamp() - streamStart) * timeBase * 1000).toLong()
                 } else frameTimeMs + frameIntervalMillis
-                if (!accept(frameTimeMs)) continue
-                val converter = scalerFor(decoded.format()) ?: return null
-                val info = checkNotNull(imageInfo)
-                val rowBytes = Math.multiplyExact(width, 4)
-                // swscale implementations may access padding beyond the last pixel.
-                return Data.makeUninitialized(Math.addExact(Math.multiplyExact(rowBytes, height), 64)).use { data ->
-                    destination.pointAt(data.writableData())
-                    val output = checkNotNull(planes)
-                    val lines = checkNotNull(strides)
-                    check(av_image_fill_arrays(output, lines, destination, AV_PIX_FMT_BGRA, width, height, 1) >= 0)
-                    check(sws_scale(converter, decoded.data(), decoded.linesize(), 0, sourceHeight, output, lines) == height)
-                    VideoFrame(width, height, Image.makeRaster(info, data, rowBytes))
-                }
+                if (accept(frameTimeMs)) return decoded
+                continue
             }
             if (draining) {
-                if (looped || !loopAtEnd || !seekTo(0)) return null
+                if (looped || !rewindAtEnd || !seekTo(0)) return null
                 looped = true
                 continue
             }
@@ -252,6 +267,25 @@ internal class DesktopCanvasDecoder(
             }
             if (pkt.stream_index() == streamIndex) avcodec_send_packet(context, pkt)
             av_packet_unref(pkt)
+        }
+    }
+
+    /** Convert only the selected frame into immutable storage owned by Skia. */
+    private fun convertFrame(decoded: AVFrame): VideoFrame? {
+        check(decoded.width() == sourceWidth && decoded.height() == sourceHeight) {
+            "motion video changed coded dimensions"
+        }
+        val converter = scalerFor(decoded.format()) ?: return null
+        val info = checkNotNull(imageInfo)
+        val rowBytes = Math.multiplyExact(width, 4)
+        // swscale implementations may access padding beyond the last pixel.
+        return Data.makeUninitialized(Math.addExact(Math.multiplyExact(rowBytes, height), 64)).use { data ->
+            destination.pointAt(data.writableData())
+            val output = checkNotNull(planes)
+            val lines = checkNotNull(strides)
+            check(av_image_fill_arrays(output, lines, destination, AV_PIX_FMT_BGRA, width, height, 1) >= 0)
+            check(sws_scale(converter, decoded.data(), decoded.linesize(), 0, sourceHeight, output, lines) == height)
+            VideoFrame(width, height, Image.makeRaster(info, data, rowBytes))
         }
     }
 
@@ -284,9 +318,13 @@ internal class DesktopCanvasDecoder(
         if (timeBase <= 0) return false
         readDeadline = System.nanoTime() + IO_TIMEOUT_NANOS
         val timestamp = (millis / 1000.0 / timeBase).toLong() + streamStart
-        if (av_seek_frame(opened, streamIndex, timestamp, AVSEEK_FLAG_BACKWARD) < 0) return false
+        val sought = av_seek_frame(opened, streamIndex, timestamp, AVSEEK_FLAG_BACKWARD) >= 0 ||
+            (millis == 0L && av_seek_frame(opened, -1, 0L, AVSEEK_FLAG_BACKWARD) >= 0)
+        if (!sought) return false
         avcodec_flush_buffers(context)
         draining = false
+        frameTimeMs = millis
+        if (millis == 0L) loopGeneration++
         return true
     }
 
@@ -319,10 +357,6 @@ internal class DesktopCanvasDecoder(
 
     companion object {
         private const val IO_TIMEOUT_NANOS = 15_000_000_000L
-        private val variants = object : LinkedHashMap<String, String>(64, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>) = size > 64
-        }
-
         /** Plenty for a sleeve, and a quarter of the pixels of the source. */
         const val MAX_EDGE = 540
 

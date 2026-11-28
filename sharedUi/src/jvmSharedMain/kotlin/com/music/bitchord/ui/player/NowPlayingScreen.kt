@@ -206,7 +206,7 @@ internal const val ART_RETRY_DELAY_MS = 1_500L
  * on it. Long enough to cover the album lookup on a normal connection, short
  * enough not to be noticed on a track that has no album to find.
  */
-internal const val ALBUM_SETTLE_MS = 700L
+internal const val ALBUM_SETTLE_MS = 60L
 
 /** Long enough for the post-upgrade rollback cue to be noticed without lingering. */
 private const val REVERT_CUE_MS = 2_600L

@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -107,6 +108,7 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
     if (!rendered) return
     val bottomFade = spec.bottomFade
     val bottomFadeEndPx = spec.bottomFadeEndPx
+    val fadeCache = remember(bottomFade, bottomFadeEndPx) { FadeBrushCache() }
     Canvas(
         modifier = modifier.graphicsLayer {
             this.alpha = alpha * presentationAlpha()
@@ -114,18 +116,20 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
             if (bottomFade > 0.001f) compositingStrategy = CompositingStrategy.Offscreen
         },
     ) {
-        val clipAspect = presentation.latest?.size?.let { it.width / it.height } ?: return@Canvas
-        val viewAspect = size.width / size.height
-        val fit = spec.contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f
-        val (drawWidth, drawHeight) = when {
-            fit && clipAspect > viewAspect -> size.width to size.width / clipAspect
-            fit -> size.height * clipAspect to size.height
-            clipAspect > viewAspect -> size.height * clipAspect to size.height
-            else -> size.width to size.width / clipAspect
-        }
-        val left = (size.width - drawWidth) / 2f
-        val top = if (fit && spec.alignPortraitTop) 0f else (size.height - drawHeight) / 2f
+        // Observe each frame's publication, then calculate the crop from the frame being drawn.
+        if (presentation.latest == null) return@Canvas
         presentation.withFrame { image ->
+            val clipAspect = image.width.toFloat() / image.height
+            val viewAspect = size.width / size.height
+            val fit = spec.contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f
+            val (drawWidth, drawHeight) = when {
+                fit && clipAspect > viewAspect -> size.width to size.width / clipAspect
+                fit -> size.height * clipAspect to size.height
+                clipAspect > viewAspect -> size.height * clipAspect to size.height
+                else -> size.width to size.width / clipAspect
+            }
+            val left = (size.width - drawWidth) / 2f
+            val top = if (fit && spec.alignPortraitTop) 0f else (size.height - drawHeight) / 2f
             val drawn = with(image) {
                 drawFrame(Rect.makeXYWH(left.roundToInt().toFloat(), top.roundToInt().toFloat(),
                     drawWidth.roundToInt().toFloat(), drawHeight.roundToInt().toFloat()))
@@ -135,16 +139,30 @@ internal fun DesktopCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
         if (bottomFade > 0.001f) {
             val endY = bottomFadeEndPx?.coerceIn(0f, size.height) ?: size.height
             drawRect(
-                brush = Brush.verticalGradient(
-                    0f to Color.Black,
-                    1f to Color.Transparent,
-                    startY = endY * (1f - bottomFade.coerceAtMost(1f)),
-                    endY = endY,
-                ),
+                brush = fadeCache.brushFor(size.height, bottomFade, endY),
                 topLeft = Offset.Zero,
                 size = size,
                 blendMode = BlendMode.DstIn,
             )
+        }
+    }
+}
+
+private class FadeBrushCache {
+    private var lastHeight = -1f
+    private var lastBrush: Brush? = null
+
+    fun brushFor(height: Float, bottomFade: Float, endY: Float): Brush {
+        val existing = lastBrush
+        if (existing != null && lastHeight == height) return existing
+        return Brush.verticalGradient(
+            0f to Color.Black,
+            1f to Color.Transparent,
+            startY = endY * (1f - bottomFade.coerceAtMost(1f)),
+            endY = endY,
+        ).also {
+            lastHeight = height
+            lastBrush = it
         }
     }
 }

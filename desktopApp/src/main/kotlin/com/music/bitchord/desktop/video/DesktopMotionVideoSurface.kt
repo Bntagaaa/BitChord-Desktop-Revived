@@ -90,7 +90,7 @@ internal fun DesktopMotionArtwork(
     } else modifier) {
         size?.let { dimensions ->
             val painter = remember(presentation, dimensions) {
-                VideoSurfacePainter(dimensions, { presentation.latest }, { presentation.withFrame(it) })
+                VideoSurfacePainter(dimensions, { presentation.latest }, { presentation.withFrame(read = it) })
             }
             Image(painter, null, Modifier.fillMaxSize(), contentScale = contentScale)
         }

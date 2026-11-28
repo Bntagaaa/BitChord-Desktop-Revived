@@ -2163,8 +2163,9 @@ internal fun BitChordDesktopApp(
         )
     }
 
-    LaunchedEffect(selectedSong?.videoId, selectedSong?.isVideo, animatedCanvas) {
-        val current = selectedSong
+    val canvasSong = selectedSong?.withDesktopPlayerMetadata(trackLinks)
+    LaunchedEffect(canvasSong?.videoId, canvasSong?.albumName, canvasSong?.isVideo, animatedCanvas) {
+        val current = canvasSong
         if (current == null || !animatedCanvas || current.isVideo) {
             canvas = null
             return@LaunchedEffect
@@ -2173,6 +2174,14 @@ internal fun BitChordDesktopApp(
         // resolved a minute ago should not go dark on its way back to the same clip.
         canvas = DesktopCanvasClient.cached(current)
         canvas = withContext(Dispatchers.IO) { DesktopCanvasClient.lookup(current) }
+    }
+
+    val nextQueueSong = liveQueue.songs.getOrNull(liveQueue.index + 1)
+    LaunchedEffect(nextQueueSong?.videoId, animatedCanvas) {
+        val upcoming = nextQueueSong ?: return@LaunchedEffect
+        if (!animatedCanvas || upcoming.isVideo) return@LaunchedEffect
+        delay(2_000L)
+        withContext(Dispatchers.IO) { DesktopCanvasClient.prefetch(upcoming, warmMedia = true) }
     }
 
 

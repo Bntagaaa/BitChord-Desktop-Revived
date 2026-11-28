@@ -103,6 +103,7 @@ private fun desktopMain(
         withContext(Dispatchers.IO) {
             runCatching { DesktopPresence.install(DesktopApplicationResources.owner) }
                 .onFailure { DesktopTrackLog.log("presence initialization failed: ${it.javaClass.simpleName}") }
+            DesktopAppleMusicCanvas.warmToken()
         }
     }
     // Closing puts the window away rather than ending the process, while there is a tray icon to

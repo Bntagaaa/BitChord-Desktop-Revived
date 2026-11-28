@@ -137,6 +137,93 @@ class DesktopCanvasTest {
         )
     }
 
+    @Test
+    fun `hlsFileFor selects smallest variant covering maxEdge and caches segments locally`() {
+        val server = com.sun.net.httpserver.HttpServer.create(java.net.InetSocketAddress("127.0.0.1", 0), 0)
+        val master = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=2160x2160,CODECS="avc1.640028"
+            high.m3u8
+            #EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=720x720,CODECS="avc1.4d401f"
+            mid.m3u8
+        """.trimIndent()
+        val midMedia = """
+            #EXTM3U
+            #EXT-X-TARGETDURATION:4
+            #EXT-X-MAP:URI="init.mp4"
+            #EXTINF:4.0,
+            seg1.m4s
+            #EXT-X-ENDLIST
+        """.trimIndent()
+        var highRequested = false
+        server.createContext("/master.m3u8") { ex ->
+            val bytes = master.toByteArray()
+            ex.sendResponseHeaders(200, bytes.size.toLong())
+            ex.responseBody.use { it.write(bytes) }
+        }
+        server.createContext("/high.m3u8") { ex ->
+            highRequested = true
+            ex.sendResponseHeaders(404, -1)
+            ex.close()
+        }
+        server.createContext("/mid.m3u8") { ex ->
+            val bytes = midMedia.toByteArray()
+            ex.sendResponseHeaders(200, bytes.size.toLong())
+            ex.responseBody.use { it.write(bytes) }
+        }
+        server.createContext("/init.mp4") { ex ->
+            val bytes = byteArrayOf(1, 2, 3, 4)
+            ex.sendResponseHeaders(200, bytes.size.toLong())
+            ex.responseBody.use { it.write(bytes) }
+        }
+        server.createContext("/seg1.m4s") { ex ->
+            val bytes = byteArrayOf(5, 6, 7, 8)
+            ex.sendResponseHeaders(200, bytes.size.toLong())
+            ex.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        val url = "http://127.0.0.1:${server.address.port}/master.m3u8"
+        val cached = try {
+            DesktopCanvasCache.hlsFileFor(url, 540)
+        } finally {
+            server.stop(0)
+        }
+        assertFalse(highRequested, "should not fetch 2160p variant when 720p covers 540px")
+        val playlist = kotlin.test.assertNotNull(cached)
+        assertTrue(java.nio.file.Files.isReadable(playlist))
+        val contents = java.nio.file.Files.readString(playlist)
+        assertFalse(contents.contains("http://"), "rewritten playlist must reference local files")
+        assertFalse(contents.contains("file:"), "FFmpeg must resolve sibling paths on Windows")
+        assertEquals(playlist, DesktopCanvasCache.hlsFileIfCached(url, 540), "second call should hit local cache")
+        assertEquals(playlist, DesktopCanvasCache.hlsFileFor(url, 540), "hlsFileFor should reuse local cache")
+    }
+
+    @Test
+    fun `DesktopCanvasDecoder loops across EOF and increments loopGeneration`() {
+        val fixture = checkNotNull(javaClass.getResourceAsStream("/video/red-h264.mp4")).use { it.readBytes() }
+        val temp = java.nio.file.Files.createTempFile("bitchord-loop-test-", ".mp4")
+        try {
+            java.nio.file.Files.write(temp, fixture)
+            DesktopCanvasDecoder(maxEdge = 540, loopAtEnd = true).use { decoder ->
+                decoder.open(temp.toAbsolutePath().toString()).getOrThrow()
+                assertEquals(0, decoder.loopGeneration)
+                var framesBeforeLoop = 0
+                var framesAfterLoop = 0
+                for (i in 0 until 120) {
+                    val frame = decoder.nextFrame() ?: break
+                    frame.close()
+                    if (decoder.loopGeneration == 0) framesBeforeLoop++ else framesAfterLoop++
+                    if (decoder.loopGeneration >= 2 && framesAfterLoop >= 2) break
+                }
+                assertTrue(framesBeforeLoop > 0, "should decode initial pass frames")
+                assertTrue(decoder.loopGeneration >= 1, "should seek to 0 at EOF and increment loopGeneration")
+                assertTrue(framesAfterLoop > 0, "should decode frames after looping")
+            }
+        } finally {
+            java.nio.file.Files.deleteIfExists(temp)
+        }
+    }
+
     private fun field(number: Int, value: String): ByteArray {
         val bytes = value.toByteArray(StandardCharsets.UTF_8)
         return byteArrayOf((number shl 3 or 2).toByte()) + varint(bytes.size) + bytes

@@ -14,9 +14,11 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.text.Normalizer
 import java.time.Duration
 import java.util.Locale
+import java.util.concurrent.locks.ReentrantLock
 
 /**
  * Where motion artwork comes from.
@@ -75,9 +77,7 @@ private val canvasClient: HttpClient = HttpClient.newBuilder()
     .build()
 
 /**
- * A plain GET returning the body, or null for anything that isn't a 2xx or that throws.
- *
- * Canvas is decoration: no provider failure is allowed to reach the player.
+ * A plain GET that returns null on a provider failure and preserves interruption for cancellation.
  */
 internal fun canvasGet(url: String, headers: Map<String, String> = emptyMap()): String? = runCatching {
     val builder = HttpRequest.newBuilder(URI.create(url))
@@ -86,7 +86,7 @@ internal fun canvasGet(url: String, headers: Map<String, String> = emptyMap()): 
     headers.forEach { (name, value) -> builder.header(name, value) }
     val response = canvasClient.send(builder.GET().build(), HttpResponse.BodyHandlers.ofString())
     if (response.statusCode() in 200..299) response.body() else null
-}.getOrNull()
+}.onFailure { if (it is InterruptedException) throw it }.getOrNull()
 
 private fun query(base: String, params: List<Pair<String, String>>): String =
     params.joinToString("&", prefix = "$base?") { (name, value) ->
@@ -152,6 +152,8 @@ internal object DesktopAppleMusicCanvas {
             score(song, title, artist, album)?.let { it to song }
         }.sortedByDescending { it.first }
 
+        val seenAlbums = HashSet<String>()
+        var albumFetches = 0
         for ((value, song) in ranked) {
             if (value < MIN_SCORE) break
             val attributes = song["attributes"]?.jsonObject ?: continue
@@ -169,7 +171,31 @@ internal object DesktopAppleMusicCanvas {
                     )
                 }
             }
+            // Expanded relationships from `include=albums` can also carry `editorialVideo`.
+            song["relationships"]?.jsonObject
+                ?.get("albums")?.jsonObject
+                ?.get("data")?.jsonArray?.firstOrNull()?.jsonObject
+                ?.let { relAlbum ->
+                    val relAttrs = relAlbum["attributes"]?.jsonObject
+                    val relAlbumName = relAttrs?.text("name").orEmpty()
+                    if (relAlbumName.isBlank() || !isCompilation(relAlbumName)) {
+                        relAttrs?.get("editorialVideo")?.jsonObject?.let { video ->
+                            motionUrls(video)?.let { (primary, alternate) ->
+                                return DesktopCanvasArtwork(
+                                    primary,
+                                    alternate,
+                                    songName,
+                                    songArtist ?: relAttrs.text("artistName"),
+                                    relAlbumName.ifBlank { attributes.text("albumName") },
+                                )
+                            }
+                        }
+                    }
+                }
             val albumId = albumId(song) ?: continue
+            if (!seenAlbums.add(albumId)) continue
+            if (albumFetches >= MAX_ALBUM_FETCHES && synchronized(albumCache) { !albumCache.containsKey(albumId) }) continue
+            albumFetches++
             fetchAlbum(albumId, bearer, songName, songArtist)?.let { return it }
         }
         return null
@@ -207,29 +233,67 @@ internal object DesktopAppleMusicCanvas {
         return null
     }
 
+    private data class CachedAlbumMotion(
+        val url: String,
+        val fallbackUrl: String?,
+        val albumName: String,
+        val artistName: String?,
+    )
+
+    private val albumCache = object : LinkedHashMap<String, CachedAlbumMotion?>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedAlbumMotion?>) = size > 64
+    }
+
     private fun fetchAlbum(
         albumId: String,
         bearer: String,
         songTitle: String?,
         songArtist: String?,
     ): DesktopCanvasArtwork? {
+        synchronized(albumCache) {
+            if (albumCache.containsKey(albumId)) {
+                return albumCache[albumId]?.let { cached ->
+                    DesktopCanvasArtwork(
+                        url = cached.url,
+                        fallbackUrl = cached.fallbackUrl,
+                        title = songTitle,
+                        artist = songArtist ?: cached.artistName,
+                        album = cached.albumName,
+                    )
+                }
+            }
+        }
         val url = query("$AMP/$storefront/albums/$albumId", listOf("extend" to "editorialVideo"))
         val album = parse(get(url, bearer))
             ?.get("data")?.jsonArray?.firstOrNull()?.jsonObject
             ?: return null
         val attributes = album["attributes"]?.jsonObject ?: return null
         val albumName = attributes.text("name").orEmpty()
-        if (isCompilation(albumName)) return null
-        val video = attributes["editorialVideo"]?.jsonObject ?: return null
-        val (primary, alternate) = motionUrls(video) ?: return null
+        if (isCompilation(albumName)) {
+            synchronized(albumCache) { albumCache[albumId] = null }
+            return null
+        }
+        val video = attributes["editorialVideo"]?.jsonObject
+        val urls = video?.let(::motionUrls)
+        if (urls == null) {
+            synchronized(albumCache) { albumCache[albumId] = null }
+            return null
+        }
+        val (primary, alternate) = urls
+        val artistName = attributes.text("artistName")
+        synchronized(albumCache) {
+            albumCache[albumId] = CachedAlbumMotion(primary, alternate, albumName, artistName)
+        }
         return DesktopCanvasArtwork(
             url = primary,
             fallbackUrl = alternate,
             title = songTitle,
-            artist = songArtist ?: attributes.text("artistName"),
+            artist = songArtist ?: artistName,
             album = albumName,
         )
     }
+
+    private const val MAX_ALBUM_FETCHES = 3
 
     private fun albumId(song: JsonObject): String? {
         song["relationships"]?.jsonObject
@@ -335,20 +399,74 @@ internal object DesktopAppleMusicCanvas {
     @Volatile private var cachedToken: String? = null
     @Volatile private var tokenExpiresAtMs = 0L
     @Volatile private var retryTokenAfterMs = 0L
+    private val rejected = mutableSetOf<String>()
+    private val tokenLock = ReentrantLock()
 
-    private fun get(url: String, bearer: String): String? = canvasGet(
-        url,
-        mapOf(
-            "Authorization" to "Bearer $bearer",
-            "Origin" to "https://music.apple.com",
-            "Referer" to "https://music.apple.com/",
-        ),
-    )
+    fun warmToken() {
+        runCatching { token() }
+    }
 
-    @Synchronized
-    private fun token(): String? {
+    private fun tokenCachePath() = DesktopMediaCache.directory.resolve("apple-canvas-token.txt")
+
+    private fun readPersistedToken(now: Long): Pair<String, Long>? = runCatching {
+        val path = tokenCachePath()
+        if (!Files.isReadable(path)) return null
+        val parts = Files.readString(path, StandardCharsets.UTF_8).trim().split('\n')
+        if (parts.size < 2) return null
+        val jwt = parts[0].trim()
+        val exp = parts[1].trim().toLongOrNull() ?: return null
+        if (jwt.isBlank() || jwt in rejected || now >= exp - 60_000L) return null
+        jwt to exp
+    }.getOrNull()
+
+    private fun persistToken(jwt: String, expiresAt: Long) {
+        runCatching { Files.writeString(tokenCachePath(), "$jwt\n$expiresAt", StandardCharsets.UTF_8) }
+    }
+
+    private fun get(url: String, bearer: String): String? = runCatching {
+        val request = HttpRequest.newBuilder(URI.create(url))
+            .timeout(Duration.ofSeconds(15))
+            .header("User-Agent", CANVAS_UA)
+            .header("Authorization", "Bearer $bearer")
+            .header("Origin", "https://music.apple.com")
+            .header("Referer", "https://music.apple.com/")
+            .GET()
+            .build()
+        val response = canvasClient.send(request, HttpResponse.BodyHandlers.ofString())
+        when {
+            response.statusCode() in 200..299 -> response.body()
+            response.statusCode() == 401 -> {
+                withTokenLock {
+                    rejected += bearer
+                    if (cachedToken == bearer) {
+                        cachedToken = null
+                        tokenExpiresAtMs = 0L
+                        runCatching { Files.deleteIfExists(tokenCachePath()) }
+                    }
+                }
+                null
+            }
+            else -> null
+        }
+    }.onFailure { if (it is InterruptedException) throw it }.getOrNull()
+
+    private inline fun <T> withTokenLock(action: () -> T): T {
+        tokenLock.lockInterruptibly()
+        try {
+            return action()
+        } finally {
+            tokenLock.unlock()
+        }
+    }
+
+    private fun token(): String? = withTokenLock {
         val now = System.currentTimeMillis()
-        cachedToken?.let { if (now < tokenExpiresAtMs - 60_000) return it }
+        cachedToken?.let { if (it !in rejected && now < tokenExpiresAtMs - 60_000) return it }
+        readPersistedToken(now)?.let { (jwt, exp) ->
+            cachedToken = jwt
+            tokenExpiresAtMs = exp
+            return jwt
+        }
         if (now < retryTokenAfterMs) return null
 
         val html = canvasGet(WEB_PLAYER)
@@ -363,6 +481,7 @@ internal object DesktopAppleMusicCanvas {
                 .findAll(script)
                 .map(MatchResult::value)
                 .distinct()
+                .filter { it !in rejected }
                 .mapNotNull { jwt -> expiry(jwt)?.let { jwt to it } }
                 .filter { it.second > now }
                 .toList()
@@ -370,6 +489,7 @@ internal object DesktopAppleMusicCanvas {
             val (jwt, expiresAt) = candidates.firstOrNull { isWebPlayerToken(it.first) } ?: candidates.first()
             cachedToken = jwt
             tokenExpiresAtMs = expiresAt
+            persistToken(jwt, expiresAt)
             return jwt
         }
         // A failed scrape backs off rather than retrying per track: if Apple has changed the page
