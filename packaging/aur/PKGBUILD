@@ -76,6 +76,8 @@ desktop_hint="$(printf '%s:%s:%s' "${XDG_CURRENT_DESKTOP:-}" "${XDG_SESSION_DESK
 case "$desktop_hint" in
   *niri*) export _JAVA_AWT_WM_NONREPARENTING=1 ;;
 esac
+# Cap glibc malloc arenas to limit per-thread native heap fragmentation across JVM/FFmpeg/Skiko/WebKit threads.
+export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}"
 exec /opt/bitchord-desktop-revived/bin/BitChord "$@"
 LAUNCHER
   chmod 755 "${pkgdir}/usr/bin/bitchord-desktop-revived"

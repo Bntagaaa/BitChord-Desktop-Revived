@@ -39,6 +39,9 @@ case "$desktop_hint" in
     *niri*) export _JAVA_AWT_WM_NONREPARENTING=1 ;;
 esac
 
+# Cap glibc malloc arenas to limit per-thread native heap fragmentation across JVM/FFmpeg/Skiko/WebKit threads.
+export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}"
+
 exec "$HERE/usr/bin/BitChord" "$@"
 APPRUN
 chmod +x "$APPDIR/AppRun"
